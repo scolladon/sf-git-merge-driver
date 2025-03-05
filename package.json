@@ -2,7 +2,7 @@
   "name": "sf-git-merge-driver",
   "description": "git remote add origin git@github.com:scolladon/sf-git-merge-driver.git",
   "version": "1.0.0",
-  "exports": "./lib/index.js",
+  "exports": "./lib/service/MergeDriver.js",
   "type": "module",
   "author": "Sébastien Colladon (colladonsebastien@gmail.com)",
   "repository": {
