@@ -1,0 +1,28 @@
+---
+name: Published release communication
+
+on:
+  release:
+    types:
+      - published
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: apexskier/github-release-commenter@v1
+        with:
+          GITHUB_TOKEN: ${{ github.token }}
+          comment-template: |
+            Shipped in [release `{release_tag}`]({release_link}).
+            Version `{release_tag}` will be assigned to the `latest` npm channel soon
+            Install it using either `{release_tag}` or the `latest-rc` npm channel
+            ```sh
+            $ sf plugins install sf-git-merge-driver@latest-rc
+            # Or
+            $ sf plugins install sf-git-merge-driver@{release_tag}
+            ```
+            💡 Enjoying sf-git-merge-driver?
+            Your contribution helps us provide fast support 🚀 and high quality features 🔥
+            Become a [sponsor](https://github.com/sponsors/scolladon) 💙
+            Happy zombies detection!

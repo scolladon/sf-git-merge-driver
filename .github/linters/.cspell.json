@@ -1,0 +1,13 @@
+{
+    "ignorePaths": [
+        "**/CHANGELOG.md",
+        "**/.git/**",
+        "**/megalinter.yml",
+        "**/node_modules/**",
+        "package-lock.json"
+    ],
+    "language": "en",
+    "noConfigSearch": true,
+    "version": "0.2",
+    "words": []
+}

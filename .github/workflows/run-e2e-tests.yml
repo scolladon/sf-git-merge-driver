@@ -1,0 +1,34 @@
+---
+name: E2E Tests a published version
+on:
+  workflow_call:
+    inputs:
+      channel:
+        type: string
+        default: latest-rc
+
+jobs:
+  e2e-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Set environment variables
+        run: |
+          echo "SF_DISABLE_AUTOUPDATE=true" >> "$GITHUB_ENV"
+          echo "SF_DISABLE_TELEMETRY=true" >> "$GITHUB_ENV"
+
+      - name: Install cli
+        run: npm install -g @salesforce/cli
+
+      - name: Install new plugin version
+        run: echo y | sf plugins install sf-git-merge-driver@${{ inputs.channel }}
+
+      - name: Test new plugin version installation
+        run: sf git merge driver --help
+
+      - name: E2E Tests
+        run: echo TODO
