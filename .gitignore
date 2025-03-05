@@ -1,0 +1,16 @@
+.sfdx
+.stryker-tmp
+.wireit
+*-debug.log
+*-error.log
+*.tgz
+/.nyc_output
+/lib
+/node_modules
+/reports
+install-state.gz
+megalinter-reports/
+perf-result.txt
+stderr*.txt
+stdout*.txt
+tsconfig.tsbuildinfo

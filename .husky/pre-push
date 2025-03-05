@@ -1,0 +1,5 @@
+npm pack
+npm run test
+npm outdated || true
+npm audit || true
+npm run lint:dependencies || true
