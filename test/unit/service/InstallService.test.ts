@@ -1,15 +1,16 @@
 import { appendFile } from 'node:fs/promises'
+import simpleGit from 'simple-git'
 import { InstallService } from '../../../src/service/installService.js'
 
-const mockedAddConfig = jest.fn()
-jest.mock('simple-git', () => {
-  return {
-    simpleGit: () => ({
-      addConfig: mockedAddConfig,
-    }),
-  }
-})
 jest.mock('node:fs/promises')
+jest.mock('simple-git')
+const mockedAddConfig = jest.fn()
+const simpleGitMock = simpleGit as jest.Mock
+simpleGitMock.mockReturnValue({
+  addConfig: mockedAddConfig,
+})
+
+const appendFileMocked = jest.mocked(appendFile)
 
 describe('InstallService', () => {
   let sut: InstallService // System Under Test
@@ -25,8 +26,8 @@ describe('InstallService', () => {
 
     // Assert
     expect(mockedAddConfig).toHaveBeenCalledTimes(3)
-    expect(appendFile).toHaveBeenCalledTimes(1)
-    expect(appendFile).toHaveBeenCalledWith(
+    expect(appendFileMocked).toHaveBeenCalledTimes(1)
+    expect(appendFileMocked).toHaveBeenCalledWith(
       '.gitattributes',
       expect.stringContaining('*.xml merge=salesforce-source\n'),
       { flag: 'a' }
