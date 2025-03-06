@@ -1,14 +1,13 @@
 import { execSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 import { execCmd } from '@salesforce/cli-plugins-testkit'
 import { expect } from 'chai'
 import { after, before, describe, it } from 'mocha'
 import { DRIVER_NAME } from '../../src/constant/driverConstant.js'
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const ROOT_FOLDER = join(__dirname, '../data')
+const ROOT_FOLDER = './test/data'
+const binaryPath = 'node_modules/.bin/sf-git-merge-driver'
 
 describe('git merge driver install', () => {
   before(() => {
@@ -22,10 +21,11 @@ describe('git merge driver install', () => {
     execSync('rm -rf .git', {
       cwd: ROOT_FOLDER,
     })
-
-    const gitattributesPath = join(ROOT_FOLDER, '.gitattributes')
-    if (existsSync(gitattributesPath)) {
-      execSync(`rm ${gitattributesPath}`, {
+    execSync('rm -rf node_modules', {
+      cwd: ROOT_FOLDER,
+    })
+    if (existsSync(join(ROOT_FOLDER, '.gitattributes'))) {
+      execSync(`rm .gitattributes`, {
         cwd: ROOT_FOLDER,
       })
     }
@@ -51,9 +51,13 @@ describe('git merge driver install', () => {
     const gitConfigOutput = execSync('git config --list', {
       cwd: ROOT_FOLDER,
     }).toString()
-    expect(gitConfigOutput).to.include(`merge.${DRIVER_NAME}.name`)
-    expect(gitConfigOutput).to.include(`merge.${DRIVER_NAME}.driver`)
-    expect(gitConfigOutput).to.include(`merge.${DRIVER_NAME}.recursive`)
+    expect(gitConfigOutput).to.include(
+      `merge.${DRIVER_NAME}.name=Salesforce source merge driver`
+    )
+    expect(gitConfigOutput).to.include(
+      `merge.${DRIVER_NAME}.driver=${binaryPath} %O %A %B %P`
+    )
+    expect(gitConfigOutput).to.include(`merge.${DRIVER_NAME}.recursive=true`)
   })
 
   it('reinstalls merge driver correctly', () => {
@@ -76,8 +80,12 @@ describe('git merge driver install', () => {
     const gitConfigOutput = execSync('git config --list', {
       cwd: ROOT_FOLDER,
     }).toString()
-    expect(gitConfigOutput).to.include(`merge.${DRIVER_NAME}.name`)
-    expect(gitConfigOutput).to.include(`merge.${DRIVER_NAME}.driver`)
-    expect(gitConfigOutput).to.include(`merge.${DRIVER_NAME}.recursive`)
+    expect(gitConfigOutput).to.include(
+      `merge.${DRIVER_NAME}.name=Salesforce source merge driver`
+    )
+    expect(gitConfigOutput).to.include(
+      `merge.${DRIVER_NAME}.driver=${binaryPath} %O %A %B %P`
+    )
+    expect(gitConfigOutput).to.include(`merge.${DRIVER_NAME}.recursive=true`)
   })
 })

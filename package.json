@@ -2,7 +2,10 @@
   "name": "sf-git-merge-driver",
   "description": "git remote add origin git@github.com:scolladon/sf-git-merge-driver.git",
   "version": "1.0.0",
-  "exports": "./lib/service/MergeDriver.js",
+  "exports": "./lib/driver/MergeDriver.js",
+  "bin": {
+    "sf-git-merge-driver": "./lib/index.js"
+  },
   "type": "module",
   "author": "Sébastien Colladon (colladonsebastien@gmail.com)",
   "repository": {
@@ -33,6 +36,7 @@
     "oclif": "^4.17.34",
     "shx": "^0.3.4",
     "ts-jest": "^29.2.6",
+    "ts-jest-mock-import-meta": "^1.2.1",
     "ts-node": "^10.9.2",
     "tslib": "^2.8.1",
     "typescript": "^5.8.2",
@@ -46,7 +50,8 @@
     "/messages",
     "/npm-shrinkwrap.json",
     "/oclif.manifest.json",
-    "/oclif.lock"
+    "/oclif.lock",
+    "/bin"
   ],
   "keywords": [
     "sf",
