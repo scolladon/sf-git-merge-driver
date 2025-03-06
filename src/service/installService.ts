@@ -14,7 +14,7 @@ export class InstallService {
       `merge.${DRIVER_NAME}.driver`,
       'node ${__dirname}/index.js %O %A %B %P' // TODO define how to do that
     )
-    await git.addConfig(`merge.${DRIVER_NAME}.recursive`, 'true') // TO CHALLENGE
+    await git.addConfig(`merge.${DRIVER_NAME}.recursive`, 'true') // TO CHALLENGE if needed
 
     const content =
       ['*.xml'].map(pattern => `${pattern} merge=${DRIVER_NAME}`).join('\n') +

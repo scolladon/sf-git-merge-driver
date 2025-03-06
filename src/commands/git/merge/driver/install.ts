@@ -15,7 +15,10 @@ export default class Install extends SfCommand<void> {
   public static override readonly flags = {}
 
   public async run(): Promise<void> {
-    await new UninstallService().uninstallMergeDriver()
+    try {
+      await new UninstallService().uninstallMergeDriver()
+      // biome-ignore lint/suspicious/noEmptyBlockStatements: <explanation>
+    } catch {}
     await new InstallService().installMergeDriver()
   }
 }

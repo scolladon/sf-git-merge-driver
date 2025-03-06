@@ -7,7 +7,10 @@ const MERGE_DRIVER_CONFIG = new RegExp(`.* merge\\s*=\\s*${DRIVER_NAME}$`)
 export class UninstallService {
   public async uninstallMergeDriver() {
     const git = simpleGit()
-    await git.raw(['config', '--remove-section', `merge.${DRIVER_NAME}`])
+    try {
+      await git.raw(['config', '--remove-section', `merge.${DRIVER_NAME}`])
+      // biome-ignore lint/suspicious/noEmptyBlockStatements: <explanation>
+    } catch {}
 
     const gitAttributes = await readFile('.gitattributes', {
       encoding: 'utf8',
