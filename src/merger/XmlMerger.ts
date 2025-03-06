@@ -1,5 +1,5 @@
 import { XMLBuilder, XMLParser } from 'fast-xml-parser'
-import { JsonMergeService } from './JsonMergeService.js'
+import { JsonMerger } from './JsonMerger.js'
 
 const options = {
   attributeNamePrefix: '@_',
@@ -16,7 +16,7 @@ const options = {
   trimValues: true,
 }
 
-export class XmlMergeService {
+export class XmlMerger {
   async tripartXmlMerge(
     ancestorContent: string,
     ourContent: string,
@@ -30,12 +30,8 @@ export class XmlMergeService {
 
     // Perform deep merge of XML objects
 
-    const jsonMergeService = new JsonMergeService()
-    const mergedObj = jsonMergeService.mergeObjects(
-      ancestorObj,
-      ourObj,
-      theirObj
-    )
+    const jsonMerger = new JsonMerger()
+    const mergedObj = jsonMerger.mergeObjects(ancestorObj, ourObj, theirObj)
 
     // Convert back to XML and format
     const builder = new XMLBuilder(options)

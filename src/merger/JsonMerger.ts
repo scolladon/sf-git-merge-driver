@@ -1,4 +1,4 @@
-export class JsonMergeService {
+export class JsonMerger {
   // Deep merge function for objects
   mergeObjects(ancestor, ours, theirs) {
     // If types don't match, prefer our version

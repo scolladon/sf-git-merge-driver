@@ -1,10 +1,10 @@
-import { JsonMergeService } from '../../../src/service/JsonMergeService.js'
+import { JsonMerger } from '../../../src/merger/JsonMerger.js'
 
-describe('JsonMergeService', () => {
-  let sut: JsonMergeService
+describe('JsonMerger', () => {
+  let sut: JsonMerger
 
   beforeEach(() => {
-    sut = new JsonMergeService()
+    sut = new JsonMerger()
   })
 
   it('should merge two JSON objects with no conflicts', async () => {

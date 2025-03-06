@@ -1,6 +1,6 @@
 import { XMLBuilder, XMLParser } from 'fast-xml-parser'
-import { JsonMergeService } from '../../../src/service/JsonMergeService.js'
-import { XmlMergeService } from '../../../src/service/XmlMergeService.js'
+import { JsonMerger } from '../../../src/merger/JsonMerger.js'
+import { XmlMerger } from '../../../src/merger/XmlMerger.js'
 
 jest.mock('fast-xml-parser', () => {
   return {
@@ -18,9 +18,9 @@ jest.mock('fast-xml-parser', () => {
 })
 
 const mockedMergeObjects = jest.fn()
-jest.mock('../../../src/service/JsonMergeService.js', () => {
+jest.mock('../../../src/merger/JsonMerger.js', () => {
   return {
-    JsonMergeService: jest.fn().mockImplementation(() => {
+    JsonMerger: jest.fn().mockImplementation(() => {
       return {
         mergeObjects: mockedMergeObjects,
       }
@@ -29,10 +29,10 @@ jest.mock('../../../src/service/JsonMergeService.js', () => {
 })
 
 describe('MergeDriver', () => {
-  let sut: XmlMergeService
+  let sut: XmlMerger
 
   beforeEach(() => {
-    sut = new XmlMergeService()
+    sut = new XmlMerger()
   })
 
   describe('tripartXmlMerge', () => {
@@ -43,7 +43,7 @@ describe('MergeDriver', () => {
       // Assert
       expect(XMLParser).toHaveBeenCalledTimes(1)
       expect(XMLBuilder).toHaveBeenCalledTimes(1)
-      expect(JsonMergeService).toHaveBeenCalledTimes(1)
+      expect(JsonMerger).toHaveBeenCalledTimes(1)
     })
 
     it('should throw an error when tripartXmlMerge fails', async () => {

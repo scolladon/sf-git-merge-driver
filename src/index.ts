@@ -1,5 +1,5 @@
 #!/usr/bin/env -S NODE_OPTIONS="--no-warnings=ExperimentalWarning" npx ts-node --project tsconfig.json --esm
-import { MergeDriver } from './service/MergeDriver.js'
+import { MergeDriver } from './driver/MergeDriver.js'
 
 if (process.argv.length >= 6) {
   const [, , ancestorFile, ourFile, theirFile, outputFile] = process.argv

@@ -1,5 +1,5 @@
 import { readFile, writeFile } from 'node:fs/promises'
-import { XmlMergeService } from './XmlMergeService.js'
+import { XmlMerger } from '../merger/XmlMerger.js'
 
 export class MergeDriver {
   async mergeFiles(ancestorFile, ourFile, theirFile, outputFile) {
@@ -10,9 +10,9 @@ export class MergeDriver {
       readFile(theirFile, 'utf8'),
     ])
 
-    const mergeService = new XmlMergeService()
+    const xmlMerger = new XmlMerger()
 
-    const mergedContent = await mergeService.tripartXmlMerge(
+    const mergedContent = await xmlMerger.tripartXmlMerge(
       ancestorContent,
       ourContent,
       theirContent

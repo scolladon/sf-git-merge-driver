@@ -1,4 +1,4 @@
-import { MergeDriver } from '../../../src/service/MergeDriver.js'
+import { MergeDriver } from '../../../src/driver/MergeDriver.js'
 
 const mockReadFile = jest.fn()
 const mockWriteFile = jest.fn()
@@ -8,8 +8,8 @@ jest.mock('node:fs/promises', () => ({
 }))
 
 const mockedTripartXmlMerge = jest.fn()
-jest.mock('../../../src/service/XmlMergeService.js', () => ({
-  XmlMergeService: jest.fn(() => ({
+jest.mock('../../../src/merger/XmlMerger.js', () => ({
+  XmlMerger: jest.fn(() => ({
     tripartXmlMerge: mockedTripartXmlMerge,
   })),
 }))
