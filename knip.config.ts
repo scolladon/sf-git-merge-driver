@@ -8,7 +8,7 @@ export default {
     '**/*.{nut,test}.ts',
     '.github/**/*.yml',
   ],
-  project: ['**/*.{ts,js,json,yml}'],
+  project: ['**/*.{ts,js,json,yml}', '!src/index.ts'],
   ignoreDependencies: [
     '@commitlint/config-conventional',
     'ts-jest-mock-import-meta',

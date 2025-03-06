@@ -1,132 +1,138 @@
-export class JsonMerger {
-  // Deep merge function for objects
-  mergeObjects(ancestor, ours, theirs) {
-    // If types don't match, prefer our version
-    if (
-      typeof ours !== typeof theirs ||
-      Array.isArray(ours) !== Array.isArray(theirs)
-    ) {
-      return ours
-    }
+type JsonValue = string | number | boolean | null | JsonObject | JsonArray
+interface JsonObject {
+  [key: string]: JsonValue
+}
+interface JsonArray extends Array<JsonValue> {}
 
-    // Handle arrays - special case for Salesforce metadata
-    if (Array.isArray(ours)) {
-      return this.mergeArrays(ancestor, ours, theirs)
+export class JsonMerger {
+  private readonly idFields = [
+    'fullName',
+    'name',
+    'field',
+    'label',
+    'id',
+    '@_name',
+  ]
+
+  mergeObjects(
+    ancestor: JsonValue | undefined,
+    ours: JsonValue,
+    theirs: JsonValue
+  ): JsonValue {
+    // Handle null/undefined cases
+    if (ours === null || theirs === null) return ours ?? theirs
+    if (typeof ours !== typeof theirs) return ours
+
+    // Handle arrays (special case for Salesforce metadata)
+    if (Array.isArray(ours) && Array.isArray(theirs)) {
+      return this.mergeArrays(
+        Array.isArray(ancestor) ? ancestor : undefined,
+        ours,
+        theirs
+      )
     }
 
     // Handle objects
-    if (typeof ours === 'object' && ours !== null) {
-      const result = { ...ours }
+    if (typeof ours === 'object' && typeof theirs === 'object') {
+      const result = { ...ours } as JsonObject
+      const ancestorObj = (ancestor ?? {}) as JsonObject
+      const theirsObj = theirs as JsonObject
 
       // Process all keys from both objects
-      const allKeys = new Set([
-        ...Object.keys(ours || {}),
-        ...Object.keys(theirs || {}),
-      ])
+      const allKeys = new Set([...Object.keys(ours), ...Object.keys(theirs)])
 
       for (const key of allKeys) {
-        // If key exists only in theirs, add it
-        if (!(key in ours)) {
-          result[key] = theirs[key]
+        if (!(key in theirsObj)) continue // Keep our version
+        if (!(key in result)) {
+          result[key] = theirsObj[key] // Take their version
           continue
         }
 
-        // If key exists only in ours, keep it
-        if (!(key in theirs)) {
-          continue
-        }
-
-        // If key exists in both, recursively merge
-        const ancestorValue = ancestor && ancestor[key]
-        result[key] = this.mergeObjects(ancestorValue, ours[key], theirs[key])
+        // Recursively merge when both have the key
+        result[key] = this.mergeObjects(
+          ancestorObj[key],
+          result[key],
+          theirsObj[key]
+        )
       }
-
       return result
     }
 
-    // For primitive values, check if they changed from ancestor
-    if (theirs !== ancestor && ours === ancestor) {
-      // They changed it, we didn't - use their change
-      return theirs
-    }
-
-    // In all other cases, prefer our version
-    return ours
+    // For primitive values, use their changes if we didn't modify from ancestor
+    if (theirs !== ancestor && ours === ancestor) return theirs
+    return ours // Default to our version
   }
 
-  // Special handling for Salesforce metadata arrays
-  mergeArrays(ancestor, ours, theirs) {
-    // For Salesforce metadata, arrays often contain objects with unique identifiers
-    // Try to match items by common identifier fields
-    const idFields = ['fullName', 'name', 'field', 'label', 'id', '@_name']
-
-    // Find a common identifier field that exists in the arrays
-    const idField = idFields.find(
+  private mergeArrays(
+    ancestor: JsonArray | undefined,
+    ours: JsonArray,
+    theirs: JsonArray
+  ): JsonArray {
+    // Find the first matching ID field that exists in both arrays
+    const idField = this.idFields.find(
       field =>
-        ours.some(item => item && typeof item === 'object' && field in item) &&
-        theirs.some(item => item && typeof item === 'object' && field in item)
+        ours.some(item => this.hasIdField(item, field)) &&
+        theirs.some(item => this.hasIdField(item, field))
     )
 
-    if (idField) {
-      // If we found a common identifier, merge by that field
-      const result = [...ours]
+    if (!idField) return ours // No common identifier, keep our version
 
-      // Create maps for faster lookups
-      const ourMap = new Map(
-        ours
-          .filter(item => item && typeof item === 'object' && idField in item)
-          .map(item => [item[idField], item])
-      )
+    // Create lookup maps
+    const ourMap = this.createIdMap(ours, idField)
+    const theirMap = this.createIdMap(theirs, idField)
+    const ancestorMap = ancestor
+      ? this.createIdMap(ancestor, idField)
+      : new Map()
 
-      const ancestorMap =
-        ancestor && Array.isArray(ancestor)
-          ? new Map(
-              ancestor
-                .filter(
-                  item => item && typeof item === 'object' && idField in item
-                )
-                .map(item => [item[idField], item])
-            )
-          : new Map()
+    const result = [...ours]
+    const processed = new Set<string>()
 
-      // Process items from their version
-      for (const theirItem of theirs) {
-        if (
-          theirItem &&
-          typeof theirItem === 'object' &&
-          idField in theirItem
-        ) {
-          const id = theirItem[idField]
-
-          if (ourMap.has(id)) {
-            // Item exists in both versions, merge them
-            const ourItem = ourMap.get(id)
-            const ancestorItem = ancestorMap.get(id)
-
-            // Find the index in our array
-            const index = result.findIndex(
-              item => item && typeof item === 'object' && item[idField] === id
-            )
-
-            if (index !== -1) {
-              // Replace with merged item
-              result[index] = this.mergeObjects(
-                ancestorItem,
-                ourItem,
-                theirItem
-              )
-            }
-          } else {
-            // Item only exists in their version, add it
-            result.push(theirItem)
-          }
+    // Process all items from both arrays
+    for (const [id, ourItem] of ourMap) {
+      const theirItem = theirMap.get(id)
+      if (theirItem) {
+        // Item exists in both versions, merge them
+        const index = result.findIndex(
+          item => this.hasIdField(item, idField) && item[idField] === id
+        )
+        if (index !== -1) {
+          result[index] = this.mergeObjects(
+            ancestorMap.get(id),
+            ourItem,
+            theirItem
+          )
         }
       }
-
-      return result
+      processed.add(id)
     }
 
-    // If no common identifier found, default to our version
-    return ours
+    // Add items that only exist in their version
+    for (const [id, theirItem] of theirMap) {
+      if (!processed.has(id)) {
+        result.push(theirItem)
+      }
+    }
+
+    return result
+  }
+
+  private hasIdField(item: JsonValue, field: string): item is JsonObject {
+    return (
+      item !== null &&
+      typeof item === 'object' &&
+      !Array.isArray(item) &&
+      field in item
+    )
+  }
+
+  private createIdMap(
+    arr: JsonArray,
+    idField: string
+  ): Map<string, JsonObject> {
+    return new Map(
+      arr
+        .filter(item => this.hasIdField(item, idField))
+        .map(item => [String(item[idField]), item])
+    )
   }
 }
