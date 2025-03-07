@@ -2,13 +2,12 @@
     "threshold": 0,
     "reporters": ["html", "markdown"],
     "ignore": [
-      "**/node_modules/**",
-      "**/.git/**",
-      "**/*cache*/**",
-      "**/.github/**",
-      "**/report/**",
-      "**/img/**",
-      "**/__tests__/**",
-      "**/*.md"
+      ".git/**",
+      ".github/**",
+      "**/*.md",
+      "node_modules/**",
+      "reports/**",
+      "src/commands/**",
+      "test/**"
     ]
   }
