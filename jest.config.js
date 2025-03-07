@@ -72,23 +72,12 @@ export default {
 
   // A map from regular expressions to paths to transformers
   transform: {
-    '\\.ts$': ['ts-jest', {
-      diagnostics: {
-        ignoreCodes: [1343]
+    '\\.ts$': [
+      'ts-jest',
+      {
+        tsconfig: './tsconfig.json',
       },
-      astTransformers: {
-        before: [
-          {
-            path: 'ts-jest-mock-import-meta',
-            options: { 
-              metaObjectReplacement: { 
-                url: 'file:///mock/test'
-              } 
-            }
-          }
-        ]
-      },
-     tsconfig: './tsconfig.json' }],
+    ],
   },
   extensionsToTreatAsEsm: ['.ts'],
   // A map from regular expressions to module names that allow to stub out resources with a single module

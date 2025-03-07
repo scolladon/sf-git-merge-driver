@@ -19,6 +19,7 @@ sf plugins install sf-git-merge-driver
 
 <!-- commands -->
 * [`sf git merge driver install`](#sf-git-merge-driver-install)
+* [`sf git merge driver run`](#sf-git-merge-driver-run)
 * [`sf git merge driver uninstall`](#sf-git-merge-driver-uninstall)
 
 ## `sf git merge driver install`
@@ -47,6 +48,44 @@ EXAMPLES
 ```
 
 _See code: [src/commands/git/merge/driver/install.ts](https://github.com/scolladon/sf-git-merge-driver/blob/main/src/commands/git/merge/driver/install.ts)_
+
+## `sf git merge driver run`
+
+Runs the merge driver for the specified files.
+
+```
+USAGE
+  $ sf git merge driver run -a <value> -o <value> -t <value> -p <value> [--json] [--flags-dir <value>]
+
+FLAGS
+  -a, --ancestor-file=<value>  (required) path to the common ancestor version of the file
+  -o, --our-file=<value>       (required) path to our version of the file
+  -p, --output-file=<value>    (required) path to the file where the merged content will be written
+  -t, --theirs-file=<value>    (required) path to their version of the file
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Runs the merge driver for the specified files.
+
+  Runs the merge driver for the specified files, handling the merge conflict resolution using Salesforce-specific merge
+  strategies. This command is typically called automatically by Git when a merge conflict is detected.
+
+EXAMPLES
+  Run the merge driver for conflicting files:
+
+    $ sf git merge driver run --ancestor-file=<value> --our-file=<value> --theirs-file=<value> --output-file=<value>
+
+  Where:
+  - ancestor-file is the path to the common ancestor version of the file
+  - our-file is the path to our version of the file
+  - their-file is the path to their version of the file
+  - output-file is the path to the file where the merged content will be written
+```
+
+_See code: [src/commands/git/merge/driver/run.ts](https://github.com/scolladon/sf-git-merge-driver/blob/main/src/commands/git/merge/driver/run.ts)_
 
 ## `sf git merge driver uninstall`
 

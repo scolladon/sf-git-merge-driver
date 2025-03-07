@@ -4,10 +4,12 @@ import { join } from 'node:path'
 import { execCmd } from '@salesforce/cli-plugins-testkit'
 import { expect } from 'chai'
 import { after, before, describe, it } from 'mocha'
-import { DRIVER_NAME } from '../../src/constant/driverConstant.js'
+import {
+  DRIVER_NAME,
+  RUN_PLUGIN_COMMAND,
+} from '../../src/constant/driverConstant.js'
 
 const ROOT_FOLDER = './test/data'
-const binaryPath = 'node_modules/.bin/sf-git-merge-driver'
 
 describe('git merge driver install', () => {
   before(() => {
@@ -46,7 +48,7 @@ describe('git merge driver install', () => {
     expect(existsSync(gitattributesPath)).to.be.true
 
     const gitattributesContent = readFileSync(gitattributesPath, 'utf-8')
-    expect(gitattributesContent).to.include('*.xml merge=salesforce-source')
+    expect(gitattributesContent).to.include(`*.xml merge=${DRIVER_NAME}`)
 
     const gitConfigOutput = execSync('git config --list', {
       cwd: ROOT_FOLDER,
@@ -55,7 +57,7 @@ describe('git merge driver install', () => {
       `merge.${DRIVER_NAME}.name=Salesforce source merge driver`
     )
     expect(gitConfigOutput).to.include(
-      `merge.${DRIVER_NAME}.driver=${binaryPath} %O %A %B %P`
+      `merge.${DRIVER_NAME}.driver=${RUN_PLUGIN_COMMAND} --ancestor-file %O --our-file %A --theirs-file %B --output-file %P`
     )
     expect(gitConfigOutput).to.include(`merge.${DRIVER_NAME}.recursive=true`)
   })
@@ -75,7 +77,7 @@ describe('git merge driver install', () => {
     expect(existsSync(gitattributesPath)).to.be.true
 
     const gitattributesContent = readFileSync(gitattributesPath, 'utf-8')
-    expect(gitattributesContent).to.include('*.xml merge=salesforce-source')
+    expect(gitattributesContent).to.include(`*.xml merge=${DRIVER_NAME}`)
 
     const gitConfigOutput = execSync('git config --list', {
       cwd: ROOT_FOLDER,
@@ -84,7 +86,7 @@ describe('git merge driver install', () => {
       `merge.${DRIVER_NAME}.name=Salesforce source merge driver`
     )
     expect(gitConfigOutput).to.include(
-      `merge.${DRIVER_NAME}.driver=${binaryPath} %O %A %B %P`
+      `merge.${DRIVER_NAME}.driver=${RUN_PLUGIN_COMMAND} --ancestor-file %O --our-file %A --theirs-file %B --output-file %P`
     )
     expect(gitConfigOutput).to.include(`merge.${DRIVER_NAME}.recursive=true`)
   })

@@ -1,18 +1,15 @@
 export default {
   packageManager: 'npm',
   entry: [
-    'src/commands/git/merge/driver/install.ts',
-    'src/commands/git/merge/driver/uninstall.ts',
+    '.github/**/*.yml',
+    '**/*.{nut,test}.ts',
     'bin/dev.js',
     'bin/run.js',
-    '**/*.{nut,test}.ts',
-    '.github/**/*.yml',
+    'src/commands/git/merge/driver/install.ts',
+    'src/commands/git/merge/driver/run.ts',
+    'src/commands/git/merge/driver/uninstall.ts',
   ],
   project: ['**/*.{ts,js,json,yml}', '!src/index.ts'],
-  ignoreDependencies: [
-    '@commitlint/config-conventional',
-    'ts-jest-mock-import-meta',
-    'ts-node',
-  ],
+  ignoreDependencies: ['@commitlint/config-conventional', 'ts-node'],
   ignoreBinaries: ['commitlint', 'npm-check-updates'],
 }

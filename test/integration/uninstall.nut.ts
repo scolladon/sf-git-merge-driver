@@ -1,14 +1,12 @@
 import { execSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 import { execCmd } from '@salesforce/cli-plugins-testkit'
 import { expect } from 'chai'
 import { after, before, describe, it } from 'mocha'
 import { DRIVER_NAME } from '../../src/constant/driverConstant.js'
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const ROOT_FOLDER = join(__dirname, '../data')
+const ROOT_FOLDER = './test/data'
 
 describe('git merge driver uninstall', () => {
   before(() => {
@@ -23,12 +21,9 @@ describe('git merge driver uninstall', () => {
       cwd: ROOT_FOLDER,
     })
 
-    const gitattributesPath = join(ROOT_FOLDER, '.gitattributes')
-    if (existsSync(gitattributesPath)) {
-      execSync(`rm ${gitattributesPath}`, {
-        cwd: ROOT_FOLDER,
-      })
-    }
+    execSync('rm .gitattributes', {
+      cwd: ROOT_FOLDER,
+    })
   })
 
   it('uninstalls merge driver correctly', () => {
@@ -49,7 +44,7 @@ describe('git merge driver uninstall', () => {
     expect(existsSync(gitattributesPath)).to.be.true
 
     const gitattributesContent = readFileSync(gitattributesPath, 'utf-8')
-    expect(gitattributesContent).not.to.include('*.xml merge=salesforce-source')
+    expect(gitattributesContent).not.to.include(`*.xml merge=${DRIVER_NAME}`)
 
     const gitConfigOutput = execSync('git config --list', {
       cwd: ROOT_FOLDER,
@@ -60,9 +55,6 @@ describe('git merge driver uninstall', () => {
   })
 
   it('uninstalls does nothing when not installed', () => {
-    // Arrange
-    // No setup needed as we're testing the case where nothing is installed
-
     // Act
     execCmd('git merge driver uninstall', {
       ensureExitCode: 0,
@@ -74,7 +66,7 @@ describe('git merge driver uninstall', () => {
     expect(existsSync(gitattributesPath)).to.be.true
 
     const gitattributesContent = readFileSync(gitattributesPath, 'utf-8')
-    expect(gitattributesContent).not.to.include('*.xml merge=salesforce-source')
+    expect(gitattributesContent).not.to.include(`*.xml merge=${DRIVER_NAME}`)
 
     const gitConfigOutput = execSync('git config --list', {
       cwd: ROOT_FOLDER,

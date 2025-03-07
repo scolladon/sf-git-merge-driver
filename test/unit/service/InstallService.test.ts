@@ -1,6 +1,9 @@
-import { appendFile, chmod, copyFile, mkdir } from 'node:fs/promises'
+import { appendFile } from 'node:fs/promises'
 import simpleGit from 'simple-git'
-import { DRIVER_NAME } from '../../../src/constant/driverConstant.js'
+import {
+  DRIVER_NAME,
+  RUN_PLUGIN_COMMAND,
+} from '../../../src/constant/driverConstant.js'
 import { InstallService } from '../../../src/service/installService.js'
 
 jest.mock('node:fs/promises')
@@ -13,9 +16,6 @@ simpleGitMock.mockReturnValue({
 })
 
 const appendFileMocked = jest.mocked(appendFile)
-const chmodMocked = jest.mocked(chmod)
-const copyFileMocked = jest.mocked(copyFile)
-const mkdirMocked = jest.mocked(mkdir)
 
 describe('InstallService', () => {
   let sut: InstallService // System Under Test
@@ -39,7 +39,7 @@ describe('InstallService', () => {
     )
     expect(mockedAddConfig).toHaveBeenCalledWith(
       `merge.${DRIVER_NAME}.driver`,
-      'node_modules/.bin/sf-git-merge-driver %O %A %B %P'
+      `${RUN_PLUGIN_COMMAND} --ancestor-file %O --our-file %A --theirs-file %B --output-file %P`
     )
     expect(mockedAddConfig).toHaveBeenCalledWith(
       `merge.${DRIVER_NAME}.recursive`,
@@ -50,21 +50,6 @@ describe('InstallService', () => {
       '.gitattributes',
       '*.xml merge=salesforce-source\n',
       { flag: 'a' }
-    )
-    expect(chmodMocked).toHaveBeenCalledTimes(1)
-    expect(chmodMocked).toHaveBeenCalledWith(
-      'node_modules/.bin/sf-git-merge-driver',
-      0o755
-    )
-    expect(copyFileMocked).toHaveBeenCalledTimes(1)
-    expect(copyFileMocked).toHaveBeenCalledWith(
-      expect.stringContaining('lib/index.js'),
-      expect.stringContaining('node_modules/.bin/sf-git-merge-driver')
-    )
-    expect(mkdirMocked).toHaveBeenCalledTimes(1)
-    expect(mkdirMocked).toHaveBeenCalledWith(
-      expect.stringContaining('node_modules/.bin'),
-      { recursive: true }
     )
   })
 })

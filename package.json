@@ -3,9 +3,6 @@
   "description": "git remote add origin git@github.com:scolladon/sf-git-merge-driver.git",
   "version": "1.0.0",
   "exports": "./lib/driver/MergeDriver.js",
-  "bin": {
-    "sf-git-merge-driver": "./lib/index.js"
-  },
   "type": "module",
   "author": "Sébastien Colladon (colladonsebastien@gmail.com)",
   "repository": {
@@ -21,7 +18,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
-    "@commitlint/config-conventional": "^19.7.1",
+    "@commitlint/config-conventional": "^19.8.0",
     "@oclif/plugin-help": "^6.2.26",
     "@salesforce/cli-plugins-testkit": "^5.3.39",
     "@salesforce/dev-config": "^4.3.1",
@@ -36,7 +33,6 @@
     "oclif": "^4.17.34",
     "shx": "^0.3.4",
     "ts-jest": "^29.2.6",
-    "ts-jest-mock-import-meta": "^1.2.1",
     "ts-node": "^10.9.2",
     "tslib": "^2.8.1",
     "typescript": "^5.8.2",

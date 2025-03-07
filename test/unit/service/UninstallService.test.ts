@@ -1,4 +1,4 @@
-import { readFile, unlink, writeFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import simpleGit from 'simple-git'
 import { DRIVER_NAME } from '../../../src/constant/driverConstant.js'
 import { UninstallService } from '../../../src/service/uninstallService.js'
@@ -15,8 +15,6 @@ const readFileMocked = jest.mocked(readFile)
 readFileMocked.mockResolvedValue(
   '*.xml merge=salesforce-source\nsome other content'
 )
-
-const unlinkMocked = jest.mocked(unlink)
 
 describe('UninstallService', () => {
   let sut: UninstallService // System Under Test
@@ -40,9 +38,5 @@ describe('UninstallService', () => {
     expect(readFile).toHaveBeenCalledWith('.gitattributes', expect.anything())
     expect(writeFile).toHaveBeenCalledTimes(1)
     expect(writeFile).toHaveBeenCalledWith('.gitattributes', expect.anything())
-    expect(unlinkMocked).toHaveBeenCalledTimes(1)
-    expect(unlinkMocked).toHaveBeenCalledWith(
-      expect.stringContaining('node_modules/.bin/sf-git-merge-driver')
-    )
   })
 })
