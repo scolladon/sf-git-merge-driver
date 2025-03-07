@@ -11,28 +11,71 @@ A custom Git merge driver designed specifically for Salesforce metadata files. T
 
 ## Installation
 
-### As SFDX Plugin
-
 ```bash
 sf plugins install sf-git-merge-driver
 ```
 
-### Local Repository Installation
+## Usage
 
-```bash
-sf git merge driver install
+<!-- commands -->
+* [`sf git merge driver install`](#sf-git-merge-driver-install)
+* [`sf git merge driver uninstall`](#sf-git-merge-driver-uninstall)
+
+## `sf git merge driver install`
+
+Installs a local git merge driver for the given org and branch.
+
+```
+USAGE
+  $ sf git merge driver install [--json] [--flags-dir <value>]
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Installs a local git merge driver for the given org and branch.
+
+  Installs a local git merge driver for the given org and branch, by updating the `.gitattributes` files in the project,
+  creating a new merge driver configuration in the `.git/config` of the project, and installing the binary in the
+  node_modules/.bin directory.
+
+EXAMPLES
+  Install the driver for a given project:
+
+    $ sf git merge driver install
 ```
 
-This will:
-- Configure your Git settings to use the merge driver
-- Add appropriate entries to your `.gitattributes` file
-- Set up the driver to handle XML files
+_See code: [src/commands/git/merge/driver/install.ts](https://github.com/scolladon/sf-git-merge-driver/blob/main/src/commands/git/merge/driver/install.ts)_
 
-## Uninstallation
+## `sf git merge driver uninstall`
 
-```bash
-sf git merge driver uninstall
+Uninstalls the local git merge driver for the given org and branch.
+
 ```
+USAGE
+  $ sf git merge driver uninstall [--json] [--flags-dir <value>]
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Uninstalls the local git merge driver for the given org and branch.
+
+  Uninstalls the local git merge driver for the given org and branch, by removing the merge driver content in the
+  `.gitattributes` files in the project, deleting the merge driver configuration from the `.git/config` of the project,
+  and removing the installed binary from the node_modules/.bin directory.
+
+EXAMPLES
+  Uninstall the driver for a given project:
+
+    $ sf git merge driver uninstall
+```
+
+_See code: [src/commands/git/merge/driver/uninstall.ts](https://github.com/scolladon/sf-git-merge-driver/blob/main/src/commands/git/merge/driver/uninstall.ts)_
+<!-- commandsstop -->
+
 
 ## How It Works
 
