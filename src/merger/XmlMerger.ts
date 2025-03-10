@@ -1,28 +1,40 @@
 import { XMLBuilder, XMLParser } from 'fast-xml-parser'
 import { JsonMerger } from './JsonMerger.js'
 
-const options = {
-  attributeNamePrefix: '@_',
-  commentPropName: '#comment',
-  format: true,
+const XML_DECL = '<?xml version="1.0" encoding="UTF-8"?>\n'
+const XML_COMMENT_PROP_NAME = '#xml__comment'
+
+const parserOptions = {
   ignoreAttributes: false,
-  ignoreNameSpace: false,
-  indentBy: '    ',
-  parseAttributeValue: false,
-  parseNodeValue: false,
   parseTagValue: false,
-  processEntities: false,
-  suppressEmptyNode: false,
-  trimValues: true,
+  parseAttributeValue: false,
+  cdataPropName: '__cdata',
+  ignoreDeclaration: true,
+  numberParseOptions: { leadingZeros: false, hex: false },
+  commentPropName: XML_COMMENT_PROP_NAME,
 }
 
+const builderOptions = {
+  format: true,
+  indentBy: '    ',
+  ignoreAttributes: false,
+  cdataPropName: '__cdata',
+  commentPropName: XML_COMMENT_PROP_NAME,
+}
+
+const correctComments = (xml: string): string =>
+  xml.includes('<!--') ? xml.replace(/\s+<!--(.*?)-->\s+/g, '<!--$1-->') : xml
+
+const handleSpecialEntities = (xml: string): string =>
+  xml.replaceAll('&amp;#160;', '&#160;')
+
 export class XmlMerger {
-  async tripartXmlMerge(
+  tripartXmlMerge(
     ancestorContent: string,
     ourContent: string,
     theirContent: string
   ) {
-    const parser = new XMLParser(options)
+    const parser = new XMLParser(parserOptions)
 
     const ancestorObj = parser.parse(ancestorContent)
     const ourObj = parser.parse(ourContent)
@@ -34,8 +46,8 @@ export class XmlMerger {
     const mergedObj = jsonMerger.mergeObjects(ancestorObj, ourObj, theirObj)
 
     // Convert back to XML and format
-    const builder = new XMLBuilder(options)
+    const builder = new XMLBuilder(builderOptions)
     const mergedXml = builder.build(mergedObj)
-    return mergedXml
+    return correctComments(XML_DECL.concat(handleSpecialEntities(mergedXml)))
   }
 }

@@ -12,7 +12,7 @@ export class MergeDriver {
 
     const xmlMerger = new XmlMerger()
 
-    const mergedContent = await xmlMerger.tripartXmlMerge(
+    const mergedContent = xmlMerger.tripartXmlMerge(
       ancestorContent,
       ourContent,
       theirContent

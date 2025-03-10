@@ -25,7 +25,7 @@ describe('MergeDriver', () => {
     it('should merge files successfully when given valid parameters', async () => {
       // Arrange
       mockReadFile.mockResolvedValue('<label>Test Object</label>')
-      mockedTripartXmlMerge.mockResolvedValue('<label>Test Object</label>')
+      mockedTripartXmlMerge.mockReturnValue('<label>Test Object</label>')
 
       // Act
       await sut.mergeFiles('AncestorFile', 'OurFile', 'TheirFile', 'OutputFile')
@@ -39,9 +39,9 @@ describe('MergeDriver', () => {
     it('should throw an error when tripartXmlMerge fails', async () => {
       // Arrange
       mockReadFile.mockResolvedValue('<label>Test Object</label>')
-      mockedTripartXmlMerge.mockRejectedValue(
-        new Error('Tripart XML merge failed')
-      )
+      mockedTripartXmlMerge.mockImplementation(() => {
+        throw new Error('Tripart XML merge failed')
+      })
 
       // Act and Assert
       await expect(

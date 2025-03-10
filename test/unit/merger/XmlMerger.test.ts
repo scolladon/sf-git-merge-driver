@@ -36,9 +36,12 @@ describe('MergeDriver', () => {
   })
 
   describe('tripartXmlMerge', () => {
-    it('should merge files successfully when given valid parameters', async () => {
+    it('should merge files successfully when given valid parameters', () => {
+      // Arrange
+      mockedMergeObjects.mockReturnValue('MergedContent')
+
       // Act
-      await sut.tripartXmlMerge('AncestorFile', 'OurFile', 'TheirFile')
+      sut.tripartXmlMerge('AncestorFile', 'OurFile', 'TheirFile')
 
       // Assert
       expect(XMLParser).toHaveBeenCalledTimes(1)
@@ -46,16 +49,56 @@ describe('MergeDriver', () => {
       expect(JsonMerger).toHaveBeenCalledTimes(1)
     })
 
-    it('should throw an error when tripartXmlMerge fails', async () => {
+    it('should throw an error when tripartXmlMerge fails', () => {
       // Arrange
-      mockedMergeObjects.mockRejectedValue(
-        new Error('Tripart XML merge failed')
-      )
+      mockedMergeObjects.mockImplementation(() => {
+        throw new Error('Tripart XML merge failed')
+      })
 
       // Act and Assert
-      await expect(
+      expect(() =>
         sut.tripartXmlMerge('AncestorFile', 'OurFile', 'TheirFile')
-      ).rejects.toThrowError('Tripart XML merge failed')
+      ).toThrow('Tripart XML merge failed')
+    })
+  })
+
+  describe('handling special XML features', () => {
+    it('should correctly handle XML special entities', () => {
+      // Arrange
+      const ancestorWithSpecial = '<root>&lt;special&gt;</root>'
+      const ourWithSpecial = '<root>&lt;modified&gt;</root>'
+      const theirWithSpecial = '<root>&lt;special&gt;</root>'
+      mockedMergeObjects.mockReturnValue('<root>&lt;modified&gt;</root>')
+
+      // Act
+      const result = sut.tripartXmlMerge(
+        ancestorWithSpecial,
+        ourWithSpecial,
+        theirWithSpecial
+      )
+
+      // Assert
+      expect(result).toContain('<?xml version="1.0" encoding="UTF-8"?>')
+      expect(result).toContain('&lt;modified&gt;')
+    })
+
+    it('should correctly handle XML comments', () => {
+      // Arrange
+      const ancestorWithComment = '<root><!-- original comment --></root>'
+      const ourWithComment = '<root><!-- our comment --></root>'
+      const theirWithComment = '<root><!-- their comment --></root>'
+      mockedMergeObjects.mockReturnValue('<root><!-- merged comment --></root>')
+
+      // Act
+      const result = sut.tripartXmlMerge(
+        ancestorWithComment,
+        ourWithComment,
+        theirWithComment
+      )
+
+      // Assert
+      expect(result).toContain('<?xml version="1.0" encoding="UTF-8"?>')
+      expect(result).toContain('<!-- merged comment -->')
     })
   })
 })
