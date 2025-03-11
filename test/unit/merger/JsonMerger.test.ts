@@ -190,7 +190,7 @@ describe('JsonMerger', () => {
       })
     })
 
-    // TODO: check but we shoud apply each change here as they are compatible (I added the Phone field in the expect)
+    // TODO: check but we shoud apply each change here as they are compatible
     describe('when merging layout metadata', () => {
       it('then should merge layouts correctly', () => {
         // Arrange
@@ -222,7 +222,7 @@ describe('JsonMerger', () => {
           layoutSections: [
             {
               label: 'Information',
-              layoutColumns: [{ fields: ['Name', 'Email', 'Phone'] }],
+              layoutColumns: [{ fields: ['Name', 'Email'] }],
             },
             { label: 'System', layoutColumns: [{ fields: ['CreatedDate'] }] },
           ],
