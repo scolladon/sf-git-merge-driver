@@ -1,4 +1,4 @@
-import { JsonMerger } from '../../../src/merger/JsonMerger.js'
+import { JsonMerger, JsonValue } from '../../../src/merger/JsonMerger.js'
 
 describe('JsonMerger', () => {
   let sut: JsonMerger
@@ -35,6 +35,12 @@ describe('JsonMerger', () => {
         expect(sut.mergeObjects(undefined, null, 1)).toBe(1)
       })
     })
+
+    // TODO : Testing Conflict outputs
+    // still not sure if we should test conflict for primitives as it lacks a unique identifier
+    //    maybe only throwing an error to treat the conflict at the parent node level
+    // (1,null,2) should output conflict with tags and each value with git conflict convention
+    // same for (1,2,null)
   })
 
   describe('given objects to merge', () => {
@@ -55,6 +61,12 @@ describe('JsonMerger', () => {
       })
     })
 
+    // TODO: Testing Conflict outputs
+    // { a: 1, b: 2 }{ a: 1, b: 3, c: 4 }{ a: 1, b: 6, d: 5 } should merge all but output conflict on b
+    // standard is <<<<<<< ours\n {ours version here} \n ||||||| base\n {base version here} \n =======\n {theirs version here} \n >>>>>>> theirs
+    // if base null or empty (node does not exist in base) we can put it as empty or remove the entire base part
+    // (I prefer always putting the 3 parts to make it clearer)
+
     describe('when objects are nested', () => {
       it('then should handle nested structures', () => {
         // Arrange
@@ -69,6 +81,7 @@ describe('JsonMerger', () => {
       })
     })
 
+    // TODO: this one should output a conflict as the types are not compatible
     describe('when type mismatches occur', () => {
       it('then should prefer our version', () => {
         // Arrange
@@ -111,6 +124,7 @@ describe('JsonMerger', () => {
       })
     })
 
+    // TODO: this one should output a conflict as there are 2 different diversions
     describe('when arrays use different identifier fields', () => {
       it('then should handle different identifiers', () => {
         // Arrange
@@ -125,6 +139,9 @@ describe('JsonMerger', () => {
       })
     })
 
+    // TODO: I don't know if we should have such case ever
+    // if we actually do, I'd think the output should be [3,4,5]
+    // because ours removes 1 and adds 4 and theirs removes 1 & 2 and adds 4 & 5 which are compatible
     describe('when arrays have no identifiers', () => {
       it('then should use our version', () => {
         // Arrange
@@ -142,19 +159,19 @@ describe('JsonMerger', () => {
     describe('when merging custom field definitions', () => {
       it('then should merge correctly', () => {
         // Arrange
-        const ancestor = {
+        const ancestor: JsonValue = {
           fields: [
             { fullName: 'Field1__c', type: 'Text', length: 100 },
             { fullName: 'Field2__c', type: 'Number', precision: 10 },
           ],
         }
-        const ours = {
+        const ours: JsonValue = {
           fields: [
             { fullName: 'Field1__c', type: 'Text', length: 255 },
             { fullName: 'Field2__c', type: 'Number', precision: 10 },
           ],
         }
-        const theirs = {
+        const theirs: JsonValue = {
           fields: [
             { fullName: 'Field1__c', type: 'Text', length: 100 },
             { fullName: 'Field2__c', type: 'Number', precision: 18 },
@@ -173,6 +190,7 @@ describe('JsonMerger', () => {
       })
     })
 
+    // TODO: check but we shoud apply each change here as they are compatible (I added the Phone field in the expect)
     describe('when merging layout metadata', () => {
       it('then should merge layouts correctly', () => {
         // Arrange
@@ -204,12 +222,20 @@ describe('JsonMerger', () => {
           layoutSections: [
             {
               label: 'Information',
-              layoutColumns: [{ fields: ['Name', 'Email'] }],
+              layoutColumns: [{ fields: ['Name', 'Email', 'Phone'] }],
             },
             { label: 'System', layoutColumns: [{ fields: ['CreatedDate'] }] },
           ],
         })
       })
     })
+
+    // TODO: Adding the different cases where the unique key is not the usual ones (those few types which have composite keys)
+
+    // TODO: Adding cases for the few for which the order of items in a list is important, like picklist values in a CustomField
+
+    // TODO: Adding conflict cases for Object element conflict
+
+    // TODO: Adding conflict cases for List element conflict
   })
 })
