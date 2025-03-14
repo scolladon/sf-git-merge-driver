@@ -4,6 +4,7 @@ import {
   DRIVER_NAME,
   RUN_PLUGIN_COMMAND,
 } from '../../../src/constant/driverConstant.js'
+import { METADATA_TYPES_PATTERNS } from '../../../src/constant/metadataConstant.js'
 import { InstallService } from '../../../src/service/installService.js'
 
 jest.mock('node:fs/promises')
@@ -46,9 +47,16 @@ describe('InstallService', () => {
       'true'
     )
     expect(appendFileMocked).toHaveBeenCalledTimes(1)
+
+    // Generate the expected content for .gitattributes
+    const expectedPatterns = METADATA_TYPES_PATTERNS.map(
+      pattern => `*.${pattern}.xml merge=${DRIVER_NAME}`
+    ).join('\n')
+    const expectedContent = `${expectedPatterns}\n`
+
     expect(appendFileMocked).toHaveBeenCalledWith(
       '.gitattributes',
-      '*.xml merge=salesforce-source\n',
+      expectedContent,
       { flag: 'a' }
     )
   })

@@ -1,6 +1,7 @@
 import { appendFile } from 'node:fs/promises'
 import { simpleGit } from 'simple-git'
 import { DRIVER_NAME, RUN_PLUGIN_COMMAND } from '../constant/driverConstant.js'
+import { METADATA_TYPES_PATTERNS } from '../constant/metadataConstant.js'
 
 export class InstallService {
   public async installMergeDriver() {
@@ -15,9 +16,11 @@ export class InstallService {
     )
     await git.addConfig(`merge.${DRIVER_NAME}.recursive`, 'true')
 
-    const content =
-      ['*.xml'].map(pattern => `${pattern} merge=${DRIVER_NAME}`).join('\n') +
-      '\n'
+    // Configure merge driver for each metadata type pattern
+    const patterns = METADATA_TYPES_PATTERNS.map(
+      pattern => `*.${pattern}.xml merge=${DRIVER_NAME}`
+    ).join('\n')
+    const content = `${patterns}\n`
 
     await appendFile('.gitattributes', content, { flag: 'a' })
   }

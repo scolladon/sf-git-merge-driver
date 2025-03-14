@@ -48,7 +48,7 @@ describe('git merge driver install', () => {
     expect(existsSync(gitattributesPath)).to.be.true
 
     const gitattributesContent = readFileSync(gitattributesPath, 'utf-8')
-    expect(gitattributesContent).to.include(`*.xml merge=${DRIVER_NAME}`)
+    expect(gitattributesContent).to.include(`.xml merge=${DRIVER_NAME}`)
 
     const gitConfigOutput = execSync('git config --list', {
       cwd: ROOT_FOLDER,
@@ -77,7 +77,7 @@ describe('git merge driver install', () => {
     expect(existsSync(gitattributesPath)).to.be.true
 
     const gitattributesContent = readFileSync(gitattributesPath, 'utf-8')
-    expect(gitattributesContent).to.include(`*.xml merge=${DRIVER_NAME}`)
+    expect(gitattributesContent).to.include(`.xml merge=${DRIVER_NAME}`)
 
     const gitConfigOutput = execSync('git config --list', {
       cwd: ROOT_FOLDER,
