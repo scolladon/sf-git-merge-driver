@@ -2,7 +2,8 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { simpleGit } from 'simple-git'
 import { DRIVER_NAME } from '../constant/driverConstant.js'
 
-const MERGE_DRIVER_CONFIG = new RegExp(`.* merge\\s*=\\s*${DRIVER_NAME}$`)
+// This match lines like: "*.profile-meta.xml merge=sf-git-merge-driver"
+const MERGE_DRIVER_CONFIG = new RegExp(`.*\s+merge\s*=\s*${DRIVER_NAME}$`)
 
 export class UninstallService {
   public async uninstallMergeDriver() {
