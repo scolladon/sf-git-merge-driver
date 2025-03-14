@@ -1,3 +1,6 @@
+import { castArray, differenceWith, isEqual, unionWith } from 'lodash-es'
+import { KEY_FIELD_METADATA } from '../constant/metadataConstant.js'
+
 export type JsonValue =
   | string
   | number
@@ -5,140 +8,241 @@ export type JsonValue =
   | null
   | JsonObject
   | JsonArray
+
 interface JsonObject {
   [key: string]: JsonValue
 }
+
 interface JsonArray extends Array<JsonValue> {}
 
 export class JsonMerger {
-  private readonly idFields = [
-    'fullName',
-    'name',
-    'field',
-    'label',
-    'id',
-    '@_name',
-  ]
-
+  /**
+   * Main entry point for merging JSON values
+   */
   mergeObjects(
     ancestor: JsonValue | undefined,
     ours: JsonValue,
     theirs: JsonValue
   ): JsonValue {
-    // Handle null/undefined cases
-    if (ours === null || theirs === null) return ours ?? theirs
-    if (typeof ours !== typeof theirs) return ours
+    // Handle root object (e.g., Profile)
+    if (
+      typeof ours === 'object' &&
+      ours !== null &&
+      !Array.isArray(ours) &&
+      typeof theirs === 'object' &&
+      theirs !== null &&
+      !Array.isArray(theirs)
+    ) {
+      // Get the base attribute (e.g., Profile)
+      const baseKey = Object.keys(ours)[0]
+      if (baseKey && Object.keys(theirs)[0] === baseKey) {
+        const result = { ...ours } as JsonObject
 
-    // Handle arrays (special case for Salesforce metadata)
-    if (Array.isArray(ours) && Array.isArray(theirs)) {
-      return this.mergeArrays(
-        Array.isArray(ancestor) ? ancestor : undefined,
-        ours,
-        theirs
-      )
-    }
+        // Get the content of the base attribute
+        const ourContent = ours[baseKey] as JsonObject
+        const theirContent = theirs[baseKey] as JsonObject
+        const ancestorContent =
+          ancestor &&
+          typeof ancestor === 'object' &&
+          !Array.isArray(ancestor) &&
+          baseKey in ancestor
+            ? ((ancestor as JsonObject)[baseKey] as JsonObject)
+            : {}
 
-    // Handle objects
-    if (typeof ours === 'object' && typeof theirs === 'object') {
-      const result = { ...ours } as JsonObject
-      const ancestorObj = (ancestor ?? {}) as JsonObject
-      const theirsObj = theirs as JsonObject
+        // Get all properties from both contents
+        const allProperties = new Set([
+          ...Object.keys(ourContent),
+          ...Object.keys(theirContent),
+        ])
 
-      // Process all keys from both objects
-      const allKeys = new Set([...Object.keys(ours), ...Object.keys(theirs)])
+        // Process each property
+        const mergedContent = { ...ourContent } as JsonObject
+        for (const property of allProperties) {
+          // Skip if property doesn't exist in their content
+          if (!(property in theirContent)) continue
 
-      for (const key of allKeys) {
-        if (!(key in theirsObj)) continue // Keep our version
-        if (!(key in result)) {
-          result[key] = theirsObj[key] // Take their version
-          continue
+          // Use their version if property doesn't exist in our content
+          if (!(property in mergedContent)) {
+            mergedContent[property] = this.ensureArray(theirContent[property])
+            continue
+          }
+
+          // Ensure both values are arrays
+          const ourArray = this.ensureArray(mergedContent[property])
+          const theirArray = this.ensureArray(theirContent[property])
+          const ancestorArray =
+            property in ancestorContent
+              ? this.ensureArray(ancestorContent[property])
+              : []
+
+          // Get the key field for this property if available
+          const keyField = this.getKeyField(property)
+
+          // Merge the arrays
+          mergedContent[property] = this.mergeArrays(
+            ancestorArray,
+            ourArray,
+            theirArray,
+            keyField
+          )
         }
 
-        // Recursively merge when both have the key
-        result[key] = this.mergeObjects(
-          ancestorObj[key],
-          result[key],
-          theirsObj[key]
-        )
+        result[baseKey] = mergedContent
+        return result
       }
-      return result
     }
 
-    // For primitive values, use their changes if we didn't modify from ancestor
-    if (theirs !== ancestor && ours === ancestor) return theirs
-    return ours // Default to our version
+    // Default to our version for other cases
+    return ours
   }
 
+  /**
+   * Ensures a value is an array
+   */
+  private ensureArray(value: JsonValue): JsonArray {
+    return value === null ? [] : (castArray(value) as JsonArray)
+  }
+
+  /**
+   * Gets the key field for a property from KEY_FIELD_METADATA
+   */
+  private getKeyField(property: string): string | undefined {
+    return property in KEY_FIELD_METADATA
+      ? KEY_FIELD_METADATA[property as keyof typeof KEY_FIELD_METADATA]
+      : undefined
+  }
+
+  /**
+   * Merges arrays using the specified key field if available
+   */
   private mergeArrays(
-    ancestor: JsonArray | undefined,
+    ancestor: JsonArray,
+    ours: JsonArray,
+    theirs: JsonArray,
+    keyField?: string
+  ): JsonArray {
+    // If no key field, use unionWith to merge arrays without duplicates
+    if (!keyField) {
+      return unionWith([...ours], theirs, isEqual)
+    }
+
+    // Special case for array position
+    if (keyField === '<array>') {
+      return this.mergeByPosition(ancestor, ours, theirs)
+    }
+
+    // Merge using key field
+    return this.mergeByKeyField(ancestor, ours, theirs, keyField)
+  }
+
+  /**
+   * Merges arrays by position
+   */
+  private mergeByPosition(
+    ancestor: JsonArray,
     ours: JsonArray,
     theirs: JsonArray
   ): JsonArray {
-    // Find the first matching ID field that exists in both arrays
-    const idField = this.idFields.find(
-      field =>
-        ours.some(item => this.hasIdField(item, field)) &&
-        theirs.some(item => this.hasIdField(item, field))
-    )
-
-    if (!idField) return ours // No common identifier, keep our version
-
-    // Create lookup maps
-    const ourMap = this.createIdMap(ours, idField)
-    const theirMap = this.createIdMap(theirs, idField)
-    const ancestorMap = ancestor
-      ? this.createIdMap(ancestor, idField)
-      : new Map()
-
     const result = [...ours]
-    const processed = new Set<string>()
 
-    // Process all items from both arrays
-    for (const [id, ourItem] of ourMap) {
-      const theirItem = theirMap.get(id)
-      if (theirItem) {
-        // Item exists in both versions, merge them
-        const index = result.findIndex(
-          item => this.hasIdField(item, idField) && item[idField] === id
-        )
-        if (index !== -1) {
-          result[index] = this.mergeObjects(
-            ancestorMap.get(id),
-            ourItem,
-            theirItem
-          )
-        }
+    // Merge items at the same positions
+    for (let i = 0; i < Math.min(ours.length, theirs.length); i++) {
+      const ancestorItem = i < ancestor.length ? ancestor[i] : undefined
+
+      // If they changed it from ancestor but we didn't, use their version
+      if (!isEqual(theirs[i], ancestorItem) && isEqual(ours[i], ancestorItem)) {
+        result[i] = theirs[i]
       }
-      processed.add(id)
     }
 
     // Add items that only exist in their version
-    for (const [id, theirItem] of theirMap) {
-      if (!processed.has(id)) {
-        result.push(theirItem)
+    if (theirs.length > ours.length) {
+      for (let i = ours.length; i < theirs.length; i++) {
+        result.push(theirs[i])
       }
     }
 
     return result
   }
 
-  private hasIdField(item: JsonValue, field: string): item is JsonObject {
-    return (
-      item !== null &&
-      typeof item === 'object' &&
-      !Array.isArray(item) &&
-      field in item
+  /**
+   * Merges arrays using a key field
+   */
+  private mergeByKeyField(
+    ancestor: JsonArray,
+    ours: JsonArray,
+    theirs: JsonArray,
+    keyField: string
+  ): JsonArray {
+    const result = [...ours]
+    const processed = new Set<string>()
+
+    // Create maps for efficient lookups
+    const ourMap = new Map<string, JsonValue>()
+    const theirMap = new Map<string, JsonValue>()
+    const ancestorMap = new Map<string, JsonValue>()
+
+    // Populate maps
+    for (const item of ours) {
+      const key = this.getItemKey(item, keyField)
+      if (key) ourMap.set(key, item)
+    }
+
+    for (const item of theirs) {
+      const key = this.getItemKey(item, keyField)
+      if (key) theirMap.set(key, item)
+    }
+
+    for (const item of ancestor) {
+      const key = this.getItemKey(item, keyField)
+      if (key) ancestorMap.set(key, item)
+    }
+
+    // Process items in our version
+    for (let i = 0; i < result.length; i++) {
+      const key = this.getItemKey(result[i], keyField)
+      if (!key) continue
+
+      processed.add(key)
+
+      // If item exists in both versions
+      if (theirMap.has(key)) {
+        const theirItem = theirMap.get(key)!
+        const ancestorItem = ancestorMap.get(key)
+
+        // If they changed it from ancestor but we didn't, use their version
+        if (
+          !isEqual(theirItem, ancestorItem) &&
+          isEqual(result[i], ancestorItem)
+        ) {
+          result[i] = theirItem
+        }
+      }
+    }
+
+    // Add items that only exist in their version
+    const uniqueTheirItems = differenceWith(
+      Array.from(theirMap.values()),
+      result,
+      (a, b) => this.getItemKey(a, keyField) === this.getItemKey(b, keyField)
     )
+    result.push(...uniqueTheirItems)
+
+    return result
   }
 
-  private createIdMap(
-    arr: JsonArray,
-    idField: string
-  ): Map<string, JsonObject> {
-    return new Map(
-      arr
-        .filter(item => this.hasIdField(item, idField))
-        .map(item => [String(item[idField]), item])
-    )
+  /**
+   * Gets the key value for an item using the specified key field
+   */
+  private getItemKey(item: JsonValue, keyField: string): string | undefined {
+    if (
+      typeof item === 'object' &&
+      item !== null &&
+      !Array.isArray(item) &&
+      keyField in item
+    ) {
+      return String(item[keyField])
+    }
+    return undefined
   }
 }

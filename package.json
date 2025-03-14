@@ -14,6 +14,7 @@
     "@salesforce/core": "^8.8.5",
     "@salesforce/sf-plugins-core": "^12.2.0",
     "fast-xml-parser": "^5.0.8",
+    "lodash-es": "^4.17.21",
     "simple-git": "^3.27.0"
   },
   "devDependencies": {
