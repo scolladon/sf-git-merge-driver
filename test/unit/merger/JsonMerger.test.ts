@@ -281,4 +281,260 @@ describe('JsonMerger', () => {
       })
     })
   })
+
+  describe('given undefined ancestor', () => {
+    it('should correctly merge objects when ancestor is undefined', () => {
+      // Arrange
+      const ancestor = undefined
+
+      const ours: JsonValue = {
+        Profile: {
+          fieldPermissions: [
+            { field: 'Account.Name', editable: 'true', readable: 'true' },
+            { field: 'Account.Type', editable: 'false', readable: 'true' },
+          ],
+          custom: ['Value1', 'Value3'],
+        },
+      }
+
+      const theirs: JsonValue = {
+        Profile: {
+          fieldPermissions: [
+            { field: 'Account.Name', editable: 'false', readable: 'false' },
+            { field: 'Account.Industry', editable: 'false', readable: 'true' },
+          ],
+          custom: ['Value2', 'Value4'],
+          description: 'Their description',
+        },
+      }
+
+      // Act
+      const result = sut.mergeObjects(ancestor, ours, theirs)
+
+      // Assert
+      expect(result).toEqual({
+        Profile: {
+          fieldPermissions: [
+            { field: 'Account.Name', editable: 'true', readable: 'true' },
+            { field: 'Account.Type', editable: 'false', readable: 'true' },
+            { field: 'Account.Industry', editable: 'false', readable: 'true' },
+          ],
+          custom: ['Value1', 'Value3', 'Value2', 'Value4'],
+          description: ['Their description'],
+        },
+      })
+    })
+
+    it('should correctly merge arrays with key field when ancestor is undefined', () => {
+      // Arrange
+      const ancestor = undefined
+
+      const ours: JsonValue = {
+        Profile: {
+          fieldPermissions: [
+            { field: 'Account.Name', editable: 'true', readable: 'true' },
+          ],
+        },
+      }
+
+      const theirs: JsonValue = {
+        Profile: {
+          fieldPermissions: [
+            { field: 'Account.Name', editable: 'false', readable: 'false' },
+            { field: 'Account.Type', editable: 'false', readable: 'true' },
+          ],
+        },
+      }
+
+      // Act
+      const result = sut.mergeObjects(ancestor, ours, theirs)
+
+      // Assert
+      expect(result).toEqual({
+        Profile: {
+          fieldPermissions: [
+            { field: 'Account.Name', editable: 'true', readable: 'true' },
+            { field: 'Account.Type', editable: 'false', readable: 'true' },
+          ],
+        },
+      })
+    })
+
+    it('should correctly merge arrays without key field when ancestor is undefined', () => {
+      // Arrange
+      const ancestor = undefined
+
+      const ours: JsonValue = {
+        Profile: {
+          custom: ['Value1', 'Value3'],
+        },
+      }
+
+      const theirs: JsonValue = {
+        Profile: {
+          custom: ['Value1', 'Value2', 'Value4'],
+        },
+      }
+
+      // Act
+      const result = sut.mergeObjects(ancestor, ours, theirs)
+
+      // Assert
+      expect(result).toEqual({
+        Profile: {
+          custom: ['Value1', 'Value3', 'Value2', 'Value4'],
+        },
+      })
+    })
+  })
+
+  describe('given arrays with <array> key field', () => {
+    it('should merge arrays by position when both sides modify different elements', () => {
+      // Arrange
+      const ancestor: JsonValue = {
+        Profile: {
+          loginHours: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+        },
+      }
+
+      const ours: JsonValue = {
+        Profile: {
+          loginHours: [
+            'Monday-Modified',
+            'Tuesday',
+            'Wednesday',
+            'Thursday',
+            'Friday',
+          ],
+        },
+      }
+
+      const theirs: JsonValue = {
+        Profile: {
+          loginHours: [
+            'Monday',
+            'Tuesday',
+            'Wednesday-Modified',
+            'Thursday',
+            'Friday',
+          ],
+        },
+      }
+
+      // Act
+      const result = sut.mergeObjects(ancestor, ours, theirs)
+
+      // Assert
+      expect(result).toEqual({
+        Profile: {
+          loginHours: [
+            'Monday-Modified',
+            'Tuesday',
+            'Wednesday-Modified',
+            'Thursday',
+            'Friday',
+          ],
+        },
+      })
+    })
+
+    it('should use their version when we did not modify an element but they did', () => {
+      // Arrange
+      const ancestor: JsonValue = {
+        Profile: {
+          loginIpRanges: ['192.168.1.1', '10.0.0.1', '172.16.0.1'],
+        },
+      }
+
+      const ours: JsonValue = {
+        Profile: {
+          loginIpRanges: ['192.168.1.1', '10.0.0.1', '172.16.0.1'],
+        },
+      }
+
+      const theirs: JsonValue = {
+        Profile: {
+          loginIpRanges: ['192.168.1.1', '10.0.0.2', '172.16.0.1'],
+        },
+      }
+
+      // Act
+      const result = sut.mergeObjects(ancestor, ours, theirs)
+
+      // Assert
+      expect(result).toEqual({
+        Profile: {
+          loginIpRanges: ['192.168.1.1', '10.0.0.2', '172.16.0.1'],
+        },
+      })
+    })
+
+    it('should append their additional elements when their array is longer', () => {
+      // Arrange
+      const ancestor: JsonValue = {
+        Profile: {
+          loginHours: ['Monday', 'Tuesday', 'Wednesday'],
+        },
+      }
+
+      const ours: JsonValue = {
+        Profile: {
+          loginHours: ['Monday', 'Tuesday', 'Wednesday'],
+        },
+      }
+
+      const theirs: JsonValue = {
+        Profile: {
+          loginHours: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+        },
+      }
+
+      // Act
+      const result = sut.mergeObjects(ancestor, ours, theirs)
+
+      // Assert
+      expect(result).toEqual({
+        Profile: {
+          loginHours: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+        },
+      })
+    })
+
+    it('should keep our additional elements when our array is longer', () => {
+      // Arrange
+      const ancestor: JsonValue = {
+        Profile: {
+          loginHours: ['Monday', 'Tuesday'],
+        },
+      }
+
+      const ours: JsonValue = {
+        Profile: {
+          loginHours: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+        },
+      }
+
+      const theirs: JsonValue = {
+        Profile: {
+          loginHours: ['Monday-Modified', 'Tuesday'],
+        },
+      }
+
+      // Act
+      const result = sut.mergeObjects(ancestor, ours, theirs)
+
+      // Assert
+      expect(result).toEqual({
+        Profile: {
+          loginHours: [
+            'Monday-Modified',
+            'Tuesday',
+            'Wednesday',
+            'Thursday',
+            'Friday',
+          ],
+        },
+      })
+    })
+  })
 })

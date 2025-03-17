@@ -1,4 +1,4 @@
-import { castArray, differenceWith, isEqual, unionWith } from 'lodash-es'
+import { castArray, differenceWith, isEqual, isNil, unionWith } from 'lodash-es'
 import { KEY_FIELD_METADATA } from '../constant/metadataConstant.js'
 
 export type JsonValue =
@@ -100,7 +100,7 @@ export class JsonMerger {
    * Ensures a value is an array
    */
   private ensureArray(value: JsonValue): JsonArray {
-    return value === null ? [] : (castArray(value) as JsonArray)
+    return isNil(value) ? [] : (castArray(value) as JsonArray)
   }
 
   /**
