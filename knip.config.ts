@@ -9,7 +9,7 @@ export default {
     'src/commands/git/merge/driver/run.ts',
     'src/commands/git/merge/driver/uninstall.ts',
   ],
-  project: ['**/*.{ts,js,json,yml}', '!src/index.ts'],
-  ignoreDependencies: ['@commitlint/config-conventional', 'ts-node'],
+  project: ['**/*.{ts,js,json,yml}'],
+  ignoreDependencies: ['@commitlint/config-conventional', 'ts-node', 'lodash'],
   ignoreBinaries: ['commitlint', 'npm-check-updates'],
 }
