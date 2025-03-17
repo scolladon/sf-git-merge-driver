@@ -5,21 +5,23 @@ const XML_DECL = '<?xml version="1.0" encoding="UTF-8"?>\n'
 const XML_COMMENT_PROP_NAME = '#xml__comment'
 
 const parserOptions = {
-  ignoreAttributes: false,
-  parseTagValue: false,
-  parseAttributeValue: false,
-  cdataPropName: '__cdata',
-  ignoreDeclaration: true,
-  numberParseOptions: { leadingZeros: false, hex: false },
   commentPropName: XML_COMMENT_PROP_NAME,
+  ignoreAttributes: false,
+  ignoreNameSpace: false,
+  numberParseOptions: { leadingZeros: false, hex: false },
+  parseAttributeValue: false,
+  parseNodeValue: false,
+  parseTagValue: false,
+  processEntities: false,
+  trimValues: true,
 }
 
 const builderOptions = {
+  ...parserOptions,
   format: true,
   indentBy: '    ',
-  ignoreAttributes: false,
-  cdataPropName: '__cdata',
-  commentPropName: XML_COMMENT_PROP_NAME,
+  suppressBooleanAttributes: false,
+  suppressEmptyNode: false,
 }
 
 const correctComments = (xml: string): string =>
