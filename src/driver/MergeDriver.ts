@@ -21,14 +21,4 @@ export class MergeDriver {
     // Write the merged content to the output file
     await writeFile(outputFile, mergedContent)
   }
-
-  async copyFiles(ancestorFile, outputFile) {
-    const ancestorContent = await readFile(ancestorFile, 'utf8')
-    console.dir(ancestorContent, { depth: null })
-
-    const xmlMerger = new XmlMerger()
-    const mergedContent = xmlMerger.parseThenBuild(ancestorContent)
-    console.dir(mergedContent, { depth: null })
-    await writeFile(outputFile, mergedContent)
-  }
 }
