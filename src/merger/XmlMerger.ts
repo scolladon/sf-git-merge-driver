@@ -35,8 +35,8 @@ const correctConflictIndent = (xml: string): string =>
 const handleSpecialEntities = (xml: string): string =>
   xml
     .replaceAll('&amp;#160;', '&#160;')
-    .replaceAll('&lt;', '<')
-    .replaceAll('&gt;', '>')
+    .replaceAll('&lt;&lt;&lt;&lt;&lt;&lt;&lt;', '<<<<<<<')
+    .replaceAll('&gt;&gt;&gt;&gt;&gt;&gt;&gt;', '>>>>>>>')
 
 export class XmlMerger {
   tripartXmlMerge(

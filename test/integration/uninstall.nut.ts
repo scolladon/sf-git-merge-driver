@@ -17,11 +17,11 @@ describe('git merge driver uninstall', () => {
 
   after(() => {
     // Clean up by removing .git folder and .gitattributes file
-    execSync('rm -rf .git', {
+    execSync('shx rm -rf .git', {
       cwd: ROOT_FOLDER,
     })
 
-    execSync('rm .gitattributes', {
+    execSync('shx rm .gitattributes', {
       cwd: ROOT_FOLDER,
     })
   })

@@ -20,14 +20,14 @@ describe('git merge driver install', () => {
 
   after(() => {
     // Clean up by removing .git folder and .gitattributes file
-    execSync('rm -rf .git', {
+    execSync('shx rm -rf .git', {
       cwd: ROOT_FOLDER,
     })
-    execSync('rm -rf node_modules', {
+    execSync('shx rm -rf node_modules', {
       cwd: ROOT_FOLDER,
     })
     if (existsSync(join(ROOT_FOLDER, '.gitattributes'))) {
-      execSync(`rm .gitattributes`, {
+      execSync(`shx rm .gitattributes`, {
         cwd: ROOT_FOLDER,
       })
     }
