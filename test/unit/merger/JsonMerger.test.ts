@@ -526,6 +526,358 @@ describe('JsonMerger', () => {
     })
   })
 
+  it('should handle string values', () => {
+    // Arrange
+    const ancestor: JsonValue = {
+      Profile: {
+        description: 'Original description',
+      },
+    }
+
+    const ours: JsonValue = {
+      Profile: {
+        description: 'Original description',
+      },
+    }
+
+    const theirs: JsonValue = {
+      Profile: {
+        description: 'Original description',
+      },
+    }
+
+    // Act
+    const result = sut.mergeObjects(ancestor, ours, theirs)
+
+    // Assert
+    expect(result).toEqual([
+      {
+        Profile: [
+          {
+            description: [{ '#text': 'Original description' }],
+          },
+        ],
+      },
+    ])
+  })
+
+  it('should handle string values', () => {
+    // Arrange
+    const ancestor: JsonValue = {
+      Profile: {},
+    }
+
+    const ours: JsonValue = {
+      Profile: {
+        description: 'Our description',
+      },
+    }
+
+    const theirs: JsonValue = {
+      Profile: {
+        description: 'Our description',
+      },
+    }
+
+    // Act
+    const result = sut.mergeObjects(ancestor, ours, theirs)
+
+    // Assert
+    expect(result).toEqual([
+      {
+        Profile: [
+          {
+            description: [{ '#text': 'Our description' }],
+          },
+        ],
+      },
+    ])
+  })
+
+  it('should handle string values', () => {
+    // Arrange
+    const ancestor: JsonValue = {
+      Profile: {
+        description: 'Our description',
+      },
+    }
+
+    const ours: JsonValue = {
+      Profile: {},
+    }
+
+    const theirs: JsonValue = {
+      Profile: {},
+    }
+
+    // Act
+    const result = sut.mergeObjects(ancestor, ours, theirs)
+
+    // Assert
+    expect(result).toEqual([
+      {
+        Profile: [],
+      },
+    ])
+  })
+
+  it('should handle string values', () => {
+    // Arrange
+    const ancestor: JsonValue = {
+      Profile: {
+        description: 'Our description',
+      },
+    }
+
+    const ours: JsonValue = {
+      Profile: {},
+    }
+
+    const theirs: JsonValue = {
+      Profile: {
+        description: 'Our description',
+      },
+    }
+
+    // Act
+    const result = sut.mergeObjects(ancestor, ours, theirs)
+
+    // Assert
+    expect(result).toEqual([
+      {
+        Profile: [],
+      },
+    ])
+  })
+
+  it('should handle string values', () => {
+    // Arrange
+    const ancestor: JsonValue = {
+      Profile: {
+        description: 'Our description',
+      },
+    }
+
+    const ours: JsonValue = {
+      Profile: {
+        description: 'Our description',
+      },
+    }
+
+    const theirs: JsonValue = {
+      Profile: {},
+    }
+
+    // Act
+    const result = sut.mergeObjects(ancestor, ours, theirs)
+
+    // Assert
+    expect(result).toEqual([
+      {
+        Profile: [],
+      },
+    ])
+  })
+
+  it('should handle string values', () => {
+    // Arrange
+    const ancestor: JsonValue = {}
+
+    const ours: JsonValue = {
+      Profile: {
+        description: 'Our description',
+      },
+    }
+
+    const theirs: JsonValue = {
+      Profile: {
+        description: 'Our description',
+      },
+    }
+
+    // Act
+    const result = sut.mergeObjects(ancestor, ours, theirs)
+
+    // Assert
+    expect(result).toEqual([
+      {
+        Profile: [
+          {
+            description: [{ '#text': 'Our description' }],
+          },
+        ],
+      },
+    ])
+  })
+
+  it('should handle string values', () => {
+    // Arrange
+    const ancestor: JsonValue = {
+      Profile: {},
+    }
+
+    const ours: JsonValue = {
+      Profile: {
+        description: 'Our description',
+      },
+    }
+
+    const theirs: JsonValue = {
+      Profile: {
+        description: 'Their description',
+      },
+    }
+
+    // Act
+    const result = sut.mergeObjects(ancestor, ours, theirs)
+
+    // Assert
+    expect(result).toEqual([
+      {
+        Profile: [
+          { '#text': '\n<<<<<<< LOCAL' },
+          {
+            description: [{ '#text': 'Our description' }],
+          },
+          { '#text': '||||||| BASE' },
+          { '#text': '\n' },
+          { '#text': '=======' },
+          {
+            description: [{ '#text': 'Their description' }],
+          },
+          { '#text': '>>>>>>> REMOTE' },
+        ],
+      },
+    ])
+  })
+
+  it('should handle string values', () => {
+    // Arrange
+    const ancestor: JsonValue = {
+      Profile: {
+        description: 'Original description',
+      },
+    }
+
+    const ours: JsonValue = {
+      Profile: {},
+    }
+
+    const theirs: JsonValue = {
+      Profile: {
+        description: 'Their description',
+      },
+    }
+
+    // Act
+    const result = sut.mergeObjects(ancestor, ours, theirs)
+
+    // Assert
+    expect(result).toEqual([
+      {
+        Profile: [
+          { '#text': '\n<<<<<<< LOCAL' },
+          { '#text': '\n' },
+          { '#text': '||||||| BASE' },
+          {
+            description: [{ '#text': 'Original description' }],
+          },
+          { '#text': '=======' },
+          {
+            description: [{ '#text': 'Their description' }],
+          },
+          { '#text': '>>>>>>> REMOTE' },
+        ],
+      },
+    ])
+  })
+
+  it('should handle string values', () => {
+    // Arrange
+    const ancestor: JsonValue = {
+      Profile: {
+        description: 'Original description',
+      },
+    }
+
+    const ours: JsonValue = {
+      Profile: {
+        description: 'Our description',
+      },
+    }
+
+    const theirs: JsonValue = {
+      Profile: {},
+    }
+
+    // Act
+    const result = sut.mergeObjects(ancestor, ours, theirs)
+
+    // Assert
+    expect(result).toEqual([
+      {
+        Profile: [
+          { '#text': '\n<<<<<<< LOCAL' },
+          {
+            description: [{ '#text': 'Our description' }],
+          },
+          { '#text': '||||||| BASE' },
+          {
+            description: [{ '#text': 'Original description' }],
+          },
+          { '#text': '=======' },
+          { '#text': '\n' },
+          { '#text': '>>>>>>> REMOTE' },
+        ],
+      },
+    ])
+  })
+
+  it('should handle string values', () => {
+    // Arrange
+    const ancestor: JsonValue = {
+      Profile: {
+        description: 'Original description',
+      },
+    }
+
+    const ours: JsonValue = {
+      Profile: {
+        description: 'Our description',
+      },
+    }
+
+    const theirs: JsonValue = {
+      Profile: {
+        description: 'Their description',
+      },
+    }
+
+    // Act
+    const result = sut.mergeObjects(ancestor, ours, theirs)
+
+    // Assert
+    expect(result).toEqual([
+      {
+        Profile: [
+          { '#text': '\n<<<<<<< LOCAL' },
+          {
+            description: [{ '#text': 'Our description' }],
+          },
+          { '#text': '||||||| BASE' },
+          {
+            description: [{ '#text': 'Original description' }],
+          },
+          { '#text': '=======' },
+          {
+            description: [{ '#text': 'Their description' }],
+          },
+          { '#text': '>>>>>>> REMOTE' },
+        ],
+      },
+    ])
+  })
+
   describe('given undefined ours', () => {
     it('should correctly merge objects when ours is undefined', () => {
       // Arrange
@@ -602,6 +954,52 @@ describe('JsonMerger', () => {
         },
         { '#text': '>>>>>>> REMOTE' },
       ])
+    })
+
+    it('should handle string values', () => {
+      // Arrange
+      const ancestor: JsonValue = {
+        Profile: {
+          description: 'Our description',
+        },
+      }
+
+      const ours: JsonValue = {}
+
+      const theirs: JsonValue = {
+        Profile: {
+          description: 'Our description',
+        },
+      }
+
+      // Act
+      const result = sut.mergeObjects(ancestor, ours, theirs)
+
+      // Assert
+      expect(result).toEqual([])
+    })
+
+    it('should handle string values', () => {
+      // Arrange
+      const ancestor: JsonValue = {
+        Profile: {
+          description: 'Our description',
+        },
+      }
+
+      const ours: JsonValue = {
+        Profile: {
+          description: 'Our description',
+        },
+      }
+
+      const theirs: JsonValue = {}
+
+      // Act
+      const result = sut.mergeObjects(ancestor, ours, theirs)
+
+      // Assert
+      expect(result).toEqual([])
     })
   })
 

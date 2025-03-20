@@ -284,76 +284,69 @@ export class JsonMerger {
       objTheirs[attrib] = [{ '#text': theirs }]
       caseCode += 1
     }
+    const finalArray: JsonArray = []
     switch (caseCode) {
       case 1:
-        return [objTheirs]
+        finalArray.push(objTheirs)
+        break
       case 10:
-        return [objOurs]
+        finalArray.push(objOurs)
+        break
       case 11:
         if (ours === theirs) {
-          return [objOurs]
+          finalArray.push(objOurs)
         } else {
-          const arr: JsonArray = []
-          arr.push({ '#text': '\n<<<<<<< LOCAL' })
-          arr.push(objOurs)
-          arr.push({ '#text': '||||||| BASE' })
-          arr.push({ '#text': '\n' })
-          arr.push({ '#text': '=======' })
-          arr.push(objTheirs)
-          arr.push({ '#text': '>>>>>>> REMOTE' })
-          return arr
+          finalArray.push({ '#text': '\n<<<<<<< LOCAL' })
+          finalArray.push(objOurs)
+          finalArray.push({ '#text': '||||||| BASE' })
+          finalArray.push({ '#text': '\n' })
+          finalArray.push({ '#text': '=======' })
+          finalArray.push(objTheirs)
+          finalArray.push({ '#text': '>>>>>>> REMOTE' })
         }
-      case 100:
-        return []
+        break
       case 101:
-        if (ancestor === theirs) {
-          return []
-        } else {
-          const arr: JsonArray = []
-          arr.push({ '#text': '\n<<<<<<< LOCAL' })
-          arr.push({ '#text': '\n' })
-          arr.push({ '#text': '||||||| BASE' })
-          arr.push(objAnc)
-          arr.push({ '#text': '=======' })
-          arr.push(objTheirs)
-          arr.push({ '#text': '>>>>>>> REMOTE' })
-          return arr
+        if (ancestor !== theirs) {
+          finalArray.push({ '#text': '\n<<<<<<< LOCAL' })
+          finalArray.push({ '#text': '\n' })
+          finalArray.push({ '#text': '||||||| BASE' })
+          finalArray.push(objAnc)
+          finalArray.push({ '#text': '=======' })
+          finalArray.push(objTheirs)
+          finalArray.push({ '#text': '>>>>>>> REMOTE' })
         }
+        break
       case 110:
-        if (ancestor === ours) {
-          return []
-        } else {
-          const arr: JsonArray = []
-          arr.push({ '#text': '\n<<<<<<< LOCAL' })
-          arr.push(objOurs)
-          arr.push({ '#text': '||||||| BASE' })
-          arr.push(objAnc)
-          arr.push({ '#text': '=======' })
-          arr.push({ '#text': '\n' })
-          arr.push({ '#text': '>>>>>>> REMOTE' })
-          return arr
+        if (ancestor !== ours) {
+          finalArray.push({ '#text': '\n<<<<<<< LOCAL' })
+          finalArray.push(objOurs)
+          finalArray.push({ '#text': '||||||| BASE' })
+          finalArray.push(objAnc)
+          finalArray.push({ '#text': '=======' })
+          finalArray.push({ '#text': '\n' })
+          finalArray.push({ '#text': '>>>>>>> REMOTE' })
         }
+        break
       case 111:
         if (ours === theirs) {
-          return [objOurs]
+          finalArray.push(objOurs)
         } else if (ancestor === ours) {
-          return [objTheirs]
+          finalArray.push(objTheirs)
         } else if (ancestor === theirs) {
-          return [objOurs]
+          finalArray.push(objOurs)
         } else {
-          const arr: JsonArray = []
-          arr.push({ '#text': '\n<<<<<<< LOCAL' })
-          arr.push(objOurs)
-          arr.push({ '#text': '||||||| BASE' })
-          arr.push(objAnc)
-          arr.push({ '#text': '=======' })
-          arr.push(objTheirs)
-          arr.push({ '#text': '>>>>>>> REMOTE' })
-          return arr
+          finalArray.push({ '#text': '\n<<<<<<< LOCAL' })
+          finalArray.push(objOurs)
+          finalArray.push({ '#text': '||||||| BASE' })
+          finalArray.push(objAnc)
+          finalArray.push({ '#text': '=======' })
+          finalArray.push(objTheirs)
+          finalArray.push({ '#text': '>>>>>>> REMOTE' })
         }
+        break
       default:
-        return []
     }
+    return finalArray
   }
 
   /**
