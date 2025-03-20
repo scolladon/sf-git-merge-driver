@@ -49,7 +49,7 @@ export class XmlMerger {
     const ancestorObj = parser.parse(ancestorContent)
     const ourObj = parser.parse(ourContent)
     const theirObj = parser.parse(theirContent)
-    // console.log('ancestorObj')
+    // console.log('ancestorObj ' + typeof ancestorObj)
     // console.dir(ancestorObj, {depth:null})
 
     // Perform deep merge of XML objects
