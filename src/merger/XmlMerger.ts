@@ -61,11 +61,13 @@ export class XmlMerger {
 
     // Convert back to XML and format
     const builder = new XMLBuilder(builderOptions)
-    const mergedXml = builder.build(mergedObj)
+    const mergedXml: string = builder.build(mergedObj)
     // console.log('mergedXml')
     // console.dir(mergedXml, {depth:null})
-    return correctConflictIndent(
-      correctComments(XML_DECL.concat(handleSpecialEntities(mergedXml)))
-    )
+    return mergedXml.length
+      ? correctConflictIndent(
+          correctComments(XML_DECL.concat(handleSpecialEntities(mergedXml)))
+        )
+      : ''
   }
 }

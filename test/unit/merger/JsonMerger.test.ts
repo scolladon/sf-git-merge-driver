@@ -505,6 +505,139 @@ describe('JsonMerger', () => {
     })
   })
 
+  // describe('given undefined ours', () => {
+  //   it('should correctly merge objects when ours is undefined', () => {
+  //     // Arrange
+  //     const ancestor: JsonValue = {
+  //       Profile: {
+  //         fieldPermissions: [
+  //           { field: 'Account.Name', editable: 'true', readable: 'true' },
+  //           { field: 'Account.Type', editable: 'false', readable: 'true' },
+  //         ],
+  //         custom: ['Value1', 'Value3'],
+  //       },
+  //     }
+
+  //     const ours = {}
+
+  //     const theirs: JsonValue = {
+  //       Profile: {
+  //         fieldPermissions: [
+  //           { field: 'Account.Name', editable: 'false', readable: 'false' },
+  //           { field: 'Account.Industry', editable: 'false', readable: 'true' },
+  //         ],
+  //         custom: ['Value2', 'Value4'],
+  //         description: 'Their description',
+  //       },
+  //     }
+
+  //     // Act
+  //     const result = sut.mergeObjects(ancestor, ours, theirs)
+
+  //     // Assert
+  //     expect(result).toEqual([
+  //       {
+  //         Profile: [
+  //           { custom: ['Value2', 'Value4'] },
+  //           { description: [{ '#text': 'Their description' }] },
+  //           {
+  //             fieldPermissions: [
+  //               { editable: [{ '#text': 'false' }] },
+  //               { field: [{ '#text': 'Account.Industry' }] },
+  //               { readable: [{ '#text': 'true' }] },
+  //             ],
+  //           },
+  //           {
+  //             fieldPermissions: [
+  //               { '#text': '<<<<<<< LOCAL' },
+  //               { '#text': '\n' },
+  //               { '#text': '||||||| BASE' },
+  //               { editable: [{ '#text': 'true' }] },
+  //               { '#text': '=======' },
+  //               { editable: [{ '#text': 'false' }] },
+  //               { '#text': '>>>>>>> REMOTE' },
+  //               { field: [{ '#text': 'Account.Name' }] },
+  //               { '#text': '<<<<<<< LOCAL' },
+  //               { '#text': '\n' },
+  //               { '#text': '||||||| BASE' },
+  //               { readable: [{ '#text': 'true' }] },
+  //               { '#text': '=======' },
+  //               { readable: [{ '#text': 'false' }] },
+  //               { '#text': '>>>>>>> REMOTE' },
+  //             ],
+  //           },
+  //         ],
+  //       },
+  //     ])
+  //   })
+  // })
+
+  // describe('given undefined theirs', () => {
+  //   it('should correctly merge objects when theirs is undefined', () => {
+  //     // Arrange
+  //     const ancestor: JsonValue = {
+  //       Profile: {
+  //         fieldPermissions: [
+  //           { field: 'Account.Name', editable: 'false', readable: 'false' },
+  //           { field: 'Account.Industry', editable: 'false', readable: 'true' },
+  //         ],
+  //         custom: ['Value2', 'Value4'],
+  //         description: 'Their description',
+  //       },
+  //     }
+
+  //     const ours: JsonValue = {
+  //       Profile: {
+  //         fieldPermissions: [
+  //           { field: 'Account.Name', editable: 'true', readable: 'true' },
+  //           { field: 'Account.Type', editable: 'false', readable: 'true' },
+  //         ],
+  //         custom: ['Value1', 'Value3'],
+  //       },
+  //     }
+
+  //     const theirs = {}
+
+  //     // Act
+  //     const result = sut.mergeObjects(ancestor, ours, theirs)
+
+  //     // Assert
+  //     expect(result).toEqual([
+  //       {
+  //         Profile: [
+  //           { custom: ['Value1', 'Value3'] },
+  //           {
+  //             fieldPermissions: [
+  //               { '#text': '<<<<<<< LOCAL' },
+  //               { editable: [{ '#text': 'true' }] },
+  //               { '#text': '||||||| BASE' },
+  //               { editable: [{ '#text': 'false' }] },
+  //               { '#text': '=======' },
+  //               { '#text': '\n' },
+  //               { '#text': '>>>>>>> REMOTE' },
+  //               { field: [{ '#text': 'Account.Name' }] },
+  //               { '#text': '<<<<<<< LOCAL' },
+  //               { readable: [{ '#text': 'true' }] },
+  //               { '#text': '||||||| BASE' },
+  //               { readable: [{ '#text': 'false' }] },
+  //               { '#text': '=======' },
+  //               { '#text': '\n' },
+  //               { '#text': '>>>>>>> REMOTE' },
+  //             ],
+  //           },
+  //           {
+  //             fieldPermissions: [
+  //               { editable: [{ '#text': 'false' }] },
+  //               { field: [{ '#text': 'Account.Type' }] },
+  //               { readable: [{ '#text': 'true' }] },
+  //             ],
+  //           },
+  //         ],
+  //       },
+  //     ])
+  //   })
+  // })
+
   describe('given arrays with <array> key field', () => {
     it('should merge arrays by position when both sides modify different elements', () => {
       // Arrange
