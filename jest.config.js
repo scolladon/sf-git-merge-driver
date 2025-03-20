@@ -40,10 +40,10 @@ export default {
   // An object that configures minimum threshold enforcement for coverage results
   coverageThreshold: {
     global: {
-      branches: 80,
+      branches: 90,
       functions: 90,
-      lines: 90,
-      statements: 90,
+      lines: 95,
+      statements: 95,
     },
   },
 
