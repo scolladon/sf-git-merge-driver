@@ -28,17 +28,21 @@ export class JsonMerger {
   ): JsonArray {
     // Get all properties from three ways
     const arrProperties: string[] = []
+    let caseCode: number = 0
     if (ancestor && !isEqual(ancestor, {})) {
+      caseCode += 100
       arrProperties.push(...Object.keys(ancestor))
     } else {
       ancestor = {}
     }
     if (ours && !isEqual(ours, {})) {
+      caseCode += 10
       arrProperties.push(...Object.keys(ours))
     } else {
       ours = {}
     }
     if (theirs && !isEqual(theirs, {})) {
+      caseCode += 1
       arrProperties.push(...Object.keys(theirs))
     } else {
       theirs = {}
@@ -48,6 +52,11 @@ export class JsonMerger {
     // Process each property
     const mergedContent = [] as JsonArray
     for (const property of allProperties) {
+      // console.info('property: '+property+'\ntypeof: '+this.getAttributePrimarytype(
+      //   ancestor[property],
+      //   ours[property],
+      //   theirs[property]
+      // ))
       switch (
         this.getAttributePrimarytype(
           ancestor[property],
@@ -68,17 +77,93 @@ export class JsonMerger {
               )
             )
           } else {
-            const propObject = {}
-            propObject[property] = []
-            propObject[property].push(
-              ...this.mergeObjects(
-                ancestor[property],
-                ours[property],
-                theirs[property],
-                propObject
-              )
-            )
-            mergedContent.push(propObject)
+            let propObject = {}
+            switch (caseCode) {
+              case 100:
+                return []
+              case 11:
+                if (isEqual(ours, theirs)) {
+                  propObject[property] = []
+                  propObject[property].push(
+                    ...this.mergeObjects({}, ours[property], {}, propObject)
+                  )
+                  mergedContent.push(propObject)
+                } else {
+                  mergedContent.push({ '#text': '\n<<<<<<< LOCAL' })
+                  propObject[property] = []
+                  propObject[property].push(
+                    ...this.mergeObjects({}, ours[property], {}, propObject)
+                  )
+                  mergedContent.push(propObject)
+                  mergedContent.push({ '#text': '||||||| BASE' })
+                  mergedContent.push({ '#text': '\n' })
+                  mergedContent.push({ '#text': '=======' })
+                  propObject = {}
+                  propObject[property] = []
+                  propObject[property].push(
+                    ...this.mergeObjects({}, {}, theirs[property], propObject)
+                  )
+                  mergedContent.push(propObject)
+                  mergedContent.push({ '#text': '>>>>>>> REMOTE' })
+                }
+                break
+              case 101:
+                if (isEqual(ancestor, theirs)) {
+                  return []
+                } else {
+                  mergedContent.push({ '#text': '\n<<<<<<< LOCAL' })
+                  mergedContent.push({ '#text': '\n' })
+                  mergedContent.push({ '#text': '||||||| BASE' })
+                  propObject[property] = []
+                  propObject[property].push(
+                    ...this.mergeObjects({}, ancestor[property], {}, propObject)
+                  )
+                  mergedContent.push(propObject)
+                  mergedContent.push({ '#text': '=======' })
+                  propObject = {}
+                  propObject[property] = []
+                  propObject[property].push(
+                    ...this.mergeObjects({}, {}, theirs[property], propObject)
+                  )
+                  mergedContent.push(propObject)
+                  mergedContent.push({ '#text': '>>>>>>> REMOTE' })
+                }
+                break
+              case 110:
+                if (isEqual(ancestor, ours)) {
+                  return []
+                } else {
+                  mergedContent.push({ '#text': '\n<<<<<<< LOCAL' })
+                  propObject[property] = []
+                  propObject[property].push(
+                    ...this.mergeObjects({}, ours[property], {}, propObject)
+                  )
+                  mergedContent.push(propObject)
+                  mergedContent.push({ '#text': '||||||| BASE' })
+                  propObject = {}
+                  propObject[property] = []
+                  propObject[property].push(
+                    ...this.mergeObjects({}, {}, ancestor[property], propObject)
+                  )
+                  mergedContent.push(propObject)
+                  mergedContent.push({ '#text': '=======' })
+                  mergedContent.push({ '#text': '\n' })
+                  mergedContent.push({ '#text': '>>>>>>> REMOTE' })
+                }
+                break
+              default:
+                propObject[property] = []
+                propObject[property].push(
+                  ...this.mergeObjects(
+                    ancestor[property],
+                    ours[property],
+                    theirs[property],
+                    propObject
+                  )
+                )
+                mergedContent.push(propObject)
+                break
+            }
           }
           break
         }
@@ -209,7 +294,7 @@ export class JsonMerger {
           return [objOurs]
         } else {
           const arr: JsonArray = []
-          arr.push({ '#text': '<<<<<<< LOCAL' })
+          arr.push({ '#text': '\n<<<<<<< LOCAL' })
           arr.push(objOurs)
           arr.push({ '#text': '||||||| BASE' })
           arr.push({ '#text': '\n' })
@@ -225,7 +310,7 @@ export class JsonMerger {
           return []
         } else {
           const arr: JsonArray = []
-          arr.push({ '#text': '<<<<<<< LOCAL' })
+          arr.push({ '#text': '\n<<<<<<< LOCAL' })
           arr.push({ '#text': '\n' })
           arr.push({ '#text': '||||||| BASE' })
           arr.push(objAnc)
@@ -239,7 +324,7 @@ export class JsonMerger {
           return []
         } else {
           const arr: JsonArray = []
-          arr.push({ '#text': '<<<<<<< LOCAL' })
+          arr.push({ '#text': '\n<<<<<<< LOCAL' })
           arr.push(objOurs)
           arr.push({ '#text': '||||||| BASE' })
           arr.push(objAnc)
@@ -257,7 +342,7 @@ export class JsonMerger {
           return [objOurs]
         } else {
           const arr: JsonArray = []
-          arr.push({ '#text': '<<<<<<< LOCAL' })
+          arr.push({ '#text': '\n<<<<<<< LOCAL' })
           arr.push(objOurs)
           arr.push({ '#text': '||||||| BASE' })
           arr.push(objAnc)
@@ -397,17 +482,7 @@ export class JsonMerger {
     //     '\ncaseCode: ' +
     //     caseCode
     // )
-    const propObject = {}
-    switch (caseCode) {
-      case 1:
-        propObject[attribute] = this.mergeObjects({}, {}, theirs, parent)
-        return [propObject]
-      case 10:
-        propObject[attribute] = this.mergeObjects({}, {}, ours, parent)
-        return [propObject]
-      case 100:
-        return []
-    }
+    // console.dir(ours, {depth: null})
     const keyedAnc = keyBy(ancestor, keyField)
     const keyedOurs = keyBy(ours, keyField)
     const keyedTheirs = keyBy(theirs, keyField)

@@ -372,34 +372,15 @@ describe('JsonMerger', () => {
 
       // Assert
       expect(result).toEqual([
+        { '#text': '\n<<<<<<< LOCAL' },
         {
           Profile: [
-            { custom: ['Value1', 'Value3', 'Value2', 'Value4'] },
-            { description: [{ '#text': 'Their description' }] },
+            { custom: ['Value1', 'Value3'] },
             {
               fieldPermissions: [
-                { editable: [{ '#text': 'false' }] },
-                { field: [{ '#text': 'Account.Industry' }] },
-                { readable: [{ '#text': 'true' }] },
-              ],
-            },
-            {
-              fieldPermissions: [
-                { '#text': '<<<<<<< LOCAL' },
                 { editable: [{ '#text': 'true' }] },
-                { '#text': '||||||| BASE' },
-                { '#text': '\n' },
-                { '#text': '=======' },
-                { editable: [{ '#text': 'false' }] },
-                { '#text': '>>>>>>> REMOTE' },
                 { field: [{ '#text': 'Account.Name' }] },
-                { '#text': '<<<<<<< LOCAL' },
                 { readable: [{ '#text': 'true' }] },
-                { '#text': '||||||| BASE' },
-                { '#text': '\n' },
-                { '#text': '=======' },
-                { readable: [{ '#text': 'false' }] },
-                { '#text': '>>>>>>> REMOTE' },
               ],
             },
             {
@@ -411,6 +392,30 @@ describe('JsonMerger', () => {
             },
           ],
         },
+        { '#text': '||||||| BASE' },
+        { '#text': '\n' },
+        { '#text': '=======' },
+        {
+          Profile: [
+            { custom: ['Value2', 'Value4'] },
+            { description: [{ '#text': 'Their description' }] },
+            {
+              fieldPermissions: [
+                { editable: [{ '#text': 'false' }] },
+                { field: [{ '#text': 'Account.Industry' }] },
+                { readable: [{ '#text': 'true' }] },
+              ],
+            },
+            {
+              fieldPermissions: [
+                { editable: [{ '#text': 'false' }] },
+                { field: [{ '#text': 'Account.Name' }] },
+                { readable: [{ '#text': 'false' }] },
+              ],
+            },
+          ],
+        },
+        { '#text': '>>>>>>> REMOTE' },
       ])
     })
 
@@ -440,25 +445,28 @@ describe('JsonMerger', () => {
 
       // Assert
       expect(result).toEqual([
+        { '#text': '\n<<<<<<< LOCAL' },
         {
           Profile: [
             {
               fieldPermissions: [
-                { '#text': '<<<<<<< LOCAL' },
                 { editable: [{ '#text': 'true' }] },
-                { '#text': '||||||| BASE' },
-                { '#text': '\n' },
-                { '#text': '=======' },
-                { editable: [{ '#text': 'false' }] },
-                { '#text': '>>>>>>> REMOTE' },
                 { field: [{ '#text': 'Account.Name' }] },
-                { '#text': '<<<<<<< LOCAL' },
                 { readable: [{ '#text': 'true' }] },
-                { '#text': '||||||| BASE' },
-                { '#text': '\n' },
-                { '#text': '=======' },
+              ],
+            },
+          ],
+        },
+        { '#text': '||||||| BASE' },
+        { '#text': '\n' },
+        { '#text': '=======' },
+        {
+          Profile: [
+            {
+              fieldPermissions: [
+                { editable: [{ '#text': 'false' }] },
+                { field: [{ '#text': 'Account.Name' }] },
                 { readable: [{ '#text': 'false' }] },
-                { '#text': '>>>>>>> REMOTE' },
               ],
             },
             {
@@ -470,6 +478,7 @@ describe('JsonMerger', () => {
             },
           ],
         },
+        { '#text': '>>>>>>> REMOTE' },
       ])
     })
 
@@ -494,149 +503,186 @@ describe('JsonMerger', () => {
 
       // Assert
       expect(result).toEqual([
+        { '#text': '\n<<<<<<< LOCAL' },
         {
           Profile: [
             {
-              custom: ['Value1', 'Value3', 'Value2', 'Value4'],
+              custom: ['Value1', 'Value3'],
             },
           ],
         },
+        { '#text': '||||||| BASE' },
+        { '#text': '\n' },
+        { '#text': '=======' },
+        {
+          Profile: [
+            {
+              custom: ['Value1', 'Value2', 'Value4'],
+            },
+          ],
+        },
+        { '#text': '>>>>>>> REMOTE' },
       ])
     })
   })
 
-  // describe('given undefined ours', () => {
-  //   it('should correctly merge objects when ours is undefined', () => {
-  //     // Arrange
-  //     const ancestor: JsonValue = {
-  //       Profile: {
-  //         fieldPermissions: [
-  //           { field: 'Account.Name', editable: 'true', readable: 'true' },
-  //           { field: 'Account.Type', editable: 'false', readable: 'true' },
-  //         ],
-  //         custom: ['Value1', 'Value3'],
-  //       },
-  //     }
+  describe('given undefined ours', () => {
+    it('should correctly merge objects when ours is undefined', () => {
+      // Arrange
+      const ancestor: JsonValue = {
+        Profile: {
+          fieldPermissions: [
+            { field: 'Account.Name', editable: 'false', readable: 'false' },
+            { field: 'Account.Industry', editable: 'false', readable: 'true' },
+          ],
+          custom: ['Value2', 'Value4'],
+          description: 'Their description',
+        },
+      }
 
-  //     const ours = {}
+      const ours = {}
 
-  //     const theirs: JsonValue = {
-  //       Profile: {
-  //         fieldPermissions: [
-  //           { field: 'Account.Name', editable: 'false', readable: 'false' },
-  //           { field: 'Account.Industry', editable: 'false', readable: 'true' },
-  //         ],
-  //         custom: ['Value2', 'Value4'],
-  //         description: 'Their description',
-  //       },
-  //     }
+      const theirs: JsonValue = {
+        Profile: {
+          fieldPermissions: [
+            { field: 'Account.Name', editable: 'true', readable: 'true' },
+            { field: 'Account.Type', editable: 'false', readable: 'true' },
+          ],
+          custom: ['Value1', 'Value3'],
+        },
+      }
 
-  //     // Act
-  //     const result = sut.mergeObjects(ancestor, ours, theirs)
+      // Act
+      const result = sut.mergeObjects(ancestor, ours, theirs)
 
-  //     // Assert
-  //     expect(result).toEqual([
-  //       {
-  //         Profile: [
-  //           { custom: ['Value2', 'Value4'] },
-  //           { description: [{ '#text': 'Their description' }] },
-  //           {
-  //             fieldPermissions: [
-  //               { editable: [{ '#text': 'false' }] },
-  //               { field: [{ '#text': 'Account.Industry' }] },
-  //               { readable: [{ '#text': 'true' }] },
-  //             ],
-  //           },
-  //           {
-  //             fieldPermissions: [
-  //               { '#text': '<<<<<<< LOCAL' },
-  //               { '#text': '\n' },
-  //               { '#text': '||||||| BASE' },
-  //               { editable: [{ '#text': 'true' }] },
-  //               { '#text': '=======' },
-  //               { editable: [{ '#text': 'false' }] },
-  //               { '#text': '>>>>>>> REMOTE' },
-  //               { field: [{ '#text': 'Account.Name' }] },
-  //               { '#text': '<<<<<<< LOCAL' },
-  //               { '#text': '\n' },
-  //               { '#text': '||||||| BASE' },
-  //               { readable: [{ '#text': 'true' }] },
-  //               { '#text': '=======' },
-  //               { readable: [{ '#text': 'false' }] },
-  //               { '#text': '>>>>>>> REMOTE' },
-  //             ],
-  //           },
-  //         ],
-  //       },
-  //     ])
-  //   })
-  // })
+      // Assert
+      expect(result).toEqual([
+        { '#text': '\n<<<<<<< LOCAL' },
+        { '#text': '\n' },
+        { '#text': '||||||| BASE' },
+        {
+          Profile: [
+            { custom: ['Value2', 'Value4'] },
+            { description: [{ '#text': 'Their description' }] },
+            {
+              fieldPermissions: [
+                { editable: [{ '#text': 'false' }] },
+                { field: [{ '#text': 'Account.Industry' }] },
+                { readable: [{ '#text': 'true' }] },
+              ],
+            },
+            {
+              fieldPermissions: [
+                { editable: [{ '#text': 'false' }] },
+                { field: [{ '#text': 'Account.Name' }] },
+                { readable: [{ '#text': 'false' }] },
+              ],
+            },
+          ],
+        },
+        { '#text': '=======' },
+        {
+          Profile: [
+            { custom: ['Value1', 'Value3'] },
+            {
+              fieldPermissions: [
+                { editable: [{ '#text': 'true' }] },
+                { field: [{ '#text': 'Account.Name' }] },
+                { readable: [{ '#text': 'true' }] },
+              ],
+            },
+            {
+              fieldPermissions: [
+                { editable: [{ '#text': 'false' }] },
+                { field: [{ '#text': 'Account.Type' }] },
+                { readable: [{ '#text': 'true' }] },
+              ],
+            },
+          ],
+        },
+        { '#text': '>>>>>>> REMOTE' },
+      ])
+    })
+  })
 
-  // describe('given undefined theirs', () => {
-  //   it('should correctly merge objects when theirs is undefined', () => {
-  //     // Arrange
-  //     const ancestor: JsonValue = {
-  //       Profile: {
-  //         fieldPermissions: [
-  //           { field: 'Account.Name', editable: 'false', readable: 'false' },
-  //           { field: 'Account.Industry', editable: 'false', readable: 'true' },
-  //         ],
-  //         custom: ['Value2', 'Value4'],
-  //         description: 'Their description',
-  //       },
-  //     }
+  describe('given undefined theirs', () => {
+    it('should correctly merge objects when theirs is undefined', () => {
+      // Arrange
+      const ancestor: JsonValue = {
+        Profile: {
+          fieldPermissions: [
+            { field: 'Account.Name', editable: 'false', readable: 'false' },
+            { field: 'Account.Industry', editable: 'false', readable: 'true' },
+          ],
+          custom: ['Value2', 'Value4'],
+          description: 'Their description',
+        },
+      }
 
-  //     const ours: JsonValue = {
-  //       Profile: {
-  //         fieldPermissions: [
-  //           { field: 'Account.Name', editable: 'true', readable: 'true' },
-  //           { field: 'Account.Type', editable: 'false', readable: 'true' },
-  //         ],
-  //         custom: ['Value1', 'Value3'],
-  //       },
-  //     }
+      const ours: JsonValue = {
+        Profile: {
+          fieldPermissions: [
+            { field: 'Account.Name', editable: 'true', readable: 'true' },
+            { field: 'Account.Type', editable: 'false', readable: 'true' },
+          ],
+          custom: ['Value1', 'Value3'],
+        },
+      }
 
-  //     const theirs = {}
+      const theirs = {}
 
-  //     // Act
-  //     const result = sut.mergeObjects(ancestor, ours, theirs)
+      // Act
+      const result = sut.mergeObjects(ancestor, ours, theirs)
 
-  //     // Assert
-  //     expect(result).toEqual([
-  //       {
-  //         Profile: [
-  //           { custom: ['Value1', 'Value3'] },
-  //           {
-  //             fieldPermissions: [
-  //               { '#text': '<<<<<<< LOCAL' },
-  //               { editable: [{ '#text': 'true' }] },
-  //               { '#text': '||||||| BASE' },
-  //               { editable: [{ '#text': 'false' }] },
-  //               { '#text': '=======' },
-  //               { '#text': '\n' },
-  //               { '#text': '>>>>>>> REMOTE' },
-  //               { field: [{ '#text': 'Account.Name' }] },
-  //               { '#text': '<<<<<<< LOCAL' },
-  //               { readable: [{ '#text': 'true' }] },
-  //               { '#text': '||||||| BASE' },
-  //               { readable: [{ '#text': 'false' }] },
-  //               { '#text': '=======' },
-  //               { '#text': '\n' },
-  //               { '#text': '>>>>>>> REMOTE' },
-  //             ],
-  //           },
-  //           {
-  //             fieldPermissions: [
-  //               { editable: [{ '#text': 'false' }] },
-  //               { field: [{ '#text': 'Account.Type' }] },
-  //               { readable: [{ '#text': 'true' }] },
-  //             ],
-  //           },
-  //         ],
-  //       },
-  //     ])
-  //   })
-  // })
+      // Assert
+      expect(result).toEqual([
+        { '#text': '\n<<<<<<< LOCAL' },
+        {
+          Profile: [
+            { custom: ['Value1', 'Value3'] },
+            {
+              fieldPermissions: [
+                { editable: [{ '#text': 'true' }] },
+                { field: [{ '#text': 'Account.Name' }] },
+                { readable: [{ '#text': 'true' }] },
+              ],
+            },
+            {
+              fieldPermissions: [
+                { editable: [{ '#text': 'false' }] },
+                { field: [{ '#text': 'Account.Type' }] },
+                { readable: [{ '#text': 'true' }] },
+              ],
+            },
+          ],
+        },
+        { '#text': '||||||| BASE' },
+        {
+          Profile: [
+            { custom: ['Value2', 'Value4'] },
+            { description: [{ '#text': 'Their description' }] },
+            {
+              fieldPermissions: [
+                { editable: [{ '#text': 'false' }] },
+                { field: [{ '#text': 'Account.Industry' }] },
+                { readable: [{ '#text': 'true' }] },
+              ],
+            },
+            {
+              fieldPermissions: [
+                { editable: [{ '#text': 'false' }] },
+                { field: [{ '#text': 'Account.Name' }] },
+                { readable: [{ '#text': 'false' }] },
+              ],
+            },
+          ],
+        },
+        { '#text': '=======' },
+        { '#text': '\n' },
+        { '#text': '>>>>>>> REMOTE' },
+      ])
+    })
+  })
 
   describe('given arrays with <array> key field', () => {
     it('should merge arrays by position when both sides modify different elements', () => {
