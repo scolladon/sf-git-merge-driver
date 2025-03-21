@@ -592,17 +592,14 @@ export class JsonMerger {
             propObject[attribute] = [
               ...this.mergeObjects({}, {}, keyedOurs[key], parent),
             ]
-            finalArray.push(propObject)
           } else if (isEqual(ancestor, ours)) {
             propObject[attribute] = [
               ...this.mergeObjects({}, {}, keyedTheirs[key], parent),
             ]
-            finalArray.push(propObject)
           } else if (isEqual(ancestor, theirs)) {
             propObject[attribute] = [
               ...this.mergeObjects({}, {}, keyedOurs[key], parent),
             ]
-            finalArray.push(propObject)
           } else {
             // finalArray.push({ '#text': '<<<<<<< LOCAL' })
             // finalArray.push(...this.mergeObjects({}, {}, keyedOurs[key], parent))
@@ -619,8 +616,8 @@ export class JsonMerger {
                 parent
               ),
             ]
-            finalArray.push(propObject)
           }
+          finalArray.push(propObject)
           break
         default:
       }

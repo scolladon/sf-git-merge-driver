@@ -526,6 +526,335 @@ describe('JsonMerger', () => {
     })
   })
 
+  it('should correctly merge objects when ancestor key undefined', () => {
+    // Arrange
+    const ancestor: JsonValue = {
+      Profile: {},
+    }
+
+    const ours: JsonValue = {
+      Profile: {
+        fieldPermissions: [
+          { field: 'Account.Name', editable: 'true', readable: 'true' },
+        ],
+      },
+    }
+
+    const theirs: JsonValue = {
+      Profile: {
+        fieldPermissions: [
+          { field: 'Account.Name', editable: 'true', readable: 'true' },
+        ],
+      },
+    }
+
+    // Act
+    const result = sut.mergeObjects(ancestor, ours, theirs)
+
+    // Assert
+    expect(result).toEqual([
+      {
+        Profile: [
+          {
+            fieldPermissions: [
+              { editable: [{ '#text': 'true' }] },
+              { field: [{ '#text': 'Account.Name' }] },
+              { readable: [{ '#text': 'true' }] },
+            ],
+          },
+        ],
+      },
+    ])
+  })
+
+  it('should correctly merge objects when ancestor key undefined', () => {
+    // Arrange
+    const ancestor: JsonValue = {
+      Profile: {},
+    }
+
+    const ours: JsonValue = {
+      Profile: {
+        fieldPermissions: [
+          { field: 'Account.Name', editable: 'true', readable: 'true' },
+        ],
+      },
+    }
+
+    const theirs: JsonValue = {
+      Profile: {
+        fieldPermissions: [
+          { field: 'Account.Name', editable: 'false', readable: 'true' },
+        ],
+      },
+    }
+
+    // Act
+    const result = sut.mergeObjects(ancestor, ours, theirs)
+
+    // Assert
+    expect(result).toEqual([
+      {
+        Profile: [
+          {
+            fieldPermissions: [
+              { '#text': '\n<<<<<<< LOCAL' },
+              { editable: [{ '#text': 'true' }] },
+              { '#text': '||||||| BASE' },
+              { '#text': '\n' },
+              { '#text': '=======' },
+              { editable: [{ '#text': 'false' }] },
+              { '#text': '>>>>>>> REMOTE' },
+              { field: [{ '#text': 'Account.Name' }] },
+              { readable: [{ '#text': 'true' }] },
+            ],
+          },
+        ],
+      },
+    ])
+  })
+
+  it('should correctly merge objects when our key undefined', () => {
+    // Arrange
+    const ancestor: JsonValue = {
+      Profile: {
+        fieldPermissions: [
+          { field: 'Account.Name', editable: 'true', readable: 'true' },
+        ],
+      },
+    }
+
+    const ours: JsonValue = {
+      Profile: {
+        fieldPermissions: [
+          { field: 'Account.Name', editable: 'false', readable: 'true' },
+        ],
+      },
+    }
+
+    const theirs: JsonValue = {
+      Profile: {},
+    }
+
+    // Act
+    const result = sut.mergeObjects(ancestor, ours, theirs)
+
+    // Assert
+    expect(result).toEqual([
+      {
+        Profile: [
+          { '#text': '\n<<<<<<< LOCAL' },
+          {
+            fieldPermissions: [
+              { editable: [{ '#text': 'false' }] },
+              { field: [{ '#text': 'Account.Name' }] },
+              { readable: [{ '#text': 'true' }] },
+            ],
+          },
+          { '#text': '||||||| BASE' },
+          {
+            fieldPermissions: [
+              { editable: [{ '#text': 'true' }] },
+              { field: [{ '#text': 'Account.Name' }] },
+              { readable: [{ '#text': 'true' }] },
+            ],
+          },
+          { '#text': '=======' },
+          { '#text': '\n' },
+          { '#text': '>>>>>>> REMOTE' },
+        ],
+      },
+    ])
+  })
+
+  it('should correctly merge objects when our key undefined', () => {
+    // Arrange
+    const ancestor: JsonValue = {
+      Profile: {
+        fieldPermissions: [
+          { field: 'Account.Name', editable: 'true', readable: 'true' },
+        ],
+      },
+    }
+
+    const ours: JsonValue = {
+      Profile: {},
+    }
+
+    const theirs: JsonValue = {
+      Profile: {
+        fieldPermissions: [
+          { field: 'Account.Name', editable: 'false', readable: 'true' },
+        ],
+      },
+    }
+
+    // Act
+    const result = sut.mergeObjects(ancestor, ours, theirs)
+
+    // Assert
+    expect(result).toEqual([
+      {
+        Profile: [
+          { '#text': '\n<<<<<<< LOCAL' },
+          { '#text': '\n' },
+          { '#text': '||||||| BASE' },
+          {
+            fieldPermissions: [
+              { editable: [{ '#text': 'true' }] },
+              { field: [{ '#text': 'Account.Name' }] },
+              { readable: [{ '#text': 'true' }] },
+            ],
+          },
+          { '#text': '=======' },
+          {
+            fieldPermissions: [
+              { editable: [{ '#text': 'false' }] },
+              { field: [{ '#text': 'Account.Name' }] },
+              { readable: [{ '#text': 'true' }] },
+            ],
+          },
+          { '#text': '>>>>>>> REMOTE' },
+        ],
+      },
+    ])
+  })
+
+  it('should correctly merge objects when our key undefined', () => {
+    // Arrange
+    const ancestor: JsonValue = {
+      Profile: {
+        fieldPermissions: [
+          { field: 'Account.Name', editable: 'true', readable: 'true' },
+        ],
+      },
+    }
+
+    const ours: JsonValue = {
+      Profile: {
+        fieldPermissions: [
+          { field: 'Account.Name', editable: 'false', readable: 'true' },
+        ],
+      },
+    }
+
+    const theirs: JsonValue = {
+      Profile: {
+        fieldPermissions: [
+          { field: 'Account.Name', editable: 'false', readable: 'true' },
+        ],
+      },
+    }
+
+    // Act
+    const result = sut.mergeObjects(ancestor, ours, theirs)
+
+    // Assert
+    expect(result).toEqual([
+      {
+        Profile: [
+          {
+            fieldPermissions: [
+              { editable: [{ '#text': 'false' }] },
+              { field: [{ '#text': 'Account.Name' }] },
+              { readable: [{ '#text': 'true' }] },
+            ],
+          },
+        ],
+      },
+    ])
+  })
+
+  it('should correctly merge objects when our key undefined', () => {
+    // Arrange
+    const ancestor: JsonValue = {
+      Profile: {
+        fieldPermissions: [
+          { field: 'Account.Name', editable: 'true', readable: 'true' },
+        ],
+      },
+    }
+
+    const ours: JsonValue = {
+      Profile: {
+        fieldPermissions: [
+          { field: 'Account.Name', editable: 'true', readable: 'true' },
+        ],
+      },
+    }
+
+    const theirs: JsonValue = {
+      Profile: {
+        fieldPermissions: [
+          { field: 'Account.Name', editable: 'false', readable: 'true' },
+        ],
+      },
+    }
+
+    // Act
+    const result = sut.mergeObjects(ancestor, ours, theirs)
+
+    // Assert
+    expect(result).toEqual([
+      {
+        Profile: [
+          {
+            fieldPermissions: [
+              { editable: [{ '#text': 'false' }] },
+              { field: [{ '#text': 'Account.Name' }] },
+              { readable: [{ '#text': 'true' }] },
+            ],
+          },
+        ],
+      },
+    ])
+  })
+
+  it('should correctly merge objects when our key undefined', () => {
+    // Arrange
+    const ancestor: JsonValue = {
+      Profile: {
+        fieldPermissions: [
+          { field: 'Account.Name', editable: 'true', readable: 'true' },
+        ],
+      },
+    }
+
+    const ours: JsonValue = {
+      Profile: {
+        fieldPermissions: [
+          { field: 'Account.Name', editable: 'false', readable: 'true' },
+        ],
+      },
+    }
+
+    const theirs: JsonValue = {
+      Profile: {
+        fieldPermissions: [
+          { field: 'Account.Name', editable: 'true', readable: 'true' },
+        ],
+      },
+    }
+
+    // Act
+    const result = sut.mergeObjects(ancestor, ours, theirs)
+
+    // Assert
+    expect(result).toEqual([
+      {
+        Profile: [
+          {
+            fieldPermissions: [
+              { editable: [{ '#text': 'false' }] },
+              { field: [{ '#text': 'Account.Name' }] },
+              { readable: [{ '#text': 'true' }] },
+            ],
+          },
+        ],
+      },
+    ])
+  })
+
   it('should handle string values', () => {
     // Arrange
     const ancestor: JsonValue = {

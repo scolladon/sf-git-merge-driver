@@ -4,23 +4,25 @@ import { JsonMerger } from './JsonMerger.js'
 const XML_DECL = '<?xml version="1.0" encoding="UTF-8"?>\n'
 const XML_COMMENT_PROP_NAME = '#xml__comment'
 
-const parserOptions = {
-  ignoreAttributes: false,
-  parseTagValue: false,
-  parseAttributeValue: false,
+const baseOptions = {
   cdataPropName: '__cdata',
+  commentPropName: XML_COMMENT_PROP_NAME,
+  ignoreAttributes: false,
+}
+
+const parserOptions = {
+  ...baseOptions,
   ignoreDeclaration: true,
   numberParseOptions: { leadingZeros: false, hex: false },
-  commentPropName: XML_COMMENT_PROP_NAME,
+  parseAttributeValue: false,
+  parseTagValue: false,
   // preserveOrder: true,
 }
 
 const builderOptions = {
+  ...baseOptions,
   format: true,
   indentBy: '    ',
-  ignoreAttributes: false,
-  cdataPropName: '__cdata',
-  commentPropName: XML_COMMENT_PROP_NAME,
   preserveOrder: true,
 }
 
