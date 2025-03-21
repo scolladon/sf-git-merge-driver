@@ -310,6 +310,77 @@ describe('JsonMerger', () => {
     })
   })
 
+  describe('test dealing with namespace', () => {
+    it('it should come at the right level', () => {
+      // Arrange
+      const ancestor: JsonValue = {
+        CustomLabels: {
+          labels: {
+            fullName: 'tested_label',
+            value: 'this is ancestor label',
+            language: 'fr',
+            protected: 'false',
+            shortDescription: 'this is ancestor label',
+          },
+          '@_xmlns': 'http://soap.sforce.com/2006/04/metadata',
+        },
+      }
+
+      const ours: JsonValue = {
+        CustomLabels: {
+          labels: {
+            fullName: 'tested_label',
+            value: 'this is ancestor label',
+            language: 'fr',
+            protected: 'false',
+            shortDescription: 'this is ancestor label',
+          },
+          '@_xmlns': 'http://soap.sforce.com/2006/04/metadata',
+        },
+      }
+
+      const theirs: JsonValue = {
+        CustomLabels: {
+          labels: {
+            fullName: 'tested_label',
+            value: 'this is ancestor label',
+            language: 'fr',
+            protected: 'false',
+            shortDescription: 'this is ancestor label',
+          },
+          '@_xmlns': 'http://soap.sforce.com/2006/04/metadata',
+        },
+      }
+
+      // Act
+      const result = sut.mergeObjects(ancestor, ours, theirs)
+
+      // Assert
+      expect(result).toEqual([
+        {
+          CustomLabels: [
+            {
+              labels: [
+                { fullName: [{ '#text': 'tested_label' }] },
+                { language: [{ '#text': 'fr' }] },
+                { protected: [{ '#text': 'false' }] },
+                {
+                  shortDescription: [{ '#text': 'this is ancestor label' }],
+                },
+                { value: [{ '#text': 'this is ancestor label' }] },
+              ],
+            },
+          ],
+          ':@': {
+            '@_xmlns': 'http://soap.sforce.com/2006/04/metadata',
+          },
+        },
+      ])
+    })
+
+    // TODO think about if we check for conflicts and what to output in suhc cases
+  })
+
   // KGO: removed because should never happen
   // describe('given type conflicts', () => {
   //   it('should prefer our changes when types conflict', () => {
