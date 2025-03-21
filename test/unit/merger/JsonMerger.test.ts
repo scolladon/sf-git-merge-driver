@@ -1,4 +1,5 @@
-import { JsonMerger, JsonValue } from '../../../src/merger/JsonMerger.js'
+import { JsonMerger } from '../../../src/merger/JsonMerger.js'
+import { JsonValue } from '../../../src/types/jsonTypes.js'
 
 describe('JsonMerger', () => {
   let sut: JsonMerger
@@ -1152,23 +1153,29 @@ describe('JsonMerger', () => {
     })
   })
 
-  describe('given arrays with <array> key field', () => {
+  describe('given special metadata kind', () => {
     it('should merge arrays by position when both sides modify different elements', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {
-          loginHours: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+          loginHours: [
+            { mondayStart: 300, mondayEnd: 400 },
+            { tuesdayStart: 300, tuesdayEnd: 400 },
+            { wednesdayStart: 300, wednesdayEnd: 400 },
+            { thursdayStart: 300, thursdayEnd: 400 },
+            { fridayStart: 300, fridayEnd: 400 },
+          ],
         },
       }
 
       const ours: JsonValue = {
         Profile: {
           loginHours: [
-            'Monday-Modified',
-            'Tuesday',
-            'Wednesday',
-            'Thursday',
-            'Friday',
+            { mondayStart: 200, mondayEnd: 400 },
+            { tuesdayStart: 300, tuesdayEnd: 400 },
+            { wednesdayStart: 300, wednesdayEnd: 400 },
+            { thursdayStart: 300, thursdayEnd: 400 },
+            { fridayStart: 300, fridayEnd: 400 },
           ],
         },
       }
@@ -1176,11 +1183,11 @@ describe('JsonMerger', () => {
       const theirs: JsonValue = {
         Profile: {
           loginHours: [
-            'Monday',
-            'Tuesday',
-            'Wednesday-Modified',
-            'Thursday',
-            'Friday',
+            { mondayStart: 300, mondayEnd: 400 },
+            { tuesdayStart: 300, tuesdayEnd: 400 },
+            { wednesdayStart: 300, wednesdayEnd: 500 },
+            { thursdayStart: 300, thursdayEnd: 400 },
+            { fridayStart: 300, fridayEnd: 400 },
           ],
         },
       }
@@ -1194,11 +1201,32 @@ describe('JsonMerger', () => {
           Profile: [
             {
               loginHours: [
-                'Monday-Modified',
-                'Tuesday',
-                'Wednesday-Modified',
-                'Thursday',
-                'Friday',
+                { fridayEnd: [{ '#text': 400 }] },
+                { fridayStart: [{ '#text': 300 }] },
+              ],
+            },
+            {
+              loginHours: [
+                { mondayEnd: [{ '#text': 400 }] },
+                { mondayStart: [{ '#text': 200 }] },
+              ],
+            },
+            {
+              loginHours: [
+                { thursdayEnd: [{ '#text': 400 }] },
+                { thursdayStart: [{ '#text': 300 }] },
+              ],
+            },
+            {
+              loginHours: [
+                { tuesdayEnd: [{ '#text': 400 }] },
+                { tuesdayStart: [{ '#text': 300 }] },
+              ],
+            },
+            {
+              loginHours: [
+                { wednesdayEnd: [{ '#text': 500 }] },
+                { wednesdayStart: [{ '#text': 300 }] },
               ],
             },
           ],
@@ -1210,19 +1238,37 @@ describe('JsonMerger', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {
-          loginIpRanges: ['192.168.1.1', '10.0.0.1', '172.16.0.1'],
+          loginIpRanges: [
+            {
+              startAddress: '192.168.1.1',
+              endAddress: '10.0.0.1',
+              description: 'description',
+            },
+          ],
         },
       }
 
       const ours: JsonValue = {
         Profile: {
-          loginIpRanges: ['192.168.1.1', '10.0.0.1', '172.16.0.1'],
+          loginIpRanges: [
+            {
+              startAddress: '192.168.1.1',
+              endAddress: '10.0.0.1',
+              description: 'description',
+            },
+          ],
         },
       }
 
       const theirs: JsonValue = {
         Profile: {
-          loginIpRanges: ['192.168.1.1', '10.0.0.2', '172.16.0.1'],
+          loginIpRanges: [
+            {
+              startAddress: '192.168.1.1',
+              endAddress: '10.0.0.2',
+              description: 'description',
+            },
+          ],
         },
       }
 
@@ -1234,7 +1280,11 @@ describe('JsonMerger', () => {
         {
           Profile: [
             {
-              loginIpRanges: ['192.168.1.1', '10.0.0.2', '172.16.0.1'],
+              loginIpRanges: [
+                { description: [{ '#text': 'description' }] },
+                { endAddress: [{ '#text': '10.0.0.2' }] },
+                { startAddress: [{ '#text': '192.168.1.1' }] },
+              ],
             },
           ],
         },
@@ -1245,19 +1295,33 @@ describe('JsonMerger', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {
-          loginHours: ['Monday', 'Tuesday', 'Wednesday'],
+          loginHours: [
+            { mondayStart: 300, mondayEnd: 400 },
+            { tuesdayStart: 300, tuesdayEnd: 400 },
+            { wednesdayStart: 300, wednesdayEnd: 400 },
+          ],
         },
       }
 
       const ours: JsonValue = {
         Profile: {
-          loginHours: ['Monday', 'Tuesday', 'Wednesday'],
+          loginHours: [
+            { mondayStart: 300, mondayEnd: 400 },
+            { tuesdayStart: 300, tuesdayEnd: 400 },
+            { wednesdayStart: 300, wednesdayEnd: 400 },
+          ],
         },
       }
 
       const theirs: JsonValue = {
         Profile: {
-          loginHours: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+          loginHours: [
+            { mondayStart: 300, mondayEnd: 400 },
+            { tuesdayStart: 300, tuesdayEnd: 400 },
+            { wednesdayStart: 300, wednesdayEnd: 400 },
+            { thursdayStart: 300, thursdayEnd: 400 },
+            { fridayStart: 300, fridayEnd: 400 },
+          ],
         },
       }
 
@@ -1270,11 +1334,32 @@ describe('JsonMerger', () => {
           Profile: [
             {
               loginHours: [
-                'Monday',
-                'Tuesday',
-                'Wednesday',
-                'Thursday',
-                'Friday',
+                { fridayEnd: [{ '#text': 400 }] },
+                { fridayStart: [{ '#text': 300 }] },
+              ],
+            },
+            {
+              loginHours: [
+                { mondayEnd: [{ '#text': 400 }] },
+                { mondayStart: [{ '#text': 300 }] },
+              ],
+            },
+            {
+              loginHours: [
+                { thursdayEnd: [{ '#text': 400 }] },
+                { thursdayStart: [{ '#text': 300 }] },
+              ],
+            },
+            {
+              loginHours: [
+                { tuesdayEnd: [{ '#text': 400 }] },
+                { tuesdayStart: [{ '#text': 300 }] },
+              ],
+            },
+            {
+              loginHours: [
+                { wednesdayEnd: [{ '#text': 400 }] },
+                { wednesdayStart: [{ '#text': 300 }] },
               ],
             },
           ],
@@ -1286,19 +1371,31 @@ describe('JsonMerger', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {
-          loginHours: ['Monday', 'Tuesday'],
+          loginHours: [
+            { mondayStart: 300, mondayEnd: 400 },
+            { tuesdayStart: 300, tuesdayEnd: 400 },
+          ],
         },
       }
 
       const ours: JsonValue = {
         Profile: {
-          loginHours: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+          loginHours: [
+            { mondayStart: 300, mondayEnd: 400 },
+            { tuesdayStart: 300, tuesdayEnd: 400 },
+            { wednesdayStart: 300, wednesdayEnd: 400 },
+            { thursdayStart: 300, thursdayEnd: 400 },
+            { fridayStart: 300, fridayEnd: 400 },
+          ],
         },
       }
 
       const theirs: JsonValue = {
         Profile: {
-          loginHours: ['Monday-Modified', 'Tuesday'],
+          loginHours: [
+            { mondayStart: 300, mondayEnd: 500 },
+            { tuesdayStart: 300, tuesdayEnd: 400 },
+          ],
         },
       }
 
@@ -1311,11 +1408,32 @@ describe('JsonMerger', () => {
           Profile: [
             {
               loginHours: [
-                'Monday-Modified',
-                'Tuesday',
-                'Wednesday',
-                'Thursday',
-                'Friday',
+                { fridayEnd: [{ '#text': 400 }] },
+                { fridayStart: [{ '#text': 300 }] },
+              ],
+            },
+            {
+              loginHours: [
+                { mondayEnd: [{ '#text': 500 }] },
+                { mondayStart: [{ '#text': 300 }] },
+              ],
+            },
+            {
+              loginHours: [
+                { thursdayEnd: [{ '#text': 400 }] },
+                { thursdayStart: [{ '#text': 300 }] },
+              ],
+            },
+            {
+              loginHours: [
+                { tuesdayEnd: [{ '#text': 400 }] },
+                { tuesdayStart: [{ '#text': 300 }] },
+              ],
+            },
+            {
+              loginHours: [
+                { wednesdayEnd: [{ '#text': 400 }] },
+                { wednesdayStart: [{ '#text': 300 }] },
               ],
             },
           ],

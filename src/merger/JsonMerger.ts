@@ -1,21 +1,13 @@
 import { castArray, isEqual, isNil, keyBy, unionWith } from 'lodash-es' // , differenceWith
-import { KEY_FIELD_METADATA } from '../constant/metadataConstant.js'
-
-export type JsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | JsonObject
-  | JsonArray
-
-interface JsonObject {
-  [key: string]: JsonValue
-}
-
-interface JsonArray extends Array<JsonValue> {}
+import { MetadataService } from '../service/MetadataService.js'
+import { JsonArray, JsonObject, JsonValue } from '../types/jsonTypes.js'
 
 export class JsonMerger {
+  private metadataService: MetadataService
+  constructor() {
+    this.metadataService = new MetadataService()
+  }
+
   /**
    * Main entry point for merging JSON values
    */
@@ -302,10 +294,10 @@ export class JsonMerger {
   /**
    * Gets the key field for a property from KEY_FIELD_METADATA
    */
-  private getKeyField(property: string): string | undefined {
-    return property in KEY_FIELD_METADATA
-      ? KEY_FIELD_METADATA[property as keyof typeof KEY_FIELD_METADATA]
-      : undefined
+  private getKeyField(
+    property: string
+  ): ((el: JsonValue) => string) | undefined {
+    return this.metadataService.getKeyFieldExtractor(property)
   }
 
   /**
@@ -317,18 +309,12 @@ export class JsonMerger {
     theirs: JsonArray,
     parent: JsonArray,
     attribute: string,
-    keyField?: string
+    keyField?: (el: JsonValue) => string
   ): JsonArray {
     const propObject = {}
     // If no key field, use unionWith to merge arrays without duplicates
     if (!keyField) {
       propObject[attribute] = unionWith([...ours], theirs, isEqual)
-      return [propObject]
-    }
-
-    // Special case for array position
-    if (keyField === '<array>') {
-      propObject[attribute] = this.mergeByPosition(ancestor, ours, theirs)
       return [propObject]
     }
 
@@ -344,43 +330,13 @@ export class JsonMerger {
   }
 
   /**
-   * Merges arrays by position
-   */
-  private mergeByPosition(
-    ancestor: JsonArray,
-    ours: JsonArray,
-    theirs: JsonArray
-  ): JsonArray {
-    const result = [...ours]
-
-    // Merge items at the same positions
-    for (let i = 0; i < Math.min(ours.length, theirs.length); i++) {
-      const ancestorItem = i < ancestor.length ? ancestor[i] : undefined
-
-      // If they changed it from ancestor but we didn't, use their version
-      if (!isEqual(theirs[i], ancestorItem) && isEqual(ours[i], ancestorItem)) {
-        result[i] = theirs[i]
-      }
-    }
-
-    // Add items that only exist in their version
-    if (theirs.length > ours.length) {
-      for (let i = ours.length; i < theirs.length; i++) {
-        result.push(theirs[i])
-      }
-    }
-
-    return result
-  }
-
-  /**
    * Merges arrays using a key field
    */
   private mergeByKeyField(
     ancestor: JsonArray,
     ours: JsonArray,
     theirs: JsonArray,
-    keyField: string,
+    keyField: (el: JsonValue) => string,
     attribute: string,
     parent: JsonArray
   ): JsonArray {
