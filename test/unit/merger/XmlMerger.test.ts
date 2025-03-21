@@ -100,5 +100,23 @@ describe('MergeDriver', () => {
       expect(result).toContain('<?xml version="1.0" encoding="UTF-8"?>')
       expect(result).toContain('<!-- merged comment -->')
     })
+
+    it('empty files should output empty file', () => {
+      // Arrange
+      const ancestorWithComment = ''
+      const ourWithComment = ''
+      const theirWithComment = ''
+      mockedMergeObjects.mockReturnValue('')
+
+      // Act
+      const result = sut.tripartXmlMerge(
+        ancestorWithComment,
+        ourWithComment,
+        theirWithComment
+      )
+
+      // Assert
+      expect(result).toEqual('')
+    })
   })
 })
