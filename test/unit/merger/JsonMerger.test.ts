@@ -614,7 +614,7 @@ describe('JsonMerger', () => {
     ])
   })
 
-  it('should correctly merge objects when our key undefined', () => {
+  it('should correctly merge objects when their key undefined', () => {
     // Arrange
     const ancestor: JsonValue = {
       Profile: {
@@ -716,6 +716,35 @@ describe('JsonMerger', () => {
           },
           { '#text': '>>>>>>> REMOTE' },
         ],
+      },
+    ])
+  })
+
+  it('only ancestor key present should just be removed', () => {
+    // Arrange
+    const ancestor: JsonValue = {
+      Profile: {
+        fieldPermissions: [
+          { field: 'Account.Name', editable: 'true', readable: 'true' },
+        ],
+      },
+    }
+
+    const ours: JsonValue = {
+      Profile: {},
+    }
+
+    const theirs: JsonValue = {
+      Profile: {},
+    }
+
+    // Act
+    const result = sut.mergeObjects(ancestor, ours, theirs)
+
+    // Assert
+    expect(result).toEqual([
+      {
+        Profile: [],
       },
     ])
   })
