@@ -49,6 +49,8 @@ export class JsonMerger {
     }
     const allProperties = new Set(arrProperties.sort())
 
+    // TODO filter the namespace here and reapply it in the end of the loop if necessary
+
     // Process each property
     const mergedContent = [] as JsonArray
     for (const property of allProperties) {
@@ -357,11 +359,7 @@ export class JsonMerger {
     ours: JsonValue | undefined | null,
     theirs: JsonValue | undefined | null
   ): string {
-    return isNil(ancestor)
-      ? isNil(ours)
-        ? typeof theirs
-        : typeof ours
-      : typeof ancestor
+    return typeof [ancestor, theirs, ours].find(ele => !isNil(ele))
   }
 
   /**
