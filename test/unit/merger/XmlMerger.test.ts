@@ -17,12 +17,12 @@ jest.mock('fast-xml-parser', () => {
   }
 })
 
-const mockedMergeObjects = jest.fn()
+const mockedmerge = jest.fn()
 jest.mock('../../../src/merger/JsonMerger.js', () => {
   return {
     JsonMerger: jest.fn().mockImplementation(() => {
       return {
-        mergeObjects: mockedMergeObjects,
+        merge: mockedmerge,
       }
     }),
   }
@@ -38,7 +38,7 @@ describe('MergeDriver', () => {
   describe('tripartXmlMerge', () => {
     it('should merge files successfully when given valid parameters', () => {
       // Arrange
-      mockedMergeObjects.mockReturnValue('MergedContent')
+      mockedmerge.mockReturnValue('MergedContent')
 
       // Act
       sut.tripartXmlMerge('AncestorFile', 'OurFile', 'TheirFile')
@@ -51,7 +51,7 @@ describe('MergeDriver', () => {
 
     it('should throw an error when tripartXmlMerge fails', () => {
       // Arrange
-      mockedMergeObjects.mockImplementation(() => {
+      mockedmerge.mockImplementation(() => {
         throw new Error('Tripart XML merge failed')
       })
 
@@ -68,7 +68,7 @@ describe('MergeDriver', () => {
       const ancestorWithSpecial = '<root>&lt;special&gt;</root>'
       const ourWithSpecial = '<root>&lt;modified&gt;</root>'
       const theirWithSpecial = '<root>&lt;special&gt;</root>'
-      mockedMergeObjects.mockReturnValue('<root>&lt;modified&gt;</root>')
+      mockedmerge.mockReturnValue('<root>&lt;modified&gt;</root>')
 
       // Act
       const result = sut.tripartXmlMerge(
@@ -87,7 +87,7 @@ describe('MergeDriver', () => {
       const ancestorWithComment = '<root><!-- original comment --></root>'
       const ourWithComment = '<root><!-- our comment --></root>'
       const theirWithComment = '<root><!-- their comment --></root>'
-      mockedMergeObjects.mockReturnValue('<root><!-- merged comment --></root>')
+      mockedmerge.mockReturnValue('<root><!-- merged comment --></root>')
 
       // Act
       const result = sut.tripartXmlMerge(
@@ -106,7 +106,7 @@ describe('MergeDriver', () => {
       const ancestorWithComment = ''
       const ourWithComment = ''
       const theirWithComment = ''
-      mockedMergeObjects.mockReturnValue('')
+      mockedmerge.mockReturnValue('')
 
       // Act
       const result = sut.tripartXmlMerge(

@@ -2,12 +2,6 @@ import { MetadataService } from '../../../src/service/MetadataService.js'
 import { JsonValue } from '../../../src/types/jsonTypes.js'
 
 describe('MetadataService', () => {
-  let metadataService: MetadataService
-
-  beforeEach(() => {
-    metadataService = new MetadataService()
-  })
-
   describe('getKeyFieldExtractor', () => {
     describe('given a valid metadata type', () => {
       const testCases = [
@@ -342,7 +336,7 @@ describe('MetadataService', () => {
         '$name',
         ({ metadataType, testObject, expected }) => {
           // Act
-          const extractor = metadataService.getKeyFieldExtractor(metadataType)
+          const extractor = MetadataService.getKeyFieldExtractor(metadataType)
 
           // Assert
           expect(extractor).toBeDefined()
@@ -357,7 +351,7 @@ describe('MetadataService', () => {
         const metadataType = 'nonExistentType'
 
         // Act
-        const extractor = metadataService.getKeyFieldExtractor(metadataType)
+        const extractor = MetadataService.getKeyFieldExtractor(metadataType)
 
         // Assert
         expect(extractor).toBeUndefined()

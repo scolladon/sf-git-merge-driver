@@ -1,7 +1,7 @@
 import { JsonValue } from '../types/jsonTypes.js'
 
 export class MetadataService {
-  public getKeyFieldExtractor(
+  public static getKeyFieldExtractor(
     metadataType: string
   ): ((el: JsonValue) => string) | undefined {
     return metadataType in METADATA_KEY_EXTRACTORS

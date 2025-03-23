@@ -57,7 +57,7 @@ export class XmlMerger {
     // Perform deep merge of XML objects
 
     const jsonMerger = new JsonMerger()
-    const mergedObj = jsonMerger.mergeObjects(ancestorObj, ourObj, theirObj)
+    const mergedObj = jsonMerger.merge(ancestorObj, ourObj, theirObj)
     // console.log('mergedObj')
     // console.dir(mergedObj, {depth:null})
 
