@@ -9,8 +9,8 @@ describe('JsonMerger', () => {
     sut = new JsonMerger()
   })
 
-  describe('given arrays with key fields', () => {
-    it('should merge arrays using the key field to identify matching elements', () => {
+  describe('Merging objects with nested arrays containing key fields', () => {
+    it('should correctly merge arrays by using object field properties as unique identifiers', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {
@@ -73,7 +73,7 @@ describe('JsonMerger', () => {
       ])
     })
 
-    it('should handle the scenario when both sides modify the same element', () => {
+    it('should resolve conflicts when both sides modify the same array element with different values', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {
@@ -118,7 +118,7 @@ describe('JsonMerger', () => {
       ])
     })
 
-    it('should handle the scenario when we modify an element and they add a new one', () => {
+    it('should preserve our modifications while incorporating their additions to the array', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {
@@ -172,8 +172,8 @@ describe('JsonMerger', () => {
     })
   })
 
-  describe('given arrays without key fields', () => {
-    it('should merge arrays without duplicates', () => {
+  describe('Merging objects with primitive arrays (no identifying keys)', () => {
+    it('should combine string arrays from both sources while preserving unique values', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {
@@ -208,7 +208,7 @@ describe('JsonMerger', () => {
       ])
     })
 
-    it('should handle primitive values in arrays', () => {
+    it('should properly merge numeric arrays by combining values from both sources', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {
@@ -244,8 +244,8 @@ describe('JsonMerger', () => {
     })
   })
 
-  describe('given mixed JSON with both key and non-key arrays', () => {
-    it('should correctly merge a complex structure with both types', () => {
+  describe('Merging complex objects with multiple data types and different array merging strategies', () => {
+    it('should correctly apply appropriate merge strategies for primitive arrays, keyed arrays, and scalar values', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {
@@ -311,8 +311,8 @@ describe('JsonMerger', () => {
     })
   })
 
-  describe('test dealing with namespace', () => {
-    it('it should come at the right level', () => {
+  describe('Handling XML namespaces in metadata merges', () => {
+    it('should correctly position namespace attributes at the appropriate level in the output structure', () => {
       // Arrange
       const ancestor: JsonValue = {
         CustomLabels: {
@@ -380,8 +380,8 @@ describe('JsonMerger', () => {
     })
   })
 
-  describe('given undefined ancestor', () => {
-    it('should correctly merge objects when ancestor is undefined', () => {
+  describe('Handling merge conflicts when a common base version is missing or incomplete', () => {
+    it('should generate a conflict marker structure when merging divergent changes without a base version', () => {
       // Arrange
       const ancestor = {}
 
@@ -458,7 +458,7 @@ describe('JsonMerger', () => {
       ])
     })
 
-    it('should correctly merge objects when ancestor key undefined', () => {
+    it('should generate field-level conflict markers when merging changes with an empty ancestor object', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {},
@@ -506,8 +506,8 @@ describe('JsonMerger', () => {
     })
   })
 
-  describe('given undefined their', () => {
-    it('should correctly merge objects', () => {
+  describe('Handling merge conflicts when our version is missing or incomplete', () => {
+    it('should generate conflict markers when an empty local version conflicts with modified field permissions in remote', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {
@@ -638,8 +638,8 @@ describe('JsonMerger', () => {
     })
   })
 
-  describe('given undefined our', () => {
-    it('should correctly merge objects', () => {
+  describe('Handling merge conflicts when our version is missing or incomplete', () => {
+    it('should generate conflict markers when an empty local version conflicts with modified field permissions in remote', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {
@@ -692,7 +692,7 @@ describe('JsonMerger', () => {
       ])
     })
 
-    it('should correctly merge objects', () => {
+    it('should generate conflict markers when an empty local version conflicts with significant structure changes in remote', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {
@@ -770,7 +770,7 @@ describe('JsonMerger', () => {
     })
   })
 
-  it('only ancestor key present should just be removed', () => {
+  it('should remove fields from result when they exist in ancestor but are removed in both ours and theirs', () => {
     // Arrange
     const ancestor: JsonValue = {
       Profile: {
@@ -799,8 +799,8 @@ describe('JsonMerger', () => {
     ])
   })
 
-  describe('Nominal case', () => {
-    it('should handle string values', () => {
+  describe('String property merging scenarios', () => {
+    it('should preserve string values when identical across all versions', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {
@@ -835,7 +835,7 @@ describe('JsonMerger', () => {
       ])
     })
 
-    it('should handle string values', () => {
+    it('should accept identical new string properties added in both ours and theirs', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {},
@@ -868,7 +868,7 @@ describe('JsonMerger', () => {
       ])
     })
 
-    it('should handle string values', () => {
+    it('should remove string properties deleted in both ours and theirs', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {
@@ -895,7 +895,7 @@ describe('JsonMerger', () => {
       ])
     })
 
-    it('should handle string values', () => {
+    it('should prioritize local deletion when ours deletes a property but theirs keeps it unchanged', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {
@@ -924,7 +924,7 @@ describe('JsonMerger', () => {
       ])
     })
 
-    it('should handle string values', () => {
+    it('should prioritize remote deletion when theirs deletes a property but ours keeps it unchanged', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {
@@ -953,7 +953,7 @@ describe('JsonMerger', () => {
       ])
     })
 
-    it('should handle string values', () => {
+    it('should accept identical new properties when ancestor lacks the parent structure entirely', () => {
       // Arrange
       const ancestor: JsonValue = {}
 
@@ -984,7 +984,7 @@ describe('JsonMerger', () => {
       ])
     })
 
-    it('should handle string values', () => {
+    it('should mark conflict when both sides add different values for the same new property', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {},
@@ -1025,7 +1025,7 @@ describe('JsonMerger', () => {
       ])
     })
 
-    it('should handle string values', () => {
+    it('should mark conflict when ours deletes a property but theirs modifies it', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {
@@ -1066,7 +1066,7 @@ describe('JsonMerger', () => {
       ])
     })
 
-    it('should handle string values', () => {
+    it('should mark conflict when ours modifies a property but theirs deletes it', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {
@@ -1107,7 +1107,7 @@ describe('JsonMerger', () => {
       ])
     })
 
-    it('should handle string values', () => {
+    it('should mark conflict when both sides modify the same property with different values', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {
@@ -1153,8 +1153,8 @@ describe('JsonMerger', () => {
     })
   })
 
-  describe('given special metadata kind', () => {
-    it('should merge arrays by position when both sides modify different elements', () => {
+  describe('Array merging in metadata with special position handling', () => {
+    it('should successfully merge arrays when local and remote changes affect different elements', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {
@@ -1234,7 +1234,7 @@ describe('JsonMerger', () => {
       ])
     })
 
-    it('should use their version when we did not modify an element but they did', () => {
+    it('should adopt remote changes when an element is modified only in the remote version', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {
@@ -1291,7 +1291,7 @@ describe('JsonMerger', () => {
       ])
     })
 
-    it('should append their additional elements when their array is longer', () => {
+    it('should incorporate new elements added in remote array when remote array is longer', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {
@@ -1367,7 +1367,7 @@ describe('JsonMerger', () => {
       ])
     })
 
-    it('should keep our additional elements when our array is longer', () => {
+    it('should preserve locally added elements while merging remote changes to existing elements', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {
