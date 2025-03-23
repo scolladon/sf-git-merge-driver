@@ -11,8 +11,8 @@
   },
   "dependencies": {
     "@oclif/core": "^4.2.10",
-    "@salesforce/core": "^8.8.5",
-    "@salesforce/sf-plugins-core": "^12.2.0",
+    "@salesforce/core": "^8.8.6",
+    "@salesforce/sf-plugins-core": "^12.2.1",
     "fast-xml-parser": "^5.0.9",
     "lodash-es": "^4.17.21",
     "simple-git": "^3.27.0"
@@ -31,7 +31,7 @@
     "knip": "^5.46.0",
     "mocha": "^11.1.0",
     "nyc": "^17.1.0",
-    "oclif": "^4.17.37",
+    "oclif": "^4.17.40",
     "shx": "^0.4.0",
     "ts-jest": "^29.2.6",
     "ts-node": "^10.9.2",
