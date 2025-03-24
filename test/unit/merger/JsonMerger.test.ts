@@ -33,9 +33,9 @@ describe('JsonMerger', () => {
       const theirs: JsonValue = {
         Profile: {
           fieldPermissions: [
+            { field: 'Account.Industry', editable: 'false', readable: 'true' },
             { field: 'Account.Name', editable: 'false', readable: 'true' },
             { field: 'Account.Type', editable: 'false', readable: 'false' },
-            { field: 'Account.Industry', editable: 'false', readable: 'true' },
           ],
         },
       }
@@ -797,6 +797,27 @@ describe('JsonMerger', () => {
         Profile: [],
       },
     ])
+  })
+
+  it('should give empty result when they exist in ancestor not ours and theirs', () => {
+    // Arrange
+    const ancestor: JsonValue = {
+      Profile: {
+        fieldPermissions: [
+          { field: 'Account.Name', editable: 'true', readable: 'true' },
+        ],
+      },
+    }
+
+    const ours: JsonValue = {}
+
+    const theirs: JsonValue = {}
+
+    // Act
+    const result = sut.merge(ancestor, ours, theirs)
+
+    // Assert
+    expect(result).toEqual([])
   })
 
   describe('String property merging scenarios', () => {
