@@ -15,6 +15,11 @@ describe('JsonMerger', () => {
       const ancestor: JsonValue = {
         Profile: {
           fieldPermissions: [
+            {
+              field: 'Account.AllAndAncestorAndTheirs',
+              editable: 'false',
+              readable: 'true',
+            },
             { field: 'Account.Name', editable: 'false', readable: 'true' },
             { field: 'Account.Type', editable: 'false', readable: 'true' },
           ],
@@ -24,7 +29,17 @@ describe('JsonMerger', () => {
       const ours: JsonValue = {
         Profile: {
           fieldPermissions: [
+            {
+              field: 'Account.AllAndAncestorAndTheirs',
+              editable: 'true',
+              readable: 'true',
+            },
             { field: 'Account.Name', editable: 'true', readable: 'true' },
+            {
+              field: 'Account.OursAndTheirs',
+              editable: 'false',
+              readable: 'true',
+            },
             { field: 'Account.Type', editable: 'false', readable: 'true' },
           ],
         },
@@ -33,8 +48,18 @@ describe('JsonMerger', () => {
       const theirs: JsonValue = {
         Profile: {
           fieldPermissions: [
+            {
+              field: 'Account.AllAndAncestorAndTheirs',
+              editable: 'false',
+              readable: 'true',
+            },
             { field: 'Account.Industry', editable: 'false', readable: 'true' },
             { field: 'Account.Name', editable: 'false', readable: 'true' },
+            {
+              field: 'Account.OursAndTheirs',
+              editable: 'false',
+              readable: 'true',
+            },
             { field: 'Account.Type', editable: 'false', readable: 'false' },
           ],
         },
@@ -49,6 +74,13 @@ describe('JsonMerger', () => {
           Profile: [
             {
               fieldPermissions: [
+                { editable: [{ '#text': 'true' }] },
+                { field: [{ '#text': 'Account.AllAndAncestorAndTheirs' }] },
+                { readable: [{ '#text': 'true' }] },
+              ],
+            },
+            {
+              fieldPermissions: [
                 { editable: [{ '#text': 'false' }] },
                 { field: [{ '#text': 'Account.Industry' }] },
                 { readable: [{ '#text': 'true' }] },
@@ -58,6 +90,13 @@ describe('JsonMerger', () => {
               fieldPermissions: [
                 { editable: [{ '#text': 'true' }] },
                 { field: [{ '#text': 'Account.Name' }] },
+                { readable: [{ '#text': 'true' }] },
+              ],
+            },
+            {
+              fieldPermissions: [
+                { editable: [{ '#text': 'false' }] },
+                { field: [{ '#text': 'Account.OursAndTheirs' }] },
                 { readable: [{ '#text': 'true' }] },
               ],
             },
