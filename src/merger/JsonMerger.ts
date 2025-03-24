@@ -63,16 +63,19 @@ const mergeMetadata = (
   const props = getUniqueSortedProps(ancestor, ours, theirs)
   for (const key of props) {
     let values: JsonArray = []
+    const ancestorOfKey = ancestor[key]
+    const oursOfKey = ours[key]
+    const theirsOfKey = theirs[key]
 
-    if (isObject(ancestor[key], ours[key], theirs[key])) {
+    if (isObject(ancestorOfKey, oursOfKey, theirsOfKey)) {
       const [ancestorkey, ourkey, theirkey] = [
-        ancestor[key],
-        ours[key],
-        theirs[key],
+        ancestorOfKey,
+        oursOfKey,
+        theirsOfKey,
       ].map(ensureArray)
       values = mergeArrays(ancestorkey, ourkey, theirkey, key)
     } else {
-      values = mergeTextAttribute(ancestor[key], ours[key], theirs[key], key)
+      values = mergeTextAttribute(ancestorOfKey, oursOfKey, theirsOfKey, key)
     }
     acc.push(values)
   }
@@ -163,59 +166,62 @@ const mergeByKeyField = (
   const acc: JsonArray = []
   const props = getUniqueSortedProps(ancestor, ours, theirs)
   for (const key of props) {
+    const ancestorOfKey = ancestor[key]
+    const oursOfKey = ours[key]
+    const theirsOfKey = theirs[key]
     const scenario: MergeScenario = getScenario(
-      ancestor[key],
-      ours[key],
-      theirs[key]
+      ancestorOfKey,
+      oursOfKey,
+      theirsOfKey
     )
     const obj = {}
     switch (scenario) {
       case MergeScenario.THEIRS_ONLY:
-        obj[attribute] = mergeMetadata({}, {}, theirs[key])
+        obj[attribute] = mergeMetadata({}, {}, theirsOfKey)
         break
       case MergeScenario.OURS_ONLY:
-        obj[attribute] = mergeMetadata({}, ours[key], {})
+        obj[attribute] = mergeMetadata({}, oursOfKey, {})
         break
       case MergeScenario.ANCESTOR_ONLY:
         break
       case MergeScenario.OURS_AND_THEIRS:
-        if (isEqual(ours[key], theirs[key])) {
-          obj[attribute] = mergeMetadata({}, {}, theirs[key])
+        if (isEqual(oursOfKey, theirsOfKey)) {
+          obj[attribute] = mergeMetadata({}, {}, theirsOfKey)
         } else {
-          obj[attribute] = mergeMetadata({}, ours[key], theirs[key])
+          obj[attribute] = mergeMetadata({}, oursOfKey, theirsOfKey)
         }
         break
       case MergeScenario.ANCESTOR_AND_THEIRS:
-        if (!isEqual(ancestor[key], theirs[key])) {
+        if (!isEqual(ancestorOfKey, theirsOfKey)) {
           const ancestorProp = {
-            [attribute]: mergeMetadata({}, ancestor[key], {}),
+            [attribute]: mergeMetadata({}, ancestorOfKey, {}),
           }
           const theirsProp = {
-            [attribute]: mergeMetadata({}, {}, theirs[key]),
+            [attribute]: mergeMetadata({}, {}, theirsOfKey),
           }
           addConflictMarkers(acc, {}, ancestorProp, theirsProp)
         }
         break
       case MergeScenario.ANCESTOR_AND_OURS:
-        if (!isEqual(ancestor[key], ours[key])) {
+        if (!isEqual(ancestorOfKey, oursOfKey)) {
           const oursProp = {
-            [attribute]: mergeMetadata({}, ours[key], {}),
+            [attribute]: mergeMetadata({}, oursOfKey, {}),
           }
           const ancestorProp = {
-            [attribute]: mergeMetadata({}, ancestor[key], {}),
+            [attribute]: mergeMetadata({}, ancestorOfKey, {}),
           }
           addConflictMarkers(acc, oursProp, ancestorProp, {})
         }
         break
       case MergeScenario.ALL:
-        if (isEqual(ours[key], theirs[key])) {
-          obj[attribute] = mergeMetadata({}, {}, theirs[key])
-        } else if (isEqual(ancestor[key], ours[key])) {
-          obj[attribute] = mergeMetadata({}, {}, theirs[key])
-        } else if (isEqual(ancestor[key], theirs[key])) {
-          obj[attribute] = mergeMetadata({}, ours[key], {})
+        if (isEqual(oursOfKey, theirsOfKey)) {
+          obj[attribute] = mergeMetadata({}, {}, theirsOfKey)
+        } else if (isEqual(ancestorOfKey, oursOfKey)) {
+          obj[attribute] = mergeMetadata({}, {}, theirsOfKey)
+        } else if (isEqual(ancestorOfKey, theirsOfKey)) {
+          obj[attribute] = mergeMetadata({}, oursOfKey, {})
         } else {
-          obj[attribute] = mergeMetadata(ancestor[key], ours[key], theirs[key])
+          obj[attribute] = mergeMetadata(ancestorOfKey, oursOfKey, theirsOfKey)
         }
         break
     }
