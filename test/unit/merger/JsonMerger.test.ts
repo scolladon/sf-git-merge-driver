@@ -506,8 +506,8 @@ describe('JsonMerger', () => {
     })
   })
 
-  describe('Handling merge conflicts when our version is missing or incomplete', () => {
-    it('should generate conflict markers when an empty local version conflicts with modified field permissions in remote', () => {
+  describe('Handling merge conflicts when their version is missing or incomplete', () => {
+    it('should generate conflict markers when an empty remote version conflicts with modified field permissions in local', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {
