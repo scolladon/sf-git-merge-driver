@@ -845,6 +845,7 @@ describe('JsonMerger', () => {
         fieldPermissions: [
           { field: 'Account.Name', editable: 'true', readable: 'true' },
         ],
+        '@_xmlns': 'http://soap.sforce.com/2006/04/metadata',
       },
     }
 
