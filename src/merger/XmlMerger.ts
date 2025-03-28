@@ -45,7 +45,7 @@ export class XmlMerger {
     ancestorContent: string,
     ourContent: string,
     theirContent: string
-  ) {
+  ): { output: string; hasConflict: boolean } {
     const parser = new XMLParser(parserOptions)
 
     const ancestorObj = parser.parse(ancestorContent)
@@ -57,19 +57,22 @@ export class XmlMerger {
     // Perform deep merge of XML objects
 
     const jsonMerger = new JsonMerger()
-    const mergedObj = jsonMerger.merge(ancestorObj, ourObj, theirObj)
+    const mergedResult = jsonMerger.merge(ancestorObj, ourObj, theirObj)
     // console.log('mergedObj')
     // console.dir(mergedObj, {depth:null})
 
     // Convert back to XML and format
     const builder = new XMLBuilder(builderOptions)
-    const mergedXml: string = builder.build(mergedObj)
+    const mergedXml: string = builder.build(mergedResult.output)
     // console.log('mergedXml')
     // console.dir(mergedXml, {depth:null})
-    return mergedXml.length
-      ? correctConflictIndent(
-          correctComments(XML_DECL.concat(handleSpecialEntities(mergedXml)))
-        )
-      : ''
+    return {
+      output: mergedXml.length
+        ? correctConflictIndent(
+            correctComments(XML_DECL.concat(handleSpecialEntities(mergedXml)))
+          )
+        : '',
+      hasConflict: mergedResult.hasConflict,
+    }
   }
 }

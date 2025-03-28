@@ -38,7 +38,10 @@ describe('MergeDriver', () => {
   describe('tripartXmlMerge', () => {
     it('should merge files successfully when given valid parameters', () => {
       // Arrange
-      mockedmerge.mockReturnValue('MergedContent')
+      mockedmerge.mockReturnValue({
+        output: 'MergedContent',
+        hasConflict: false,
+      })
 
       // Act
       sut.tripartXmlMerge('AncestorFile', 'OurFile', 'TheirFile')
@@ -68,7 +71,10 @@ describe('MergeDriver', () => {
       const ancestorWithSpecial = '<root>&lt;special&gt;</root>'
       const ourWithSpecial = '<root>&lt;modified&gt;</root>'
       const theirWithSpecial = '<root>&lt;special&gt;</root>'
-      mockedmerge.mockReturnValue('<root>&lt;modified&gt;</root>')
+      mockedmerge.mockReturnValue({
+        output: '<root>&lt;modified&gt;</root>',
+        hasConflict: false,
+      })
 
       // Act
       const result = sut.tripartXmlMerge(
@@ -78,8 +84,9 @@ describe('MergeDriver', () => {
       )
 
       // Assert
-      expect(result).toContain('<?xml version="1.0" encoding="UTF-8"?>')
-      expect(result).toContain('&lt;modified&gt;')
+      expect(result.output).toContain('<?xml version="1.0" encoding="UTF-8"?>')
+      expect(result.output).toContain('&lt;modified&gt;')
+      expect(result.hasConflict).toBe(false)
     })
 
     it('should correctly handle XML comments', () => {
@@ -87,7 +94,10 @@ describe('MergeDriver', () => {
       const ancestorWithComment = '<root><!-- original comment --></root>'
       const ourWithComment = '<root><!-- our comment --></root>'
       const theirWithComment = '<root><!-- their comment --></root>'
-      mockedmerge.mockReturnValue('<root><!-- merged comment --></root>')
+      mockedmerge.mockReturnValue({
+        output: '<root><!-- merged comment --></root>',
+        hasConflict: false,
+      })
 
       // Act
       const result = sut.tripartXmlMerge(
@@ -97,8 +107,9 @@ describe('MergeDriver', () => {
       )
 
       // Assert
-      expect(result).toContain('<?xml version="1.0" encoding="UTF-8"?>')
-      expect(result).toContain('<!-- merged comment -->')
+      expect(result.output).toContain('<?xml version="1.0" encoding="UTF-8"?>')
+      expect(result.output).toContain('<!-- merged comment -->')
+      expect(result.hasConflict).toBe(false)
     })
 
     it('empty files should output empty file', () => {
@@ -106,7 +117,7 @@ describe('MergeDriver', () => {
       const ancestorWithComment = ''
       const ourWithComment = ''
       const theirWithComment = ''
-      mockedmerge.mockReturnValue('')
+      mockedmerge.mockReturnValue({ output: '', hasConflict: false })
 
       // Act
       const result = sut.tripartXmlMerge(
@@ -116,7 +127,8 @@ describe('MergeDriver', () => {
       )
 
       // Assert
-      expect(result).toEqual('')
+      expect(result.output).toEqual('')
+      expect(result.hasConflict).toBe(false)
     })
   })
 })

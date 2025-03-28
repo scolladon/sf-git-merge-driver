@@ -2,7 +2,12 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { XmlMerger } from '../merger/XmlMerger.js'
 
 export class MergeDriver {
-  async mergeFiles(ancestorFile, ourFile, theirFile, outputFile) {
+  async mergeFiles(
+    ancestorFile: string,
+    ourFile: string,
+    theirFile: string,
+    outputFile: string
+  ): Promise<boolean> {
     // Read all three versions
     const [ancestorContent, ourContent, theirContent] = await Promise.all([
       readFile(ancestorFile, 'utf8'),
@@ -19,6 +24,7 @@ export class MergeDriver {
     )
 
     // Write the merged content to the output file
-    await writeFile(outputFile, mergedContent)
+    await writeFile(outputFile, mergedContent.output)
+    return mergedContent.hasConflict
   }
 }

@@ -1,4 +1,5 @@
 import { JsonMerger } from '../../../src/merger/JsonMerger.js'
+import { ConflictMarker } from '../../../src/merger/conflictMarker.js'
 import { JsonValue } from '../../../src/types/jsonTypes.js'
 
 describe('JsonMerger', () => {
@@ -7,6 +8,7 @@ describe('JsonMerger', () => {
   beforeEach(() => {
     // Arrange
     sut = new JsonMerger()
+    ConflictMarker['hasConflict'] = false
   })
 
   describe('Merging objects with nested arrays containing key fields', () => {
@@ -69,7 +71,7 @@ describe('JsonMerger', () => {
       const result = sut.merge(ancestor, ours, theirs)
 
       // Assert
-      expect(result).toEqual([
+      expect(result.output).toEqual([
         {
           Profile: [
             {
@@ -110,6 +112,7 @@ describe('JsonMerger', () => {
           ],
         },
       ])
+      expect(result.hasConflict).toBe(false)
     })
 
     it('should resolve conflicts when both sides modify the same array element with different values', () => {
@@ -142,7 +145,7 @@ describe('JsonMerger', () => {
       const result = sut.merge(ancestor, ours, theirs)
 
       // Assert
-      expect(result).toEqual([
+      expect(result.output).toEqual([
         {
           Profile: [
             {
@@ -155,6 +158,7 @@ describe('JsonMerger', () => {
           ],
         },
       ])
+      expect(result.hasConflict).toBe(false)
     })
 
     it('should preserve our modifications while incorporating their additions to the array', () => {
@@ -188,7 +192,7 @@ describe('JsonMerger', () => {
       const result = sut.merge(ancestor, ours, theirs)
 
       // Assert
-      expect(result).toEqual([
+      expect(result.output).toEqual([
         {
           Profile: [
             {
@@ -208,6 +212,7 @@ describe('JsonMerger', () => {
           ],
         },
       ])
+      expect(result.hasConflict).toBe(false)
     })
   })
 
@@ -236,7 +241,7 @@ describe('JsonMerger', () => {
       const result = sut.merge(ancestor, ours, theirs)
 
       // Assert
-      expect(result).toEqual([
+      expect(result.output).toEqual([
         {
           Profile: [
             {
@@ -245,6 +250,7 @@ describe('JsonMerger', () => {
           ],
         },
       ])
+      expect(result.hasConflict).toBe(false)
     })
 
     it('should properly merge numeric arrays by combining values from both sources', () => {
@@ -271,7 +277,7 @@ describe('JsonMerger', () => {
       const result = sut.merge(ancestor, ours, theirs)
 
       // Assert
-      expect(result).toEqual([
+      expect(result.output).toEqual([
         {
           Profile: [
             {
@@ -280,6 +286,7 @@ describe('JsonMerger', () => {
           ],
         },
       ])
+      expect(result.hasConflict).toBe(false)
     })
   })
 
@@ -322,7 +329,7 @@ describe('JsonMerger', () => {
       const result = sut.merge(ancestor, ours, theirs)
 
       // Assert
-      expect(result).toEqual([
+      expect(result.output).toEqual([
         {
           Profile: [
             { custom: ['Value1', 'Value3', 'Value2', 'Value4'] },
@@ -347,6 +354,7 @@ describe('JsonMerger', () => {
           ],
         },
       ])
+      expect(result.hasConflict).toBe(false)
     })
   })
 
@@ -396,7 +404,7 @@ describe('JsonMerger', () => {
       const result = sut.merge(ancestor, ours, theirs)
 
       // Assert
-      expect(result).toEqual([
+      expect(result.output).toEqual([
         {
           CustomLabels: [
             {
@@ -416,6 +424,7 @@ describe('JsonMerger', () => {
           },
         },
       ])
+      expect(result.hasConflict).toBe(false)
     })
   })
 
@@ -449,7 +458,7 @@ describe('JsonMerger', () => {
       const result = sut.merge(ancestor, ours, theirs)
 
       // Assert
-      expect(result).toEqual([
+      expect(result.output).toEqual([
         { '#text': '\n<<<<<<< LOCAL' },
         {
           Profile: [
@@ -495,6 +504,7 @@ describe('JsonMerger', () => {
         },
         { '#text': '>>>>>>> REMOTE' },
       ])
+      expect(result.hasConflict).toBe(true)
     })
 
     it('should generate field-level conflict markers when merging changes with an empty ancestor object', () => {
@@ -523,7 +533,7 @@ describe('JsonMerger', () => {
       const result = sut.merge(ancestor, ours, theirs)
 
       // Assert
-      expect(result).toEqual([
+      expect(result.output).toEqual([
         {
           Profile: [
             {
@@ -542,6 +552,7 @@ describe('JsonMerger', () => {
           ],
         },
       ])
+      expect(result.hasConflict).toBe(true)
     })
   })
 
@@ -572,7 +583,7 @@ describe('JsonMerger', () => {
       const result = sut.merge(ancestor, ours, theirs)
 
       // Assert
-      expect(result).toEqual([
+      expect(result.output).toEqual([
         {
           Profile: [
             { '#text': '\n<<<<<<< LOCAL' },
@@ -597,6 +608,7 @@ describe('JsonMerger', () => {
           ],
         },
       ])
+      expect(result.hasConflict).toBe(true)
     })
 
     it('should correctly merge objects when theirs is undefined', () => {
@@ -628,7 +640,7 @@ describe('JsonMerger', () => {
       const result = sut.merge(ancestor, ours, theirs)
 
       // Assert
-      expect(result).toEqual([
+      expect(result.output).toEqual([
         { '#text': '\n<<<<<<< LOCAL' },
         {
           Profile: [
@@ -674,6 +686,7 @@ describe('JsonMerger', () => {
         { '#text': '\n' },
         { '#text': '>>>>>>> REMOTE' },
       ])
+      expect(result.hasConflict).toBe(true)
     })
   })
 
@@ -704,7 +717,7 @@ describe('JsonMerger', () => {
       const result = sut.merge(ancestor, ours, theirs)
 
       // Assert
-      expect(result).toEqual([
+      expect(result.output).toEqual([
         {
           Profile: [
             { '#text': '\n<<<<<<< LOCAL' },
@@ -729,6 +742,7 @@ describe('JsonMerger', () => {
           ],
         },
       ])
+      expect(result.hasConflict).toBe(true)
     })
 
     it('should generate conflict markers when an empty local version conflicts with significant structure changes in remote', () => {
@@ -760,7 +774,7 @@ describe('JsonMerger', () => {
       const result = sut.merge(ancestor, ours, theirs)
 
       // Assert
-      expect(result).toEqual([
+      expect(result.output).toEqual([
         { '#text': '\n<<<<<<< LOCAL' },
         { '#text': '\n' },
         { '#text': '||||||| BASE' },
@@ -806,6 +820,7 @@ describe('JsonMerger', () => {
         },
         { '#text': '>>>>>>> REMOTE' },
       ])
+      expect(result.hasConflict).toBe(true)
     })
   })
 
@@ -831,11 +846,12 @@ describe('JsonMerger', () => {
     const result = sut.merge(ancestor, ours, theirs)
 
     // Assert
-    expect(result).toEqual([
+    expect(result.output).toEqual([
       {
         Profile: [],
       },
     ])
+    expect(result.hasConflict).toBe(false)
   })
 
   it('should give empty result when they exist in ancestor not ours and theirs', () => {
@@ -857,7 +873,8 @@ describe('JsonMerger', () => {
     const result = sut.merge(ancestor, ours, theirs)
 
     // Assert
-    expect(result).toEqual([])
+    expect(result.output).toEqual([])
+    expect(result.hasConflict).toBe(false)
   })
 
   describe('String property merging scenarios', () => {
@@ -885,7 +902,7 @@ describe('JsonMerger', () => {
       const result = sut.merge(ancestor, ours, theirs)
 
       // Assert
-      expect(result).toEqual([
+      expect(result.output).toEqual([
         {
           Profile: [
             {
@@ -894,6 +911,7 @@ describe('JsonMerger', () => {
           ],
         },
       ])
+      expect(result.hasConflict).toBe(false)
     })
 
     it('should accept identical new string properties added in both ours and theirs', () => {
@@ -918,7 +936,7 @@ describe('JsonMerger', () => {
       const result = sut.merge(ancestor, ours, theirs)
 
       // Assert
-      expect(result).toEqual([
+      expect(result.output).toEqual([
         {
           Profile: [
             {
@@ -927,6 +945,7 @@ describe('JsonMerger', () => {
           ],
         },
       ])
+      expect(result.hasConflict).toBe(false)
     })
 
     it('should remove string properties deleted in both ours and theirs', () => {
@@ -949,11 +968,12 @@ describe('JsonMerger', () => {
       const result = sut.merge(ancestor, ours, theirs)
 
       // Assert
-      expect(result).toEqual([
+      expect(result.output).toEqual([
         {
           Profile: [],
         },
       ])
+      expect(result.hasConflict).toBe(false)
     })
 
     it('should prioritize local deletion when ours deletes a property but theirs keeps it unchanged', () => {
@@ -978,11 +998,12 @@ describe('JsonMerger', () => {
       const result = sut.merge(ancestor, ours, theirs)
 
       // Assert
-      expect(result).toEqual([
+      expect(result.output).toEqual([
         {
           Profile: [],
         },
       ])
+      expect(result.hasConflict).toBe(false)
     })
 
     it('should prioritize remote deletion when theirs deletes a property but ours keeps it unchanged', () => {
@@ -1007,11 +1028,12 @@ describe('JsonMerger', () => {
       const result = sut.merge(ancestor, ours, theirs)
 
       // Assert
-      expect(result).toEqual([
+      expect(result.output).toEqual([
         {
           Profile: [],
         },
       ])
+      expect(result.hasConflict).toBe(false)
     })
 
     it('should accept identical new properties when ancestor lacks the parent structure entirely', () => {
@@ -1034,7 +1056,7 @@ describe('JsonMerger', () => {
       const result = sut.merge(ancestor, ours, theirs)
 
       // Assert
-      expect(result).toEqual([
+      expect(result.output).toEqual([
         {
           Profile: [
             {
@@ -1043,6 +1065,7 @@ describe('JsonMerger', () => {
           ],
         },
       ])
+      expect(result.hasConflict).toBe(false)
     })
 
     it('should mark conflict when both sides add different values for the same new property', () => {
@@ -1067,7 +1090,7 @@ describe('JsonMerger', () => {
       const result = sut.merge(ancestor, ours, theirs)
 
       // Assert
-      expect(result).toEqual([
+      expect(result.output).toEqual([
         {
           Profile: [
             { '#text': '\n<<<<<<< LOCAL' },
@@ -1084,6 +1107,7 @@ describe('JsonMerger', () => {
           ],
         },
       ])
+      expect(result.hasConflict).toBe(true)
     })
 
     it('should mark conflict when ours deletes a property but theirs modifies it', () => {
@@ -1108,7 +1132,7 @@ describe('JsonMerger', () => {
       const result = sut.merge(ancestor, ours, theirs)
 
       // Assert
-      expect(result).toEqual([
+      expect(result.output).toEqual([
         {
           Profile: [
             { '#text': '\n<<<<<<< LOCAL' },
@@ -1125,6 +1149,7 @@ describe('JsonMerger', () => {
           ],
         },
       ])
+      expect(result.hasConflict).toBe(true)
     })
 
     it('should mark conflict when ours modifies a property but theirs deletes it', () => {
@@ -1149,7 +1174,7 @@ describe('JsonMerger', () => {
       const result = sut.merge(ancestor, ours, theirs)
 
       // Assert
-      expect(result).toEqual([
+      expect(result.output).toEqual([
         {
           Profile: [
             { '#text': '\n<<<<<<< LOCAL' },
@@ -1166,6 +1191,7 @@ describe('JsonMerger', () => {
           ],
         },
       ])
+      expect(result.hasConflict).toBe(true)
     })
 
     it('should mark conflict when both sides modify the same property with different values', () => {
@@ -1192,7 +1218,7 @@ describe('JsonMerger', () => {
       const result = sut.merge(ancestor, ours, theirs)
 
       // Assert
-      expect(result).toEqual([
+      expect(result.output).toEqual([
         {
           Profile: [
             { '#text': '\n<<<<<<< LOCAL' },
@@ -1211,6 +1237,7 @@ describe('JsonMerger', () => {
           ],
         },
       ])
+      expect(result.hasConflict).toBe(true)
     })
   })
 
@@ -1257,7 +1284,7 @@ describe('JsonMerger', () => {
       const result = sut.merge(ancestor, ours, theirs)
 
       // Assert
-      expect(result).toEqual([
+      expect(result.output).toEqual([
         {
           Profile: [
             {
@@ -1293,6 +1320,7 @@ describe('JsonMerger', () => {
           ],
         },
       ])
+      expect(result.hasConflict).toBe(false)
     })
 
     it('should adopt remote changes when an element is modified only in the remote version', () => {
@@ -1337,7 +1365,7 @@ describe('JsonMerger', () => {
       const result = sut.merge(ancestor, ours, theirs)
 
       // Assert
-      expect(result).toEqual([
+      expect(result.output).toEqual([
         {
           Profile: [
             {
@@ -1350,6 +1378,7 @@ describe('JsonMerger', () => {
           ],
         },
       ])
+      expect(result.hasConflict).toBe(false)
     })
 
     it('should incorporate new elements added in remote array when remote array is longer', () => {
@@ -1390,7 +1419,7 @@ describe('JsonMerger', () => {
       const result = sut.merge(ancestor, ours, theirs)
 
       // Assert
-      expect(result).toEqual([
+      expect(result.output).toEqual([
         {
           Profile: [
             {
@@ -1426,6 +1455,7 @@ describe('JsonMerger', () => {
           ],
         },
       ])
+      expect(result.hasConflict).toBe(false)
     })
 
     it('should preserve locally added elements while merging remote changes to existing elements', () => {
@@ -1464,7 +1494,7 @@ describe('JsonMerger', () => {
       const result = sut.merge(ancestor, ours, theirs)
 
       // Assert
-      expect(result).toEqual([
+      expect(result.output).toEqual([
         {
           Profile: [
             {
@@ -1500,6 +1530,7 @@ describe('JsonMerger', () => {
           ],
         },
       ])
+      expect(result.hasConflict).toBe(false)
     })
   })
 })

@@ -48,5 +48,45 @@ describe('MergeDriver', () => {
         sut.mergeFiles('AncestorFile', 'OurFile', 'TheirFile', 'OutputFile')
       ).rejects.toThrowError('Tripart XML merge failed')
     })
+
+    it('should return true when there is a conflict', async () => {
+      // Arrange
+      mockReadFile.mockResolvedValue('<label>Test Object</label>')
+      mockedTripartXmlMerge.mockReturnValue({
+        output: '<label>Test Object</label>',
+        hasConflict: true,
+      })
+
+      // Act
+      const result = await sut.mergeFiles(
+        'AncestorFile',
+        'OurFile',
+        'TheirFile',
+        'OutputFile'
+      )
+
+      // Assert
+      expect(result).toBe(true)
+    })
+
+    it('should return false when there is no conflict', async () => {
+      // Arrange
+      mockReadFile.mockResolvedValue('<label>Test Object</label>')
+      mockedTripartXmlMerge.mockReturnValue({
+        output: '<label>Test Object</label>',
+        hasConflict: false,
+      })
+
+      // Act
+      const result = await sut.mergeFiles(
+        'AncestorFile',
+        'OurFile',
+        'TheirFile',
+        'OutputFile'
+      )
+
+      // Assert
+      expect(result).toBe(false)
+    })
   })
 })

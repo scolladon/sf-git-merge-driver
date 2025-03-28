@@ -41,11 +41,12 @@ export default class Run extends SfCommand<void> {
   public async run(): Promise<void> {
     const { flags } = await this.parse(Run)
     const mergeDriver = new MergeDriver()
-    await mergeDriver.mergeFiles(
+    const hasConflict = await mergeDriver.mergeFiles(
       flags['ancestor-file'],
       flags['our-file'],
       flags['theirs-file'],
       flags['output-file']
     )
+    this.exit(hasConflict ? 1 : 0)
   }
 }

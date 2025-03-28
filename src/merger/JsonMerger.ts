@@ -8,7 +8,7 @@ import {
   getUniqueSortedProps,
   isObject,
 } from '../utils/mergeUtils.js'
-import { addConflictMarkers } from './conflictMarker.js'
+import { ConflictMarker } from './conflictMarker.js'
 import { mergeTextAttribute } from './textAttribute.js'
 
 export class JsonMerger {
@@ -16,7 +16,7 @@ export class JsonMerger {
     ancestor: JsonObject | JsonArray,
     ours: JsonObject | JsonArray,
     theirs: JsonObject | JsonArray
-  ): JsonArray {
+  ): { output: JsonArray; hasConflict: boolean } {
     const namespaceHandler = new NamespaceHandler()
     const namespaces = namespaceHandler.processNamespaces(
       ancestor,
@@ -51,7 +51,10 @@ export class JsonMerger {
 
     const result = acc.flat()
     namespaceHandler.addNamespacesToResult(result, namespaces)
-    return result
+    return {
+      output: result,
+      hasConflict: ConflictMarker.hasConflictMarker(),
+    }
   }
 }
 const mergeMetadata = (
@@ -95,7 +98,7 @@ const handleOursAndTheirs = (
     const theirsProp = {
       [key]: mergeMetadata({}, {}, theirs[key]),
     }
-    addConflictMarkers(acc, obj, {}, theirsProp)
+    ConflictMarker.addConflictMarkers(acc, obj, {}, theirsProp)
   } else {
     acc.push(obj)
   }
@@ -115,7 +118,7 @@ const handleAncestorAndTheirs = (
     const theirsProp = {
       [key]: mergeMetadata({}, {}, theirs[key]),
     }
-    addConflictMarkers(acc, {}, ancestorProp, theirsProp)
+    ConflictMarker.addConflictMarkers(acc, {}, ancestorProp, theirsProp)
   }
   return acc
 }
@@ -133,7 +136,7 @@ const handleAncestorAndOurs = (
     const ancestorProp = {
       [key]: mergeMetadata({}, {}, ancestor[key]),
     }
-    addConflictMarkers(acc, oursProp, ancestorProp, {})
+    ConflictMarker.addConflictMarkers(acc, oursProp, ancestorProp, {})
   }
   return acc
 }
@@ -199,7 +202,7 @@ const mergeByKeyField = (
           const theirsProp = {
             [attribute]: mergeMetadata({}, {}, theirsOfKey),
           }
-          addConflictMarkers(acc, {}, ancestorProp, theirsProp)
+          ConflictMarker.addConflictMarkers(acc, {}, ancestorProp, theirsProp)
         }
         break
       case MergeScenario.ANCESTOR_AND_OURS:
@@ -210,7 +213,7 @@ const mergeByKeyField = (
           const ancestorProp = {
             [attribute]: mergeMetadata({}, ancestorOfKey, {}),
           }
-          addConflictMarkers(acc, oursProp, ancestorProp, {})
+          ConflictMarker.addConflictMarkers(acc, oursProp, ancestorProp, {})
         }
         break
       case MergeScenario.ALL:

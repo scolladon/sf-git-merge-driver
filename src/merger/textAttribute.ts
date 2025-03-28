@@ -2,7 +2,7 @@ import { isEqual, isNil } from 'lodash-es'
 import { TEXT_TAG } from '../constant/conflicConstant.js'
 import type { JsonArray, JsonObject, JsonValue } from '../types/jsonTypes.js'
 import { MergeScenario, getScenario } from '../types/mergeScenario.js'
-import { addConflictMarkers } from './conflictMarker.js'
+import { ConflictMarker } from './conflictMarker.js'
 
 export const mergeTextAttribute = (
   ancestor: JsonValue | null,
@@ -40,18 +40,18 @@ export const mergeTextAttribute = (
       break
 
     case MergeScenario.OURS_AND_THEIRS:
-      addConflictMarkers(acc, objOurs, {}, objTheirs)
+      ConflictMarker.addConflictMarkers(acc, objOurs, {}, objTheirs)
       break
 
     case MergeScenario.ANCESTOR_AND_THEIRS:
       if (ancestor !== theirs) {
-        addConflictMarkers(acc, {}, objAnc, objTheirs)
+        ConflictMarker.addConflictMarkers(acc, {}, objAnc, objTheirs)
       }
       break
 
     case MergeScenario.ANCESTOR_AND_OURS:
       if (ancestor !== ours) {
-        addConflictMarkers(acc, objOurs, objAnc, {})
+        ConflictMarker.addConflictMarkers(acc, objOurs, objAnc, {})
       }
       break
 
@@ -61,7 +61,7 @@ export const mergeTextAttribute = (
       } else if (ancestor === theirs) {
         acc.push(objOurs)
       } else {
-        addConflictMarkers(acc, objOurs, objAnc, objTheirs)
+        ConflictMarker.addConflictMarkers(acc, objOurs, objAnc, objTheirs)
       }
       break
   }
