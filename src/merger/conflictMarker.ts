@@ -18,9 +18,9 @@ export class ConflictMarker {
 
   public static addConflictMarkers(
     acc: JsonArray,
-    ours: JsonObject,
-    ancestor: JsonObject,
-    theirs: JsonObject
+    ours: JsonObject | JsonArray,
+    ancestor: JsonObject | JsonArray,
+    theirs: JsonObject | JsonArray
   ): void {
     ConflictMarker.hasConflict = true
     acc.push({ [TEXT_TAG]: `${NEWLINE}${LOCAL}` })

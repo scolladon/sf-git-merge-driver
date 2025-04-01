@@ -1,4 +1,4 @@
-import { isEmpty, isEqual, keyBy, unionWith } from 'lodash-es'
+import { isEmpty, isEqual, keyBy } from 'lodash-es'
 import { MetadataService } from '../service/MetadataService.js'
 import { NamespaceHandler } from '../service/NamespaceHandler.js'
 import type { JsonArray, JsonObject } from '../types/jsonTypes.js'
@@ -86,17 +86,39 @@ const mergeMetadata = (
   return acc.flat()
 }
 
+const formatMetadata = (inputObj: JsonObject | JsonArray): JsonArray => {
+  const acc: JsonArray[] = []
+  // const props = getUniqueSortedProps(inputObj)
+  for (const attribute of getUniqueSortedProps(inputObj)) {
+    let values: JsonArray = []
+    const inputObjOfAttr = inputObj[attribute]
+
+    if (isObject(inputObjOfAttr, null, null)) {
+      const inputObjAtt = ensureArray(inputObjOfAttr)
+      for (const key of getUniqueSortedProps(inputObjAtt)) {
+        const inputObjKeyOfKey = inputObjAtt[key]
+        values.push({ [attribute]: formatMetadata(inputObjKeyOfKey) })
+      }
+    } else {
+      values = mergeTextAttribute(null, null, inputObjOfAttr, attribute)
+    }
+    acc.push(values)
+  }
+
+  return acc.flat()
+}
+
 const handleOursAndTheirs = (
   key: string,
   ours: JsonObject | JsonArray,
   theirs: JsonObject | JsonArray
 ): JsonArray => {
   const obj: JsonObject = {}
-  obj[key] = mergeMetadata({}, ours[key], {})
+  obj[key] = formatMetadata(ours[key])
   const acc: JsonArray = []
   if (!isEqual(ours, theirs)) {
     const theirsProp = {
-      [key]: mergeMetadata({}, {}, theirs[key]),
+      [key]: formatMetadata(theirs[key]),
     }
     ConflictMarker.addConflictMarkers(acc, obj, {}, theirsProp)
   } else {
@@ -113,10 +135,10 @@ const handleAncestorAndTheirs = (
   const acc: JsonArray = []
   if (!isEqual(ancestor, theirs)) {
     const ancestorProp = {
-      [key]: mergeMetadata({}, {}, ancestor[key]),
+      [key]: formatMetadata(ancestor[key]),
     }
     const theirsProp = {
-      [key]: mergeMetadata({}, {}, theirs[key]),
+      [key]: formatMetadata(theirs[key]),
     }
     ConflictMarker.addConflictMarkers(acc, {}, ancestorProp, theirsProp)
   }
@@ -131,10 +153,10 @@ const handleAncestorAndOurs = (
   const acc: JsonArray = []
   if (!isEqual(ancestor, ours)) {
     const oursProp = {
-      [key]: mergeMetadata({}, {}, ours[key]),
+      [key]: formatMetadata(ours[key]),
     }
     const ancestorProp = {
-      [key]: mergeMetadata({}, {}, ancestor[key]),
+      [key]: formatMetadata(ancestor[key]),
     }
     ConflictMarker.addConflictMarkers(acc, oursProp, ancestorProp, {})
   }
@@ -148,10 +170,22 @@ const mergeArrays = (
   attribute: string
 ): JsonArray => {
   const keyField = MetadataService.getKeyFieldExtractor(attribute)
+  console.info('attribute: ' + attribute)
   if (!keyField) {
-    const obj = {}
-    obj[attribute] = unionWith(ours, theirs, isEqual)
-    return [obj]
+    console.info('did not find keyField')
+    // const scenario: MergeScenario = getScenario(ancestor, ours, theirs)
+    const arr: JsonArray = []
+    // obj[attribute] = unionWith(ours, theirs, isEqual)
+    // obj[attribute] = mergeTextAttribute(ours, theirs, isEqual, attribute)
+    // obj[attribute] = []
+    ConflictMarker.addConflictMarkers(
+      arr,
+      formatMetadata({ [attribute]: ours }),
+      formatMetadata({ [attribute]: ancestor }),
+      formatMetadata({ [attribute]: theirs })
+    )
+    return arr.flat()
+    // return mergeTextAttribute(ancestor, ours, theirs, attribute).flat()
   }
 
   const [keyedAnc, keyedOurs, keyedTheirs] = [ancestor, ours, theirs].map(arr =>
