@@ -170,9 +170,7 @@ const mergeArrays = (
   attribute: string
 ): JsonArray => {
   const keyField = MetadataService.getKeyFieldExtractor(attribute)
-  console.info('attribute: ' + attribute)
   if (!keyField) {
-    console.info('did not find keyField')
     // const scenario: MergeScenario = getScenario(ancestor, ours, theirs)
     const arr: JsonArray = []
     // obj[attribute] = unionWith(ours, theirs, isEqual)
