@@ -48,12 +48,11 @@ export default class Run extends SfCommand<void> {
       flags['output-file']
     )
     if (hasConflict) {
-      console.error(
+      this.error(
         messages.getMessage('result.withconflict') + ' ' + flags['output-file']
       )
-      this.exit(1)
     } else {
-      console.info(
+      this.info(
         messages.getMessage('result.successful') + ' ' + flags['output-file']
       )
     }
