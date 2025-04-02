@@ -216,80 +216,6 @@ describe('JsonMerger', () => {
     })
   })
 
-  // describe('Merging objects with primitive arrays (no identifying keys)', () => {
-  //   it('should combine string arrays from both sources while preserving unique values', () => {
-  //     // Arrange
-  //     const ancestor: JsonValue = {
-  //       Profile: {
-  //         custom: ['Value1', 'Value2'],
-  //       },
-  //     }
-
-  //     const ours: JsonValue = {
-  //       Profile: {
-  //         custom: ['Value1', 'Value3'],
-  //       },
-  //     }
-
-  //     const theirs: JsonValue = {
-  //       Profile: {
-  //         custom: ['Value1', 'Value2', 'Value4'],
-  //       },
-  //     }
-
-  //     // Act
-  //     const result = sut.merge(ancestor, ours, theirs)
-
-  //     // Assert
-  //     expect(result.output).toEqual([
-  //       {
-  //         Profile: [
-  //           {
-  //             custom: ['Value1', 'Value3', 'Value2', 'Value4'],
-  //           },
-  //         ],
-  //       },
-  //     ])
-  //     expect(result.hasConflict).toBe(false)
-  //   })
-
-  //   it('should properly merge numeric arrays by combining values from both sources', () => {
-  //     // Arrange
-  //     const ancestor: JsonValue = {
-  //       Profile: {
-  //         values: [1, 2, 3],
-  //       },
-  //     }
-
-  //     const ours: JsonValue = {
-  //       Profile: {
-  //         values: [1, 4, 5],
-  //       },
-  //     }
-
-  //     const theirs: JsonValue = {
-  //       Profile: {
-  //         values: [1, 2, 6],
-  //       },
-  //     }
-
-  //     // Act
-  //     const result = sut.merge(ancestor, ours, theirs)
-
-  //     // Assert
-  //     expect(result.output).toEqual([
-  //       {
-  //         Profile: [
-  //           {
-  //             values: [1, 4, 5, 2, 6],
-  //           },
-  //         ],
-  //       },
-  //     ])
-  //     expect(result.hasConflict).toBe(false)
-  //   })
-  // })
-
   describe('Merging complex objects with multiple data types and different array merging strategies', () => {
     it('should correctly apply appropriate merge strategies for primitive arrays, keyed arrays, and scalar values', () => {
       // Arrange
@@ -299,7 +225,6 @@ describe('JsonMerger', () => {
           fieldPermissions: [
             { field: 'Account.Name', editable: 'false', readable: 'true' },
           ],
-          // custom: ['Value1', 'Value2'],
         },
       }
 
@@ -309,7 +234,6 @@ describe('JsonMerger', () => {
           fieldPermissions: [
             { field: 'Account.Name', editable: 'true', readable: 'true' },
           ],
-          // custom: ['Value1', 'Value3'],
         },
       }
 
@@ -320,7 +244,6 @@ describe('JsonMerger', () => {
             { field: 'Account.Name', editable: 'false', readable: 'false' },
             { field: 'Account.Type', editable: 'false', readable: 'true' },
           ],
-          // custom: ['Value2', 'Value4'],
           label: 'Their Label',
         },
       }
@@ -332,7 +255,6 @@ describe('JsonMerger', () => {
       expect(result.output).toEqual([
         {
           Profile: [
-            // { custom: ['Value1', 'Value3', 'Value2', 'Value4'] },
             {
               description: [{ '#text': 'Our updated description' }],
             },
@@ -439,7 +361,6 @@ describe('JsonMerger', () => {
             { field: 'Account.Name', editable: 'true', readable: 'true' },
             { field: 'Account.Type', editable: 'false', readable: 'true' },
           ],
-          // custom: ['Value1', 'Value3'],
         },
       }
 
@@ -449,7 +370,6 @@ describe('JsonMerger', () => {
             { field: 'Account.Name', editable: 'false', readable: 'false' },
             { field: 'Account.Industry', editable: 'false', readable: 'true' },
           ],
-          // custom: ['Value2', 'Value4'],
           description: 'Their description',
         },
       }
@@ -462,7 +382,6 @@ describe('JsonMerger', () => {
         { '#text': '\n<<<<<<< LOCAL' },
         {
           Profile: [
-            // { custom: ['Value1', 'Value3'] },
             {
               fieldPermissions: [
                 { editable: [{ '#text': 'true' }] },
@@ -484,7 +403,6 @@ describe('JsonMerger', () => {
         { '#text': '=======' },
         {
           Profile: [
-            // { custom: ['Value2', 'Value4'] },
             { description: [{ '#text': 'Their description' }] },
             {
               fieldPermissions: [
@@ -673,7 +591,6 @@ describe('JsonMerger', () => {
             { field: 'Account.Name', editable: 'false', readable: 'false' },
             { field: 'Account.Industry', editable: 'false', readable: 'true' },
           ],
-          // custom: ['Value2', 'Value4'],
           description: 'Their description',
         },
       }
@@ -684,7 +601,6 @@ describe('JsonMerger', () => {
             { field: 'Account.Name', editable: 'true', readable: 'true' },
             { field: 'Account.Type', editable: 'false', readable: 'true' },
           ],
-          // custom: ['Value1', 'Value3'],
         },
       }
 
@@ -698,7 +614,6 @@ describe('JsonMerger', () => {
         { '#text': '\n<<<<<<< LOCAL' },
         {
           Profile: [
-            // { custom: ['Value1', 'Value3'] },
             {
               fieldPermissions: [
                 { editable: [{ '#text': 'true' }] },
@@ -718,7 +633,6 @@ describe('JsonMerger', () => {
         { '#text': '||||||| BASE' },
         {
           Profile: [
-            // { custom: ['Value2', 'Value4'] },
             { description: [{ '#text': 'Their description' }] },
             {
               fieldPermissions: [
@@ -807,7 +721,6 @@ describe('JsonMerger', () => {
             { field: 'Account.Name', editable: 'false', readable: 'false' },
             { field: 'Account.Industry', editable: 'false', readable: 'true' },
           ],
-          // custom: ['Value2', 'Value4'],
           description: 'Their description',
         },
       }
@@ -820,7 +733,6 @@ describe('JsonMerger', () => {
             { field: 'Account.Name', editable: 'true', readable: 'true' },
             { field: 'Account.Type', editable: 'false', readable: 'true' },
           ],
-          // custom: ['Value1', 'Value3'],
         },
       }
 
@@ -834,7 +746,6 @@ describe('JsonMerger', () => {
         { '#text': '||||||| BASE' },
         {
           Profile: [
-            // { custom: ['Value2', 'Value4'] },
             { description: [{ '#text': 'Their description' }] },
             {
               fieldPermissions: [
@@ -855,7 +766,6 @@ describe('JsonMerger', () => {
         { '#text': '=======' },
         {
           Profile: [
-            // { custom: ['Value1', 'Value3'] },
             {
               fieldPermissions: [
                 { editable: [{ '#text': 'true' }] },
