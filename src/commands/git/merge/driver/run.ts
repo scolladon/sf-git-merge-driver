@@ -50,7 +50,7 @@ export default class Run extends SfCommand<void> {
     if (hasConflict) {
       this.error(
         messages.getMessage('result.withconflict') + ' ' + flags['output-file'],
-        { code: '1' }
+        { exit: 1 }
       )
     } else {
       this.info(
