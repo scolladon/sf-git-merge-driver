@@ -34,3 +34,11 @@ path to their version of the file
 
 path to the file where the merged content will be written
 
+# result.withconflict
+
+There are conflicts for file
+
+# result.successful
+
+Successfully merged file
+
