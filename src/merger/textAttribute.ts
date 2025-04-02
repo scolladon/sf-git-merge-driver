@@ -1,8 +1,16 @@
-import { isEqual, isNil } from 'lodash-es'
+import { deepEqual } from 'fast-equals'
+import { isNil } from 'lodash-es'
 import { TEXT_TAG } from '../constant/conflicConstant.js'
 import type { JsonArray, JsonObject, JsonValue } from '../types/jsonTypes.js'
 import { MergeScenario, getScenario } from '../types/mergeScenario.js'
 import { ConflictMarker } from './conflictMarker.js'
+
+export const generateObj = (
+  value: JsonValue | null,
+  attrib: string
+): JsonObject => {
+  return isNil(value) ? {} : { [attrib]: [{ [TEXT_TAG]: value }] }
+}
 
 export const mergeTextAttribute = (
   ancestor: JsonValue | null,
@@ -10,19 +18,15 @@ export const mergeTextAttribute = (
   theirs: JsonValue | null,
   attrib: string
 ): JsonArray => {
-  const generateObj = (value: JsonValue | null): JsonObject => {
-    return isNil(value) ? {} : { [attrib]: [{ [TEXT_TAG]: value }] }
-  }
-
-  const objAnc: JsonObject = generateObj(ancestor)
-  const objOurs: JsonObject = generateObj(ours)
-  const objTheirs: JsonObject = generateObj(theirs)
+  const objAnc: JsonObject = generateObj(ancestor, attrib)
+  const objOurs: JsonObject = generateObj(ours, attrib)
+  const objTheirs: JsonObject = generateObj(theirs, attrib)
   const scenario: MergeScenario = getScenario(objAnc, objOurs, objTheirs)
   const acc: JsonArray = []
 
   // Early return for identical values
   if (
-    isEqual(ours, theirs) &&
+    deepEqual(ours, theirs) &&
     (scenario === MergeScenario.OURS_AND_THEIRS ||
       scenario === MergeScenario.ALL)
   ) {
