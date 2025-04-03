@@ -51,21 +51,14 @@ export class XmlMerger {
     const ancestorObj = parser.parse(ancestorContent)
     const ourObj = parser.parse(ourContent)
     const theirObj = parser.parse(theirContent)
-    // console.log('ancestorObj ' + typeof ancestorObj)
-    // console.dir(ancestorObj, {depth:null})
 
     // Perform deep merge of XML objects
-
     const jsonMerger = new JsonMerger()
     const mergedResult = jsonMerger.merge(ancestorObj, ourObj, theirObj)
-    // console.log('mergedObj')
-    // console.dir(mergedObj, {depth:null})
 
     // Convert back to XML and format
     const builder = new XMLBuilder(builderOptions)
     const mergedXml: string = builder.build(mergedResult.output)
-    // console.log('mergedXml')
-    // console.dir(mergedXml, {depth:null})
     return {
       output: mergedXml.length
         ? correctConflictIndent(
