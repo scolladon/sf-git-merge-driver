@@ -13,7 +13,7 @@ import { ConflictMarker } from './conflictMarker.js'
 import { generateObj, mergeTextAttribute } from './textAttribute.js'
 
 export class JsonMerger {
-  public merge(
+  public mergeThreeWay(
     ancestor: JsonObject | JsonArray,
     local: JsonObject | JsonArray,
     other: JsonObject | JsonArray
@@ -42,7 +42,7 @@ export class JsonMerger {
           break
         default: {
           const obj = {
-            [key]: mergeThreeWay(ancestor[key], local[key], other[key]),
+            [key]: merge(ancestor[key], local[key], other[key]),
           }
           acc.push([obj])
           break
@@ -59,7 +59,7 @@ export class JsonMerger {
   }
 }
 
-function mergeThreeWay(
+function merge(
   ancestor: JsonObject | JsonArray,
   local: JsonObject | JsonArray,
   other: JsonObject | JsonArray
@@ -213,27 +213,27 @@ const mergeByKeyField = (
     const obj = {}
     switch (scenario) {
       case MergeScenario.OTHER_ONLY:
-        obj[attribute] = mergeThreeWay({}, {}, otherOfKey)
+        obj[attribute] = merge({}, {}, otherOfKey)
         break
       case MergeScenario.LOCAL_ONLY:
-        obj[attribute] = mergeThreeWay({}, localOfKey, {})
+        obj[attribute] = merge({}, localOfKey, {})
         break
       case MergeScenario.ANCESTOR_ONLY:
         break
       case MergeScenario.LOCAL_AND_OTHER:
         if (deepEqual(localOfKey, otherOfKey)) {
-          obj[attribute] = mergeThreeWay({}, {}, otherOfKey)
+          obj[attribute] = merge({}, {}, otherOfKey)
         } else {
-          obj[attribute] = mergeThreeWay({}, localOfKey, otherOfKey)
+          obj[attribute] = merge({}, localOfKey, otherOfKey)
         }
         break
       case MergeScenario.ANCESTOR_AND_OTHER:
         if (!deepEqual(ancestorOfKey, otherOfKey)) {
           const ancestorProp = {
-            [attribute]: mergeThreeWay({}, ancestorOfKey, {}),
+            [attribute]: merge({}, ancestorOfKey, {}),
           }
           const otherProp = {
-            [attribute]: mergeThreeWay({}, {}, otherOfKey),
+            [attribute]: merge({}, {}, otherOfKey),
           }
           ConflictMarker.addConflictMarkers(acc, {}, ancestorProp, otherProp)
         }
@@ -241,23 +241,23 @@ const mergeByKeyField = (
       case MergeScenario.ANCESTOR_AND_LOCAL:
         if (!deepEqual(ancestorOfKey, localOfKey)) {
           const localProp = {
-            [attribute]: mergeThreeWay({}, localOfKey, {}),
+            [attribute]: merge({}, localOfKey, {}),
           }
           const ancestorProp = {
-            [attribute]: mergeThreeWay({}, ancestorOfKey, {}),
+            [attribute]: merge({}, ancestorOfKey, {}),
           }
           ConflictMarker.addConflictMarkers(acc, localProp, ancestorProp, {})
         }
         break
       case MergeScenario.ALL:
         if (deepEqual(localOfKey, otherOfKey)) {
-          obj[attribute] = mergeThreeWay({}, {}, otherOfKey)
+          obj[attribute] = merge({}, {}, otherOfKey)
         } else if (deepEqual(ancestorOfKey, localOfKey)) {
-          obj[attribute] = mergeThreeWay({}, {}, otherOfKey)
+          obj[attribute] = merge({}, {}, otherOfKey)
         } else if (deepEqual(ancestorOfKey, otherOfKey)) {
-          obj[attribute] = mergeThreeWay({}, localOfKey, {})
+          obj[attribute] = merge({}, localOfKey, {})
         } else {
-          obj[attribute] = mergeThreeWay(ancestorOfKey, localOfKey, otherOfKey)
+          obj[attribute] = merge(ancestorOfKey, localOfKey, otherOfKey)
         }
         break
     }

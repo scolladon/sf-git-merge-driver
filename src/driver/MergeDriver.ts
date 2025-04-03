@@ -17,7 +17,7 @@ export class MergeDriver {
 
     const xmlMerger = new XmlMerger()
 
-    const mergedContent = xmlMerger.tripartXmlMerge(
+    const mergedContent = xmlMerger.mergeThreeWay(
       ancestorContent,
       ourContent,
       theirContent

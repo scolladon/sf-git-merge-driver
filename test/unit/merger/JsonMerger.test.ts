@@ -68,7 +68,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, local, other)
+      const result = sut.mergeThreeWay(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -142,7 +142,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, local, other)
+      const result = sut.mergeThreeWay(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -189,7 +189,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, local, other)
+      const result = sut.mergeThreeWay(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -249,7 +249,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, local, other)
+      const result = sut.mergeThreeWay(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -323,7 +323,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, local, other)
+      const result = sut.mergeThreeWay(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -375,7 +375,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, local, other)
+      const result = sut.mergeThreeWay(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -448,7 +448,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, local, other)
+      const result = sut.mergeThreeWay(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -496,7 +496,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, local, other)
+      const result = sut.mergeThreeWay(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -552,7 +552,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, local, other)
+      const result = sut.mergeThreeWay(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -607,7 +607,7 @@ describe('JsonMerger', () => {
       const other = {}
 
       // Act
-      const result = sut.merge(ancestor, local, other)
+      const result = sut.mergeThreeWay(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -682,7 +682,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, local, other)
+      const result = sut.mergeThreeWay(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -737,7 +737,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, local, other)
+      const result = sut.mergeThreeWay(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -807,7 +807,7 @@ describe('JsonMerger', () => {
     }
 
     // Act
-    const result = sut.merge(ancestor, local, other)
+    const result = sut.mergeThreeWay(ancestor, local, other)
 
     // Assert
     expect(result.output).toEqual([
@@ -834,7 +834,7 @@ describe('JsonMerger', () => {
     const other: JsonValue = {}
 
     // Act
-    const result = sut.merge(ancestor, local, other)
+    const result = sut.mergeThreeWay(ancestor, local, other)
 
     // Assert
     expect(result.output).toEqual([])
@@ -863,7 +863,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, local, other)
+      const result = sut.mergeThreeWay(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -897,7 +897,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, local, other)
+      const result = sut.mergeThreeWay(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -929,7 +929,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, local, other)
+      const result = sut.mergeThreeWay(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -959,7 +959,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, local, other)
+      const result = sut.mergeThreeWay(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -989,7 +989,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, local, other)
+      const result = sut.mergeThreeWay(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -1017,7 +1017,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, local, other)
+      const result = sut.mergeThreeWay(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -1051,7 +1051,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, local, other)
+      const result = sut.mergeThreeWay(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -1093,7 +1093,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, local, other)
+      const result = sut.mergeThreeWay(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -1135,7 +1135,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, local, other)
+      const result = sut.mergeThreeWay(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -1179,7 +1179,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, local, other)
+      const result = sut.mergeThreeWay(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -1245,7 +1245,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, local, other)
+      const result = sut.mergeThreeWay(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -1326,7 +1326,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, local, other)
+      const result = sut.mergeThreeWay(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -1380,7 +1380,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, local, other)
+      const result = sut.mergeThreeWay(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -1455,7 +1455,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, local, other)
+      const result = sut.mergeThreeWay(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([

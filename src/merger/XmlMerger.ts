@@ -41,7 +41,7 @@ const handleSpecialEntities = (xml: string): string =>
     .replaceAll('&gt;&gt;&gt;&gt;&gt;&gt;&gt;', '>>>>>>>')
 
 export class XmlMerger {
-  tripartXmlMerge(
+  mergeThreeWay(
     ancestorContent: string,
     ourContent: string,
     theirContent: string
@@ -54,7 +54,7 @@ export class XmlMerger {
 
     // Perform deep merge of XML objects
     const jsonMerger = new JsonMerger()
-    const mergedResult = jsonMerger.merge(ancestorObj, ourObj, theirObj)
+    const mergedResult = jsonMerger.mergeThreeWay(ancestorObj, ourObj, theirObj)
 
     // Convert back to XML and format
     const builder = new XMLBuilder(builderOptions)

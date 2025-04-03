@@ -7,10 +7,10 @@ jest.mock('node:fs/promises', () => ({
   writeFile: (...args) => mockWriteFile(...args),
 }))
 
-const mockedTripartXmlMerge = jest.fn()
+const mockedmergeThreeWay = jest.fn()
 jest.mock('../../../src/merger/XmlMerger.js', () => ({
   XmlMerger: jest.fn(() => ({
-    tripartXmlMerge: mockedTripartXmlMerge,
+    mergeThreeWay: mockedmergeThreeWay,
   })),
 }))
 
@@ -25,21 +25,21 @@ describe('MergeDriver', () => {
     it('should merge files successfully when given valid parameters', async () => {
       // Arrange
       mockReadFile.mockResolvedValue('<label>Test Object</label>')
-      mockedTripartXmlMerge.mockReturnValue('<label>Test Object</label>')
+      mockedmergeThreeWay.mockReturnValue('<label>Test Object</label>')
 
       // Act
       await sut.mergeFiles('AncestorFile', 'OurFile', 'TheirFile', 'OutputFile')
 
       // Assert
       expect(mockReadFile).toHaveBeenCalledTimes(3)
-      expect(mockedTripartXmlMerge).toHaveBeenCalledTimes(1)
+      expect(mockedmergeThreeWay).toHaveBeenCalledTimes(1)
       expect(mockWriteFile).toHaveBeenCalledTimes(1)
     })
 
-    it('should throw an error when tripartXmlMerge fails', async () => {
+    it('should throw an error when mergeThreeWay fails', async () => {
       // Arrange
       mockReadFile.mockResolvedValue('<label>Test Object</label>')
-      mockedTripartXmlMerge.mockImplementation(() => {
+      mockedmergeThreeWay.mockImplementation(() => {
         throw new Error('Tripart XML merge failed')
       })
 
@@ -52,7 +52,7 @@ describe('MergeDriver', () => {
     it('should return true when there is a conflict', async () => {
       // Arrange
       mockReadFile.mockResolvedValue('<label>Test Object</label>')
-      mockedTripartXmlMerge.mockReturnValue({
+      mockedmergeThreeWay.mockReturnValue({
         output: '<label>Test Object</label>',
         hasConflict: true,
       })
@@ -72,7 +72,7 @@ describe('MergeDriver', () => {
     it('should return false when there is no conflict', async () => {
       // Arrange
       mockReadFile.mockResolvedValue('<label>Test Object</label>')
-      mockedTripartXmlMerge.mockReturnValue({
+      mockedmergeThreeWay.mockReturnValue({
         output: '<label>Test Object</label>',
         hasConflict: false,
       })

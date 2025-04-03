@@ -22,7 +22,7 @@ jest.mock('../../../src/merger/JsonMerger.js', () => {
   return {
     JsonMerger: jest.fn().mockImplementation(() => {
       return {
-        merge: mockedmerge,
+        mergeThreeWay: mockedmerge,
       }
     }),
   }
@@ -35,7 +35,7 @@ describe('MergeDriver', () => {
     sut = new XmlMerger()
   })
 
-  describe('tripartXmlMerge', () => {
+  describe('mergeThreeWay', () => {
     it('should merge files successfully when given valid parameters', () => {
       // Arrange
       mockedmerge.mockReturnValue({
@@ -44,7 +44,7 @@ describe('MergeDriver', () => {
       })
 
       // Act
-      sut.tripartXmlMerge('AncestorFile', 'OurFile', 'TheirFile')
+      sut.mergeThreeWay('AncestorFile', 'OurFile', 'TheirFile')
 
       // Assert
       expect(XMLParser).toHaveBeenCalledTimes(1)
@@ -52,7 +52,7 @@ describe('MergeDriver', () => {
       expect(JsonMerger).toHaveBeenCalledTimes(1)
     })
 
-    it('should throw an error when tripartXmlMerge fails', () => {
+    it('should throw an error when mergeThreeWay fails', () => {
       // Arrange
       mockedmerge.mockImplementation(() => {
         throw new Error('Tripart XML merge failed')
@@ -60,7 +60,7 @@ describe('MergeDriver', () => {
 
       // Act and Assert
       expect(() =>
-        sut.tripartXmlMerge('AncestorFile', 'OurFile', 'TheirFile')
+        sut.mergeThreeWay('AncestorFile', 'OurFile', 'TheirFile')
       ).toThrow('Tripart XML merge failed')
     })
   })
@@ -77,7 +77,7 @@ describe('MergeDriver', () => {
       })
 
       // Act
-      const result = sut.tripartXmlMerge(
+      const result = sut.mergeThreeWay(
         ancestorWithSpecial,
         ourWithSpecial,
         theirWithSpecial
@@ -100,7 +100,7 @@ describe('MergeDriver', () => {
       })
 
       // Act
-      const result = sut.tripartXmlMerge(
+      const result = sut.mergeThreeWay(
         ancestorWithComment,
         ourWithComment,
         theirWithComment
@@ -120,7 +120,7 @@ describe('MergeDriver', () => {
       mockedmerge.mockReturnValue({ output: '', hasConflict: false })
 
       // Act
-      const result = sut.tripartXmlMerge(
+      const result = sut.mergeThreeWay(
         ancestorWithComment,
         ourWithComment,
         theirWithComment
