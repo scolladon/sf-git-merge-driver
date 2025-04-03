@@ -2,10 +2,6 @@ import { EOL } from 'node:os'
 import { isEmpty } from 'lodash-es'
 import {
   ANCESTOR_CONFLICT_MARKER,
-  DEFAULT_ANCESTOR_CONFLICT_TAG,
-  DEFAULT_CONFLICT_MARKER_SIZE,
-  DEFAULT_LOCAL_CONFLICT_TAG,
-  DEFAULT_OTHER_CONFLICT_TAG,
   LOCAL_CONFLICT_MARKER,
   OTHER_CONFLICT_MARKER,
   SEPARATOR,
@@ -24,24 +20,10 @@ const buildSeparator = (size: number): string => {
 
 export class ConflictMarker {
   private static hasConflict = false
-  private static baseMarker: string = buildMarker(
-    ANCESTOR_CONFLICT_MARKER,
-    DEFAULT_CONFLICT_MARKER_SIZE,
-    DEFAULT_ANCESTOR_CONFLICT_TAG
-  )
-  private static localMarker: string = buildMarker(
-    LOCAL_CONFLICT_MARKER,
-    DEFAULT_CONFLICT_MARKER_SIZE,
-    DEFAULT_LOCAL_CONFLICT_TAG
-  )
-  private static otherMarker: string = buildMarker(
-    OTHER_CONFLICT_MARKER,
-    DEFAULT_CONFLICT_MARKER_SIZE,
-    DEFAULT_OTHER_CONFLICT_TAG
-  )
-  private static separatorMarker: string = buildSeparator(
-    DEFAULT_CONFLICT_MARKER_SIZE
-  )
+  private static baseMarker: string
+  private static localMarker: string
+  private static otherMarker: string
+  private static separatorMarker: string
 
   public static hasConflictMarker(): boolean {
     return ConflictMarker.hasConflict
