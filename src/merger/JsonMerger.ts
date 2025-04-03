@@ -1,4 +1,5 @@
-import { isEmpty, isEqual, keyBy, unionWith } from 'lodash-es'
+import { deepEqual } from 'fast-equals'
+import { isEmpty, keyBy } from 'lodash-es'
 import { MetadataService } from '../service/MetadataService.js'
 import { NamespaceHandler } from '../service/NamespaceHandler.js'
 import type { JsonArray, JsonObject } from '../types/jsonTypes.js'
@@ -9,7 +10,7 @@ import {
   isObject,
 } from '../utils/mergeUtils.js'
 import { ConflictMarker } from './conflictMarker.js'
-import { mergeTextAttribute } from './textAttribute.js'
+import { generateObj, mergeTextAttribute } from './textAttribute.js'
 
 export class JsonMerger {
   public merge(
@@ -41,7 +42,7 @@ export class JsonMerger {
           break
         default: {
           const obj = {
-            [key]: mergeMetadata(ancestor[key], ours[key], theirs[key]),
+            [key]: mergeThreeWay(ancestor[key], ours[key], theirs[key]),
           }
           acc.push([obj])
           break
@@ -57,11 +58,12 @@ export class JsonMerger {
     }
   }
 }
-const mergeMetadata = (
+
+function mergeThreeWay(
   ancestor: JsonObject | JsonArray,
   ours: JsonObject | JsonArray,
   theirs: JsonObject | JsonArray
-): JsonArray => {
+): JsonArray {
   const acc: JsonArray[] = []
   const props = getUniqueSortedProps(ancestor, ours, theirs)
   for (const key of props) {
@@ -86,17 +88,38 @@ const mergeMetadata = (
   return acc.flat()
 }
 
+function toJsonArray(inputObj: JsonObject | JsonArray): JsonArray {
+  const acc: JsonArray[] = []
+  for (const attribute of getUniqueSortedProps(inputObj)) {
+    const values: JsonArray = []
+    const inputObjOfAttr = inputObj[attribute]
+
+    if (typeof inputObjOfAttr === 'object') {
+      const inputObjAtt = ensureArray(inputObjOfAttr)
+      for (const key of getUniqueSortedProps(inputObjAtt)) {
+        const inputObjKeyOfKey = inputObjAtt[key]
+        values.push({ [attribute]: toJsonArray(inputObjKeyOfKey) })
+      }
+    } else {
+      values.push(generateObj(inputObjOfAttr, attribute))
+    }
+    acc.push(values)
+  }
+
+  return acc.flat()
+}
+
 const handleOursAndTheirs = (
   key: string,
   ours: JsonObject | JsonArray,
   theirs: JsonObject | JsonArray
 ): JsonArray => {
   const obj: JsonObject = {}
-  obj[key] = mergeMetadata({}, ours[key], {})
+  obj[key] = toJsonArray(ours[key])
   const acc: JsonArray = []
-  if (!isEqual(ours, theirs)) {
+  if (!deepEqual(ours, theirs)) {
     const theirsProp = {
-      [key]: mergeMetadata({}, {}, theirs[key]),
+      [key]: toJsonArray(theirs[key]),
     }
     ConflictMarker.addConflictMarkers(acc, obj, {}, theirsProp)
   } else {
@@ -111,12 +134,12 @@ const handleAncestorAndTheirs = (
   theirs: JsonObject | JsonArray
 ): JsonArray => {
   const acc: JsonArray = []
-  if (!isEqual(ancestor, theirs)) {
+  if (!deepEqual(ancestor, theirs)) {
     const ancestorProp = {
-      [key]: mergeMetadata({}, {}, ancestor[key]),
+      [key]: toJsonArray(ancestor[key]),
     }
     const theirsProp = {
-      [key]: mergeMetadata({}, {}, theirs[key]),
+      [key]: toJsonArray(theirs[key]),
     }
     ConflictMarker.addConflictMarkers(acc, {}, ancestorProp, theirsProp)
   }
@@ -129,12 +152,12 @@ const handleAncestorAndOurs = (
   ours: JsonObject | JsonArray
 ): JsonArray => {
   const acc: JsonArray = []
-  if (!isEqual(ancestor, ours)) {
+  if (!deepEqual(ancestor, ours)) {
     const oursProp = {
-      [key]: mergeMetadata({}, {}, ours[key]),
+      [key]: toJsonArray(ours[key]),
     }
     const ancestorProp = {
-      [key]: mergeMetadata({}, {}, ancestor[key]),
+      [key]: toJsonArray(ancestor[key]),
     }
     ConflictMarker.addConflictMarkers(acc, oursProp, ancestorProp, {})
   }
@@ -149,9 +172,19 @@ const mergeArrays = (
 ): JsonArray => {
   const keyField = MetadataService.getKeyFieldExtractor(attribute)
   if (!keyField) {
-    const obj = {}
-    obj[attribute] = unionWith(ours, theirs, isEqual)
-    return [obj]
+    // const scenario: MergeScenario = getScenario(ancestor, ours, theirs)
+    const arr: JsonArray = []
+    // obj[attribute] = unionWith(ours, theirs, deepEqual)
+    // obj[attribute] = mergeTextAttribute(ours, theirs, deepEqual, attribute)
+    // obj[attribute] = []
+    ConflictMarker.addConflictMarkers(
+      arr,
+      toJsonArray({ [attribute]: ours }),
+      toJsonArray({ [attribute]: ancestor }),
+      toJsonArray({ [attribute]: theirs })
+    )
+    return arr.flat()
+    // return mergeTextAttribute(ancestor, ours, theirs, attribute).flat()
   }
 
   const [keyedAnc, keyedOurs, keyedTheirs] = [ancestor, ours, theirs].map(arr =>
@@ -180,51 +213,51 @@ const mergeByKeyField = (
     const obj = {}
     switch (scenario) {
       case MergeScenario.THEIRS_ONLY:
-        obj[attribute] = mergeMetadata({}, {}, theirsOfKey)
+        obj[attribute] = mergeThreeWay({}, {}, theirsOfKey)
         break
       case MergeScenario.OURS_ONLY:
-        obj[attribute] = mergeMetadata({}, oursOfKey, {})
+        obj[attribute] = mergeThreeWay({}, oursOfKey, {})
         break
       case MergeScenario.ANCESTOR_ONLY:
         break
       case MergeScenario.OURS_AND_THEIRS:
-        if (isEqual(oursOfKey, theirsOfKey)) {
-          obj[attribute] = mergeMetadata({}, {}, theirsOfKey)
+        if (deepEqual(oursOfKey, theirsOfKey)) {
+          obj[attribute] = mergeThreeWay({}, {}, theirsOfKey)
         } else {
-          obj[attribute] = mergeMetadata({}, oursOfKey, theirsOfKey)
+          obj[attribute] = mergeThreeWay({}, oursOfKey, theirsOfKey)
         }
         break
       case MergeScenario.ANCESTOR_AND_THEIRS:
-        if (!isEqual(ancestorOfKey, theirsOfKey)) {
+        if (!deepEqual(ancestorOfKey, theirsOfKey)) {
           const ancestorProp = {
-            [attribute]: mergeMetadata({}, ancestorOfKey, {}),
+            [attribute]: mergeThreeWay({}, ancestorOfKey, {}),
           }
           const theirsProp = {
-            [attribute]: mergeMetadata({}, {}, theirsOfKey),
+            [attribute]: mergeThreeWay({}, {}, theirsOfKey),
           }
           ConflictMarker.addConflictMarkers(acc, {}, ancestorProp, theirsProp)
         }
         break
       case MergeScenario.ANCESTOR_AND_OURS:
-        if (!isEqual(ancestorOfKey, oursOfKey)) {
+        if (!deepEqual(ancestorOfKey, oursOfKey)) {
           const oursProp = {
-            [attribute]: mergeMetadata({}, oursOfKey, {}),
+            [attribute]: mergeThreeWay({}, oursOfKey, {}),
           }
           const ancestorProp = {
-            [attribute]: mergeMetadata({}, ancestorOfKey, {}),
+            [attribute]: mergeThreeWay({}, ancestorOfKey, {}),
           }
           ConflictMarker.addConflictMarkers(acc, oursProp, ancestorProp, {})
         }
         break
       case MergeScenario.ALL:
-        if (isEqual(oursOfKey, theirsOfKey)) {
-          obj[attribute] = mergeMetadata({}, {}, theirsOfKey)
-        } else if (isEqual(ancestorOfKey, oursOfKey)) {
-          obj[attribute] = mergeMetadata({}, {}, theirsOfKey)
-        } else if (isEqual(ancestorOfKey, theirsOfKey)) {
-          obj[attribute] = mergeMetadata({}, oursOfKey, {})
+        if (deepEqual(oursOfKey, theirsOfKey)) {
+          obj[attribute] = mergeThreeWay({}, {}, theirsOfKey)
+        } else if (deepEqual(ancestorOfKey, oursOfKey)) {
+          obj[attribute] = mergeThreeWay({}, {}, theirsOfKey)
+        } else if (deepEqual(ancestorOfKey, theirsOfKey)) {
+          obj[attribute] = mergeThreeWay({}, oursOfKey, {})
         } else {
-          obj[attribute] = mergeMetadata(ancestorOfKey, oursOfKey, theirsOfKey)
+          obj[attribute] = mergeThreeWay(ancestorOfKey, oursOfKey, theirsOfKey)
         }
         break
     }
