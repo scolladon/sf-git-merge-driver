@@ -12,7 +12,7 @@ export class InstallService {
     )
     await git.addConfig(
       `merge.${DRIVER_NAME}.driver`,
-      `${RUN_PLUGIN_COMMAND} --ancestor-file %O --our-file %A --theirs-file %B --output-file %P`
+      `${RUN_PLUGIN_COMMAND} -O %O -A %A -B %B -P %P -L %L -X %X -Y %Y`
     )
     await git.addConfig(`merge.${DRIVER_NAME}.recursive`, 'true')
 

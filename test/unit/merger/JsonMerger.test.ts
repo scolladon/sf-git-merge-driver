@@ -18,7 +18,7 @@ describe('JsonMerger', () => {
         Profile: {
           fieldPermissions: [
             {
-              field: 'Account.AllAndAncestorAndTheirs',
+              field: 'Account.AllAndAncestorAndOther',
               editable: 'false',
               readable: 'true',
             },
@@ -28,17 +28,17 @@ describe('JsonMerger', () => {
         },
       }
 
-      const ours: JsonValue = {
+      const local: JsonValue = {
         Profile: {
           fieldPermissions: [
             {
-              field: 'Account.AllAndAncestorAndTheirs',
+              field: 'Account.AllAndAncestorAndOther',
               editable: 'true',
               readable: 'true',
             },
             { field: 'Account.Name', editable: 'true', readable: 'true' },
             {
-              field: 'Account.OursAndTheirs',
+              field: 'Account.LocalAndOther',
               editable: 'false',
               readable: 'true',
             },
@@ -47,18 +47,18 @@ describe('JsonMerger', () => {
         },
       }
 
-      const theirs: JsonValue = {
+      const other: JsonValue = {
         Profile: {
           fieldPermissions: [
             {
-              field: 'Account.AllAndAncestorAndTheirs',
+              field: 'Account.AllAndAncestorAndOther',
               editable: 'false',
               readable: 'true',
             },
             { field: 'Account.Industry', editable: 'false', readable: 'true' },
             { field: 'Account.Name', editable: 'false', readable: 'true' },
             {
-              field: 'Account.OursAndTheirs',
+              field: 'Account.LocalAndOther',
               editable: 'false',
               readable: 'true',
             },
@@ -68,7 +68,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, ours, theirs)
+      const result = sut.merge(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -77,7 +77,7 @@ describe('JsonMerger', () => {
             {
               fieldPermissions: [
                 { editable: [{ '#text': 'true' }] },
-                { field: [{ '#text': 'Account.AllAndAncestorAndTheirs' }] },
+                { field: [{ '#text': 'Account.AllAndAncestorAndOther' }] },
                 { readable: [{ '#text': 'true' }] },
               ],
             },
@@ -90,15 +90,15 @@ describe('JsonMerger', () => {
             },
             {
               fieldPermissions: [
-                { editable: [{ '#text': 'true' }] },
-                { field: [{ '#text': 'Account.Name' }] },
+                { editable: [{ '#text': 'false' }] },
+                { field: [{ '#text': 'Account.LocalAndOther' }] },
                 { readable: [{ '#text': 'true' }] },
               ],
             },
             {
               fieldPermissions: [
-                { editable: [{ '#text': 'false' }] },
-                { field: [{ '#text': 'Account.OursAndTheirs' }] },
+                { editable: [{ '#text': 'true' }] },
+                { field: [{ '#text': 'Account.Name' }] },
                 { readable: [{ '#text': 'true' }] },
               ],
             },
@@ -125,7 +125,7 @@ describe('JsonMerger', () => {
         },
       }
 
-      const ours: JsonValue = {
+      const local: JsonValue = {
         Profile: {
           fieldPermissions: [
             { field: 'Account.Name', editable: 'true', readable: 'true' },
@@ -133,7 +133,7 @@ describe('JsonMerger', () => {
         },
       }
 
-      const theirs: JsonValue = {
+      const other: JsonValue = {
         Profile: {
           fieldPermissions: [
             { field: 'Account.Name', editable: 'false', readable: 'false' },
@@ -142,7 +142,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, ours, theirs)
+      const result = sut.merge(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -171,7 +171,7 @@ describe('JsonMerger', () => {
         },
       }
 
-      const ours: JsonValue = {
+      const local: JsonValue = {
         Profile: {
           fieldPermissions: [
             { field: 'Account.Name', editable: 'true', readable: 'true' },
@@ -179,7 +179,7 @@ describe('JsonMerger', () => {
         },
       }
 
-      const theirs: JsonValue = {
+      const other: JsonValue = {
         Profile: {
           fieldPermissions: [
             { field: 'Account.Name', editable: 'false', readable: 'true' },
@@ -189,7 +189,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, ours, theirs)
+      const result = sut.merge(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -228,7 +228,7 @@ describe('JsonMerger', () => {
         },
       }
 
-      const ours: JsonValue = {
+      const local: JsonValue = {
         Profile: {
           description: 'Our updated description',
           fieldPermissions: [
@@ -237,7 +237,7 @@ describe('JsonMerger', () => {
         },
       }
 
-      const theirs: JsonValue = {
+      const other: JsonValue = {
         Profile: {
           description: 'Original description',
           fieldPermissions: [
@@ -249,7 +249,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, ours, theirs)
+      const result = sut.merge(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -296,7 +296,7 @@ describe('JsonMerger', () => {
         },
       }
 
-      const ours: JsonValue = {
+      const local: JsonValue = {
         CustomLabels: {
           labels: {
             fullName: 'tested_label',
@@ -309,7 +309,7 @@ describe('JsonMerger', () => {
         },
       }
 
-      const theirs: JsonValue = {
+      const other: JsonValue = {
         CustomLabels: {
           labels: {
             fullName: 'tested_label',
@@ -323,7 +323,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, ours, theirs)
+      const result = sut.merge(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -355,7 +355,7 @@ describe('JsonMerger', () => {
       // Arrange
       const ancestor = {}
 
-      const ours: JsonValue = {
+      const local: JsonValue = {
         Profile: {
           fieldPermissions: [
             { field: 'Account.Name', editable: 'true', readable: 'true' },
@@ -364,7 +364,7 @@ describe('JsonMerger', () => {
         },
       }
 
-      const theirs: JsonValue = {
+      const other: JsonValue = {
         Profile: {
           fieldPermissions: [
             { field: 'Account.Name', editable: 'false', readable: 'false' },
@@ -375,7 +375,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, ours, theirs)
+      const result = sut.merge(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -431,7 +431,7 @@ describe('JsonMerger', () => {
         Profile: {},
       }
 
-      const ours: JsonValue = {
+      const local: JsonValue = {
         Profile: {
           fieldPermissions: [
             { field: 'Account.Name', editable: 'true', readable: 'true' },
@@ -439,7 +439,7 @@ describe('JsonMerger', () => {
         },
       }
 
-      const theirs: JsonValue = {
+      const other: JsonValue = {
         Profile: {
           fieldPermissions: [
             { field: 'Account.Name', editable: 'false', readable: 'true' },
@@ -448,7 +448,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, ours, theirs)
+      const result = sut.merge(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -479,7 +479,7 @@ describe('JsonMerger', () => {
         Profile: {},
       }
 
-      const ours: JsonValue = {
+      const local: JsonValue = {
         Profile: {
           unknown: [
             { field: 'Account.Name', editable: 'true', readable: 'true' },
@@ -487,7 +487,7 @@ describe('JsonMerger', () => {
         },
       }
 
-      const theirs: JsonValue = {
+      const other: JsonValue = {
         Profile: {
           unknown: [
             { field: 'Account.Name', editable: 'false', readable: 'true' },
@@ -496,7 +496,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, ours, theirs)
+      const result = sut.merge(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -539,7 +539,7 @@ describe('JsonMerger', () => {
         },
       }
 
-      const ours: JsonValue = {
+      const local: JsonValue = {
         Profile: {
           fieldPermissions: [
             { field: 'Account.Name', editable: 'false', readable: 'true' },
@@ -547,12 +547,12 @@ describe('JsonMerger', () => {
         },
       }
 
-      const theirs: JsonValue = {
+      const other: JsonValue = {
         Profile: {},
       }
 
       // Act
-      const result = sut.merge(ancestor, ours, theirs)
+      const result = sut.merge(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -583,7 +583,7 @@ describe('JsonMerger', () => {
       expect(result.hasConflict).toBe(true)
     })
 
-    it('should correctly merge objects when theirs is undefined', () => {
+    it('should correctly merge objects when other is undefined', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {
@@ -595,7 +595,7 @@ describe('JsonMerger', () => {
         },
       }
 
-      const ours: JsonValue = {
+      const local: JsonValue = {
         Profile: {
           fieldPermissions: [
             { field: 'Account.Name', editable: 'true', readable: 'true' },
@@ -604,10 +604,10 @@ describe('JsonMerger', () => {
         },
       }
 
-      const theirs = {}
+      const other = {}
 
       // Act
-      const result = sut.merge(ancestor, ours, theirs)
+      const result = sut.merge(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -669,11 +669,11 @@ describe('JsonMerger', () => {
         },
       }
 
-      const ours: JsonValue = {
+      const local: JsonValue = {
         Profile: {},
       }
 
-      const theirs: JsonValue = {
+      const other: JsonValue = {
         Profile: {
           fieldPermissions: [
             { field: 'Account.Name', editable: 'false', readable: 'true' },
@@ -682,7 +682,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, ours, theirs)
+      const result = sut.merge(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -725,9 +725,9 @@ describe('JsonMerger', () => {
         },
       }
 
-      const ours = {}
+      const local = {}
 
-      const theirs: JsonValue = {
+      const other: JsonValue = {
         Profile: {
           fieldPermissions: [
             { field: 'Account.Name', editable: 'true', readable: 'true' },
@@ -737,7 +737,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, ours, theirs)
+      const result = sut.merge(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -788,7 +788,7 @@ describe('JsonMerger', () => {
     })
   })
 
-  it('should remove fields from result when they exist in ancestor but are removed in both ours and theirs', () => {
+  it('should remove fields from result when they exist in ancestor but are removed in both local and other', () => {
     // Arrange
     const ancestor: JsonValue = {
       Profile: {
@@ -798,16 +798,16 @@ describe('JsonMerger', () => {
       },
     }
 
-    const ours: JsonValue = {
+    const local: JsonValue = {
       Profile: {},
     }
 
-    const theirs: JsonValue = {
+    const other: JsonValue = {
       Profile: {},
     }
 
     // Act
-    const result = sut.merge(ancestor, ours, theirs)
+    const result = sut.merge(ancestor, local, other)
 
     // Assert
     expect(result.output).toEqual([
@@ -818,7 +818,7 @@ describe('JsonMerger', () => {
     expect(result.hasConflict).toBe(false)
   })
 
-  it('should give empty result when they exist in ancestor not ours and theirs', () => {
+  it('should give empty result when they exist in ancestor not local and other', () => {
     // Arrange
     const ancestor: JsonValue = {
       Profile: {
@@ -829,12 +829,12 @@ describe('JsonMerger', () => {
       },
     }
 
-    const ours: JsonValue = {}
+    const local: JsonValue = {}
 
-    const theirs: JsonValue = {}
+    const other: JsonValue = {}
 
     // Act
-    const result = sut.merge(ancestor, ours, theirs)
+    const result = sut.merge(ancestor, local, other)
 
     // Assert
     expect(result.output).toEqual([])
@@ -850,20 +850,20 @@ describe('JsonMerger', () => {
         },
       }
 
-      const ours: JsonValue = {
+      const local: JsonValue = {
         Profile: {
           description: 'Original description',
         },
       }
 
-      const theirs: JsonValue = {
+      const other: JsonValue = {
         Profile: {
           description: 'Original description',
         },
       }
 
       // Act
-      const result = sut.merge(ancestor, ours, theirs)
+      const result = sut.merge(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -878,26 +878,26 @@ describe('JsonMerger', () => {
       expect(result.hasConflict).toBe(false)
     })
 
-    it('should accept identical new string properties added in both ours and theirs', () => {
+    it('should accept identical new string properties added in both local and other', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {},
       }
 
-      const ours: JsonValue = {
+      const local: JsonValue = {
         Profile: {
           description: 'Our description',
         },
       }
 
-      const theirs: JsonValue = {
+      const other: JsonValue = {
         Profile: {
           description: 'Our description',
         },
       }
 
       // Act
-      const result = sut.merge(ancestor, ours, theirs)
+      const result = sut.merge(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -912,7 +912,7 @@ describe('JsonMerger', () => {
       expect(result.hasConflict).toBe(false)
     })
 
-    it('should remove string properties deleted in both ours and theirs', () => {
+    it('should remove string properties deleted in both local and other', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {
@@ -920,16 +920,16 @@ describe('JsonMerger', () => {
         },
       }
 
-      const ours: JsonValue = {
+      const local: JsonValue = {
         Profile: {},
       }
 
-      const theirs: JsonValue = {
+      const other: JsonValue = {
         Profile: {},
       }
 
       // Act
-      const result = sut.merge(ancestor, ours, theirs)
+      const result = sut.merge(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -940,7 +940,7 @@ describe('JsonMerger', () => {
       expect(result.hasConflict).toBe(false)
     })
 
-    it('should prioritize local deletion when ours deletes a property but theirs keeps it unchanged', () => {
+    it('should prioritize local deletion when local deletes a property but other keeps it unchanged', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {
@@ -948,18 +948,18 @@ describe('JsonMerger', () => {
         },
       }
 
-      const ours: JsonValue = {
+      const local: JsonValue = {
         Profile: {},
       }
 
-      const theirs: JsonValue = {
+      const other: JsonValue = {
         Profile: {
           description: 'Our description',
         },
       }
 
       // Act
-      const result = sut.merge(ancestor, ours, theirs)
+      const result = sut.merge(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -970,7 +970,7 @@ describe('JsonMerger', () => {
       expect(result.hasConflict).toBe(false)
     })
 
-    it('should prioritize remote deletion when theirs deletes a property but ours keeps it unchanged', () => {
+    it('should prioritize remote deletion when other deletes a property but local keeps it unchanged', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {
@@ -978,18 +978,18 @@ describe('JsonMerger', () => {
         },
       }
 
-      const ours: JsonValue = {
+      const local: JsonValue = {
         Profile: {
           description: 'Our description',
         },
       }
 
-      const theirs: JsonValue = {
+      const other: JsonValue = {
         Profile: {},
       }
 
       // Act
-      const result = sut.merge(ancestor, ours, theirs)
+      const result = sut.merge(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -1004,20 +1004,20 @@ describe('JsonMerger', () => {
       // Arrange
       const ancestor: JsonValue = {}
 
-      const ours: JsonValue = {
+      const local: JsonValue = {
         Profile: {
           description: 'Our description',
         },
       }
 
-      const theirs: JsonValue = {
+      const other: JsonValue = {
         Profile: {
           description: 'Our description',
         },
       }
 
       // Act
-      const result = sut.merge(ancestor, ours, theirs)
+      const result = sut.merge(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -1038,20 +1038,20 @@ describe('JsonMerger', () => {
         Profile: {},
       }
 
-      const ours: JsonValue = {
+      const local: JsonValue = {
         Profile: {
           description: 'Our description',
         },
       }
 
-      const theirs: JsonValue = {
+      const other: JsonValue = {
         Profile: {
           description: 'Their description',
         },
       }
 
       // Act
-      const result = sut.merge(ancestor, ours, theirs)
+      const result = sut.merge(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -1074,7 +1074,7 @@ describe('JsonMerger', () => {
       expect(result.hasConflict).toBe(true)
     })
 
-    it('should mark conflict when ours deletes a property but theirs modifies it', () => {
+    it('should mark conflict when local deletes a property but other modifies it', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {
@@ -1082,18 +1082,18 @@ describe('JsonMerger', () => {
         },
       }
 
-      const ours: JsonValue = {
+      const local: JsonValue = {
         Profile: {},
       }
 
-      const theirs: JsonValue = {
+      const other: JsonValue = {
         Profile: {
           description: 'Their description',
         },
       }
 
       // Act
-      const result = sut.merge(ancestor, ours, theirs)
+      const result = sut.merge(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -1116,7 +1116,7 @@ describe('JsonMerger', () => {
       expect(result.hasConflict).toBe(true)
     })
 
-    it('should mark conflict when ours modifies a property but theirs deletes it', () => {
+    it('should mark conflict when local modifies a property but other deletes it', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {
@@ -1124,18 +1124,18 @@ describe('JsonMerger', () => {
         },
       }
 
-      const ours: JsonValue = {
+      const local: JsonValue = {
         Profile: {
           description: 'Our description',
         },
       }
 
-      const theirs: JsonValue = {
+      const other: JsonValue = {
         Profile: {},
       }
 
       // Act
-      const result = sut.merge(ancestor, ours, theirs)
+      const result = sut.merge(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -1166,20 +1166,20 @@ describe('JsonMerger', () => {
         },
       }
 
-      const ours: JsonValue = {
+      const local: JsonValue = {
         Profile: {
           description: 'Our description',
         },
       }
 
-      const theirs: JsonValue = {
+      const other: JsonValue = {
         Profile: {
           description: 'Their description',
         },
       }
 
       // Act
-      const result = sut.merge(ancestor, ours, theirs)
+      const result = sut.merge(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -1220,7 +1220,7 @@ describe('JsonMerger', () => {
         },
       }
 
-      const ours: JsonValue = {
+      const local: JsonValue = {
         Profile: {
           loginHours: [
             { mondayStart: 200, mondayEnd: 400 },
@@ -1232,7 +1232,7 @@ describe('JsonMerger', () => {
         },
       }
 
-      const theirs: JsonValue = {
+      const other: JsonValue = {
         Profile: {
           loginHours: [
             { mondayStart: 300, mondayEnd: 400 },
@@ -1245,7 +1245,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, ours, theirs)
+      const result = sut.merge(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -1301,7 +1301,7 @@ describe('JsonMerger', () => {
         },
       }
 
-      const ours: JsonValue = {
+      const local: JsonValue = {
         Profile: {
           loginIpRanges: [
             {
@@ -1313,7 +1313,7 @@ describe('JsonMerger', () => {
         },
       }
 
-      const theirs: JsonValue = {
+      const other: JsonValue = {
         Profile: {
           loginIpRanges: [
             {
@@ -1326,7 +1326,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, ours, theirs)
+      const result = sut.merge(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -1357,7 +1357,7 @@ describe('JsonMerger', () => {
         },
       }
 
-      const ours: JsonValue = {
+      const local: JsonValue = {
         Profile: {
           loginHours: [
             { mondayStart: 300, mondayEnd: 400 },
@@ -1367,7 +1367,7 @@ describe('JsonMerger', () => {
         },
       }
 
-      const theirs: JsonValue = {
+      const other: JsonValue = {
         Profile: {
           loginHours: [
             { mondayStart: 300, mondayEnd: 400 },
@@ -1380,7 +1380,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, ours, theirs)
+      const result = sut.merge(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([
@@ -1433,7 +1433,7 @@ describe('JsonMerger', () => {
         },
       }
 
-      const ours: JsonValue = {
+      const local: JsonValue = {
         Profile: {
           loginHours: [
             { mondayStart: 300, mondayEnd: 400 },
@@ -1445,7 +1445,7 @@ describe('JsonMerger', () => {
         },
       }
 
-      const theirs: JsonValue = {
+      const other: JsonValue = {
         Profile: {
           loginHours: [
             { mondayStart: 300, mondayEnd: 500 },
@@ -1455,7 +1455,7 @@ describe('JsonMerger', () => {
       }
 
       // Act
-      const result = sut.merge(ancestor, ours, theirs)
+      const result = sut.merge(ancestor, local, other)
 
       // Assert
       expect(result.output).toEqual([

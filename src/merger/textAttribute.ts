@@ -1,6 +1,6 @@
 import { deepEqual } from 'fast-equals'
 import { isNil } from 'lodash-es'
-import { TEXT_TAG } from '../constant/conflicConstant.js'
+import { TEXT_TAG } from '../constant/parserConstant.js'
 import type { JsonArray, JsonObject, JsonValue } from '../types/jsonTypes.js'
 import { MergeScenario, getScenario } from '../types/mergeScenario.js'
 import { ConflictMarker } from './conflictMarker.js'
@@ -14,58 +14,58 @@ export const generateObj = (
 
 export const mergeTextAttribute = (
   ancestor: JsonValue | null,
-  ours: JsonValue | null,
-  theirs: JsonValue | null,
+  local: JsonValue | null,
+  other: JsonValue | null,
   attrib: string
 ): JsonArray => {
   const objAnc: JsonObject = generateObj(ancestor, attrib)
-  const objOurs: JsonObject = generateObj(ours, attrib)
-  const objTheirs: JsonObject = generateObj(theirs, attrib)
-  const scenario: MergeScenario = getScenario(objAnc, objOurs, objTheirs)
+  const objlocal: JsonObject = generateObj(local, attrib)
+  const objother: JsonObject = generateObj(other, attrib)
+  const scenario: MergeScenario = getScenario(objAnc, objlocal, objother)
   const acc: JsonArray = []
 
   // Early return for identical values
   if (
-    deepEqual(ours, theirs) &&
-    (scenario === MergeScenario.OURS_AND_THEIRS ||
+    deepEqual(local, other) &&
+    (scenario === MergeScenario.LOCAL_AND_OTHER ||
       scenario === MergeScenario.ALL)
   ) {
-    return [objOurs]
+    return [objlocal]
   }
 
   // Handle specific merge scenarios
   switch (scenario) {
-    case MergeScenario.THEIRS_ONLY:
-      acc.push(objTheirs)
+    case MergeScenario.OTHER_ONLY:
+      acc.push(objother)
       break
 
-    case MergeScenario.OURS_ONLY:
-      acc.push(objOurs)
+    case MergeScenario.LOCAL_ONLY:
+      acc.push(objlocal)
       break
 
-    case MergeScenario.OURS_AND_THEIRS:
-      ConflictMarker.addConflictMarkers(acc, objOurs, {}, objTheirs)
+    case MergeScenario.LOCAL_AND_OTHER:
+      ConflictMarker.addConflictMarkers(acc, objlocal, {}, objother)
       break
 
-    case MergeScenario.ANCESTOR_AND_THEIRS:
-      if (ancestor !== theirs) {
-        ConflictMarker.addConflictMarkers(acc, {}, objAnc, objTheirs)
+    case MergeScenario.ANCESTOR_AND_OTHER:
+      if (ancestor !== other) {
+        ConflictMarker.addConflictMarkers(acc, {}, objAnc, objother)
       }
       break
 
-    case MergeScenario.ANCESTOR_AND_OURS:
-      if (ancestor !== ours) {
-        ConflictMarker.addConflictMarkers(acc, objOurs, objAnc, {})
+    case MergeScenario.ANCESTOR_AND_LOCAL:
+      if (ancestor !== local) {
+        ConflictMarker.addConflictMarkers(acc, objlocal, objAnc, {})
       }
       break
 
     case MergeScenario.ALL:
-      if (ancestor === ours) {
-        acc.push(objTheirs)
-      } else if (ancestor === theirs) {
-        acc.push(objOurs)
+      if (ancestor === local) {
+        acc.push(objother)
+      } else if (ancestor === other) {
+        acc.push(objlocal)
       } else {
-        ConflictMarker.addConflictMarkers(acc, objOurs, objAnc, objTheirs)
+        ConflictMarker.addConflictMarkers(acc, objlocal, objAnc, objother)
       }
       break
   }

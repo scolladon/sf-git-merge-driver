@@ -55,13 +55,18 @@ Runs the merge driver for the specified files.
 
 ```
 USAGE
-  $ sf git merge driver run -a <value> -o <value> -t <value> -p <value> [--json] [--flags-dir <value>]
+  $ sf git merge driver run -O <value> -A <value> -B <value> -P <value> [--json] [--flags-dir <value>] [-L <value>] [-S
+    <value>] [-X <value>] [-Y <value>]
 
 FLAGS
-  -a, --ancestor-file=<value>  (required) path to the common ancestor version of the file
-  -o, --our-file=<value>       (required) path to our version of the file
-  -p, --output-file=<value>    (required) path to the file where the merged content will be written
-  -t, --theirs-file=<value>    (required) path to their version of the file
+  -A, --local-file=<value>             (required) path to our version of the file
+  -B, --other-file=<value>             (required) path to their version of the file
+  -L, --conflict-marker-size=<value>   [default: 7] number of characters to show for conflict markers
+  -O, --ancestor-file=<value>          (required) path to the common ancestor version of the file
+  -P, --output-file=<value>            (required) path to the file where the merged content will be written
+  -S, --ancestor-conflict-tag=<value>  [default: BASE] string used to tag ancestor version in conflicts
+  -X, --local-conflict-tag=<value>     [default: LOCAL] string used to tag local version in conflicts
+  -Y, --other-conflict-tag=<value>     [default: REMOTE] string used to tag other version in conflicts
 
 GLOBAL FLAGS
   --flags-dir=<value>  Import flag values from a directory.
@@ -76,12 +81,13 @@ DESCRIPTION
 EXAMPLES
   Run the merge driver for conflicting files:
 
-    $ sf git merge driver run --ancestor-file=<value> --our-file=<value> --theirs-file=<value> --output-file=<value>
+    $ sf git merge driver run --ancestor-file=<value> --local-file=<value> --other-file=<value> \
+      --output-file=<value>
 
   Where:
   - ancestor-file is the path to the common ancestor version of the file
-  - our-file is the path to our version of the file
-  - their-file is the path to their version of the file
+  - local-file is the path to our version of the file
+  - other-file is the path to their version of the file
   - output-file is the path to the file where the merged content will be written
 ```
 

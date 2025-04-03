@@ -6,13 +6,13 @@ const NAMESPACE_ROOT = ':@'
 export class NamespaceHandler {
   public processNamespaces(
     ancestor: JsonObject | JsonArray,
-    ours: JsonObject | JsonArray,
-    theirs: JsonObject | JsonArray
+    local: JsonObject | JsonArray,
+    other: JsonObject | JsonArray
   ): JsonObject {
     const namespaces: JsonObject = {}
 
     // Look for namespace attributes directly at the root level
-    for (const obj of [ancestor, ours, theirs]) {
+    for (const obj of [ancestor, local, other]) {
       for (const key of Object.keys(obj)) {
         // It's an object, check for namespace attributes and remove them
         const childObj = obj[key] as JsonObject

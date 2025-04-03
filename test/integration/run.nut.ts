@@ -23,12 +23,12 @@ const TEST_FOLDERS = [
 const setupTestFiles = (
   folder: string,
   ancestorXml: string,
-  oursXml: string,
-  theirsXml: string
+  localXml: string,
+  otherXml: string
 ): void => {
   writeFileSync(join(ROOT_FOLDER, folder, 'ancestor.xml'), ancestorXml)
-  writeFileSync(join(ROOT_FOLDER, folder, 'ours.xml'), oursXml)
-  writeFileSync(join(ROOT_FOLDER, folder, 'theirs.xml'), theirsXml)
+  writeFileSync(join(ROOT_FOLDER, folder, 'local.xml'), localXml)
+  writeFileSync(join(ROOT_FOLDER, folder, 'other.xml'), otherXml)
 }
 
 describe('git merge driver run', () => {
@@ -71,7 +71,7 @@ describe('git merge driver run', () => {
   it('merges XML files without conflict', () => {
     // Act
     execCmd(
-      `git merge driver run --ancestor-file ${join(TEST_FILES_FOLDER, 'ancestor.xml')} --our-file ${join(TEST_FILES_FOLDER, 'ours.xml')} --theirs-file ${join(TEST_FILES_FOLDER, 'theirs.xml')} --output-file ${join(TEST_FILES_FOLDER, 'output.xml')}`,
+      `git merge driver run --ancestor-file ${join(TEST_FILES_FOLDER, 'ancestor.xml')} --local-file ${join(TEST_FILES_FOLDER, 'local.xml')} --other-file ${join(TEST_FILES_FOLDER, 'other.xml')} --output-file ${join(TEST_FILES_FOLDER, 'output.xml')}`,
       {
         ensureExitCode: 0,
         cwd: ROOT_FOLDER,
@@ -91,7 +91,7 @@ describe('git merge driver run', () => {
   it('merges XML files with conflict', () => {
     // Act
     execCmd(
-      `git merge driver run --ancestor-file ${join(CONFLICT_TEST_FILES_FOLDER, 'ancestor.xml')} --our-file ${join(CONFLICT_TEST_FILES_FOLDER, 'ours.xml')} --theirs-file ${join(CONFLICT_TEST_FILES_FOLDER, 'theirs.xml')} --output-file ${join(CONFLICT_TEST_FILES_FOLDER, 'output.xml')}`,
+      `git merge driver run --ancestor-file ${join(CONFLICT_TEST_FILES_FOLDER, 'ancestor.xml')} --local-file ${join(CONFLICT_TEST_FILES_FOLDER, 'local.xml')} --other-file ${join(CONFLICT_TEST_FILES_FOLDER, 'other.xml')} --output-file ${join(CONFLICT_TEST_FILES_FOLDER, 'output.xml')}`,
       {
         ensureExitCode: 1,
         cwd: ROOT_FOLDER,
@@ -115,7 +115,7 @@ describe('git merge driver run', () => {
   it('merges XML files with empty result', () => {
     // Act
     execCmd(
-      `git merge driver run --ancestor-file ${join(EMPTY_TEST_FILES_FOLDER, 'ancestor.xml')} --our-file ${join(EMPTY_TEST_FILES_FOLDER, 'ours.xml')} --theirs-file ${join(EMPTY_TEST_FILES_FOLDER, 'theirs.xml')} --output-file ${join(EMPTY_TEST_FILES_FOLDER, 'output.xml')}`,
+      `git merge driver run --ancestor-file ${join(EMPTY_TEST_FILES_FOLDER, 'ancestor.xml')} --local-file ${join(EMPTY_TEST_FILES_FOLDER, 'local.xml')} --other-file ${join(EMPTY_TEST_FILES_FOLDER, 'other.xml')} --output-file ${join(EMPTY_TEST_FILES_FOLDER, 'output.xml')}`,
       {
         ensureExitCode: 0,
         cwd: ROOT_FOLDER,
