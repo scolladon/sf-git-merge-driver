@@ -72,12 +72,18 @@ export default {
 
   // A map from regular expressions to paths to transformers
   transform: {
-    '\\.ts$': ['ts-jest', { tsconfig: './tsconfig.json' }],
+    '\\.ts$': [
+      'ts-jest',
+      {
+        tsconfig: './tsconfig.json',
+      },
+    ],
   },
   extensionsToTreatAsEsm: ['.ts'],
   // A map from regular expressions to module names that allow to stub out resources with a single module
   moduleNameMapper: {
     '(.+)\\.js': '$1',
+    '^lodash-es$': 'lodash', // FIXME: Huge workaround to allow compile lodash-es module when testing https://stackoverflow.com/a/54117206/1809659
   },
 
   // An array of regexp pattern strings, matched against all module paths before considered 'visible' to the module loader
@@ -122,7 +128,7 @@ export default {
   // runner: "jest-runner",
 
   // The paths to modules that run some code to configure or set up the testing environment before each test
-  //setupFiles: ['./test/utils/globalTestHelper.ts'],
+  setupFiles: ['./test/utils/setupConflictMarker.ts'],
 
   // A list of paths to modules that run some code to configure or set up the testing framework before each test
   // setupFilesAfterEnv: [],
