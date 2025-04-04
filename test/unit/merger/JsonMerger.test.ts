@@ -380,7 +380,7 @@ describe('JsonMerger', () => {
 
       // Assert
       expect(result.output).toEqual([
-        { '#text': '\n<<<<<<< LOCAL' },
+        { '#text': EOL + '<<<<<<< LOCAL' },
         {
           Profile: [
             {
@@ -457,7 +457,7 @@ describe('JsonMerger', () => {
           Profile: [
             {
               fieldPermissions: [
-                { '#text': '\n<<<<<<< LOCAL' },
+                { '#text': EOL + '<<<<<<< LOCAL' },
                 { editable: [{ '#text': 'true' }] },
                 { '#text': '||||||| BASE' },
                 { '#text': EOL },
@@ -503,7 +503,7 @@ describe('JsonMerger', () => {
       expect(result.output).toEqual([
         {
           Profile: [
-            { '#text': '\n<<<<<<< LOCAL' },
+            { '#text': EOL + '<<<<<<< LOCAL' },
             {
               unknown: [
                 { editable: [{ '#text': 'true' }] },
@@ -559,7 +559,7 @@ describe('JsonMerger', () => {
       expect(result.output).toEqual([
         {
           Profile: [
-            { '#text': '\n<<<<<<< LOCAL' },
+            { '#text': EOL + '<<<<<<< LOCAL' },
             {
               fieldPermissions: [
                 { editable: [{ '#text': 'false' }] },
@@ -612,7 +612,7 @@ describe('JsonMerger', () => {
 
       // Assert
       expect(result.output).toEqual([
-        { '#text': '\n<<<<<<< LOCAL' },
+        { '#text': EOL + '<<<<<<< LOCAL' },
         {
           Profile: [
             {
@@ -689,7 +689,7 @@ describe('JsonMerger', () => {
       expect(result.output).toEqual([
         {
           Profile: [
-            { '#text': '\n<<<<<<< LOCAL' },
+            { '#text': EOL + '<<<<<<< LOCAL' },
             { '#text': EOL },
             { '#text': '||||||| BASE' },
             {
@@ -742,7 +742,7 @@ describe('JsonMerger', () => {
 
       // Assert
       expect(result.output).toEqual([
-        { '#text': '\n<<<<<<< LOCAL' },
+        { '#text': EOL + '<<<<<<< LOCAL' },
         { '#text': EOL },
         { '#text': '||||||| BASE' },
         {
@@ -1058,7 +1058,7 @@ describe('JsonMerger', () => {
       expect(result.output).toEqual([
         {
           Profile: [
-            { '#text': '\n<<<<<<< LOCAL' },
+            { '#text': EOL + '<<<<<<< LOCAL' },
             {
               description: [{ '#text': 'Our description' }],
             },
@@ -1100,7 +1100,7 @@ describe('JsonMerger', () => {
       expect(result.output).toEqual([
         {
           Profile: [
-            { '#text': '\n<<<<<<< LOCAL' },
+            { '#text': EOL + '<<<<<<< LOCAL' },
             { '#text': EOL },
             { '#text': '||||||| BASE' },
             {
@@ -1142,7 +1142,7 @@ describe('JsonMerger', () => {
       expect(result.output).toEqual([
         {
           Profile: [
-            { '#text': '\n<<<<<<< LOCAL' },
+            { '#text': EOL + '<<<<<<< LOCAL' },
             {
               description: [{ '#text': 'Our description' }],
             },
@@ -1186,7 +1186,7 @@ describe('JsonMerger', () => {
       expect(result.output).toEqual([
         {
           Profile: [
-            { '#text': '\n<<<<<<< LOCAL' },
+            { '#text': EOL + '<<<<<<< LOCAL' },
             {
               description: [{ '#text': 'Our description' }],
             },
