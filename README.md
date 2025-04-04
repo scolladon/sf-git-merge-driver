@@ -8,6 +8,7 @@ A custom Git merge driver designed specifically for Salesforce metadata files. T
 - Handles complex metadata structures like arrays with unique identifiers
 - Supports both local and global installation
 - Easy to use with SFDX CLI plugin commands
+- Warning: as of now it does not preserve the order of items that are order dependant like valuesets
 
 ## Installation
 
