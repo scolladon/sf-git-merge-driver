@@ -1,7 +1,4 @@
-/**
- * Note: KEY_FIELD_METADATA has been moved to MetadataService
- * @see MetadataService for key field extraction logic
- */
+export const SALESFORCE_EOL = '\n'
 
 export const METADATA_TYPES_PATTERNS = [
   'labels', // CustomLabels

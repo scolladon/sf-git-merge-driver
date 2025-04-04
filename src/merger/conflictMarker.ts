@@ -1,4 +1,3 @@
-import { EOL } from 'node:os'
 import { isEmpty } from 'lodash-es'
 import {
   ANCESTOR_CONFLICT_MARKER,
@@ -6,6 +5,7 @@ import {
   OTHER_CONFLICT_MARKER,
   SEPARATOR,
 } from '../constant/conflictConstant.js'
+import { SALESFORCE_EOL } from '../constant/metadataConstant.js'
 import { TEXT_TAG } from '../constant/parserConstant.js'
 import { conflicConfig } from '../types/conflictTypes.js'
 import type { JsonArray, JsonObject } from '../types/jsonTypes.js'
@@ -36,12 +36,12 @@ export class ConflictMarker {
     other: JsonObject | JsonArray
   ): void {
     ConflictMarker.hasConflict = true
-    acc.push({ [TEXT_TAG]: `${EOL}${ConflictMarker.localMarker}` })
-    acc.push(isEmpty(local) ? { [TEXT_TAG]: EOL } : local)
+    acc.push({ [TEXT_TAG]: `${SALESFORCE_EOL}${ConflictMarker.localMarker}` })
+    acc.push(isEmpty(local) ? { [TEXT_TAG]: SALESFORCE_EOL } : local)
     acc.push({ [TEXT_TAG]: ConflictMarker.baseMarker })
-    acc.push(isEmpty(ancestor) ? { [TEXT_TAG]: EOL } : ancestor)
+    acc.push(isEmpty(ancestor) ? { [TEXT_TAG]: SALESFORCE_EOL } : ancestor)
     acc.push({ [TEXT_TAG]: ConflictMarker.separatorMarker })
-    acc.push(isEmpty(other) ? { [TEXT_TAG]: EOL } : other)
+    acc.push(isEmpty(other) ? { [TEXT_TAG]: SALESFORCE_EOL } : other)
     acc.push({ [TEXT_TAG]: ConflictMarker.otherMarker })
   }
 
