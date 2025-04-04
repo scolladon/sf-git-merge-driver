@@ -1,3 +1,4 @@
+import { EOL } from 'node:os'
 import { JsonMerger } from '../../../src/merger/JsonMerger.js'
 import { ConflictMarker } from '../../../src/merger/conflictMarker.js'
 import { JsonValue } from '../../../src/types/jsonTypes.js'
@@ -399,7 +400,7 @@ describe('JsonMerger', () => {
           ],
         },
         { '#text': '||||||| BASE' },
-        { '#text': '\n' },
+        { '#text': EOL },
         { '#text': '=======' },
         {
           Profile: [
@@ -459,7 +460,7 @@ describe('JsonMerger', () => {
                 { '#text': '\n<<<<<<< LOCAL' },
                 { editable: [{ '#text': 'true' }] },
                 { '#text': '||||||| BASE' },
-                { '#text': '\n' },
+                { '#text': EOL },
                 { '#text': '=======' },
                 { editable: [{ '#text': 'false' }] },
                 { '#text': '>>>>>>> REMOTE' },
@@ -511,7 +512,7 @@ describe('JsonMerger', () => {
               ],
             },
             { '#text': '||||||| BASE' },
-            { '#text': '\n' },
+            { '#text': EOL },
             { '#text': '=======' },
             {
               unknown: [
@@ -575,7 +576,7 @@ describe('JsonMerger', () => {
               ],
             },
             { '#text': '=======' },
-            { '#text': '\n' },
+            { '#text': EOL },
             { '#text': '>>>>>>> REMOTE' },
           ],
         },
@@ -651,7 +652,7 @@ describe('JsonMerger', () => {
           ],
         },
         { '#text': '=======' },
-        { '#text': '\n' },
+        { '#text': EOL },
         { '#text': '>>>>>>> REMOTE' },
       ])
       expect(result.hasConflict).toBe(true)
@@ -689,7 +690,7 @@ describe('JsonMerger', () => {
         {
           Profile: [
             { '#text': '\n<<<<<<< LOCAL' },
-            { '#text': '\n' },
+            { '#text': EOL },
             { '#text': '||||||| BASE' },
             {
               fieldPermissions: [
@@ -742,7 +743,7 @@ describe('JsonMerger', () => {
       // Assert
       expect(result.output).toEqual([
         { '#text': '\n<<<<<<< LOCAL' },
-        { '#text': '\n' },
+        { '#text': EOL },
         { '#text': '||||||| BASE' },
         {
           Profile: [
@@ -1062,7 +1063,7 @@ describe('JsonMerger', () => {
               description: [{ '#text': 'Our description' }],
             },
             { '#text': '||||||| BASE' },
-            { '#text': '\n' },
+            { '#text': EOL },
             { '#text': '=======' },
             {
               description: [{ '#text': 'Their description' }],
@@ -1100,7 +1101,7 @@ describe('JsonMerger', () => {
         {
           Profile: [
             { '#text': '\n<<<<<<< LOCAL' },
-            { '#text': '\n' },
+            { '#text': EOL },
             { '#text': '||||||| BASE' },
             {
               description: [{ '#text': 'Original description' }],
@@ -1150,7 +1151,7 @@ describe('JsonMerger', () => {
               description: [{ '#text': 'Original description' }],
             },
             { '#text': '=======' },
-            { '#text': '\n' },
+            { '#text': EOL },
             { '#text': '>>>>>>> REMOTE' },
           ],
         },
