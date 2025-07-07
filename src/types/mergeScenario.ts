@@ -18,11 +18,11 @@ export enum MergeScenario {
 }
 
 export const getScenario = (
-  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+  // biome-ignore lint/suspicious/noExplicitAny: can be any metadata in json format
   ancestor: any,
-  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+  // biome-ignore lint/suspicious/noExplicitAny: can be any metadata in json format
   local: any,
-  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+  // biome-ignore lint/suspicious/noExplicitAny: can be any metadata in json format
   other: any
 ): MergeScenario => {
   let scenario: MergeScenario = MergeScenario.NONE
