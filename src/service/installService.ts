@@ -18,7 +18,7 @@ export class InstallService {
 
     // Configure merge driver for each metadata type pattern
     const patterns = METADATA_TYPES_PATTERNS.map(
-      pattern => `*.${pattern}.xml merge=${DRIVER_NAME}`
+      pattern => `*.${pattern}-meta.xml merge=${DRIVER_NAME}`
     ).join('\n')
     const content = `${patterns}\n`
 

@@ -50,7 +50,7 @@ describe('InstallService', () => {
 
     // Generate the expected content for .gitattributes
     const expectedPatterns = METADATA_TYPES_PATTERNS.map(
-      pattern => `*.${pattern}.xml merge=${DRIVER_NAME}`
+      pattern => `*.${pattern}-meta.xml merge=${DRIVER_NAME}`
     ).join('\n')
     const expectedContent = `${expectedPatterns}\n`
 
