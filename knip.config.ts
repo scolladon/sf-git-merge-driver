@@ -1,5 +1,4 @@
 export default {
-  packageManager: 'npm',
   entry: [
     '.github/**/*.yml',
     '**/*.{nut,test}.ts',
@@ -10,6 +9,6 @@ export default {
     'src/commands/git/merge/driver/uninstall.ts',
   ],
   project: ['**/*.{ts,js,json,yml}'],
-  ignoreDependencies: ['@commitlint/config-conventional', 'ts-node', 'lodash'],
+  ignoreDependencies: ['@commitlint/config-conventional', 'lodash'],
   ignoreBinaries: ['commitlint', 'npm-check-updates'],
 }
