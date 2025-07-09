@@ -81,8 +81,7 @@ export default class Run extends SfCommand<void> {
     const hasConflict = await mergeDriver.mergeFiles(
       flags['ancestor-file'],
       flags['local-file'],
-      flags['other-file'],
-      flags['output-file']
+      flags['other-file']
     )
     if (hasConflict) {
       this.error(
