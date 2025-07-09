@@ -23,6 +23,8 @@ export class MergeDriver {
       theirContent
     )
 
+    console.log('investigation: ', mergedContent)
+
     // Write the merged content to the output file
     await writeFile(outputFile, mergedContent.output)
     return mergedContent.hasConflict
