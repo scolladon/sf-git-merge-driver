@@ -79,7 +79,7 @@ describe('git merge driver run', () => {
     )
 
     // Assert
-    const outputPath = join(ROOT_FOLDER, TEST_FILES_FOLDER, 'output.xml')
+    const outputPath = join(ROOT_FOLDER, TEST_FILES_FOLDER, 'local.xml')
     expect(existsSync(outputPath)).to.be.true
 
     const outputContent = readFileSync(outputPath, 'utf-8')
@@ -102,7 +102,7 @@ describe('git merge driver run', () => {
     const outputPath = join(
       ROOT_FOLDER,
       CONFLICT_TEST_FILES_FOLDER,
-      'output.xml'
+      'local.xml'
     )
     expect(existsSync(outputPath)).to.be.true
 
@@ -123,7 +123,7 @@ describe('git merge driver run', () => {
     )
 
     // Assert
-    const outputPath = join(ROOT_FOLDER, EMPTY_TEST_FILES_FOLDER, 'output.xml')
+    const outputPath = join(ROOT_FOLDER, EMPTY_TEST_FILES_FOLDER, 'local.xml')
     expect(existsSync(outputPath)).to.be.true
 
     const outputContent = readFileSync(outputPath, 'utf-8')

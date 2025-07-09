@@ -5,8 +5,7 @@ export class MergeDriver {
   async mergeFiles(
     ancestorFile: string,
     ourFile: string,
-    theirFile: string,
-    outputFile: string
+    theirFile: string
   ): Promise<boolean> {
     // Read all three versions
     const [ancestorContent, ourContent, theirContent] = await Promise.all([
@@ -26,7 +25,7 @@ export class MergeDriver {
     console.log('investigation: ', mergedContent)
 
     // Write the merged content to the output file
-    await writeFile(outputFile, mergedContent.output)
+    await writeFile(ourFile, mergedContent.output)
     return mergedContent.hasConflict
   }
 }
