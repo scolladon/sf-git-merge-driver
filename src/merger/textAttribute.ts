@@ -2,7 +2,7 @@ import { deepEqual } from 'fast-equals'
 import { isNil } from 'lodash-es'
 import { TEXT_TAG } from '../constant/parserConstant.js'
 import type { JsonArray, JsonObject, JsonValue } from '../types/jsonTypes.js'
-import { MergeScenario, getScenario } from '../types/mergeScenario.js'
+import { getScenario, MergeScenario } from '../types/mergeScenario.js'
 import { ConflictMarker } from './conflictMarker.js'
 
 export const generateObj = (

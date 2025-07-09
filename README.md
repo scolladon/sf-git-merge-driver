@@ -135,7 +135,55 @@ The merge driver works by:
 The driver is configured to work with `.xml` files by default. The installation adds the following to your `.gitattributes` file:
 
 ```
-*.xml merge=salesforce-source
+
+
+*.labels-meta.xml merge=salesforce-source
+*.label-meta.xml merge=salesforce-source
+*.profile-meta.xml merge=salesforce-source
+*.permissionset-meta.xml merge=salesforce-source
+*.applicationVisibility-meta.xml merge=salesforce-source
+*.classAccess-meta.xml merge=salesforce-source
+*.customMetadataTypeAccess-meta.xml merge=salesforce-source
+*.customPermission-meta.xml merge=salesforce-source
+*.customSettingAccess-meta.xml merge=salesforce-source
+*.externalCredentialPrincipalAccess-meta.xml merge=salesforce-source
+*.externalDataSourceAccess-meta.xml merge=salesforce-source
+*.fieldPermission-meta.xml merge=salesforce-source
+*.flowAccess-meta.xml merge=salesforce-source
+*.objectPermission-meta.xml merge=salesforce-source
+*.pageAccess-meta.xml merge=salesforce-source
+*.recordTypeVisibility-meta.xml merge=salesforce-source
+*.tabSetting-meta.xml merge=salesforce-source
+*.userPermission-meta.xml merge=salesforce-source
+*.objectSettings-meta.xml merge=salesforce-source
+*.permissionsetgroup-meta.xml merge=salesforce-source
+*.permissionSetLicenseDefinition-meta.xml merge=salesforce-source
+*.mutingpermissionset-meta.xml merge=salesforce-source
+*.sharingRules-meta.xml merge=salesforce-source
+*.sharingCriteriaRule-meta.xml merge=salesforce-source
+*.sharingGuestRule-meta.xml merge=salesforce-source
+*.sharingOwnerRule-meta.xml merge=salesforce-source
+*.sharingTerritoryRule-meta.xml merge=salesforce-source
+*.workflow-meta.xml merge=salesforce-source
+*.workflowAlert-meta.xml merge=salesforce-source
+*.workflowFieldUpdate-meta.xml merge=salesforce-source
+*.workflowFlowAction-meta.xml merge=salesforce-source
+*.workflowKnowledgePublish-meta.xml merge=salesforce-source
+*.workflowOutboundMessage-meta.xml merge=salesforce-source
+*.workflowRule-meta.xml merge=salesforce-source
+*.workflowSend-meta.xml merge=salesforce-source
+*.workflowTask-meta.xml merge=salesforce-source
+*.assignmentRules-meta.xml merge=salesforce-source
+*.autoResponseRules-meta.xml merge=salesforce-source
+*.escalationRules-meta.xml merge=salesforce-source
+*.marketingappextension-meta.xml merge=salesforce-source
+*.matchingRule-meta.xml merge=salesforce-source
+*.globalValueSet-meta.xml merge=salesforce-source
+*.standardValueSet-meta.xml merge=salesforce-source
+*.globalValueSetTranslation-meta.xml merge=salesforce-source
+*.standardValueSetTranslation-meta.xml merge=salesforce-source
+*.translation-meta.xml merge=salesforce-source
+*.objectTranslation-meta.xml merge=salesforce-source
 ```
 
 ## Changelog

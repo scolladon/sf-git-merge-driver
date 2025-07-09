@@ -1,6 +1,6 @@
 import { SALESFORCE_EOL } from '../../../src/constant/metadataConstant.js'
-import { JsonMerger } from '../../../src/merger/JsonMerger.js'
 import { ConflictMarker } from '../../../src/merger/conflictMarker.js'
+import { JsonMerger } from '../../../src/merger/JsonMerger.js'
 import { JsonValue } from '../../../src/types/jsonTypes.js'
 
 describe('JsonMerger', () => {

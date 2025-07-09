@@ -3,7 +3,7 @@ import { isEmpty, keyBy } from 'lodash-es'
 import { MetadataService } from '../service/MetadataService.js'
 import { NamespaceHandler } from '../service/NamespaceHandler.js'
 import type { JsonArray, JsonObject } from '../types/jsonTypes.js'
-import { MergeScenario, getScenario } from '../types/mergeScenario.js'
+import { getScenario, MergeScenario } from '../types/mergeScenario.js'
 import {
   ensureArray,
   getUniqueSortedProps,

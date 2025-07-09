@@ -10,7 +10,7 @@ export class UninstallService {
     const git = simpleGit()
     try {
       await git.raw(['config', '--remove-section', `merge.${DRIVER_NAME}`])
-      // biome-ignore lint/suspicious/noEmptyBlockStatements: <explanation>
+      // biome-ignore lint/suspicious/noEmptyBlockStatements: fail silently
     } catch {}
 
     const gitAttributes = await readFile('.gitattributes', {

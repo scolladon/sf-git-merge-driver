@@ -17,7 +17,7 @@ export default class Install extends SfCommand<void> {
   public async run(): Promise<void> {
     try {
       await new UninstallService().uninstallMergeDriver()
-      // biome-ignore lint/suspicious/noEmptyBlockStatements: <explanation>
+      // biome-ignore lint/suspicious/noEmptyBlockStatements: fail silently
     } catch {}
     await new InstallService().installMergeDriver()
   }
