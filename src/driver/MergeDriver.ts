@@ -21,8 +21,11 @@ export class MergeDriver {
       ourContent,
       theirContent
     )
-
     console.log('investigation: ', mergedContent)
+
+    console.log('investigation: ', ancestorFile)
+    console.log('investigation: ', ourFile)
+    console.log('investigation: ', theirFile)
 
     // Write the merged content to the output file
     await writeFile(ourFile, mergedContent.output)
