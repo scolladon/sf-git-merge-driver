@@ -86,17 +86,6 @@ export default class Run extends SfCommand<void> {
       flags['local-file'],
       flags['other-file']
     )
-    if (hasConflict) {
-      process.exitCode = ERROR_EXIT_CODE
-      this.error(
-        messages.getMessage('result.withconflict') + ' ' + flags['output-file'],
-        { exit: ERROR_EXIT_CODE }
-      )
-    } else {
-      process.exitCode = SUCCESS_EXIT_CODE
-      this.info(
-        messages.getMessage('result.successful') + ' ' + flags['output-file']
-      )
-    }
+    process.exitCode = hasConflict ? ERROR_EXIT_CODE : SUCCESS_EXIT_CODE
   }
 }
