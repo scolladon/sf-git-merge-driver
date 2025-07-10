@@ -23,6 +23,12 @@ export class MergeDriver {
       theirContent
     )
 
+    process.stderr.write(`[SF-MERGE-DEBUG] wrote to: ${normalize(ourFile)}\n`)
+    process.stderr.write(`[SF-MERGE-DEBUG] content: ${mergedContent.output}\n`)
+    process.stderr.write(
+      `[SF-MERGE-DEBUG] hasConflict: ${mergedContent.hasConflict}\n`
+    )
+
     // Write the merged content to the our file
     await writeFile(normalize(ourFile), mergedContent.output)
     return mergedContent.hasConflict
