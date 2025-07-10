@@ -6,7 +6,8 @@ export class MergeDriver {
   async mergeFiles(
     ancestorFile: string,
     ourFile: string,
-    theirFile: string
+    theirFile: string,
+    outputFile: string
   ): Promise<boolean> {
     // Read all three versions
     const [ancestorContent, ourContent, theirContent] = await Promise.all(
@@ -23,14 +24,23 @@ export class MergeDriver {
       theirContent
     )
 
-    process.stderr.write(`[SF-MERGE-DEBUG] wrote to: ${normalize(ourFile)}\n`)
+    process.stderr.write(
+      `[SF-MERGE-DEBUG] wrote to ourFile: ${normalize(ourFile)}\n`
+    )
+    process.stderr.write(
+      `[SF-MERGE-DEBUG] wrote to outputFile: ${normalize(outputFile)}\n`
+    )
     process.stderr.write(`[SF-MERGE-DEBUG] content: ${mergedContent.output}\n`)
     process.stderr.write(
       `[SF-MERGE-DEBUG] hasConflict: ${mergedContent.hasConflict}\n`
     )
 
     // Write the merged content to the our file
-    await writeFile(normalize(ourFile), mergedContent.output)
+    await Promise.all(
+      [ourFile, outputFile]
+        .map(normalize)
+        .map(path => writeFile(path, mergedContent.output))
+    )
     return mergedContent.hasConflict
   }
 }
