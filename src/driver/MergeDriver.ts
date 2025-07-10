@@ -1,4 +1,5 @@
 import { readFile, writeFile } from 'node:fs/promises'
+import { normalize } from 'node:path'
 import { XmlMerger } from '../merger/XmlMerger.js'
 
 export class MergeDriver {
@@ -8,11 +9,11 @@ export class MergeDriver {
     theirFile: string
   ): Promise<boolean> {
     // Read all three versions
-    const [ancestorContent, ourContent, theirContent] = await Promise.all([
-      readFile(ancestorFile, 'utf8'),
-      readFile(ourFile, 'utf8'),
-      readFile(theirFile, 'utf8'),
-    ])
+    const [ancestorContent, ourContent, theirContent] = await Promise.all(
+      [ancestorFile, ourFile, theirFile]
+        .map(normalize)
+        .map(path => readFile(path, 'utf8'))
+    )
 
     const xmlMerger = new XmlMerger()
 
@@ -21,14 +22,9 @@ export class MergeDriver {
       ourContent,
       theirContent
     )
-    console.log('investigation: ', mergedContent)
 
-    console.log('investigation: ', ancestorFile)
-    console.log('investigation: ', ourFile)
-    console.log('investigation: ', theirFile)
-
-    // Write the merged content to the output file
-    await writeFile(ourFile, mergedContent.output)
+    // Write the merged content to the our file
+    await writeFile(normalize(ourFile), mergedContent.output)
     return mergedContent.hasConflict
   }
 }

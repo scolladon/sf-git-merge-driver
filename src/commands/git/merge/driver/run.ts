@@ -93,10 +93,10 @@ export default class Run extends SfCommand<void> {
         { exit: ERROR_EXIT_CODE }
       )
     } else {
+      process.exitCode = SUCCESS_EXIT_CODE
       this.info(
         messages.getMessage('result.successful') + ' ' + flags['output-file']
       )
     }
-    process.exitCode = SUCCESS_EXIT_CODE
   }
 }
