@@ -13,6 +13,9 @@ import { conflicConfig } from '../../../../types/conflictTypes.js'
 Messages.importMessagesDirectoryFromMetaUrl(import.meta.url)
 const messages = Messages.loadMessages('sf-git-merge-driver', 'run')
 
+const ERROR_EXIT_CODE = 1
+const SUCCESS_EXIT_CODE = 0
+
 export default class Run extends SfCommand<void> {
   public static override readonly summary = messages.getMessage('summary')
   public static override readonly description =
@@ -84,14 +87,16 @@ export default class Run extends SfCommand<void> {
       flags['other-file']
     )
     if (hasConflict) {
+      process.exitCode = ERROR_EXIT_CODE
       this.error(
         messages.getMessage('result.withconflict') + ' ' + flags['output-file'],
-        { exit: 1 }
+        { exit: ERROR_EXIT_CODE }
       )
     } else {
       this.info(
         messages.getMessage('result.successful') + ' ' + flags['output-file']
       )
     }
+    process.exitCode = SUCCESS_EXIT_CODE
   }
 }
