@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@oclif/core": "^4.5.0",
-    "@salesforce/core": "^8.18.0",
+    "@salesforce/core": "^8.18.1",
     "@salesforce/sf-plugins-core": "^12.2.3",
     "fast-equals": "^5.2.2",
     "fast-xml-parser": "^5.2.5",
