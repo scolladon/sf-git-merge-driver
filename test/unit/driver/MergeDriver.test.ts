@@ -28,12 +28,12 @@ describe('MergeDriver', () => {
       mockedmergeThreeWay.mockReturnValue('<label>Test Object</label>')
 
       // Act
-      await sut.mergeFiles('AncestorFile', 'OurFile', 'TheirFile', 'OutputFile')
+      await sut.mergeFiles('AncestorFile', 'OurFile', 'TheirFile')
 
       // Assert
       expect(mockReadFile).toHaveBeenCalledTimes(3)
       expect(mockedmergeThreeWay).toHaveBeenCalledTimes(1)
-      expect(mockWriteFile).toHaveBeenCalledTimes(2)
+      expect(mockWriteFile).toHaveBeenCalledTimes(1)
     })
 
     it('should throw an error when mergeThreeWay fails', async () => {
@@ -45,7 +45,7 @@ describe('MergeDriver', () => {
 
       // Act and Assert
       await expect(
-        sut.mergeFiles('AncestorFile', 'OurFile', 'TheirFile', 'OutputFile')
+        sut.mergeFiles('AncestorFile', 'OurFile', 'TheirFile')
       ).rejects.toThrow('Tripart XML merge failed')
     })
 
@@ -61,8 +61,7 @@ describe('MergeDriver', () => {
       const result = await sut.mergeFiles(
         'AncestorFile',
         'OurFile',
-        'TheirFile',
-        'OutputFile'
+        'TheirFile'
       )
 
       // Assert
@@ -81,8 +80,7 @@ describe('MergeDriver', () => {
       const result = await sut.mergeFiles(
         'AncestorFile',
         'OurFile',
-        'TheirFile',
-        'OutputFile'
+        'TheirFile'
       )
 
       // Assert
