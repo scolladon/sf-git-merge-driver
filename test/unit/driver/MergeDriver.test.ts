@@ -86,5 +86,50 @@ describe('MergeDriver', () => {
       // Assert
       expect(result).toBe(false)
     })
+
+    it('given our file uses CRLF when merging then it writes output with CRLF', async () => {
+      // Arrange
+      mockReadFile.mockReset()
+      mockWriteFile.mockReset()
+      mockReadFile
+        .mockResolvedValueOnce('<a>1</a>') // ancestor
+        .mockResolvedValueOnce('<a>\r\n  1\r\n</a>') // our with CRLF
+        .mockResolvedValueOnce('<a>2</a>') // their
+      mockedmergeThreeWay.mockReturnValue({
+        output: '<a>\n  1\n</a>',
+        hasConflict: false,
+      })
+
+      // Act
+      await sut.mergeFiles('AncestorFile', 'OurFile', 'TheirFile')
+
+      // Assert
+      expect(mockWriteFile).toHaveBeenCalledTimes(1)
+      const [, written] = mockWriteFile.mock.calls[0]
+      expect(written).toBe('<a>\r\n  1\r\n</a>')
+    })
+
+    it('given our file uses LF when merging then it writes output unchanged (LF)', async () => {
+      // Arrange
+      mockReadFile.mockReset()
+      mockWriteFile.mockReset()
+      mockReadFile
+        .mockResolvedValueOnce('<a>1</a>') // ancestor
+        .mockResolvedValueOnce('<a>\n  1\n</a>') // our with LF
+        .mockResolvedValueOnce('<a>2</a>') // their
+      const merged = '<a>\n  1\n</a>'
+      mockedmergeThreeWay.mockReturnValue({
+        output: merged,
+        hasConflict: false,
+      })
+
+      // Act
+      await sut.mergeFiles('AncestorFile', 'OurFile', 'TheirFile')
+
+      // Assert
+      expect(mockWriteFile).toHaveBeenCalledTimes(1)
+      const [, written] = mockWriteFile.mock.calls[0]
+      expect(written).toBe(merged)
+    })
   })
 })
