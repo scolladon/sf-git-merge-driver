@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Profile xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:n1="http://www.w3.org/2001/XMLSchema-instance">
+    <custom>false</custom>
+    <fieldPermissions>
+        <editable>false</editable>
+        <field>MyObject__c.AncestorField__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fullName>MyProfile</fullName>
+    <userLicense>Salesforce</userLicense>
+</Profile>
