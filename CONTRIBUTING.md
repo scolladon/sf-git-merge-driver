@@ -9,7 +9,7 @@ We encourage the developer community to contribute to this repository. This guid
 
 ## Requirements
 
-- [Node](https://nodejs.org/) >= 18.6.0
+- [Node](https://nodejs.org/) >= 20
 - [npm](https://www.npmjs.com/) >= 10.9.0
 
 ## Installation
@@ -65,8 +65,28 @@ npm run test:nut
 
 ### E2E Testing
 
-WIP
+sf-git-merge-driver has E2E executed at the PR level.
+Those test are located in the branch `e2e/base` and `e2e/conflict`
+Base scenario are implemented in `e2e/base` branch
+Conflict scenario are implemented in `e2e/conflict`
 
+To run the E2E test locally, clone the repository in another folder (in the `e2e` folder local to the repo for example) and checkout the branch `e2e/base`
+Then execute:
+
+```bash
+# setup the repo
+mkdir e2e
+git clone git@github.com:scolladon/sf-git-merge-driver.git e2e
+cd e2e
+git fetch
+
+# setup branches
+git checkout e2e/conflict
+git checkout e2e/base
+
+# run the test
+git merge -m 'test(e2e): sf git merge driver' e2e/conflict
+```
 ## Editor Configurations
 
 Configure your editor to use our lint and code style rules.

@@ -46,7 +46,7 @@ describe('MergeDriver', () => {
       // Act and Assert
       await expect(
         sut.mergeFiles('AncestorFile', 'OurFile', 'TheirFile', 'OutputFile')
-      ).rejects.toThrowError('Tripart XML merge failed')
+      ).rejects.toThrow('Tripart XML merge failed')
     })
 
     it('should return true when there is a conflict', async () => {

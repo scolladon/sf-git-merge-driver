@@ -27,7 +27,7 @@ export default {
   coverageDirectory: 'reports/coverage',
 
   // An array of regexp pattern strings used to skip coverage collection
-  coveragePathIgnorePatterns: ['/node_modules/', '/test/utils/', '/reports/'],
+  coveragePathIgnorePatterns: ['/node_modules/', '/test/utils/', '/reports/', '/e2e/'],
 
   // A list of reporter names that Jest uses when writing coverage reports
   coverageReporters: [
@@ -151,6 +151,7 @@ export default {
   // An array of regexp pattern strings that are matched against all test paths, matched tests are skipped
   testPathIgnorePatterns: [
     'src',
+    'e2e',
     '/node_modules/',
     '/test/utils/',
     '/reports/',

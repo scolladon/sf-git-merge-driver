@@ -135,8 +135,6 @@ The merge driver works by:
 The driver is configured to work with `.xml` files by default. The installation adds the following to your `.gitattributes` file:
 
 ```
-
-
 *.labels-meta.xml merge=salesforce-source
 *.label-meta.xml merge=salesforce-source
 *.profile-meta.xml merge=salesforce-source
