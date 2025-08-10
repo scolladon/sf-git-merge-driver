@@ -3,7 +3,7 @@
     <custom>false</custom>
     <fieldPermissions>
         <editable>false</editable>
-        <field>MyObject__c.AncestorField__c</field>
+        <field>MyObject__c.OurField__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fullName>MyProfile</fullName>
