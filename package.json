@@ -1,0 +1,18 @@
+{
+  "name": "sf-git-merge-driver-e2e",
+  "version": "1.0.0",
+  "description": "E2E test for sf-git-merge-driver",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scolladon/sf-git-merge-driver.git"
+  },
+  "author": "Sébastien Colladon <colladonsebastien@gmail.com>",
+  "license": "MIT",
+  "scripts": {
+    "pretest:e2e": "sf git merge driver install",
+    "test:e2e": "git merge -m \"test(e2e): merge conflicting branch successfully\" origin/e2e/conflict",
+    "posttest:e2e": "sf git merge driver uninstall",
+    "validate": "git diff --quiet --diff-filter=U"
+  }
+}
