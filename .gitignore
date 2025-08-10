@@ -8,6 +8,7 @@
 /lib
 /node_modules
 /reports
+e2e
 install-state.gz
 megalinter-reports/
 perf-result.txt

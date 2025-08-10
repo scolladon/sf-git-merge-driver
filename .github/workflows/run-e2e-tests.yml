@@ -9,17 +9,30 @@ on:
 
 jobs:
   e2e-test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+        node: [20, 22, 24]
+    runs-on: ${{ matrix.os }}
     steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+        with:
+          ref: 'e2e/base'
+          fetch-depth: 0
+
       - name: Setup node
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: ${{ matrix.node }}
 
-      - name: Set environment variables
+      - name: Additional setup
         run: |
           echo "SF_DISABLE_AUTOUPDATE=true" >> "$GITHUB_ENV"
           echo "SF_DISABLE_TELEMETRY=true" >> "$GITHUB_ENV"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
 
       - name: Install cli
         run: npm install -g @salesforce/cli
@@ -30,5 +43,13 @@ jobs:
       - name: Test new plugin version installation
         run: sf git merge driver --help
 
-      - name: E2E Tests
-        run: echo TODO
+      - name: E2E Test
+        run: npm run test:e2e
+
+      - name: Check E2E test result
+        run: npm run validate
+
+      - name: Display current state
+        run: git status
+
+          
