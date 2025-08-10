@@ -2,14 +2,19 @@ import { readFile, writeFile } from 'node:fs/promises'
 import simpleGit from 'simple-git'
 import { DRIVER_NAME } from '../../../src/constant/driverConstant.js'
 import { UninstallService } from '../../../src/service/uninstallService.js'
+import { getGitAttributesPath } from '../../../src/utils/gitUtils.js'
 
 jest.mock('node:fs/promises')
 jest.mock('simple-git')
+jest.mock('../../../src/utils/gitUtils.js')
 const mockedRaw = jest.fn()
 const simpleGitMock = simpleGit as jest.Mock
 simpleGitMock.mockReturnValue({
   raw: mockedRaw,
 })
+
+const getGitAttributesPathMocked = jest.mocked(getGitAttributesPath)
+getGitAttributesPathMocked.mockResolvedValue('.git/info/attributes')
 
 const readFileMocked = jest.mocked(readFile)
 readFileMocked.mockResolvedValue(
@@ -35,8 +40,15 @@ describe('UninstallService', () => {
       `merge.${DRIVER_NAME}`,
     ])
     expect(readFile).toHaveBeenCalledTimes(1)
-    expect(readFile).toHaveBeenCalledWith('.gitattributes', expect.anything())
+    expect(readFile).toHaveBeenCalledWith(
+      '.git/info/attributes',
+      expect.anything()
+    )
     expect(writeFile).toHaveBeenCalledTimes(1)
-    expect(writeFile).toHaveBeenCalledWith('.gitattributes', expect.anything())
+    expect(writeFile).toHaveBeenCalledWith(
+      '.git/info/attributes',
+      expect.anything()
+    )
+    expect(getGitAttributesPathMocked).toHaveBeenCalledTimes(1)
   })
 })

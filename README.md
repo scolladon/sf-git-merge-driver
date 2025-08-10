@@ -38,9 +38,9 @@ GLOBAL FLAGS
 DESCRIPTION
   Installs a local git merge driver for the given org and branch.
 
-  Installs a local git merge driver for the given org and branch, by updating the `.gitattributes` files in the project,
-  creating a new merge driver configuration in the `.git/config` of the project, and installing the binary in the
-  node_modules/.bin directory.
+  Installs a local git merge driver for the given org and branch, by updating the `.git/info/attributes` files in the
+  project, creating a new merge driver configuration in the `.git/config` of the project, and installing the binary in
+  the node_modules/.bin directory.
 
 EXAMPLES
   Install the driver for a given project:
@@ -110,8 +110,8 @@ DESCRIPTION
   Uninstalls the local git merge driver for the given org and branch.
 
   Uninstalls the local git merge driver for the given org and branch, by removing the merge driver content in the
-  `.gitattributes` files in the project, deleting the merge driver configuration from the `.git/config` of the project,
-  and removing the installed binary from the node_modules/.bin directory.
+  `.git/info/attributes` files in the project, deleting the merge driver configuration from the `.git/config` of the
+  project, and removing the installed binary from the node_modules/.bin directory.
 
 EXAMPLES
   Uninstall the driver for a given project:
@@ -132,7 +132,7 @@ The merge driver works by:
 
 ## Configuration
 
-The driver is configured to work with `.xml` files by default. The installation adds the following to your `.gitattributes` file:
+The driver is configured to work with `.xml` files by default. The installation adds the following to the `.git/info/attributes` file (so it is discrete for the current repo):
 
 ```
 *.labels-meta.xml merge=salesforce-source

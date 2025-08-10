@@ -6,9 +6,11 @@ import {
 } from '../../../src/constant/driverConstant.js'
 import { METADATA_TYPES_PATTERNS } from '../../../src/constant/metadataConstant.js'
 import { InstallService } from '../../../src/service/installService.js'
+import { getGitAttributesPath } from '../../../src/utils/gitUtils.js'
 
 jest.mock('node:fs/promises')
 jest.mock('simple-git')
+jest.mock('../../../src/utils/gitUtils.js')
 
 const mockedAddConfig = jest.fn()
 const simpleGitMock = simpleGit as jest.Mock
@@ -16,6 +18,7 @@ simpleGitMock.mockReturnValue({
   addConfig: mockedAddConfig,
 })
 
+const getGitAttributesPathMocked = getGitAttributesPath as jest.Mock
 const appendFileMocked = jest.mocked(appendFile)
 
 describe('InstallService', () => {
@@ -26,6 +29,7 @@ describe('InstallService', () => {
     sut = new InstallService()
     mockedAddConfig.mockClear()
     appendFileMocked.mockClear()
+    getGitAttributesPathMocked.mockResolvedValue('.git/info/attributes')
   })
 
   it('should install successfully when given valid parameters', async () => {
@@ -33,6 +37,7 @@ describe('InstallService', () => {
     await sut.installMergeDriver()
 
     // Assert
+    expect(getGitAttributesPathMocked).toHaveBeenCalledTimes(1)
     expect(mockedAddConfig).toHaveBeenCalledTimes(3)
     expect(mockedAddConfig).toHaveBeenCalledWith(
       `merge.${DRIVER_NAME}.name`,
@@ -55,7 +60,7 @@ describe('InstallService', () => {
     const expectedContent = `${expectedPatterns}\n`
 
     expect(appendFileMocked).toHaveBeenCalledWith(
-      '.gitattributes',
+      '.git/info/attributes',
       expectedContent,
       { flag: 'a' }
     )

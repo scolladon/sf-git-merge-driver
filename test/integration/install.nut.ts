@@ -19,18 +19,13 @@ describe('git merge driver install', () => {
   })
 
   after(() => {
-    // Clean up by removing .git folder and .gitattributes file
+    // Clean up by removing .git folder and .git/info/attributes file
     execSync('shx rm -rf .git', {
       cwd: ROOT_FOLDER,
     })
     execSync('shx rm -rf node_modules', {
       cwd: ROOT_FOLDER,
     })
-    if (existsSync(join(ROOT_FOLDER, '.gitattributes'))) {
-      execSync(`shx rm .gitattributes`, {
-        cwd: ROOT_FOLDER,
-      })
-    }
   })
 
   it('installs merge driver correctly', () => {
@@ -44,7 +39,7 @@ describe('git merge driver install', () => {
     })
 
     // Assert
-    const gitattributesPath = join(ROOT_FOLDER, '.gitattributes')
+    const gitattributesPath = join(ROOT_FOLDER, '.git/info/attributes')
     expect(existsSync(gitattributesPath)).to.be.true
 
     const gitattributesContent = readFileSync(gitattributesPath, 'utf-8')
@@ -73,7 +68,7 @@ describe('git merge driver install', () => {
     })
 
     // Assert
-    const gitattributesPath = join(ROOT_FOLDER, '.gitattributes')
+    const gitattributesPath = join(ROOT_FOLDER, '.git/info/attributes')
     expect(existsSync(gitattributesPath)).to.be.true
 
     const gitattributesContent = readFileSync(gitattributesPath, 'utf-8')

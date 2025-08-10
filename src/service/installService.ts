@@ -2,6 +2,7 @@ import { appendFile } from 'node:fs/promises'
 import { simpleGit } from 'simple-git'
 import { DRIVER_NAME, RUN_PLUGIN_COMMAND } from '../constant/driverConstant.js'
 import { METADATA_TYPES_PATTERNS } from '../constant/metadataConstant.js'
+import { getGitAttributesPath } from '../utils/gitUtils.js'
 
 export class InstallService {
   public async installMergeDriver() {
@@ -22,6 +23,8 @@ export class InstallService {
     ).join('\n')
     const content = `${patterns}\n`
 
-    await appendFile('.gitattributes', content, { flag: 'a' })
+    const gitAttributesPath = await getGitAttributesPath()
+
+    await appendFile(gitAttributesPath, content, { flag: 'a' })
   }
 }
