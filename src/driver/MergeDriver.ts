@@ -27,14 +27,6 @@ export class MergeDriver {
     const targetEol = detectEol(ourContent)
     const outputWithEol = normalizeEol(mergedContent.output, targetEol)
 
-    process.stderr.write(
-      `[SF-MERGE-DEBUG] wrote to ourFile: ${normalize(ourFile)}\n`
-    )
-    process.stderr.write(`[SF-MERGE-DEBUG] content: ${outputWithEol}\n`)
-    process.stderr.write(
-      `[SF-MERGE-DEBUG] hasConflict: ${mergedContent.hasConflict}\n`
-    )
-
     // Write the merged content to the our file
     await writeFile(normalize(ourFile), outputWithEol)
     return mergedContent.hasConflict

@@ -72,32 +72,6 @@ export default class Run extends SfCommand<void> {
 
   public async run(): Promise<void> {
     const { flags } = await this.parse(Run)
-
-    process.stderr.write(
-      `[SF-MERGE-DEBUG] %O(ancestor-file): ${flags['ancestor-file']}\n`
-    )
-    process.stderr.write(
-      `[SF-MERGE-DEBUG] %A(local-file): ${flags['local-file']}\n`
-    )
-    process.stderr.write(
-      `[SF-MERGE-DEBUG] %B(other-file): ${flags['other-file']}\n`
-    )
-    process.stderr.write(
-      `[SF-MERGE-DEBUG] %P(output-file): ${flags['output-file']}\n`
-    )
-    process.stderr.write(
-      `[SF-MERGE-DEBUG] %L(conflict-marker-size): ${flags['conflict-marker-size']}\n`
-    )
-    process.stderr.write(
-      `[SF-MERGE-DEBUG] %S(ancestor-conflict-tag): ${flags['ancestor-conflict-tag']}\n`
-    )
-    process.stderr.write(
-      `[SF-MERGE-DEBUG] %X(local-conflict-tag): ${flags['local-conflict-tag']}\n`
-    )
-    process.stderr.write(
-      `[SF-MERGE-DEBUG] %Y(other-conflict-tag): ${flags['other-conflict-tag']}\n`
-    )
-
     const conflicConfig: conflicConfig = {
       conflictMarkerSize: flags['conflict-marker-size'],
       ancestorConflictTag: flags['ancestor-conflict-tag'],
