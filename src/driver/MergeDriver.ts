@@ -1,19 +1,9 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { normalize } from 'node:path'
 import { XmlMerger } from '../merger/XmlMerger.js'
+import { detectEol, normalizeEol } from '../utils/mergeUtils.js'
 
 export class MergeDriver {
-  private static detectEol(text: string): string {
-    if (text.includes('\r\n')) return '\r\n'
-    return '\n'
-  }
-
-  private static applyEol(text: string, eol: string): string {
-    // XML Merge Driver default to \n
-    if (eol === '\r\n') return text.split(/\r\n|\n/).join(eol)
-    return text
-  }
-
   async mergeFiles(
     ancestorFile: string,
     ourFile: string,
@@ -34,8 +24,8 @@ export class MergeDriver {
       theirContent
     )
 
-    const targetEol = MergeDriver.detectEol(ourContent)
-    const outputWithEol = MergeDriver.applyEol(mergedContent.output, targetEol)
+    const targetEol = detectEol(ourContent)
+    const outputWithEol = normalizeEol(mergedContent.output, targetEol)
 
     process.stderr.write(
       `[SF-MERGE-DEBUG] wrote to ourFile: ${normalize(ourFile)}\n`
