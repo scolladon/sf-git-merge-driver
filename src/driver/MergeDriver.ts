@@ -1,19 +1,20 @@
 import { readFile, writeFile } from 'node:fs/promises'
+import { normalize } from 'node:path'
 import { XmlMerger } from '../merger/XmlMerger.js'
+import { detectEol, normalizeEol } from '../utils/mergeUtils.js'
 
 export class MergeDriver {
   async mergeFiles(
     ancestorFile: string,
     ourFile: string,
-    theirFile: string,
-    outputFile: string
+    theirFile: string
   ): Promise<boolean> {
     // Read all three versions
-    const [ancestorContent, ourContent, theirContent] = await Promise.all([
-      readFile(ancestorFile, 'utf8'),
-      readFile(ourFile, 'utf8'),
-      readFile(theirFile, 'utf8'),
-    ])
+    const [ancestorContent, ourContent, theirContent] = await Promise.all(
+      [ancestorFile, ourFile, theirFile]
+        .map(normalize)
+        .map(path => readFile(path, 'utf8'))
+    )
 
     const xmlMerger = new XmlMerger()
 
@@ -23,8 +24,11 @@ export class MergeDriver {
       theirContent
     )
 
-    // Write the merged content to the output file
-    await writeFile(outputFile, mergedContent.output)
+    const targetEol = detectEol(ourContent)
+    const outputWithEol = normalizeEol(mergedContent.output, targetEol)
+
+    // Write the merged content to the our file
+    await writeFile(normalize(ourFile), outputWithEol)
     return mergedContent.hasConflict
   }
 }

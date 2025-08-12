@@ -45,7 +45,7 @@ describe('InstallService', () => {
     )
     expect(mockedAddConfig).toHaveBeenCalledWith(
       `merge.${DRIVER_NAME}.driver`,
-      `${RUN_PLUGIN_COMMAND} -O %O -A %A -B %B -P %P -L %L -X %X -Y %Y`
+      `sh -c '${RUN_PLUGIN_COMMAND} -O "$1" -A "$2" -B "$3" -P "$4" -L "$5" -X "$6" -Y "$7"' -- %O %A %B %P %L %X %Y`
     )
     expect(mockedAddConfig).toHaveBeenCalledWith(
       `merge.${DRIVER_NAME}.recursive`,

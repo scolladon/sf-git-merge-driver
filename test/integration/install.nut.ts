@@ -52,7 +52,7 @@ describe('git merge driver install', () => {
       `merge.${DRIVER_NAME}.name=Salesforce source merge driver`
     )
     expect(gitConfigOutput).to.include(
-      `merge.${DRIVER_NAME}.driver=${RUN_PLUGIN_COMMAND} -O %O -A %A -B %B -P %P -L %L -X %X -Y %Y`
+      `merge.${DRIVER_NAME}.driver=sh -c '${RUN_PLUGIN_COMMAND} -O "$1" -A "$2" -B "$3" -P "$4" -L "$5" -X "$6" -Y "$7"' -- %O %A %B %P %L %X %Y`
     )
     expect(gitConfigOutput).to.include(`merge.${DRIVER_NAME}.recursive=true`)
   })
@@ -81,7 +81,7 @@ describe('git merge driver install', () => {
       `merge.${DRIVER_NAME}.name=Salesforce source merge driver`
     )
     expect(gitConfigOutput).to.include(
-      `merge.${DRIVER_NAME}.driver=${RUN_PLUGIN_COMMAND} -O %O -A %A -B %B -P %P -L %L -X %X -Y %Y`
+      `merge.${DRIVER_NAME}.driver=sh -c '${RUN_PLUGIN_COMMAND} -O "$1" -A "$2" -B "$3" -P "$4" -L "$5" -X "$6" -Y "$7"' -- %O %A %B %P %L %X %Y`
     )
     expect(gitConfigOutput).to.include(`merge.${DRIVER_NAME}.recursive=true`)
   })

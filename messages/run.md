@@ -45,11 +45,3 @@ string used to tag local version in conflicts
 
 # flags.other-conflict-tag.summary
 string used to tag other version in conflicts
-
-# result.withconflict
-
-There are conflicts for file
-
-# result.successful
-
-Successfully merged file
