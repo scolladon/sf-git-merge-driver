@@ -8,6 +8,7 @@ const baseOptions = {
   cdataPropName: '__cdata',
   commentPropName: XML_COMMENT_PROP_NAME,
   ignoreAttributes: false,
+  processEntities: false,
 }
 
 const parserOptions = {
