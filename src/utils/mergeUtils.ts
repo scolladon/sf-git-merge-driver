@@ -5,6 +5,8 @@ import type { JsonArray, JsonObject, JsonValue } from '../types/jsonTypes.js'
 const CR = '\r'
 const LF = '\n'
 const CRLF = `${CR}${LF}`
+const RE_CRLF = /\r\n/g
+const RE_LF_OR_CRLF = /\r\n|\n/g
 
 export const isObject = (
   ancestor: JsonValue | undefined | null,
@@ -45,22 +47,15 @@ export const detectEol = (text: string): string => {
   return hasCRLF ? CRLF : hasLF ? LF : EOL
 }
 
-export const normalizeEol = (text: string, eol: string): string => {
-  if (!eol || !text) {
+export const normalizeEol = (text: string, eol: string = EOL): string => {
+  if (!text) {
     return text
   }
-  return normalizePlatformEol(eol)(text)
-}
 
-const normalizePlatformEol = (eol: string) => (text: string) =>
-  eol === CRLF ? normalizeWindowsEol(text) : normalizeUnixEol(text)
+  let regex = RE_CRLF
+  if (eol === CRLF) {
+    regex = RE_LF_OR_CRLF
+  }
 
-const normalizeWindowsEol = (text: string) => {
-  // Convert CRLF to LF to deal with mixed EOL
-  // Then convert all the LF back to CRLF
-  return normalizeUnixEol(text).split(LF).join(CRLF)
-}
-
-const normalizeUnixEol = (text: string) => {
-  return text.split(CRLF).join(LF)
+  return text.replace(regex, eol)
 }

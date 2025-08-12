@@ -141,8 +141,8 @@ describe('mergeUtils', () => {
       }
       const cases: Case[] = [
         {
-          name: 'given eol undefined then returns text unchanged',
-          input: 'a\nb\n',
+          name: 'given eol undefined then returns platform EOL',
+          input: 'a\r\nb\r\n',
           eol: undefined as unknown as never,
           expected: 'a\nb\n',
         },
@@ -154,7 +154,7 @@ describe('mergeUtils', () => {
         },
 
         {
-          name: 'given eol LF then returns text unchanged',
+          name: 'given eol LF and text already LF then returns text unchanged',
           input: 'a\n b\n',
           eol: '\n',
           expected: 'a\n b\n',
@@ -190,9 +190,15 @@ describe('mergeUtils', () => {
           expected: '<a>\r\n 1\r\n</a>',
         },
         {
-          name: 'given solitary CR only then not stripped',
+          name: 'given solitary CR only with LF then not stripped',
           input: 'a\rb\r',
           eol: '\n',
+          expected: 'a\rb\r',
+        },
+        {
+          name: 'given solitary CR only with CRLF then not stripped',
+          input: 'a\rb\r',
+          eol: '\r\n',
           expected: 'a\rb\r',
         },
         {
@@ -200,6 +206,12 @@ describe('mergeUtils', () => {
           input: 'a\rb\n\rc\r\nd',
           eol: '\n',
           expected: 'a\rb\n\rc\nd',
+        },
+        {
+          name: 'given mixed CR, LF, CRLF then normalized to CRLF',
+          input: 'a\rb\n\rc\r\nd',
+          eol: '\r\n',
+          expected: 'a\rb\r\n\rc\r\nd',
         },
       ]
 
