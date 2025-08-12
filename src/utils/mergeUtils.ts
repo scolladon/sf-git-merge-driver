@@ -1,8 +1,10 @@
 import { castArray, isNil } from 'lodash-es'
+import { EOL } from 'os'
 import type { JsonArray, JsonObject, JsonValue } from '../types/jsonTypes.js'
 
-const CRLF = '\r\n'
+const CR = '\r'
 const LF = '\n'
+const CRLF = `${CR}${LF}`
 
 export const isObject = (
   ancestor: JsonValue | undefined | null,
@@ -18,8 +20,30 @@ export const getUniqueSortedProps = (
   ...objects: (JsonObject | JsonArray)[]
 ): string[] => Array.from(new Set([...objects].map(Object.keys).flat())).sort()
 
-export const detectEol = (text: string): string =>
-  text.includes(CRLF) ? CRLF : LF
+export const detectEol = (text: string): string => {
+  if (!text) {
+    return EOL
+  }
+
+  let hasCRLF = false
+  let hasLF = false
+
+  for (let i = 0; i < text.length; ++i) {
+    if (text[i] === LF) {
+      if (i > 0 && text[i - 1] === CR) {
+        hasCRLF = true
+      } else {
+        hasLF = true
+      }
+
+      if (hasCRLF && hasLF) {
+        return EOL
+      }
+    }
+  }
+
+  return hasCRLF ? CRLF : hasLF ? LF : EOL
+}
 
 export const normalizeEol = (text: string, eol: string): string => {
   if (!eol || !text) {
@@ -38,6 +62,5 @@ const normalizeWindowsEol = (text: string) => {
 }
 
 const normalizeUnixEol = (text: string) => {
-  // Convert CRLF to LF
   return text.split(CRLF).join(LF)
 }

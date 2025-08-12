@@ -1,3 +1,4 @@
+import { EOL } from 'os'
 import {
   detectEol,
   ensureArray,
@@ -92,37 +93,42 @@ describe('mergeUtils', () => {
 
   describe('EOL helpers', () => {
     describe('detectEol', () => {
-      it('given CRLF content when detectEol then returns CRLF', () => {
+      type Case = { name: string; input: string | undefined; expected: string }
+
+      const cases: Case[] = [
+        {
+          name: 'given CRLF-only content when detectEol then returns CRLF',
+          input: 'a\r\nb\r\n',
+          expected: '\r\n',
+        },
+        {
+          name: 'given LF-only content when detectEol then returns LF',
+          input: 'a\nb\n',
+          expected: '\n',
+        },
+        {
+          name: 'given mix EOL content when detectEol then returns os.EOL',
+          input: 'a\r\nb\n',
+          expected: EOL,
+        },
+        {
+          name: 'given no EOL content when detectEol then returns os.EOL',
+          input: 'abc',
+          expected: EOL,
+        },
+        {
+          name: 'given undefined content when detectEol then returns os.EOL',
+          input: undefined as unknown as never,
+          expected: EOL,
+        },
+      ]
+
+      it.each(cases)('$name', ({ input, expected }) => {
         // Arrange
-        const text = 'a\r\nb\r\n'
-
         // Act
-        const eol = detectEol(text)
-
+        const eol = detectEol(input as never)
         // Assert
-        expect(eol).toBe('\r\n')
-      })
-
-      it('given LF-only content when detectEol then returns LF', () => {
-        // Arrange
-        const text = 'a\nb\n'
-
-        // Act
-        const eol = detectEol(text)
-
-        // Assert
-        expect(eol).toBe('\n')
-      })
-
-      it('given no EOL content when detectEol then returns LF by default', () => {
-        // Arrange
-        const text = 'abc'
-
-        // Act
-        const eol = detectEol(text)
-
-        // Assert
-        expect(eol).toBe('\n')
+        expect(eol).toBe(expected)
       })
     })
 
