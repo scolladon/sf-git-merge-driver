@@ -1,8 +1,6 @@
 import { castArray, isNil } from 'lodash-es'
 import type { JsonArray, JsonObject, JsonValue } from '../types/jsonTypes.js'
 
-const LF_OR_CRLF_REGEX = /\r?\n/g
-const CRLF_ONLY_REGEX = /\r\n/g
 const CRLF = '\r\n'
 const LF = '\n'
 
@@ -27,7 +25,19 @@ export const normalizeEol = (text: string, eol: string): string => {
   if (!eol || !text) {
     return text
   }
+  return normalizePlatformEol(eol)(text)
+}
 
-  const regex = eol === CRLF ? LF_OR_CRLF_REGEX : CRLF_ONLY_REGEX
-  return text.replace(regex, eol)
+const normalizePlatformEol = (eol: string) => (text: string) =>
+  eol === CRLF ? normalizeWindowsEol(text) : normalizeUnixEol(text)
+
+const normalizeWindowsEol = (text: string) => {
+  // Convert CRLF to LF to deal with mixed EOL
+  // Then convert all the LF back to CRLF
+  return normalizeUnixEol(text).split(LF).join(CRLF)
+}
+
+const normalizeUnixEol = (text: string) => {
+  // Convert CRLF to LF
+  return text.split(CRLF).join(LF)
 }
