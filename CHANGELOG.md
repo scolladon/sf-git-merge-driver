@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.3](https://github.com/scolladon/sf-git-merge-driver/compare/v1.0.2...v1.0.3) (2025-08-12)
+
+
+### Bug Fixes
+
+* don't process XML entities and deal with defined JSONElements ([#87](https://github.com/scolladon/sf-git-merge-driver/issues/87)) ([8d873ca](https://github.com/scolladon/sf-git-merge-driver/commit/8d873cafc17f7a6df395806293f0a2bdf8cff19e))
+
 ## [1.0.2](https://github.com/scolladon/sf-git-merge-driver/compare/v1.0.1...v1.0.2) (2025-08-12)
 
 
