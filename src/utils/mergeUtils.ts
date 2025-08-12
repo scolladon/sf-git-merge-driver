@@ -20,7 +20,17 @@ export const ensureArray = (value: JsonValue): JsonArray =>
 
 export const getUniqueSortedProps = (
   ...objects: (JsonObject | JsonArray)[]
-): string[] => Array.from(new Set([...objects].map(Object.keys).flat())).sort()
+): string[] =>
+  Array.from(
+    new Set(
+      [...objects]
+        .filter(
+          jsonElement => ![undefined, null].includes(jsonElement as never)
+        )
+        .map(Object.keys)
+        .flat()
+    )
+  ).sort()
 
 export const detectEol = (text: string): string => {
   if (!text) {

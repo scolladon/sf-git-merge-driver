@@ -82,9 +82,17 @@ describe('mergeUtils', () => {
       const a = { b: 1, a: 2 }
       const b = { c: 3, a: 4 }
       const c = ['x', 'y'] // keys: '0','1'
+      const d = null
+      const e = undefined
 
       // Act
-      const result = getUniqueSortedProps(a as never, b as never, c as never)
+      const result = getUniqueSortedProps(
+        a as never,
+        b as never,
+        c as never,
+        d as never,
+        e as never
+      )
 
       // Assert
       expect(result).toEqual(['0', '1', 'a', 'b', 'c'])
