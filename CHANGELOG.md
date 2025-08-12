@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.4](https://github.com/scolladon/sf-git-merge-driver/compare/v1.0.3...v1.0.4) (2025-08-12)
+
+
+### Bug Fixes
+
+* make reading `our`|`ancestor`|`their` variable more robust ([#89](https://github.com/scolladon/sf-git-merge-driver/issues/89)) ([d470f49](https://github.com/scolladon/sf-git-merge-driver/commit/d470f496ef4e3a2bf0723583e64c77513fbffe36))
+
 ## [1.0.3](https://github.com/scolladon/sf-git-merge-driver/compare/v1.0.2...v1.0.3) (2025-08-12)
 
 
