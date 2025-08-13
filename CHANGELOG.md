@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.5](https://github.com/scolladon/sf-git-merge-driver/compare/v1.0.4...v1.0.5) (2025-08-13)
+
+
+### Bug Fixes
+
+* default behavior on parsing exception ([#91](https://github.com/scolladon/sf-git-merge-driver/issues/91)) ([ab1cc1a](https://github.com/scolladon/sf-git-merge-driver/commit/ab1cc1ac8b7a119644f665430a2dc0001341b293))
+
 ## [1.0.4](https://github.com/scolladon/sf-git-merge-driver/compare/v1.0.3...v1.0.4) (2025-08-12)
 
 
