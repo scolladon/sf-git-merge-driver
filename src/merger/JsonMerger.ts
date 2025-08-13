@@ -42,7 +42,7 @@ export class JsonMerger {
           break
         default: {
           const obj = {
-            [key]: merge(ancestor?.[key], local?.[key], other?.[key]),
+            [key]: merge(ancestor[key], local[key], other[key]),
           }
           acc.push([obj])
           break
@@ -68,9 +68,9 @@ function merge(
   const props = getUniqueSortedProps(ancestor, local, other)
   for (const key of props) {
     let values: JsonArray = []
-    const ancestorOfKey = ancestor?.[key]
-    const localOfKey = local?.[key]
-    const otherOfKey = other?.[key]
+    const ancestorOfKey = ancestor[key]
+    const localOfKey = local[key]
+    const otherOfKey = other[key]
 
     if (isObject(ancestorOfKey, localOfKey, otherOfKey)) {
       const [ancestorkey, ourkey, theirkey] = [
@@ -92,7 +92,7 @@ function toJsonArray(inputObj: JsonObject | JsonArray): JsonArray {
   const acc: JsonArray[] = []
   for (const attribute of getUniqueSortedProps(inputObj)) {
     const values: JsonArray = []
-    const inputObjOfAttr = inputObj?.[attribute]
+    const inputObjOfAttr = inputObj[attribute]
 
     if (typeof inputObjOfAttr === 'object') {
       const inputObjAtt = ensureArray(inputObjOfAttr)
@@ -115,11 +115,11 @@ const handlelocalAndother = (
   other: JsonObject | JsonArray
 ): JsonArray => {
   const obj: JsonObject = {}
-  obj[key] = toJsonArray(local?.[key])
+  obj[key] = toJsonArray(local[key])
   const acc: JsonArray = []
   if (!deepEqual(local, other)) {
     const otherProp = {
-      [key]: toJsonArray(other?.[key]),
+      [key]: toJsonArray(other[key]),
     }
     ConflictMarker.addConflictMarkers(acc, obj, {}, otherProp)
   } else {
@@ -136,10 +136,10 @@ const handleAncestorAndother = (
   const acc: JsonArray = []
   if (!deepEqual(ancestor, other)) {
     const ancestorProp = {
-      [key]: toJsonArray(ancestor?.[key]),
+      [key]: toJsonArray(ancestor[key]),
     }
     const otherProp = {
-      [key]: toJsonArray(other?.[key]),
+      [key]: toJsonArray(other[key]),
     }
     ConflictMarker.addConflictMarkers(acc, {}, ancestorProp, otherProp)
   }
@@ -154,10 +154,10 @@ const handleAncestorAndlocal = (
   const acc: JsonArray = []
   if (!deepEqual(ancestor, local)) {
     const localProp = {
-      [key]: toJsonArray(local?.[key]),
+      [key]: toJsonArray(local[key]),
     }
     const ancestorProp = {
-      [key]: toJsonArray(ancestor?.[key]),
+      [key]: toJsonArray(ancestor[key]),
     }
     ConflictMarker.addConflictMarkers(acc, localProp, ancestorProp, {})
   }
@@ -202,9 +202,9 @@ const mergeByKeyField = (
   const acc: JsonArray = []
   const props = getUniqueSortedProps(ancestor, local, other)
   for (const key of props) {
-    const ancestorOfKey = ancestor?.[key]
-    const localOfKey = local?.[key]
-    const otherOfKey = other?.[key]
+    const ancestorOfKey = ancestor[key]
+    const localOfKey = local[key]
+    const otherOfKey = other[key]
     const scenario: MergeScenario = getScenario(
       ancestorOfKey,
       localOfKey,
