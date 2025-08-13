@@ -36,17 +36,29 @@ describe('MergeDriver', () => {
       expect(mockWriteFile).toHaveBeenCalledTimes(1)
     })
 
-    it('should throw an error when mergeThreeWay fails', async () => {
+    it('should return true and write ourfile with ourcontent when mergeThreeWay throws', async () => {
       // Arrange
-      mockReadFile.mockResolvedValue('<label>Test Object</label>')
+      mockReadFile.mockResolvedValueOnce('<label>Ancestor Object</label>')
+      mockReadFile.mockResolvedValueOnce('<label>Our Object</label>')
+      mockReadFile.mockResolvedValueOnce('<label>Their Object</label>')
       mockedmergeThreeWay.mockImplementation(() => {
         throw new Error('Tripart XML merge failed')
       })
 
-      // Act and Assert
-      await expect(
-        sut.mergeFiles('AncestorFile', 'OurFile', 'TheirFile')
-      ).rejects.toThrow('Tripart XML merge failed')
+      // Act
+      const result = await sut.mergeFiles(
+        'AncestorFile',
+        'OurFile',
+        'TheirFile'
+      )
+
+      // Assert
+      expect(result).toBe(true)
+      expect(mockWriteFile).toHaveBeenCalledTimes(1)
+      expect(mockWriteFile).toHaveBeenCalledWith(
+        'OurFile',
+        '<label>Our Object</label>'
+      )
     })
 
     it('should return true when there is a conflict', async () => {

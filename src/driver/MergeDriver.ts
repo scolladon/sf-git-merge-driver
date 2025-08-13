@@ -18,17 +18,21 @@ export class MergeDriver {
 
     const xmlMerger = new XmlMerger()
 
-    const mergedContent = xmlMerger.mergeThreeWay(
-      ancestorContent,
-      ourContent,
-      theirContent
-    )
+    try {
+      const mergedContent = xmlMerger.mergeThreeWay(
+        ancestorContent,
+        ourContent,
+        theirContent
+      )
 
-    const targetEol = detectEol(ourContent)
-    const outputWithEol = normalizeEol(mergedContent.output, targetEol)
+      const targetEol = detectEol(ourContent)
+      const resolvedContent = normalizeEol(mergedContent.output, targetEol)
+      await writeFile(normalize(ourFile), resolvedContent)
 
-    // Write the merged content to the our file
-    await writeFile(normalize(ourFile), outputWithEol)
-    return mergedContent.hasConflict
+      return mergedContent.hasConflict
+    } catch {
+      await writeFile(normalize(ourFile), ourContent)
+      return true
+    }
   }
 }
