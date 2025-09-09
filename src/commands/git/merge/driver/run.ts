@@ -79,6 +79,10 @@ export default class Run extends SfCommand<void> {
       otherConflictTag: flags['other-conflict-tag'],
     }
     ConflictMarker.setConflictConfig(conflicConfig)
+    this.log(
+      'Git merge with driver sf-git-merge-driver for file ' +
+        flags['output-file']
+    )
 
     const mergeDriver = new MergeDriver()
     const hasConflict = await mergeDriver.mergeFiles(
