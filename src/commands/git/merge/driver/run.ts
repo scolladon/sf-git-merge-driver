@@ -6,12 +6,13 @@ import {
   DEFAULT_LOCAL_CONFLICT_TAG,
   DEFAULT_OTHER_CONFLICT_TAG,
 } from '../../../../constant/conflictConstant.js'
+import { PLUGIN_NAME } from '../../../../constant/pluginConstant.js'
 import { MergeDriver } from '../../../../driver/MergeDriver.js'
 import { ConflictMarker } from '../../../../merger/conflictMarker.js'
 import { conflicConfig } from '../../../../types/conflictTypes.js'
 
 Messages.importMessagesDirectoryFromMetaUrl(import.meta.url)
-const messages = Messages.loadMessages('sf-git-merge-driver', 'run')
+const messages = Messages.loadMessages(PLUGIN_NAME, 'run')
 
 const ERROR_EXIT_CODE = 1
 const SUCCESS_EXIT_CODE = 0
