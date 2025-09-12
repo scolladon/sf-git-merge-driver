@@ -380,14 +380,33 @@ describe('JsonMerger', () => {
 
       // Assert
       expect(result.output).toEqual([
-        { '#text': SALESFORCE_EOL + '<<<<<<< LOCAL' },
         {
           Profile: [
+            { description: [{ '#text': 'Their description' }] },
             {
               fieldPermissions: [
-                { editable: [{ '#text': 'true' }] },
-                { field: [{ '#text': 'Account.Name' }] },
+                { editable: [{ '#text': 'false' }] },
+                { field: [{ '#text': 'Account.Industry' }] },
                 { readable: [{ '#text': 'true' }] },
+              ],
+            },
+            {
+              fieldPermissions: [
+                { '#text': SALESFORCE_EOL + '<<<<<<< LOCAL' },
+                { editable: [{ '#text': 'true' }] },
+                { '#text': '||||||| BASE' },
+                { '#text': SALESFORCE_EOL },
+                { '#text': '=======' },
+                { editable: [{ '#text': 'false' }] },
+                { '#text': '>>>>>>> REMOTE' },
+                { field: [{ '#text': 'Account.Name' }] },
+                { '#text': SALESFORCE_EOL + '<<<<<<< LOCAL' },
+                { readable: [{ '#text': 'true' }] },
+                { '#text': '||||||| BASE' },
+                { '#text': SALESFORCE_EOL },
+                { '#text': '=======' },
+                { readable: [{ '#text': 'false' }] },
+                { '#text': '>>>>>>> REMOTE' },
               ],
             },
             {
@@ -399,29 +418,6 @@ describe('JsonMerger', () => {
             },
           ],
         },
-        { '#text': '||||||| BASE' },
-        { '#text': SALESFORCE_EOL },
-        { '#text': '=======' },
-        {
-          Profile: [
-            { description: [{ '#text': 'Their description' }] },
-            {
-              fieldPermissions: [
-                { editable: [{ '#text': 'false' }] },
-                { field: [{ '#text': 'Account.Name' }] },
-                { readable: [{ '#text': 'false' }] },
-              ],
-            },
-            {
-              fieldPermissions: [
-                { editable: [{ '#text': 'false' }] },
-                { field: [{ '#text': 'Account.Industry' }] },
-                { readable: [{ '#text': 'true' }] },
-              ],
-            },
-          ],
-        },
-        { '#text': '>>>>>>> REMOTE' },
       ])
       expect(result.hasConflict).toBe(true)
     })
