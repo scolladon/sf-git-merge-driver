@@ -74,7 +74,7 @@
     "clean:package-manager": "wireit",
     "clean": "wireit",
     "compile": "wireit",
-    "dependencies:upgrade": "npm update ; npm audit fix",
+    "dependencies:upgrade": "npx npm-check-updates -u ; npm update ; npm audit fix",
     "lint": "wireit",
     "lint:dependencies": "wireit",
     "lint:fix": "wireit",
