@@ -10,6 +10,8 @@ import { PLUGIN_NAME } from '../../../../constant/pluginConstant.js'
 import { MergeDriver } from '../../../../driver/MergeDriver.js'
 import { ConflictMarker } from '../../../../merger/conflictMarker.js'
 import { conflicConfig } from '../../../../types/conflictTypes.js'
+import { TraceAsyncMethod } from '../../../../utils/LoggingDecorator.js'
+import { Logger } from '../../../../utils/LoggingService.js'
 
 Messages.importMessagesDirectoryFromMetaUrl(import.meta.url)
 const messages = Messages.loadMessages(PLUGIN_NAME, 'run')
@@ -71,6 +73,7 @@ export default class Run extends SfCommand<void> {
     }),
   }
 
+  @TraceAsyncMethod
   public async run(): Promise<void> {
     const { flags } = await this.parse(Run)
     const conflicConfig: conflicConfig = {
@@ -81,11 +84,17 @@ export default class Run extends SfCommand<void> {
     }
     ConflictMarker.setConflictConfig(conflicConfig)
 
+    Logger.debug(`flags: ${JSON.stringify(flags)}`)
+    Logger.debug(`conflicConfig: ${JSON.stringify(conflicConfig)}`)
+
     const mergeDriver = new MergeDriver()
     const hasConflict = await mergeDriver.mergeFiles(
       flags['ancestor-file'],
       flags['local-file'],
       flags['other-file']
+    )
+    Logger.info(
+      `Merge completed with ${hasConflict ? 'conflicts' : 'no conflicts'}`
     )
     process.exitCode = hasConflict ? ERROR_EXIT_CODE : SUCCESS_EXIT_CODE
   }

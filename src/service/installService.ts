@@ -3,8 +3,10 @@ import { simpleGit } from 'simple-git'
 import { DRIVER_NAME, RUN_PLUGIN_COMMAND } from '../constant/driverConstant.js'
 import { METADATA_TYPES_PATTERNS } from '../constant/metadataConstant.js'
 import { getGitAttributesPath } from '../utils/gitUtils.js'
+import { TraceAsyncMethod } from '../utils/LoggingDecorator.js'
 
 export class InstallService {
+  @TraceAsyncMethod
   public async installMergeDriver() {
     const git = simpleGit()
     await git.addConfig(

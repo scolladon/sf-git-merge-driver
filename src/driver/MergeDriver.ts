@@ -1,9 +1,12 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { normalize } from 'node:path'
 import { XmlMerger } from '../merger/XmlMerger.js'
+import { TraceAsyncMethod } from '../utils/LoggingDecorator.js'
+import { Logger } from '../utils/LoggingService.js'
 import { detectEol, normalizeEol } from '../utils/mergeUtils.js'
 
 export class MergeDriver {
+  @TraceAsyncMethod
   async mergeFiles(
     ancestorFile: string,
     ourFile: string,
@@ -30,7 +33,9 @@ export class MergeDriver {
       await writeFile(normalize(ourFile), resolvedContent)
 
       return mergedContent.hasConflict
-    } catch {
+    } catch (error) {
+      Logger.error('Merge failed', error)
+      Logger.info('Restore our file')
       await writeFile(normalize(ourFile), ourContent)
       return true
     }

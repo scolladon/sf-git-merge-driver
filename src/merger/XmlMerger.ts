@@ -1,4 +1,5 @@
 import { XMLBuilder, XMLParser } from 'fast-xml-parser'
+import { TraceSyncMethod } from '../utils/LoggingDecorator.js'
 import { JsonMerger } from './JsonMerger.js'
 
 const XML_DECL = '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -42,6 +43,7 @@ const handleSpecialEntities = (xml: string): string =>
     .replaceAll('&gt;&gt;&gt;&gt;&gt;&gt;&gt;', '>>>>>>>')
 
 export class XmlMerger {
+  @TraceSyncMethod
   mergeThreeWay(
     ancestorContent: string,
     ourContent: string,
