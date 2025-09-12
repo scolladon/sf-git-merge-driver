@@ -115,16 +115,11 @@ const handlelocalAndother = (
   other: JsonObject | JsonArray
 ): JsonArray => {
   const obj: JsonObject = {}
-  obj[key] = toJsonArray(local[key])
+  obj[key] = merge({}, local[key], other[key])
   const acc: JsonArray = []
-  if (!deepEqual(local, other)) {
-    const otherProp = {
-      [key]: toJsonArray(other[key]),
-    }
-    ConflictMarker.addConflictMarkers(acc, obj, {}, otherProp)
-  } else {
-    acc.push(obj)
-  }
+  // Functional choice: Don't use deepEqual because it would tax performence when the ancestor is empty at a too high level of the metadata tree
+  // merge will functionally do the same itself while perfoming its normal function
+  acc.push(obj)
   return acc
 }
 
