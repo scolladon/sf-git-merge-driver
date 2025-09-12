@@ -149,10 +149,16 @@ describe('mergeUtils', () => {
       }
       const cases: Case[] = [
         {
-          name: 'given eol undefined then returns platform EOL',
+          name: 'given eol undefined and CRLF in file then returns platform EOL',
           input: 'a\r\nb\r\n',
           eol: undefined as unknown as never,
-          expected: 'a\nb\n',
+          expected: 'a' + EOL + 'b' + EOL,
+        },
+        {
+          name: 'given eol undefined and LF in file then returns platform EOL',
+          input: 'a\nb\n',
+          eol: undefined as unknown as never,
+          expected: 'a' + EOL + 'b' + EOL,
         },
         {
           name: 'given input undefined then returns undefined',

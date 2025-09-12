@@ -1,3 +1,4 @@
+import { sep } from 'node:path'
 import { getGitAttributesPath } from '../../../src/utils/gitUtils.js'
 
 const mockRevparse = jest.fn()
@@ -23,7 +24,7 @@ describe('gitUtils.getGitAttributesPath', () => {
 
     // Assert
     expect(mockRevparse).toHaveBeenCalledWith(['--git-dir'])
-    expect(result).toBe('.git/info/attributes')
+    expect(result).toBe('.git' + sep + 'info' + sep + 'attributes')
   })
 
   it('when git revparse fails then getGitAttributesPath should propagate the error', async () => {
