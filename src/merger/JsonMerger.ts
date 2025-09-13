@@ -4,6 +4,7 @@ import { MetadataService } from '../service/MetadataService.js'
 import { NamespaceHandler } from '../service/NamespaceHandler.js'
 import type { JsonArray, JsonObject } from '../types/jsonTypes.js'
 import { getScenario, MergeScenario } from '../types/mergeScenario.js'
+import { TraceSyncMethod } from '../utils/LoggingDecorator.js'
 import {
   ensureArray,
   getUniqueSortedProps,
@@ -13,6 +14,7 @@ import { ConflictMarker } from './conflictMarker.js'
 import { generateObj, mergeTextAttribute } from './textAttribute.js'
 
 export class JsonMerger {
+  @TraceSyncMethod
   public mergeThreeWay(
     ancestor: JsonObject | JsonArray,
     local: JsonObject | JsonArray,
