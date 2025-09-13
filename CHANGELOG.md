@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.0](https://github.com/scolladon/sf-git-merge-driver/compare/v1.0.5...v1.1.0) (2025-09-13)
+
+
+### Features
+
+* change empty ancestor behavior ([#107](https://github.com/scolladon/sf-git-merge-driver/issues/107)) ([a9f18cc](https://github.com/scolladon/sf-git-merge-driver/commit/a9f18cc1f8a20f9e00f19edaf614db8e04efafb7))
+* implement basic logger ([#108](https://github.com/scolladon/sf-git-merge-driver/issues/108)) ([9a9f482](https://github.com/scolladon/sf-git-merge-driver/commit/9a9f4822c079813b74d0ae46c5139009d82af3f1))
+
+
+### Bug Fixes
+
+* windows eol and path seperator in unit tests ([#106](https://github.com/scolladon/sf-git-merge-driver/issues/106)) ([04c0aa7](https://github.com/scolladon/sf-git-merge-driver/commit/04c0aa7f0fa3078a2d1f7335bd1fdbb3b5839cc0))
+
 ## [1.0.5](https://github.com/scolladon/sf-git-merge-driver/compare/v1.0.4...v1.0.5) (2025-08-13)
 
 
