@@ -75,6 +75,7 @@ export default class Run extends SfCommand<void> {
 
   @TraceAsyncMethod
   public async run(): Promise<void> {
+    Logger.info('Merge starting')
     const { flags } = await this.parse(Run)
     const conflicConfig: conflicConfig = {
       conflictMarkerSize: flags['conflict-marker-size'],
