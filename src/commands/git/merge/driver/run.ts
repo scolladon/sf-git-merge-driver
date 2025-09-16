@@ -10,7 +10,7 @@ import { PLUGIN_NAME } from '../../../../constant/pluginConstant.js'
 import { MergeDriver } from '../../../../driver/MergeDriver.js'
 import { ConflictMarker } from '../../../../merger/conflictMarker.js'
 import { conflicConfig } from '../../../../types/conflictTypes.js'
-import { TraceAsyncMethod } from '../../../../utils/LoggingDecorator.js'
+import { log } from '../../../../utils/LoggingDecorator.js'
 import { Logger } from '../../../../utils/LoggingService.js'
 
 Messages.importMessagesDirectoryFromMetaUrl(import.meta.url)
@@ -73,7 +73,7 @@ export default class Run extends SfCommand<void> {
     }),
   }
 
-  @TraceAsyncMethod
+  @log
   public async run(): Promise<void> {
     Logger.info('Merge starting')
     const { flags } = await this.parse(Run)

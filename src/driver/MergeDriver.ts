@@ -1,12 +1,12 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { normalize } from 'node:path'
 import { XmlMerger } from '../merger/XmlMerger.js'
-import { TraceAsyncMethod } from '../utils/LoggingDecorator.js'
+import { log } from '../utils/LoggingDecorator.js'
 import { Logger } from '../utils/LoggingService.js'
 import { detectEol, normalizeEol } from '../utils/mergeUtils.js'
 
 export class MergeDriver {
-  @TraceAsyncMethod
+  @log
   async mergeFiles(
     ancestorFile: string,
     ourFile: string,
