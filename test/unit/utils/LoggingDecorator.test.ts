@@ -8,193 +8,347 @@ import {
 describe('LoggingDecorator', () => {
   describe('hasCustomToString', () => {
     // Objects with custom toString
-    it('should return true for objects with custom toString', () => {
+    it('given object with custom toString when hasCustomToString then returns true', () => {
+      // Arrange
       const obj = {
         toString: () => 'custom',
       }
-      expect(hasCustomToString(obj)).toBe(true)
+
+      // Act
+      const result = hasCustomToString(obj)
+
+      // Assert
+      expect(result).toBe(true)
     })
 
-    it('should return true for class instances with custom toString', () => {
+    it('given class instance with custom toString when hasCustomToString then returns true', () => {
+      // Arrange
       class CustomClass {
         toString() {
           return 'custom'
         }
       }
-      expect(hasCustomToString(new CustomClass())).toBe(true)
+      const sut = new CustomClass()
+
+      // Act
+      const result = hasCustomToString(sut)
+
+      // Assert
+      expect(result).toBe(true)
     })
 
     // Objects without custom toString
-    it('should return false for plain objects', () => {
-      expect(hasCustomToString({})).toBe(false)
+    it('given plain object when hasCustomToString then returns false', () => {
+      // Arrange
+      const sut = {}
+
+      // Act
+      const result = hasCustomToString(sut)
+
+      // Assert
+      expect(result).toBe(false)
     })
 
-    it('should return false for class instances without custom toString', () => {
+    it('given class instance without custom toString when hasCustomToString then returns false', () => {
+      // Arrange
       class PlainClass {}
-      expect(hasCustomToString(new PlainClass())).toBe(false)
+      const sut = new PlainClass()
+
+      // Act
+      const result = hasCustomToString(sut)
+
+      // Assert
+      expect(result).toBe(false)
     })
 
     // Edge cases
-    it('should return false for null', () => {
-      expect(hasCustomToString(null)).toBe(false)
+    it('given null when hasCustomToString then returns false', () => {
+      // Arrange
+      const sut = null
+
+      // Act
+      const result = hasCustomToString(sut)
+
+      // Assert
+      expect(result).toBe(false)
     })
 
-    it('should return false for undefined', () => {
-      expect(hasCustomToString(undefined)).toBe(false)
+    it('given undefined when hasCustomToString then returns false', () => {
+      // Arrange
+      const sut = undefined
+
+      // Act
+      const result = hasCustomToString(sut)
+
+      // Assert
+      expect(result).toBe(false)
     })
 
-    it('should return false for primitives', () => {
-      expect(hasCustomToString(42)).toBe(false)
-      expect(hasCustomToString('string')).toBe(false)
-      expect(hasCustomToString(true)).toBe(false)
-      expect(hasCustomToString(Symbol())).toBe(false)
+    it('given primitives when hasCustomToString then returns false', () => {
+      // Arrange
+      const numberSut = 42
+      const stringSut = 'string'
+      const booleanSut = true
+      const symbolSut = Symbol()
+
+      // Act & Assert
+      expect(hasCustomToString(numberSut)).toBe(false)
+      expect(hasCustomToString(stringSut)).toBe(false)
+      expect(hasCustomToString(booleanSut)).toBe(false)
+      expect(hasCustomToString(symbolSut)).toBe(false)
     })
 
     // Special cases
-    it('should return true for objects with own toString property', () => {
-      const obj = Object.create(null)
-      obj.toString = () => 'custom'
-      expect(hasCustomToString(obj)).toBe(true)
+    it('given object with own toString property when hasCustomToString then returns true', () => {
+      // Arrange
+      const sut = Object.create(null)
+      sut.toString = () => 'custom'
+
+      // Act
+      const result = hasCustomToString(sut)
+
+      // Assert
+      expect(result).toBe(true)
     })
 
-    it('should return false for objects with non-function toString', () => {
-      const obj = { toString: 'not a function' }
-      expect(hasCustomToString(obj)).toBe(false)
+    it('given object with non-function toString when hasCustomToString then returns false', () => {
+      // Arrange
+      const sut = { toString: 'not a function' }
+
+      // Act
+      const result = hasCustomToString(sut)
+
+      // Assert
+      expect(result).toBe(false)
     })
 
-    it('should return true for Date objects (considered as having custom toString)', () => {
-      expect(hasCustomToString(new Date())).toBe(true)
+    it('given Date object when hasCustomToString then returns true', () => {
+      // Arrange
+      const sut = new Date()
+
+      // Act
+      const result = hasCustomToString(sut)
+
+      // Assert
+      expect(result).toBe(true)
     })
 
-    it('should return true for Array objects (considered as having custom toString)', () => {
-      expect(hasCustomToString([])).toBe(true)
+    it('given Array object when hasCustomToString then returns true', () => {
+      // Arrange
+      const sut = []
+
+      // Act
+      const result = hasCustomToString(sut)
+
+      // Assert
+      expect(result).toBe(true)
     })
 
-    it('should return true for objects with prototype chain toString', () => {
+    it('given object with prototype chain toString when hasCustomToString then returns true', () => {
+      // Arrange
       const parent = { toString: () => 'parent' }
-      const child = Object.create(parent)
-      expect(hasCustomToString(child)).toBe(true)
+      const sut = Object.create(parent)
+
+      // Act
+      const result = hasCustomToString(sut)
+
+      // Assert
+      expect(result).toBe(true)
     })
 
     // Additional test cases
-    it('should return true for Error objects', () => {
-      expect(hasCustomToString(new Error('test'))).toBe(true)
+    it('given Error object when hasCustomToString then returns true', () => {
+      // Arrange
+      const sut = new Error('test')
+
+      // Act
+      const result = hasCustomToString(sut)
+
+      // Assert
+      expect(result).toBe(true)
     })
 
-    it('should handle objects with Symbol.toStringTag', () => {
-      const obj = {
+    it('given object with Symbol.toStringTag when hasCustomToString then returns true', () => {
+      // Arrange
+      const sut = {
         [Symbol.toStringTag]: 'Test',
         toString: () => 'custom',
       }
-      expect(hasCustomToString(obj)).toBe(true)
+
+      // Act
+      const result = hasCustomToString(sut)
+
+      // Assert
+      expect(result).toBe(true)
     })
 
-    it('should work with Proxy objects', () => {
+    it('given Proxy object when hasCustomToString then returns true', () => {
+      // Arrange
       const target = { toString: () => 'proxy target' }
-      const proxy = new Proxy(target, {})
-      expect(hasCustomToString(proxy)).toBe(true)
+      const sut = new Proxy(target, {})
+
+      // Act
+      const result = hasCustomToString(sut)
+
+      // Assert
+      expect(result).toBe(true)
     })
 
-    it('should return false for objects with only Symbol.toStringTag', () => {
-      const obj = { [Symbol.toStringTag]: 'Test' }
-      expect(hasCustomToString(obj)).toBe(false)
+    it('given object with only Symbol.toStringTag when hasCustomToString then returns false', () => {
+      // Arrange
+      const sut = { [Symbol.toStringTag]: 'Test' }
+
+      // Act
+      const result = hasCustomToString(sut)
+
+      // Assert
+      expect(result).toBe(false)
     })
 
     // Prototype-less object tests
-    it('should return false for prototype-less objects without toString', () => {
-      const obj = Object.create(null)
-      expect(hasCustomToString(obj)).toBe(false)
+    it('given prototype-less object without toString when hasCustomToString then returns false', () => {
+      // Arrange
+      const sut = Object.create(null)
+
+      // Act
+      const result = hasCustomToString(sut)
+
+      // Assert
+      expect(result).toBe(false)
     })
 
-    it('should return true for prototype-less objects with added toString', () => {
-      const obj = Object.create(null)
-      obj.toString = () => 'custom'
-      expect(hasCustomToString(obj)).toBe(true)
+    it('given prototype-less object with added toString when hasCustomToString then returns true', () => {
+      // Arrange
+      const sut = Object.create(null)
+      sut.toString = () => 'custom'
+
+      // Act
+      const result = hasCustomToString(sut)
+
+      // Assert
+      expect(result).toBe(true)
     })
 
-    it('should handle prototype-less objects with non-function toString', () => {
-      const obj = Object.create(null)
-      obj.toString = 'not a function'
-      expect(hasCustomToString(obj)).toBe(false)
+    it('given prototype-less object with non-function toString when hasCustomToString then returns false', () => {
+      // Arrange
+      const sut = Object.create(null)
+      sut.toString = 'not a function'
+
+      // Act
+      const result = hasCustomToString(sut)
+
+      // Assert
+      expect(result).toBe(false)
     })
 
-    it('should handle prototype-less objects with inherited toString', () => {
+    it('given prototype-less object with inherited toString when hasCustomToString then returns true', () => {
+      // Arrange
       const parent = Object.create(null)
       parent.toString = () => 'parent'
-      const child = Object.create(parent)
-      expect(hasCustomToString(child)).toBe(true)
+      const sut = Object.create(parent)
+
+      // Act
+      const result = hasCustomToString(sut)
+
+      // Assert
+      expect(result).toBe(true)
     })
 
-    it('should return false for objects with null prototype and no toString', () => {
-      const obj = Object.create(null)
-      expect(hasCustomToString(obj)).toBe(false)
-      expect(Object.getPrototypeOf(obj)).toBeNull()
+    it('given object with null prototype and no toString when hasCustomToString then returns false', () => {
+      // Arrange
+      const sut = Object.create(null)
+
+      // Act
+      const result = hasCustomToString(sut)
+
+      // Assert
+      expect(result).toBe(false)
+      expect(Object.getPrototypeOf(sut)).toBeNull()
     })
 
-    it('should handle objects with null prototype chain', () => {
-      const obj = Object.create(null)
-      expect(hasCustomToString(obj)).toBe(false)
+    it('given object with null prototype chain when hasCustomToString then returns false', () => {
+      // Arrange
+      const sut = Object.create(null)
+
+      // Act
+      const result = hasCustomToString(sut)
+
+      // Assert
+      expect(result).toBe(false)
     })
   })
 
   describe('stringify', () => {
-    it('should convert Map to array of entries', () => {
-      const map = new Map()
-      map.set('key1', 'value1')
-      map.set('key2', 'value2')
+    it('given Map when stringify then converts to array of entries', () => {
+      // Arrange
+      const sut = new Map()
+      sut.set('key1', 'value1')
+      sut.set('key2', 'value2')
 
-      const result = stringify(map)
+      // Act
+      const result = stringify(sut)
+
+      // Assert
       const parsed = JSON.parse(result)
-
       expect(parsed).toEqual([
         ['key1', 'value1'],
         ['key2', 'value2'],
       ])
     })
 
-    it('should convert Set to array', () => {
-      const set = new Set(['value1', 'value2', 'value3'])
+    it('given Set when stringify then converts to array', () => {
+      // Arrange
+      const sut = new Set(['value1', 'value2', 'value3'])
 
-      const result = stringify(set)
+      // Act
+      const result = stringify(sut)
+
+      // Assert
       const parsed = JSON.parse(result)
-
       expect(parsed).toEqual(['value1', 'value2', 'value3'])
     })
 
-    it('should handle nested Map and Set structures', () => {
-      const nestedMap = new Map()
+    it('given nested Map and Set structures when stringify then handles correctly', () => {
+      // Arrange
+      const sut = new Map()
       const innerSet = new Set(['a', 'b', 'c'])
-      nestedMap.set('set', innerSet)
-      nestedMap.set('primitive', 42)
+      sut.set('set', innerSet)
+      sut.set('primitive', 42)
 
-      const result = stringify(nestedMap)
+      // Act
+      const result = stringify(sut)
+
+      // Assert
       const parsed = JSON.parse(result)
-
       expect(parsed).toEqual([
         ['set', ['a', 'b', 'c']],
         ['primitive', 42],
       ])
     })
 
-    it('should handle Map with complex key types', () => {
-      const map = new Map()
-      map.set({ id: 1 }, 'object key')
-      map.set(42, 'number key')
+    it('given Map with complex key types when stringify then handles correctly', () => {
+      // Arrange
+      const sut = new Map()
+      sut.set({ id: 1 }, 'object key')
+      sut.set(42, 'number key')
 
-      const result = stringify(map)
+      // Act
+      const result = stringify(sut)
+
+      // Assert
       const parsed = JSON.parse(result)
-
-      // Map keys that are objects are stringified in the result
       expect(parsed.length).toBe(2)
       expect(parsed[1]).toEqual([42, 'number key'])
     })
 
-    it('should handle empty Map and Set', () => {
-      const emptyMap = new Map()
-      const emptySet = new Set()
+    it('given empty Map and Set when stringify then returns empty array', () => {
+      // Arrange
+      const emptySutMap = new Map()
+      const emptySutSet = new Set()
 
-      expect(stringify(emptyMap)).toBe('[]')
-      expect(stringify(emptySet)).toBe('[]')
+      // Act & Assert
+      expect(stringify(emptySutMap)).toBe('[]')
+      expect(stringify(emptySutSet)).toBe('[]')
     })
   })
 })
