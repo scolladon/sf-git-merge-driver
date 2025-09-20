@@ -187,7 +187,7 @@ The driver is configured to work with `.xml` files by default. The installation 
 ## Debugging
 
 The plugin uses the [Salesforce CLI logging system](https://developer.salesforce.com/docs/atlas.en-us.sfdx_setup.meta/sfdx_setup/sfdx_dev_cli_log_messages.htm) to log information.
-You can control the logging level by setting the `SFDX_LOG_LEVEL` environment variable.
+You can control the logging level by setting the `SF_LOG_LEVEL` environment variable.
 You can redirect the logging in the terminal using `DEBUG=sf-git-merge-driver`.
 
 You can also use `GIT_TRACE=1` to get more information about git operations.
@@ -198,7 +198,7 @@ Example:
 
 ```sh
 DEBUG=sf-git-merge-driver
-SFDX_LOG_LEVEL=trace # can be error | warn | info | debug | trace, default: warn
+SF_LOG_LEVEL=trace # can be error | warn | info | debug | trace, default: warn
 GIT_MERGE_VERBOSITY=5 # can be 0 to 5
 GIT_TRACE=true
 git merge ...

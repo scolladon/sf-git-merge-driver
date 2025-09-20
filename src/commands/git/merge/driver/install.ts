@@ -3,7 +3,7 @@ import { SfCommand } from '@salesforce/sf-plugins-core'
 import { PLUGIN_NAME } from '../../../../constant/pluginConstant.js'
 import { InstallService } from '../../../../service/installService.js'
 import { UninstallService } from '../../../../service/uninstallService.js'
-import { TraceAsyncMethod } from '../../../../utils/LoggingDecorator.js'
+import { log } from '../../../../utils/LoggingDecorator.js'
 import { Logger } from '../../../../utils/LoggingService.js'
 
 Messages.importMessagesDirectoryFromMetaUrl(import.meta.url)
@@ -17,7 +17,7 @@ export default class Install extends SfCommand<void> {
 
   public static override readonly flags = {}
 
-  @TraceAsyncMethod
+  @log
   public async run(): Promise<void> {
     try {
       await new UninstallService().uninstallMergeDriver()

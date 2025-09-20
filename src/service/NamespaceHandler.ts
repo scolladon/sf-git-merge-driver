@@ -1,11 +1,11 @@
 import type { JsonArray, JsonObject } from '../types/jsonTypes.js'
-import { TraceSyncMethod } from '../utils/LoggingDecorator.js'
+import { log } from '../utils/LoggingDecorator.js'
 
 const NAMESPACE_PREFIX = '@_'
 const NAMESPACE_ROOT = ':@'
 
 export class NamespaceHandler {
-  @TraceSyncMethod
+  @log
   public processNamespaces(
     ancestor: JsonObject | JsonArray,
     local: JsonObject | JsonArray,
@@ -30,7 +30,7 @@ export class NamespaceHandler {
     return namespaces
   }
 
-  @TraceSyncMethod
+  @log
   public addNamespacesToResult(acc: JsonArray, namespaces: JsonObject): void {
     if (Object.keys(namespaces).length > 0 && acc.length > 0) {
       // Create a root object if needed
