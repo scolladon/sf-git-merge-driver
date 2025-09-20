@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/scolladon/sf-git-merge-driver/compare/v1.1.0...v1.2.0) (2025-09-20)
+
+
+### Features
+
+* better logging ux and performance ([#113](https://github.com/scolladon/sf-git-merge-driver/issues/113)) ([918c812](https://github.com/scolladon/sf-git-merge-driver/commit/918c812a306950175887ef634bc9ce444f641b31))
+
 ## [1.1.0](https://github.com/scolladon/sf-git-merge-driver/compare/v1.0.5...v1.1.0) (2025-09-13)
 
 
