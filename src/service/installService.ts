@@ -17,7 +17,6 @@ export class InstallService {
       `merge.${DRIVER_NAME}.driver`,
       `sh -c '${RUN_PLUGIN_COMMAND} -O "$1" -A "$2" -B "$3" -P "$4" -L "$5" -X "$6" -Y "$7"' -- %O %A %B %P %L %X %Y`
     )
-    await git.addConfig(`merge.${DRIVER_NAME}.recursive`, 'true')
 
     // Configure merge driver for each metadata type pattern
     const patterns = METADATA_TYPES_PATTERNS.map(
