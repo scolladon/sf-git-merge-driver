@@ -38,7 +38,7 @@ describe('InstallService', () => {
 
     // Assert
     expect(getGitAttributesPathMocked).toHaveBeenCalledTimes(1)
-    expect(mockedAddConfig).toHaveBeenCalledTimes(3)
+    expect(mockedAddConfig).toHaveBeenCalledTimes(2)
     expect(mockedAddConfig).toHaveBeenCalledWith(
       `merge.${DRIVER_NAME}.name`,
       'Salesforce source merge driver'
@@ -46,10 +46,6 @@ describe('InstallService', () => {
     expect(mockedAddConfig).toHaveBeenCalledWith(
       `merge.${DRIVER_NAME}.driver`,
       `sh -c '${RUN_PLUGIN_COMMAND} -O "$1" -A "$2" -B "$3" -P "$4" -L "$5" -X "$6" -Y "$7"' -- %O %A %B %P %L %X %Y`
-    )
-    expect(mockedAddConfig).toHaveBeenCalledWith(
-      `merge.${DRIVER_NAME}.recursive`,
-      'true'
     )
     expect(appendFileMocked).toHaveBeenCalledTimes(1)
 
