@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/scolladon/sf-git-merge-driver/compare/v1.2.0...v1.2.1) (2025-10-13)
+
+
+### Bug Fixes
+
+* remove `recursive` driver attribut ([#132](https://github.com/scolladon/sf-git-merge-driver/issues/132)) ([773674b](https://github.com/scolladon/sf-git-merge-driver/commit/773674bb8c9470dd53ece62f54f2ad432590227b))
+
 ## [1.2.0](https://github.com/scolladon/sf-git-merge-driver/compare/v1.1.0...v1.2.0) (2025-09-20)
 
 
