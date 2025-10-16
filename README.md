@@ -1,22 +1,131 @@
 # Salesforce Metadata Git Merge Driver
 
-A custom Git merge driver designed specifically for Salesforce metadata files. This tool helps resolve merge conflicts in Salesforce XML metadata files by understanding their structure and intelligently merging changes.
+[![License](https://img.shields.io/badge/License-MIT-blue)]()
+[![Compatibility](https://img.shields.io/badge/Windows%20%7C%20Mac%20%7C%20Linux-Supported-success)]()
 
-## Features
+An intelligent Git merge driver specifically designed for Salesforce metadata files. **Eliminates hours** of manual merge conflicts resolution.
 
-- Intelligent merging of Salesforce XML metadata files
-- Handles complex metadata structures like arrays with unique identifiers
-- Supports both local and global installation
-- Easy to use with SFDX CLI plugin commands
-- Warning: as of now it does not preserve the order of items that are order dependant like valuesets
+![Demo GIF](./docs/media/demo-sf-git-merge-driver.gif)
 
-## Installation
+## Why use this plugin?
+
+- **Saves time**: No more manual XML conflict resolution
+- **Zero-config**: Works immediately after installation
+- **Reliable**: Understands Salesforce metadata structure
+- **Transparent**: Seamless Git workflow integration
+
+## How it works
+
+```mermaid
+sequenceDiagram
+    participant Dev
+    participant Git
+    participant MergeDriver
+
+    Dev->>Git: git merge
+    Git->>MergeDriver: Detects XML conflict
+    MergeDriver->>MergeDriver: Analyzes metadata structure
+    MergeDriver->>MergeDriver: Smart merging
+    MergeDriver->>Git: Returns merged result
+    Git->>Dev: Clean commit (no conflicts)
+```
+
+## Installation (30 seconds)
 
 ```bash
+# Install plugin (one time, global)
 sf plugins install sf-git-merge-driver
+
+# Configure merge driver in your project (one time, local per project)
+cd my/sf/project
+sf git merge driver install
 ```
 
 ## Usage
+
+The merge driver activates **automatically** for conflicts on:
+- [Full list of supported metadata](#configuration)
+
+**No additional steps required!** Works during normal Git operations:
+```bash
+git pull  # Conflicts resolved automatically
+git merge # Same here
+```
+
+## Configuration
+
+Configured for these metadata files by default:
+```gitattributes
+*.profile-meta.xml merge=salesforce-source
+*.permissionset-meta.xml merge=salesforce-source
+*.labels-meta.xml merge=salesforce-source
+*.label-meta.xml merge=salesforce-source
+*.applicationVisibility-meta.xml merge=salesforce-source
+*.classAccess-meta.xml merge=salesforce-source
+*.customMetadataTypeAccess-meta.xml merge=salesforce-source
+*.customPermission-meta.xml merge=salesforce-source
+*.customSettingAccess-meta.xml merge=salesforce-source
+*.externalCredentialPrincipalAccess-meta.xml merge=salesforce-source
+*.externalDataSourceAccess-meta.xml merge=salesforce-source
+*.fieldPermission-meta.xml merge=salesforce-source
+*.flowAccess-meta.xml merge=salesforce-source
+*.objectPermission-meta.xml merge=salesforce-source
+*.pageAccess-meta.xml merge=salesforce-source
+*.recordTypeVisibility-meta.xml merge=salesforce-source
+*.tabSetting-meta.xml merge=salesforce-source
+*.userPermission-meta.xml merge=salesforce-source
+*.objectSettings-meta.xml merge=salesforce-source
+*.permissionsetgroup-meta.xml merge=salesforce-source
+*.permissionSetLicenseDefinition-meta.xml merge=salesforce-source
+*.mutingpermissionset-meta.xml merge=salesforce-source
+*.sharingRules-meta.xml merge=salesforce-source
+*.sharingCriteriaRule-meta.xml merge=salesforce-source
+*.sharingGuestRule-meta.xml merge=salesforce-source
+*.sharingOwnerRule-meta.xml merge=salesforce-source
+*.sharingTerritoryRule-meta.xml merge=salesforce-source
+*.workflow-meta.xml merge=salesforce-source
+*.workflowAlert-meta.xml merge=salesforce-source
+*.workflowFieldUpdate-meta.xml merge=salesforce-source
+*.workflowFlowAction-meta.xml merge=salesforce-source
+*.workflowKnowledgePublish-meta.xml merge=salesforce-source
+*.workflowOutboundMessage-meta.xml merge=salesforce-source
+*.workflowRule-meta.xml merge=salesforce-source
+*.workflowSend-meta.xml merge=salesforce-source
+*.workflowTask-meta.xml merge=salesforce-source
+*.assignmentRules-meta.xml merge=salesforce-source
+*.autoResponseRules-meta.xml merge=salesforce-source
+*.escalationRules-meta.xml merge=salesforce-source
+*.marketingappextension-meta.xml merge=salesforce-source
+*.matchingRule-meta.xml merge=salesforce-source
+*.globalValueSet-meta.xml merge=salesforce-source
+*.standardValueSet-meta.xml merge=salesforce-source
+*.globalValueSetTranslation-meta.xml merge=salesforce-source
+*.standardValueSetTranslation-meta.xml merge=salesforce-source
+*.translation-meta.xml merge=salesforce-source
+*.objectTranslation-meta.xml merge=salesforce-source
+```
+
+## Troubleshooting
+
+The plugin uses the [Salesforce CLI logging system](https://developer.salesforce.com/docs/atlas.en-us.sfdx_setup.meta/sfdx_setup/sfdx_dev_cli_log_messages.htm) to log information.
+You can control the logging level by setting the `SF_LOG_LEVEL` environment variable.
+You can redirect the logging in the terminal using `DEBUG=sf-git-merge-driver`.
+
+You can also use `GIT_TRACE=1` to get more information about git operations.
+You can also use `GIT_MERGE_VERBOSITY=5` to get more information about the merge process.
+Git environment variables are detailed [here](https://git-scm.com/book/en/v2/Git-Internals-Environment-Variables).
+
+Example:
+
+```sh
+DEBUG=sf-git-merge-driver
+SF_LOG_LEVEL=trace # can be error | warn | info | debug | trace, default: warn
+GIT_MERGE_VERBOSITY=5 # can be 0 to 5
+GIT_TRACE=true
+git merge ...
+```
+
+## Commands
 
 <!-- commands -->
 * [`sf git merge driver install`](#sf-git-merge-driver-install)
@@ -121,90 +230,6 @@ EXAMPLES
 
 _See code: [src/commands/git/merge/driver/uninstall.ts](https://github.com/scolladon/sf-git-merge-driver/blob/main/src/commands/git/merge/driver/uninstall.ts)_
 <!-- commandsstop -->
-
-## How It Works
-
-The merge driver works by:
-1. Converting XML to JSON for easier processing
-2. Using a specialized three-way merge algorithm that understands Salesforce metadata structures
-3. Intelligently resolving conflicts based on metadata type
-4. Converting the merged result back to properly formatted XML
-
-## Configuration
-
-The driver is configured to work with `.xml` files by default. The installation adds the following to the `.git/info/attributes` file (so it is discrete for the current repo):
-
-```
-*.labels-meta.xml merge=salesforce-source
-*.label-meta.xml merge=salesforce-source
-*.profile-meta.xml merge=salesforce-source
-*.permissionset-meta.xml merge=salesforce-source
-*.applicationVisibility-meta.xml merge=salesforce-source
-*.classAccess-meta.xml merge=salesforce-source
-*.customMetadataTypeAccess-meta.xml merge=salesforce-source
-*.customPermission-meta.xml merge=salesforce-source
-*.customSettingAccess-meta.xml merge=salesforce-source
-*.externalCredentialPrincipalAccess-meta.xml merge=salesforce-source
-*.externalDataSourceAccess-meta.xml merge=salesforce-source
-*.fieldPermission-meta.xml merge=salesforce-source
-*.flowAccess-meta.xml merge=salesforce-source
-*.objectPermission-meta.xml merge=salesforce-source
-*.pageAccess-meta.xml merge=salesforce-source
-*.recordTypeVisibility-meta.xml merge=salesforce-source
-*.tabSetting-meta.xml merge=salesforce-source
-*.userPermission-meta.xml merge=salesforce-source
-*.objectSettings-meta.xml merge=salesforce-source
-*.permissionsetgroup-meta.xml merge=salesforce-source
-*.permissionSetLicenseDefinition-meta.xml merge=salesforce-source
-*.mutingpermissionset-meta.xml merge=salesforce-source
-*.sharingRules-meta.xml merge=salesforce-source
-*.sharingCriteriaRule-meta.xml merge=salesforce-source
-*.sharingGuestRule-meta.xml merge=salesforce-source
-*.sharingOwnerRule-meta.xml merge=salesforce-source
-*.sharingTerritoryRule-meta.xml merge=salesforce-source
-*.workflow-meta.xml merge=salesforce-source
-*.workflowAlert-meta.xml merge=salesforce-source
-*.workflowFieldUpdate-meta.xml merge=salesforce-source
-*.workflowFlowAction-meta.xml merge=salesforce-source
-*.workflowKnowledgePublish-meta.xml merge=salesforce-source
-*.workflowOutboundMessage-meta.xml merge=salesforce-source
-*.workflowRule-meta.xml merge=salesforce-source
-*.workflowSend-meta.xml merge=salesforce-source
-*.workflowTask-meta.xml merge=salesforce-source
-*.assignmentRules-meta.xml merge=salesforce-source
-*.autoResponseRules-meta.xml merge=salesforce-source
-*.escalationRules-meta.xml merge=salesforce-source
-*.marketingappextension-meta.xml merge=salesforce-source
-*.matchingRule-meta.xml merge=salesforce-source
-*.globalValueSet-meta.xml merge=salesforce-source
-*.standardValueSet-meta.xml merge=salesforce-source
-*.globalValueSetTranslation-meta.xml merge=salesforce-source
-*.standardValueSetTranslation-meta.xml merge=salesforce-source
-*.translation-meta.xml merge=salesforce-source
-*.objectTranslation-meta.xml merge=salesforce-source
-```
-
-## Debugging
-
-The plugin uses the [Salesforce CLI logging system](https://developer.salesforce.com/docs/atlas.en-us.sfdx_setup.meta/sfdx_setup/sfdx_dev_cli_log_messages.htm) to log information.
-You can control the logging level by setting the `SF_LOG_LEVEL` environment variable.
-You can redirect the logging in the terminal using `DEBUG=sf-git-merge-driver`.
-
-You can also use `GIT_TRACE=1` to get more information about git operations.
-You can also use `GIT_MERGE_VERBOSITY=5` to get more information about the merge process.
-Git environment variables are detailed [here](https://git-scm.com/book/en/v2/Git-Internals-Environment-Variables).
-
-Example:
-
-```sh
-DEBUG=sf-git-merge-driver
-SF_LOG_LEVEL=trace # can be error | warn | info | debug | trace, default: warn
-GIT_MERGE_VERBOSITY=5 # can be 0 to 5
-GIT_TRACE=true
-git merge ...
-```
-
-
 ## Changelog
 
 [changelog.md](CHANGELOG.md) is available for consultation.
@@ -220,7 +245,7 @@ Versioning follows [SemVer](http://semver.org/) specification.
 
 ## Contributing
 
-Contributions are what make the trailblazer community such an amazing place. I regard this component as a way to inspire and learn from others. Any contributions you make are **appreciated**.
+Contributions are what make the trailblazer community such an amazing place. We regard this component as a way to inspire and learn from others. Any contributions you make are **appreciated**.
 
 See [contributing.md](CONTRIBUTING.md) for sgd contribution principles.
 
