@@ -105,6 +105,24 @@ Configured for these metadata files by default:
 *.objectTranslation-meta.xml merge=salesforce-source
 ```
 
+## How to disable it for a specific merge
+
+When you don't want to use the merge driver for a specific merge, just backup the `.git/info/attributes` file and put it back after the merge.
+```sh
+mv .git/info/attributes .git/info/attributes.bak
+git merge <branche>
+mv .git/info/attributes.bak .git/info/attributes
+```
+
+If you want to disable the merge driver for a specific file, just comment the merge driver configuration from the `.git/info/attributes` file.
+```sh
+# *.profile-meta.xml merge=salesforce-source
+```
+
+If you want to disable it for all the project, just uninstall the driver: 
+```sh
+sf git merge driver uninstall
+```
 ## Troubleshooting
 
 The plugin uses the [Salesforce CLI logging system](https://developer.salesforce.com/docs/atlas.en-us.sfdx_setup.meta/sfdx_setup/sfdx_dev_cli_log_messages.htm) to log information.
