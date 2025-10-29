@@ -123,6 +123,19 @@ If you want to disable it for all the project, just uninstall the driver:
 ```sh
 sf git merge driver uninstall
 ```
+
+## How to know if it is installed and enabled ?
+
+You can check if the merge driver is installed by running the following command:
+```sh
+git config --show-origin --get-regexp '^merge.salesforce-source(\..*)?'
+```
+
+You can check if the merge driver is enabled by running the following command:
+```sh
+grep "merge=salesforce-source" .git/info/attributes
+```
+
 ## Troubleshooting
 
 The plugin uses the [Salesforce CLI logging system](https://developer.salesforce.com/docs/atlas.en-us.sfdx_setup.meta/sfdx_setup/sfdx_dev_cli_log_messages.htm) to log information.
