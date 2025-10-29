@@ -5,7 +5,13 @@
 
 An intelligent Git merge driver specifically designed for Salesforce metadata files. **Eliminates hours** of manual merge conflicts resolution.
 
-![Demo GIF](./docs/media/demo-sf-git-merge-driver.gif)
+## Demo
+
+### Without sf-git-merge-driver
+![Demo without sf-git-merge-driver](./docs/media/demo-without-sf-git-merge-driver.gif)
+
+### With sf-git-merge-driver
+![Demo with sf-git-merge-driver](./docs/media/demo-with-sf-git-merge-driver.gif)
 
 ## Why use this plugin?
 
