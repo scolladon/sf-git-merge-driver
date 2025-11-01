@@ -35,7 +35,7 @@ jobs:
       - name: Integration test
         run: npm run test:nut
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: coverage-test-report
           path: reports/coverage
