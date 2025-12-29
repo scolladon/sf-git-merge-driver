@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.2](https://github.com/scolladon/sf-git-merge-driver/compare/v1.2.1...v1.2.2) (2025-12-29)
+
+
+### Bug Fixes
+
+* git attributes cleaning when uninstalling ([#148](https://github.com/scolladon/sf-git-merge-driver/issues/148)) ([9c8cbbe](https://github.com/scolladon/sf-git-merge-driver/commit/9c8cbbed96cf67d40a7fb12a9df55424ae24535f))
+
 ## [1.2.1](https://github.com/scolladon/sf-git-merge-driver/compare/v1.2.0...v1.2.1) (2025-10-13)
 
 
