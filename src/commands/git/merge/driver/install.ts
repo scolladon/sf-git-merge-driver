@@ -11,6 +11,9 @@ const messages = Messages.loadMessages(PLUGIN_NAME, 'install')
 
 export default class Install extends SfCommand<void> {
   public static override readonly summary = messages.getMessage('summary')
+  public static override readonly aliases: string[] = [
+    'git:merge:driver:enable',
+  ]
   public static override readonly description =
     messages.getMessage('description')
   public static override readonly examples = messages.getMessages('examples')
