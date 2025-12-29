@@ -177,6 +177,9 @@ Installs a local git merge driver for the given org and branch.
 USAGE
   $ sf git merge driver install [--json] [--flags-dir <value>]
 
+ALIASES
+  $ sf git merge driver enable
+
 GLOBAL FLAGS
   --flags-dir=<value>  Import flag values from a directory.
   --json               Format output as json.
@@ -247,6 +250,9 @@ Uninstalls the local git merge driver for the given org and branch.
 ```
 USAGE
   $ sf git merge driver uninstall [--json] [--flags-dir <value>]
+
+ALIASES
+  $ sf git merge driver disable
 
 GLOBAL FLAGS
   --flags-dir=<value>  Import flag values from a directory.

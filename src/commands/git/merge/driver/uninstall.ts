@@ -13,6 +13,9 @@ export default class Uninstall extends SfCommand<void> {
   public static override readonly description =
     messages.getMessage('description')
   public static override readonly examples = messages.getMessages('examples')
+  public static override readonly aliases: string[] = [
+    'git:merge:driver:disable',
+  ]
 
   public static override readonly flags = {}
 
