@@ -570,17 +570,18 @@ describe('MetadataService', () => {
         },
       ]
 
-      test.each(testCases)(
-        '$name',
-        ({ metadataType, testObject, expected }) => {
-          // Act
-          const extractor = MetadataService.getKeyFieldExtractor(metadataType)
+      test.each(testCases)('$name', ({
+        metadataType,
+        testObject,
+        expected,
+      }) => {
+        // Act
+        const extractor = MetadataService.getKeyFieldExtractor(metadataType)
 
-          // Assert
-          expect(extractor).toBeDefined()
-          expect(extractor!(testObject as unknown as JsonValue)).toBe(expected)
-        }
-      )
+        // Assert
+        expect(extractor).toBeDefined()
+        expect(extractor!(testObject as unknown as JsonValue)).toBe(expected)
+      })
     })
 
     describe('given a metadata type not in the extractors', () => {
