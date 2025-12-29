@@ -6,25 +6,29 @@ import { log } from '../utils/LoggingDecorator.js'
 import { Logger } from '../utils/LoggingService.js'
 
 // This match lines like: "*.profile-meta.xml merge=sf-git-merge-driver"
-const MERGE_DRIVER_CONFIG = new RegExp(`.*\s+merge\s*=\s*${DRIVER_NAME}$`)
+const MERGE_DRIVER_CONFIG = new RegExp(
+  `.*\\s+merge\\s*=\\s*${DRIVER_NAME}\\s*$`
+)
+
+const GIT_EOL = '\n'
 
 export class UninstallService {
   @log
   public async uninstallMergeDriver() {
     const git = simpleGit()
     try {
-      // Throw when the merge driver is not installed
+      // Throws when the merge driver is not installed
       await git.raw(['config', '--remove-section', `merge.${DRIVER_NAME}`])
 
       const gitAttributesPath = await getGitAttributesPath()
-      // Throw when the file does not exist
+      // Throws when the file does not exist
       const gitAttributes = await readFile(gitAttributesPath, {
         encoding: 'utf8',
       })
       const filteredAttributes = gitAttributes
-        .split('\n')
+        .split(GIT_EOL)
         .filter(line => !MERGE_DRIVER_CONFIG.test(line))
-      await writeFile(gitAttributesPath, filteredAttributes.join('\n'))
+      await writeFile(gitAttributesPath, filteredAttributes.join(GIT_EOL))
     } catch (error) {
       Logger.error('Merge driver uninstallation failed', error)
     }
