@@ -116,7 +116,7 @@ Configured for these metadata files by default:
 When you don't want to use the merge driver for a specific merge, just backup the `.git/info/attributes` file and put it back after the merge.
 ```sh
 mv .git/info/attributes .git/info/attributes.bak
-git merge <branche>
+git merge <branch>
 mv .git/info/attributes.bak .git/info/attributes
 ```
 
