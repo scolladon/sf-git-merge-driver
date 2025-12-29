@@ -18,7 +18,14 @@ export class UninstallService {
     try {
       // Throws when the merge driver is not installed
       await git.raw(['config', '--remove-section', `merge.${DRIVER_NAME}`])
+    } catch (error) {
+      Logger.error(
+        'Merge driver uninstallation failed to cleanup git config',
+        error
+      )
+    }
 
+    try {
       const gitAttributesPath = await getGitAttributesPath()
       // Throws when the file does not exist
       const gitAttributes = await readFile(gitAttributesPath, {
@@ -29,7 +36,10 @@ export class UninstallService {
         .filter(line => !MERGE_DRIVER_CONFIG.test(line))
       await writeFile(gitAttributesPath, filteredAttributes.join(GIT_EOL))
     } catch (error) {
-      Logger.error('Merge driver uninstallation failed', error)
+      Logger.error(
+        'Merge driver uninstallation failed to cleanup git attributes',
+        error
+      )
     }
   }
 }

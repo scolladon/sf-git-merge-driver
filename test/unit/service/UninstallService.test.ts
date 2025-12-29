@@ -51,4 +51,52 @@ describe('UninstallService', () => {
     )
     expect(getGitAttributesPathMocked).toHaveBeenCalledTimes(1)
   })
+
+  it('should cleanup attributes even when config cleanup fails', async () => {
+    // Arrange
+    mockedRaw.mockRejectedValue(new Error('Failed to cleanup git config'))
+
+    // Act
+    await sut.uninstallMergeDriver()
+
+    // Assert
+    expect(mockedRaw).toHaveBeenCalledWith([
+      'config',
+      '--remove-section',
+      `merge.${DRIVER_NAME}`,
+    ])
+    expect(readFile).toHaveBeenCalledTimes(1)
+    expect(readFile).toHaveBeenCalledWith(
+      '.git/info/attributes',
+      expect.anything()
+    )
+    expect(writeFile).toHaveBeenCalledTimes(1)
+    expect(writeFile).toHaveBeenCalledWith(
+      '.git/info/attributes',
+      'some other content'
+    )
+    expect(getGitAttributesPathMocked).toHaveBeenCalledTimes(1)
+  })
+
+  it('should fail silently', async () => {
+    // Arrange
+    mockedRaw.mockRejectedValue(new Error('Failed to cleanup git config'))
+    readFileMocked.mockRejectedValue(
+      new Error('Failed to cleanup git attributes')
+    )
+
+    // Act
+    await sut.uninstallMergeDriver()
+
+    // Assert
+    expect(mockedRaw).toHaveBeenCalledWith([
+      'config',
+      '--remove-section',
+      `merge.${DRIVER_NAME}`,
+    ])
+    expect(readFile).toHaveBeenCalledWith(
+      '.git/info/attributes',
+      expect.anything()
+    )
+  })
 })
