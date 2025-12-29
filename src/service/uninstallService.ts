@@ -8,7 +8,7 @@ import { Logger } from '../utils/LoggingService.js'
 
 // This match lines like: "*.profile-meta.xml merge=sf-git-merge-driver"
 const MERGE_DRIVER_CONFIG = new RegExp(
-  `.*\\s+merge\\s*=\\s*${DRIVER_NAME}\\s*$`
+  String.raw`.*\s+merge\s*=\s*${DRIVER_NAME}\s*$`
 )
 
 export class UninstallService {
