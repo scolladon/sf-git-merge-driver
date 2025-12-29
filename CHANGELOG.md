@@ -1,5 +1,7 @@
 # Changelog
 
+- npm audit fix to solve security issues
+
 ## [1.2.1](https://github.com/scolladon/sf-git-merge-driver/compare/v1.2.0...v1.2.1) (2025-10-13)
 
 
