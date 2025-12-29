@@ -1,5 +1,7 @@
 # Changelog
 
+- Fix issue when uninstalling the plugin
+- Add aliases to install and uninstall commands (enable/disable) to the difference between install sf plugin and enable it on a repo is easier to understand
 - npm audit fix to solve security issues
 
 ## [1.2.1](https://github.com/scolladon/sf-git-merge-driver/compare/v1.2.0...v1.2.1) (2025-10-13)
