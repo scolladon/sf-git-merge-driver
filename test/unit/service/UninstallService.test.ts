@@ -47,7 +47,7 @@ describe('UninstallService', () => {
     expect(writeFile).toHaveBeenCalledTimes(1)
     expect(writeFile).toHaveBeenCalledWith(
       '.git/info/attributes',
-      expect.anything()
+      'some other content'
     )
     expect(getGitAttributesPathMocked).toHaveBeenCalledTimes(1)
   })
