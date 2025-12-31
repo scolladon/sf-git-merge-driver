@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/scolladon/sf-git-merge-driver/compare/v1.2.2...v1.3.0) (2025-12-31)
+
+
+### Features
+
+* add aliases enable (=install) or disable (=uninstall) ([#151](https://github.com/scolladon/sf-git-merge-driver/issues/151)) ([864f3c5](https://github.com/scolladon/sf-git-merge-driver/commit/864f3c5e04abeef61c280a4a47617a3d2cf9621e))
+
 ## [1.2.2](https://github.com/scolladon/sf-git-merge-driver/compare/v1.2.1...v1.2.2) (2025-12-29)
 
 
