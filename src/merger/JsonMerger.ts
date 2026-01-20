@@ -190,6 +190,9 @@ const mergeArrays = (
   return mergeByKeyField(keyedAnc, keyedlocal, keyedother, attribute)
 }
 
+const isPrimitiveValue = (value: unknown): boolean =>
+  value !== undefined && value !== null && typeof value !== 'object'
+
 const mergeByKeyField = (
   ancestor: JsonArray,
   local: JsonArray,
@@ -208,55 +211,98 @@ const mergeByKeyField = (
       otherOfKey
     )
     const obj = {}
-    switch (scenario) {
-      case MergeScenario.OTHER_ONLY:
-        obj[attribute] = merge({}, {}, otherOfKey)
-        break
-      case MergeScenario.LOCAL_ONLY:
-        obj[attribute] = merge({}, localOfKey, {})
-        break
-      case MergeScenario.ANCESTOR_ONLY:
-        break
-      case MergeScenario.LOCAL_AND_OTHER:
-        if (deepEqual(localOfKey, otherOfKey)) {
+
+    // Check if we're dealing with primitive values (like string members in package.xml)
+    // Primitives can't be recursively merged - they're either present or absent
+    const hasPrimitive =
+      isPrimitiveValue(ancestorOfKey) ||
+      isPrimitiveValue(localOfKey) ||
+      isPrimitiveValue(otherOfKey)
+
+    if (hasPrimitive) {
+      // For primitive values, handle them directly without recursive merge
+      // generateObj returns { attribute: [{ '#text': value }] } which we push directly to acc
+      switch (scenario) {
+        case MergeScenario.OTHER_ONLY:
+          // Added in other only - include it
+          acc.push(generateObj(otherOfKey, attribute))
+          break
+        case MergeScenario.LOCAL_ONLY:
+          // Added in local only - include it
+          acc.push(generateObj(localOfKey, attribute))
+          break
+        case MergeScenario.ANCESTOR_ONLY:
+          // Deleted in both - don't include
+          break
+        case MergeScenario.LOCAL_AND_OTHER:
+          // Both have it (same value since keyed by value) - include once
+          acc.push(generateObj(localOfKey, attribute))
+          break
+        case MergeScenario.ANCESTOR_AND_OTHER:
+          // Deleted in local - respect deletion
+          break
+        case MergeScenario.ANCESTOR_AND_LOCAL:
+          // Deleted in other - respect deletion
+          break
+        case MergeScenario.ALL:
+          // Present in all three - include it
+          acc.push(generateObj(localOfKey, attribute))
+          break
+      }
+      // Skip the obj handling below for primitives since we pushed directly to acc
+      continue
+    } else {
+      // Original logic for object values
+      switch (scenario) {
+        case MergeScenario.OTHER_ONLY:
           obj[attribute] = merge({}, {}, otherOfKey)
-        } else {
-          obj[attribute] = merge({}, localOfKey, otherOfKey)
-        }
-        break
-      case MergeScenario.ANCESTOR_AND_OTHER:
-        if (!deepEqual(ancestorOfKey, otherOfKey)) {
-          const ancestorProp = {
-            [attribute]: merge({}, ancestorOfKey, {}),
-          }
-          const otherProp = {
-            [attribute]: merge({}, {}, otherOfKey),
-          }
-          ConflictMarker.addConflictMarkers(acc, {}, ancestorProp, otherProp)
-        }
-        break
-      case MergeScenario.ANCESTOR_AND_LOCAL:
-        if (!deepEqual(ancestorOfKey, localOfKey)) {
-          const localProp = {
-            [attribute]: merge({}, localOfKey, {}),
-          }
-          const ancestorProp = {
-            [attribute]: merge({}, ancestorOfKey, {}),
-          }
-          ConflictMarker.addConflictMarkers(acc, localProp, ancestorProp, {})
-        }
-        break
-      case MergeScenario.ALL:
-        if (deepEqual(localOfKey, otherOfKey)) {
-          obj[attribute] = merge({}, {}, otherOfKey)
-        } else if (deepEqual(ancestorOfKey, localOfKey)) {
-          obj[attribute] = merge({}, {}, otherOfKey)
-        } else if (deepEqual(ancestorOfKey, otherOfKey)) {
+          break
+        case MergeScenario.LOCAL_ONLY:
           obj[attribute] = merge({}, localOfKey, {})
-        } else {
-          obj[attribute] = merge(ancestorOfKey, localOfKey, otherOfKey)
-        }
-        break
+          break
+        case MergeScenario.ANCESTOR_ONLY:
+          break
+        case MergeScenario.LOCAL_AND_OTHER:
+          if (deepEqual(localOfKey, otherOfKey)) {
+            obj[attribute] = merge({}, {}, otherOfKey)
+          } else {
+            obj[attribute] = merge({}, localOfKey, otherOfKey)
+          }
+          break
+        case MergeScenario.ANCESTOR_AND_OTHER:
+          if (!deepEqual(ancestorOfKey, otherOfKey)) {
+            const ancestorProp = {
+              [attribute]: merge({}, ancestorOfKey, {}),
+            }
+            const otherProp = {
+              [attribute]: merge({}, {}, otherOfKey),
+            }
+            ConflictMarker.addConflictMarkers(acc, {}, ancestorProp, otherProp)
+          }
+          break
+        case MergeScenario.ANCESTOR_AND_LOCAL:
+          if (!deepEqual(ancestorOfKey, localOfKey)) {
+            const localProp = {
+              [attribute]: merge({}, localOfKey, {}),
+            }
+            const ancestorProp = {
+              [attribute]: merge({}, ancestorOfKey, {}),
+            }
+            ConflictMarker.addConflictMarkers(acc, localProp, ancestorProp, {})
+          }
+          break
+        case MergeScenario.ALL:
+          if (deepEqual(localOfKey, otherOfKey)) {
+            obj[attribute] = merge({}, {}, otherOfKey)
+          } else if (deepEqual(ancestorOfKey, localOfKey)) {
+            obj[attribute] = merge({}, {}, otherOfKey)
+          } else if (deepEqual(ancestorOfKey, otherOfKey)) {
+            obj[attribute] = merge({}, localOfKey, {})
+          } else {
+            obj[attribute] = merge(ancestorOfKey, localOfKey, otherOfKey)
+          }
+          break
+      }
     }
     if (!isEmpty(obj)) {
       acc.push(obj)
