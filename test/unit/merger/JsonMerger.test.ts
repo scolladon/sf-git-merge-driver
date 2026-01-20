@@ -1494,4 +1494,150 @@ describe('JsonMerger', () => {
       expect(result.hasConflict).toBe(false)
     })
   })
+
+  describe('Package.xml version auto-resolution', () => {
+    it('should auto-resolve to higher version when both sides change version to different values', () => {
+      // Arrange
+      const ancestor: JsonValue = {
+        Package: {
+          version: '59.0',
+        },
+      }
+
+      const local: JsonValue = {
+        Package: {
+          version: '60.0',
+        },
+      }
+
+      const other: JsonValue = {
+        Package: {
+          version: '61.0',
+        },
+      }
+
+      // Act
+      const result = sut.mergeThreeWay(ancestor, local, other)
+
+      // Assert
+      expect(result.output).toEqual([
+        {
+          Package: [
+            {
+              version: [{ '#text': '61.0' }],
+            },
+          ],
+        },
+      ])
+      expect(result.hasConflict).toBe(false)
+    })
+
+    it('should auto-resolve to local version when local is higher', () => {
+      // Arrange
+      const ancestor: JsonValue = {
+        Package: {
+          version: '59.0',
+        },
+      }
+
+      const local: JsonValue = {
+        Package: {
+          version: '62.0',
+        },
+      }
+
+      const other: JsonValue = {
+        Package: {
+          version: '60.0',
+        },
+      }
+
+      // Act
+      const result = sut.mergeThreeWay(ancestor, local, other)
+
+      // Assert
+      expect(result.output).toEqual([
+        {
+          Package: [
+            {
+              version: [{ '#text': '62.0' }],
+            },
+          ],
+        },
+      ])
+      expect(result.hasConflict).toBe(false)
+    })
+
+    it('should use the changed version when only one side changes it', () => {
+      // Arrange
+      const ancestor: JsonValue = {
+        Package: {
+          version: '59.0',
+        },
+      }
+
+      const local: JsonValue = {
+        Package: {
+          version: '59.0',
+        },
+      }
+
+      const other: JsonValue = {
+        Package: {
+          version: '60.0',
+        },
+      }
+
+      // Act
+      const result = sut.mergeThreeWay(ancestor, local, other)
+
+      // Assert
+      expect(result.output).toEqual([
+        {
+          Package: [
+            {
+              version: [{ '#text': '60.0' }],
+            },
+          ],
+        },
+      ])
+      expect(result.hasConflict).toBe(false)
+    })
+
+    it('should preserve version when both sides have the same version', () => {
+      // Arrange
+      const ancestor: JsonValue = {
+        Package: {
+          version: '59.0',
+        },
+      }
+
+      const local: JsonValue = {
+        Package: {
+          version: '60.0',
+        },
+      }
+
+      const other: JsonValue = {
+        Package: {
+          version: '60.0',
+        },
+      }
+
+      // Act
+      const result = sut.mergeThreeWay(ancestor, local, other)
+
+      // Assert
+      expect(result.output).toEqual([
+        {
+          Package: [
+            {
+              version: [{ '#text': '60.0' }],
+            },
+          ],
+        },
+      ])
+      expect(result.hasConflict).toBe(false)
+    })
+  })
 })

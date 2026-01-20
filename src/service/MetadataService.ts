@@ -151,4 +151,8 @@ const METADATA_KEY_EXTRACTORS = {
   validationRules: (el: JsonValue) => getPropertyValue(el, 'name'), // CustomObjectTranslation
   webLinks: (el: JsonValue) => getPropertyValue(el, 'name'), // CustomObjectTranslation
   workflowTasks: (el: JsonValue) => getPropertyValue(el, 'name'), // CustomObjectTranslation
+
+  // Package.xml (manifest file)
+  types: (el: JsonValue) => getPropertyValue(el, 'name'), // Package - types keyed by metadata type name
+  members: (el: JsonValue) => String(el), // Package - members are strings, use the value itself as key
 }

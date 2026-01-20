@@ -18,6 +18,14 @@ export const mergeTextAttribute = (
   other: JsonValue | null,
   attrib: string
 ): JsonArray => {
+  // Special handling for API version in package.xml - always take the higher version
+  if (attrib === 'version' && local !== other) {
+    const localVersion = parseFloat(String(local)) || 0
+    const otherVersion = parseFloat(String(other)) || 0
+    const higherVersion = Math.max(localVersion, otherVersion).toFixed(1)
+    return [generateObj(higherVersion, attrib)]
+  }
+
   const objAnc: JsonObject = generateObj(ancestor, attrib)
   const objlocal: JsonObject = generateObj(local, attrib)
   const objother: JsonObject = generateObj(other, attrib)

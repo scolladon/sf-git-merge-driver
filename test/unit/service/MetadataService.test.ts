@@ -568,6 +568,20 @@ describe('MetadataService', () => {
           testObject: { name: 'TestWorkflowTask' },
           expected: 'TestWorkflowTask',
         },
+
+        // Package.xml (manifest file) extractors
+        {
+          name: 'handles types with name (for package.xml)',
+          metadataType: 'types',
+          testObject: { name: 'ApexClass', members: ['MyClass'] },
+          expected: 'ApexClass',
+        },
+        {
+          name: 'handles members as string (for package.xml)',
+          metadataType: 'members',
+          testObject: 'MyClass',
+          expected: 'MyClass',
+        },
       ]
 
       test.each(testCases)('$name', ({

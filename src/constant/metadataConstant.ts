@@ -1,5 +1,13 @@
 export const SALESFORCE_EOL = '\n'
 
+// Patterns for manifest files (like package.xml, destructiveChanges.xml)
+export const MANIFEST_PATTERNS = [
+  'package.xml',
+  'destructiveChanges.xml',
+  'destructiveChangesPre.xml',
+  'destructiveChangesPost.xml',
+]
+
 export const METADATA_TYPES_PATTERNS = [
   'labels', // CustomLabels
   'label', // CustomLabels decomposed
