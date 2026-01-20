@@ -1495,8 +1495,8 @@ describe('JsonMerger', () => {
     })
   })
 
-  describe('Package.xml version auto-resolution', () => {
-    it('should auto-resolve to higher version when both sides change version to different values', () => {
+  describe('Package.xml version merging', () => {
+    it('should generate conflict markers when both sides change version to different values', () => {
       // Arrange
       const ancestor: JsonValue = {
         Package: {
@@ -1523,49 +1523,23 @@ describe('JsonMerger', () => {
       expect(result.output).toEqual([
         {
           Package: [
+            { '#text': SALESFORCE_EOL + '<<<<<<< LOCAL' },
+            {
+              version: [{ '#text': '60.0' }],
+            },
+            { '#text': '||||||| BASE' },
+            {
+              version: [{ '#text': '59.0' }],
+            },
+            { '#text': '=======' },
             {
               version: [{ '#text': '61.0' }],
             },
+            { '#text': '>>>>>>> REMOTE' },
           ],
         },
       ])
-      expect(result.hasConflict).toBe(false)
-    })
-
-    it('should auto-resolve to local version when local is higher', () => {
-      // Arrange
-      const ancestor: JsonValue = {
-        Package: {
-          version: '59.0',
-        },
-      }
-
-      const local: JsonValue = {
-        Package: {
-          version: '62.0',
-        },
-      }
-
-      const other: JsonValue = {
-        Package: {
-          version: '60.0',
-        },
-      }
-
-      // Act
-      const result = sut.mergeThreeWay(ancestor, local, other)
-
-      // Assert
-      expect(result.output).toEqual([
-        {
-          Package: [
-            {
-              version: [{ '#text': '62.0' }],
-            },
-          ],
-        },
-      ])
-      expect(result.hasConflict).toBe(false)
+      expect(result.hasConflict).toBe(true)
     })
 
     it('should use the changed version when only one side changes it', () => {
