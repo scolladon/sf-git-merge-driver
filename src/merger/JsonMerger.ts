@@ -215,7 +215,9 @@ const mergeTextArrays = (
       remonvedInOther
     ),
     removedInLocal
-  ).sort()
+  )
+    .sort()
+    .map(item => generateObj(item, attribute))
 
   if (!isEmpty(obj)) {
     acc.push(obj)
