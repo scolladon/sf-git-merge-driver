@@ -35,6 +35,19 @@ describe('mergeUtils', () => {
       expect(result).toBe(false)
     })
 
+    it('given only primitives arrays and nil when isObject then returns false', () => {
+      // Arrange
+      const ancestor = ['x']
+      const local = null
+      const other = 1
+
+      // Act
+      const result = isObject(ancestor, local, other)
+
+      // Assert
+      expect(result).toBe(false)
+    })
+
     it('given all nil when isObject then returns false', () => {
       // Arrange
       // Act
