@@ -1720,7 +1720,13 @@ describe('JsonMerger', () => {
           Package: [
             {
               types: [
-                { members: ['SelectorClass', 'ServiceClass', 'ServiceClass2'] },
+                {
+                  members: [
+                    { members: [{ '#text': 'SelectorClass' }] },
+                    { members: [{ '#text': 'ServiceClass' }] },
+                    { members: [{ '#text': 'ServiceClass2' }] },
+                  ],
+                },
                 { name: [{ '#text': 'ApexTrigger' }] },
               ],
             },
@@ -1769,7 +1775,12 @@ describe('JsonMerger', () => {
           Package: [
             {
               types: [
-                { members: ['NewLocalClass', 'ServiceClass'] },
+                {
+                  members: [
+                    { members: [{ '#text': 'NewLocalClass' }] },
+                    { members: [{ '#text': 'ServiceClass' }] },
+                  ],
+                },
                 { name: [{ '#text': 'ApexTrigger' }] },
               ],
             },
@@ -1814,7 +1825,13 @@ describe('JsonMerger', () => {
           Package: [
             {
               types: [
-                { members: ['LocalMember', 'OnlyMember', 'RemoteMember'] },
+                {
+                  members: [
+                    { members: [{ '#text': 'LocalMember' }] },
+                    { members: [{ '#text': 'OnlyMember' }] },
+                    { members: [{ '#text': 'RemoteMember' }] },
+                  ],
+                },
                 { name: [{ '#text': 'ApexClass' }] },
               ],
             },
