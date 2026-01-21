@@ -32,13 +32,6 @@ export const isStringArray = (
 export const ensureArray = (value: JsonValue): JsonArray =>
   isNil(value) ? [] : (castArray(value) as JsonArray)
 
-export const ensureStringArray = (value: JsonArray): JsonArray =>
-  isNil(value)
-    ? ['']
-    : typeof value === 'string' || value instanceof String
-      ? [value]
-      : value
-
 export const getUniqueSortedProps = (
   ...objects: (JsonObject | JsonArray)[]
 ): string[] =>
