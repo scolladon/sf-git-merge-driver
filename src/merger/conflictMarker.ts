@@ -9,6 +9,7 @@ import { SALESFORCE_EOL } from '../constant/metadataConstant.js'
 import { TEXT_TAG } from '../constant/parserConstant.js'
 import { conflicConfig } from '../types/conflictTypes.js'
 import type { JsonArray, JsonObject } from '../types/jsonTypes.js'
+import { ensureArray } from '../utils/mergeUtils.js'
 
 const buildMarker = (marker: string, size: number, tag: string): string => {
   return `${marker.repeat(size)} ${tag}`
@@ -42,16 +43,16 @@ export class ConflictMarker {
 
   public static addConflictMarkers(
     acc: JsonArray,
-    local: JsonObject | JsonArray,
-    ancestor: JsonObject | JsonArray,
-    other: JsonObject | JsonArray
+    local: JsonArray | JsonObject,
+    ancestor: JsonArray | JsonObject,
+    other: JsonArray | JsonObject
   ): void {
     ConflictMarker.hasConflict = true
     const [localValue, ancestorValue, otherValue] = [
       local,
       ancestor,
       other,
-    ].map(value => (isEmpty(value) ? getEmptyValue() : [value].flat()))
+    ].map(value => (isEmpty(value) ? getEmptyValue() : ensureArray(value)))
 
     acc.push(getMarkerValue(ConflictMarker.localMarker, true))
     acc.push(...localValue)

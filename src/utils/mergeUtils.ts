@@ -17,7 +17,7 @@ export const isObject = (
     if (isNil(ele) || typeof ele !== 'object') {
       return false
     }
-    return Array.isArray(ele) && ele.every(item => typeof item === 'object')
+    return !Array.isArray(ele) || ele.every(item => typeof item === 'object')
   })
 
 export const ensureArray = (value: JsonValue): JsonArray =>

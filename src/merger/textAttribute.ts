@@ -1,8 +1,9 @@
 import { deepEqual } from 'fast-equals'
-import { castArray, isNil } from 'lodash-es'
+import { isNil } from 'lodash-es'
 import { TEXT_TAG } from '../constant/parserConstant.js'
 import type { JsonArray, JsonValue } from '../types/jsonTypes.js'
 import { getScenario, MergeScenario } from '../types/mergeScenario.js'
+import { ensureArray } from '../utils/mergeUtils.js'
 import { ConflictMarker } from './conflictMarker.js'
 
 export const generateObj = (
@@ -11,7 +12,7 @@ export const generateObj = (
 ): JsonArray => {
   return isNil(value)
     ? []
-    : castArray(value).map(v => ({ [attrib]: [{ [TEXT_TAG]: v }] }))
+    : ensureArray(value).map(v => ({ [attrib]: [{ [TEXT_TAG]: v }] }))
 }
 
 export const mergeTextAttribute = (
@@ -32,7 +33,7 @@ export const mergeTextAttribute = (
     (scenario === MergeScenario.LOCAL_AND_OTHER ||
       scenario === MergeScenario.ALL)
   ) {
-    return castArray(objlocal)
+    return objlocal
   }
 
   // Handle specific merge scenarios
