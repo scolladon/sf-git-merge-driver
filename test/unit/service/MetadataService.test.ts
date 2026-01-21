@@ -296,6 +296,13 @@ describe('MetadataService', () => {
           testObject: { name: 'TestScontrol' },
           expected: 'TestScontrol',
         },
+        // Package.xml (manifest file) extractors
+        {
+          name: 'handles types with name (for package.xml)',
+          metadataType: 'types',
+          testObject: { name: 'ApexClass', members: ['MyClass'] },
+          expected: 'ApexClass',
+        },
 
         // Complex extractors
         {
@@ -570,18 +577,17 @@ describe('MetadataService', () => {
         },
       ]
 
-      test.each(testCases)('$name', ({
-        metadataType,
-        testObject,
-        expected,
-      }) => {
-        // Act
-        const extractor = MetadataService.getKeyFieldExtractor(metadataType)
+      test.each(testCases)(
+        '$name',
+        ({ metadataType, testObject, expected }) => {
+          // Act
+          const extractor = MetadataService.getKeyFieldExtractor(metadataType)
 
-        // Assert
-        expect(extractor).toBeDefined()
-        expect(extractor!(testObject as unknown as JsonValue)).toBe(expected)
-      })
+          // Assert
+          expect(extractor).toBeDefined()
+          expect(extractor!(testObject as unknown as JsonValue)).toBe(expected)
+        }
+      )
     })
 
     describe('given a metadata type not in the extractors', () => {

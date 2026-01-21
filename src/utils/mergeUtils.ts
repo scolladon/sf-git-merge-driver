@@ -13,10 +13,31 @@ export const isObject = (
   local: JsonValue | undefined | null,
   other: JsonValue | undefined | null
 ): boolean =>
-  typeof [ancestor, other, local].find(ele => !isNil(ele)) === 'object'
+  // typeof [ancestor, other, local].find(ele => !isNil(ele)) === 'object'
+  [ancestor, local, other].some(ele => !isNil(ele) && typeof ele === 'object')
+
+export const isStringArray = (
+  ancestor: JsonValue | undefined | null,
+  local: JsonValue | undefined | null,
+  other: JsonValue | undefined | null
+): boolean =>
+  // typeof [ancestor, other, local].find(ele => !isNil(ele)) === 'object'
+  [ancestor, local, other].some(
+    ele =>
+      !isNil(ele) &&
+      Array.isArray(ele) &&
+      ele.every(item => typeof item === 'string' || item instanceof String)
+  )
 
 export const ensureArray = (value: JsonValue): JsonArray =>
   isNil(value) ? [] : (castArray(value) as JsonArray)
+
+export const ensureStringArray = (value: JsonArray): JsonArray =>
+  isNil(value)
+    ? ['']
+    : typeof value === 'string' || value instanceof String
+      ? [value]
+      : value
 
 export const getUniqueSortedProps = (
   ...objects: (JsonObject | JsonArray)[]

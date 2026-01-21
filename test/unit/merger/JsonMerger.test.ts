@@ -1494,4 +1494,333 @@ describe('JsonMerger', () => {
       expect(result.hasConflict).toBe(false)
     })
   })
+
+  describe('Package.xml version merging', () => {
+    it('should generate conflict markers when both sides change version to different values', () => {
+      // Arrange
+      const ancestor: JsonValue = {
+        Package: {
+          version: '59.0',
+        },
+      }
+
+      const local: JsonValue = {
+        Package: {
+          version: '60.0',
+        },
+      }
+
+      const other: JsonValue = {
+        Package: {
+          version: '61.0',
+        },
+      }
+
+      // Act
+      const result = sut.mergeThreeWay(ancestor, local, other)
+
+      // Assert
+      expect(result.output).toEqual([
+        {
+          Package: [
+            { '#text': SALESFORCE_EOL + '<<<<<<< LOCAL' },
+            {
+              version: [{ '#text': '60.0' }],
+            },
+            { '#text': '||||||| BASE' },
+            {
+              version: [{ '#text': '59.0' }],
+            },
+            { '#text': '=======' },
+            {
+              version: [{ '#text': '61.0' }],
+            },
+            { '#text': '>>>>>>> REMOTE' },
+          ],
+        },
+      ])
+      expect(result.hasConflict).toBe(true)
+    })
+
+    it('should use the changed version when only one side changes it', () => {
+      // Arrange
+      const ancestor: JsonValue = {
+        Package: {
+          version: '59.0',
+        },
+      }
+
+      const local: JsonValue = {
+        Package: {
+          version: '59.0',
+        },
+      }
+
+      const other: JsonValue = {
+        Package: {
+          version: '60.0',
+        },
+      }
+
+      // Act
+      const result = sut.mergeThreeWay(ancestor, local, other)
+
+      // Assert
+      expect(result.output).toEqual([
+        {
+          Package: [
+            {
+              version: [{ '#text': '60.0' }],
+            },
+          ],
+        },
+      ])
+      expect(result.hasConflict).toBe(false)
+    })
+
+    it('should preserve version when both sides have the same version', () => {
+      // Arrange
+      const ancestor: JsonValue = {
+        Package: {
+          version: '59.0',
+        },
+      }
+
+      const local: JsonValue = {
+        Package: {
+          version: '60.0',
+        },
+      }
+
+      const other: JsonValue = {
+        Package: {
+          version: '60.0',
+        },
+      }
+
+      // Act
+      const result = sut.mergeThreeWay(ancestor, local, other)
+
+      // Assert
+      expect(result.output).toEqual([
+        {
+          Package: [
+            {
+              version: [{ '#text': '60.0' }],
+            },
+          ],
+        },
+      ])
+      expect(result.hasConflict).toBe(false)
+    })
+  })
+
+  describe('Package.xml members merging', () => {
+    it('should merge members from both sides when adding different members to same type', () => {
+      // Arrange - simulates the scenario from the issue
+      const ancestor: JsonValue = {
+        Package: {
+          types: [
+            { members: 'ServiceClass', name: 'ApexTrigger' },
+            { members: 'AccountTrigger', name: 'ApexClass' },
+          ],
+          version: '63.0',
+        },
+      }
+
+      const local: JsonValue = {
+        Package: {
+          types: [
+            {
+              members: ['ServiceClass', 'SelectorClass'],
+              name: 'ApexTrigger',
+            },
+            {
+              members: ['AccountTrigger', 'OpportunityTrigger'],
+              name: 'ApexClass',
+            },
+            { members: 'AccountPage', name: 'ApexPage' },
+          ],
+          version: '64.0',
+        },
+      }
+
+      const other: JsonValue = {
+        Package: {
+          types: [
+            {
+              members: ['ServiceClass', 'ServiceClass2'],
+              name: 'ApexTrigger',
+            },
+            {
+              members: ['AccountTrigger', 'OpportunityTrigger'],
+              name: 'ApexClass',
+            },
+          ],
+          version: '65.0',
+        },
+      }
+
+      // Act
+      const result = sut.mergeThreeWay(ancestor, local, other)
+
+      // Assert - ApexClass should have merged members without conflict
+      // ApexTrigger should have ServiceClass, SelectorClass (from local), and ServiceClass2 (from other)
+      // ApexPage should be included (added in local only)
+      // Version should have a conflict (64.0 vs 65.0)
+      expect(result.hasConflict).toBe(true) // Only because of version conflict
+
+      // Verify the structure contains the expected types
+      const packageContent = result.output[0] as { Package: JsonValue[] }
+      expect(packageContent).toHaveProperty('Package')
+
+      // Find the types in the output
+      const types = (packageContent.Package as JsonValue[]).filter(
+        (item: JsonValue) =>
+          typeof item === 'object' && item !== null && 'types' in item
+      )
+
+      // Should have ApexClass, ApexPage, and ApexTrigger types
+      expect(types.length).toBeGreaterThanOrEqual(3)
+    })
+
+    it('should merge members arrays correctly when both sides add different members', () => {
+      // Arrange - simplified case focusing on members array merging
+      const ancestor: JsonValue = {
+        Package: {
+          types: { members: 'ServiceClass', name: 'ApexTrigger' },
+        },
+      }
+
+      const local: JsonValue = {
+        Package: {
+          types: {
+            members: ['ServiceClass', 'SelectorClass'],
+            name: 'ApexTrigger',
+          },
+        },
+      }
+
+      const other: JsonValue = {
+        Package: {
+          types: {
+            members: ['ServiceClass', 'ServiceClass2'],
+            name: 'ApexTrigger',
+          },
+        },
+      }
+
+      // Act
+      const result = sut.mergeThreeWay(ancestor, local, other)
+
+      // Assert - should include all three members: ServiceClass, SelectorClass, ServiceClass2
+      expect(result.hasConflict).toBe(false)
+      expect(result.output).toEqual([
+        {
+          Package: [
+            {
+              types: [
+                { members: ['SelectorClass', 'ServiceClass', 'ServiceClass2'] },
+                { name: [{ '#text': 'ApexTrigger' }] },
+              ],
+            },
+          ],
+        },
+      ])
+    })
+
+    it('should handle member deletion correctly when removed in one branch', () => {
+      // Arrange
+      const ancestor: JsonValue = {
+        Package: {
+          types: {
+            members: ['ServiceClass', 'OldClass'],
+            name: 'ApexTrigger',
+          },
+        },
+      }
+
+      const local: JsonValue = {
+        Package: {
+          types: {
+            members: ['ServiceClass', 'OldClass', 'NewLocalClass'],
+            name: 'ApexTrigger',
+          },
+        },
+      }
+
+      const other: JsonValue = {
+        Package: {
+          types: {
+            // OldClass removed, ServiceClass kept
+            members: 'ServiceClass',
+            name: 'ApexTrigger',
+          },
+        },
+      }
+
+      // Act
+      const result = sut.mergeThreeWay(ancestor, local, other)
+
+      // Assert - OldClass should be removed (deleted in other), NewLocalClass should be added
+      expect(result.hasConflict).toBe(false)
+      expect(result.output).toEqual([
+        {
+          Package: [
+            {
+              types: [
+                { members: ['NewLocalClass', 'ServiceClass'] },
+                { name: [{ '#text': 'ApexTrigger' }] },
+              ],
+            },
+          ],
+        },
+      ])
+    })
+
+    it('should handle single member to array member conversion', () => {
+      // Arrange
+      const ancestor: JsonValue = {
+        Package: {
+          types: { members: 'OnlyMember', name: 'ApexClass' },
+        },
+      }
+
+      const local: JsonValue = {
+        Package: {
+          types: {
+            members: ['OnlyMember', 'LocalMember'],
+            name: 'ApexClass',
+          },
+        },
+      }
+
+      const other: JsonValue = {
+        Package: {
+          types: {
+            members: ['OnlyMember', 'RemoteMember'],
+            name: 'ApexClass',
+          },
+        },
+      }
+
+      // Act
+      const result = sut.mergeThreeWay(ancestor, local, other)
+
+      // Assert - should have all three members
+      expect(result.hasConflict).toBe(false)
+      expect(result.output).toEqual([
+        {
+          Package: [
+            {
+              types: [
+                { members: ['LocalMember', 'OnlyMember', 'RemoteMember'] },
+                { name: [{ '#text': 'ApexClass' }] },
+              ],
+            },
+          ],
+        },
+      ])
+    })
+  })
 })

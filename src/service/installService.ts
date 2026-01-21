@@ -1,7 +1,10 @@
 import { appendFile } from 'node:fs/promises'
 import { simpleGit } from 'simple-git'
 import { DRIVER_NAME, RUN_PLUGIN_COMMAND } from '../constant/driverConstant.js'
-import { METADATA_TYPES_PATTERNS } from '../constant/metadataConstant.js'
+import {
+  MANIFEST_PATTERNS,
+  METADATA_TYPES_PATTERNS,
+} from '../constant/metadataConstant.js'
 import { getGitAttributesPath } from '../utils/gitUtils.js'
 import { log } from '../utils/LoggingDecorator.js'
 
@@ -19,10 +22,16 @@ export class InstallService {
     )
 
     // Configure merge driver for each metadata type pattern
-    const patterns = METADATA_TYPES_PATTERNS.map(
+    const metadataPatterns = METADATA_TYPES_PATTERNS.map(
       pattern => `*.${pattern}-meta.xml merge=${DRIVER_NAME}`
     ).join('\n')
-    const content = `${patterns}\n`
+
+    // Configure merge driver for manifest files (package.xml, destructiveChanges.xml, etc.)
+    const manifestPatterns = MANIFEST_PATTERNS.map(
+      pattern => `${pattern} merge=${DRIVER_NAME}`
+    ).join('\n')
+
+    const content = `${metadataPatterns}\n${manifestPatterns}\n`
 
     const gitAttributesPath = await getGitAttributesPath()
 
