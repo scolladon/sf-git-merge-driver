@@ -7,8 +7,10 @@ import { getScenario, MergeScenario } from '../types/mergeScenario.js'
 import { log } from '../utils/LoggingDecorator.js'
 import {
   ensureArray,
+  ensureStringArray,
   getUniqueSortedProps,
   isObject,
+  isStringArray,
 } from '../utils/mergeUtils.js'
 import { ConflictMarker } from './conflictMarker.js'
 import { generateObj, mergeTextAttribute } from './textAttribute.js'
@@ -74,7 +76,14 @@ function merge(
     const localOfKey = local[key]
     const otherOfKey = other[key]
 
-    if (isObject(ancestorOfKey, localOfKey, otherOfKey)) {
+    if (isStringArray(ancestorOfKey, localOfKey, otherOfKey)) {
+      const [ancestorkey, ourkey, theirkey] = [
+        ancestorOfKey,
+        localOfKey,
+        otherOfKey,
+      ].map(ensureStringArray)
+      values = mergeTextArrays(ancestorkey, ourkey, theirkey, key)
+    } else if (isObject(ancestorOfKey, localOfKey, otherOfKey)) {
       const [ancestorkey, ourkey, theirkey] = [
         ancestorOfKey,
         localOfKey,
@@ -188,6 +197,38 @@ const mergeArrays = (
     keyBy(arr, keyField)
   )
   return mergeByKeyField(keyedAnc, keyedlocal, keyedother, attribute)
+}
+
+const mergeTextArrays = (
+  ancestor: JsonArray,
+  local: JsonArray,
+  other: JsonArray,
+  attribute: string
+): JsonArray => {
+  const acc: JsonArray = []
+  const removedInLocal = supprimerElements(ancestor, local)
+  const remonvedInOther = supprimerElements(ancestor, other)
+  const obj = {}
+  obj[attribute] = supprimerElements(
+    supprimerElements(
+      [...new Set([...ancestor, ...local, ...other])],
+      remonvedInOther
+    ),
+    removedInLocal
+  ).sort()
+
+  if (!isEmpty(obj)) {
+    acc.push(obj)
+  }
+  return acc
+}
+
+const supprimerElements = (
+  listeSource: JsonArray,
+  listeASupprimer: JsonArray
+): JsonArray => {
+  const exclusionSet = new Set(listeASupprimer)
+  return listeSource.filter(item => !exclusionSet.has(item))
 }
 
 const mergeByKeyField = (
