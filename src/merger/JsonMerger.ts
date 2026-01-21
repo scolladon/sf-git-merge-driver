@@ -7,7 +7,6 @@ import { getScenario, MergeScenario } from '../types/mergeScenario.js'
 import { log } from '../utils/LoggingDecorator.js'
 import {
   ensureArray,
-  ensureStringArray,
   getUniqueSortedProps,
   isObject,
   isStringArray,
@@ -76,19 +75,14 @@ function merge(
     const localOfKey = local[key]
     const otherOfKey = other[key]
 
+    const [ancestorkey, ourkey, theirkey] = [
+      ancestorOfKey,
+      localOfKey,
+      otherOfKey,
+    ].map(ensureArray)
     if (isStringArray(ancestorOfKey, localOfKey, otherOfKey)) {
-      const [ancestorkey, ourkey, theirkey] = [
-        ancestorOfKey,
-        localOfKey,
-        otherOfKey,
-      ].map(ensureStringArray)
       values = mergeTextArrays(ancestorkey, ourkey, theirkey, key)
     } else if (isObject(ancestorOfKey, localOfKey, otherOfKey)) {
-      const [ancestorkey, ourkey, theirkey] = [
-        ancestorOfKey,
-        localOfKey,
-        otherOfKey,
-      ].map(ensureArray)
       values = mergeArrays(ancestorkey, ourkey, theirkey, key)
     } else {
       values = mergeTextAttribute(ancestorOfKey, localOfKey, otherOfKey, key)
@@ -205,32 +199,21 @@ const mergeTextArrays = (
   other: JsonArray,
   attribute: string
 ): JsonArray => {
-  const acc: JsonArray = []
-  const removedInLocal = supprimerElements(ancestor, local)
-  const remonvedInOther = supprimerElements(ancestor, other)
-  const obj = {}
-  obj[attribute] = supprimerElements(
-    supprimerElements(
-      [...new Set([...ancestor, ...local, ...other])],
-      remonvedInOther
-    ),
-    removedInLocal
-  )
+  const localSet = new Set(local)
+  const otherSet = new Set(other)
+
+  // Simplest way to merge without removed elements
+  const removedInLocal = ancestor.filter(item => !localSet.has(item))
+  const removedInOther = ancestor.filter(item => !otherSet.has(item))
+  const removedSet = new Set([...removedInLocal, ...removedInOther])
+
+  const merged = [...new Set([...ancestor, ...local, ...other])]
+    .filter(item => !removedSet.has(item))
     .sort()
     .map(item => generateObj(item, attribute))
+  const obj: JsonArray = [{ [attribute]: merged }]
 
-  if (!isEmpty(obj)) {
-    acc.push(obj)
-  }
-  return acc
-}
-
-const supprimerElements = (
-  listeSource: JsonArray,
-  listeASupprimer: JsonArray
-): JsonArray => {
-  const exclusionSet = new Set(listeASupprimer)
-  return listeSource.filter(item => !exclusionSet.has(item))
+  return isEmpty(merged) ? [] : obj
 }
 
 const mergeByKeyField = (
