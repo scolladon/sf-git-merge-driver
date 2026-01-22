@@ -1,8 +1,6 @@
+import { NAMESPACE_PREFIX, NAMESPACE_ROOT } from '../constant/parserConstant.js'
 import type { JsonArray, JsonObject } from '../types/jsonTypes.js'
 import { log } from '../utils/LoggingDecorator.js'
-
-const NAMESPACE_PREFIX = '@_'
-const NAMESPACE_ROOT = ':@'
 
 export class NamespaceHandler {
   @log

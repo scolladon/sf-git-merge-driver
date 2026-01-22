@@ -1,12 +1,15 @@
 import { XMLBuilder, XMLParser } from 'fast-xml-parser'
+import {
+  CDATA_PROP_NAME,
+  XML_COMMENT_PROP_NAME,
+  XML_DECL,
+  XML_INDENT,
+} from '../constant/parserConstant.js'
 import { log } from '../utils/LoggingDecorator.js'
 import { JsonMerger } from './JsonMerger.js'
 
-const XML_DECL = '<?xml version="1.0" encoding="UTF-8"?>\n'
-const XML_COMMENT_PROP_NAME = '#xml__comment'
-
 const baseOptions = {
-  cdataPropName: '__cdata',
+  cdataPropName: CDATA_PROP_NAME,
   commentPropName: XML_COMMENT_PROP_NAME,
   ignoreAttributes: false,
   processEntities: false,
@@ -23,7 +26,7 @@ const parserOptions = {
 const builderOptions = {
   ...baseOptions,
   format: true,
-  indentBy: '    ',
+  indentBy: XML_INDENT,
   preserveOrder: true,
 }
 

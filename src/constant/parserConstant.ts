@@ -1,1 +1,7 @@
 export const TEXT_TAG = '#text'
+export const XML_DECL = '<?xml version="1.0" encoding="UTF-8"?>\n'
+export const XML_COMMENT_PROP_NAME = '#xml__comment'
+export const CDATA_PROP_NAME = '__cdata'
+export const XML_INDENT = '    '
+export const NAMESPACE_PREFIX = '@_'
+export const NAMESPACE_ROOT = ':@'
