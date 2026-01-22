@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/scolladon/sf-git-merge-driver/compare/v1.3.0...v1.4.0) (2026-01-22)
+
+
+### Features
+
+* support manifest (`package.xml` like) merge ([#155](https://github.com/scolladon/sf-git-merge-driver/issues/155)) ([1b26b65](https://github.com/scolladon/sf-git-merge-driver/commit/1b26b6538bedb3d56d13f10f6271feca2f6b4044))
+
 ## [1.3.0](https://github.com/scolladon/sf-git-merge-driver/compare/v1.2.2...v1.3.0) (2025-12-31)
 
 
