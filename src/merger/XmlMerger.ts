@@ -41,6 +41,18 @@ const handleSpecialEntities = (xml: string): string =>
     .replaceAll('&lt;&lt;&lt;&lt;&lt;&lt;&lt;', '<<<<<<<')
     .replaceAll('&gt;&gt;&gt;&gt;&gt;&gt;&gt;', '>>>>>>>')
 
+const pipe =
+  (...fns: ((xml: string) => string)[]) =>
+  (input: string): string =>
+    fns.reduce((acc, fn) => fn(acc), input)
+
+const formatXmlOutput = pipe(
+  (xml: string) => XML_DECL.concat(xml),
+  handleSpecialEntities,
+  correctComments,
+  correctConflictIndent
+)
+
 export class XmlMerger {
   @log
   mergeThreeWay(
@@ -62,11 +74,7 @@ export class XmlMerger {
     const builder = new XMLBuilder(builderOptions)
     const mergedXml: string = builder.build(mergedResult.output)
     return {
-      output: mergedXml.length
-        ? correctConflictIndent(
-            correctComments(XML_DECL.concat(handleSpecialEntities(mergedXml)))
-          )
-        : '',
+      output: mergedXml.length ? formatXmlOutput(mergedXml) : '',
       hasConflict: mergedResult.hasConflict,
     }
   }
