@@ -1,6 +1,6 @@
 {
   "name": "sf-git-merge-driver",
-  "description": "git remote add origin git@github.com:scolladon/sf-git-merge-driver.git",
+  "description": "Git merge driver for Salesforce metadata XML files - automatically resolves merge conflicts in profiles, permission sets, and 50+ metadata types",
   "version": "1.4.0",
   "exports": "./lib/driver/MergeDriver.js",
   "type": "module",
