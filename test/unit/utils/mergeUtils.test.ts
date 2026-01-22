@@ -4,6 +4,7 @@ import {
   ensureArray,
   getUniqueSortedProps,
   isObject,
+  isStringArray,
   normalizeEol,
 } from '../../../src/utils/mergeUtils.js'
 
@@ -39,6 +40,108 @@ describe('mergeUtils', () => {
       // Arrange
       // Act
       const result = isObject(undefined, undefined, null)
+
+      // Assert
+      expect(result).toBe(false)
+    })
+  })
+
+  describe('isStringArray', () => {
+    it('given one string array when isStringArray then returns true', () => {
+      // Arrange
+      const ancestor = null
+      const local = ['a', 'b']
+      const other = undefined
+
+      // Act
+      const result = isStringArray(ancestor, local, other)
+
+      // Assert
+      expect(result).toBe(true)
+    })
+
+    it('given string array with String objects when isStringArray then returns true', () => {
+      // Arrange
+      const ancestor = undefined
+      const local = [new String('a'), 'b'] as unknown as never
+      const other = null
+
+      // Act
+      const result = isStringArray(ancestor, local, other)
+
+      // Assert
+      expect(result).toBe(true)
+    })
+
+    it('given multiple string arrays when isStringArray then returns true', () => {
+      // Arrange
+      const ancestor = ['x']
+      const local = ['a', 'b']
+      const other = ['c']
+
+      // Act
+      const result = isStringArray(ancestor, local, other)
+
+      // Assert
+      expect(result).toBe(true)
+    })
+
+    it('given array with non-string elements when isStringArray then returns false', () => {
+      // Arrange
+      const ancestor = null
+      const local = ['a', 1]
+      const other = undefined
+
+      // Act
+      const result = isStringArray(ancestor, local, other)
+
+      // Assert
+      expect(result).toBe(false)
+    })
+
+    it('given array with objects when isStringArray then returns false', () => {
+      // Arrange
+      const ancestor = undefined
+      const local = ['a', { b: 1 }]
+      const other = null
+
+      // Act
+      const result = isStringArray(ancestor, local, other)
+
+      // Assert
+      expect(result).toBe(false)
+    })
+
+    it('given empty array when isStringArray then returns true', () => {
+      // Arrange
+      const ancestor = null
+      const local = [] as string[]
+      const other = undefined
+
+      // Act
+      const result = isStringArray(ancestor, local, other as never)
+
+      // Assert
+      expect(result).toBe(true)
+    })
+
+    it('given only non-array values when isStringArray then returns false', () => {
+      // Arrange
+      const ancestor = 'x'
+      const local = null
+      const other = 1
+
+      // Act
+      const result = isStringArray(ancestor, local, other)
+
+      // Assert
+      expect(result).toBe(false)
+    })
+
+    it('given all nil when isStringArray then returns false', () => {
+      // Arrange
+      // Act
+      const result = isStringArray(undefined, undefined, null)
 
       // Assert
       expect(result).toBe(false)
