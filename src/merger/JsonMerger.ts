@@ -9,6 +9,7 @@ import {
   ensureArray,
   getUniqueSortedProps,
   isObject,
+  isStringArray,
 } from '../utils/mergeUtils.js'
 import { ConflictMarker } from './conflictMarker.js'
 import { generateObj, mergeTextAttribute } from './textAttribute.js'
@@ -74,12 +75,14 @@ function merge(
     const localOfKey = local[key]
     const otherOfKey = other[key]
 
-    if (isObject(ancestorOfKey, localOfKey, otherOfKey)) {
-      const [ancestorkey, ourkey, theirkey] = [
-        ancestorOfKey,
-        localOfKey,
-        otherOfKey,
-      ].map(ensureArray)
+    const [ancestorkey, ourkey, theirkey] = [
+      ancestorOfKey,
+      localOfKey,
+      otherOfKey,
+    ].map(ensureArray)
+    if (isStringArray(ancestorOfKey, localOfKey, otherOfKey)) {
+      values = mergeTextArrays(ancestorkey, ourkey, theirkey, key)
+    } else if (isObject(ancestorOfKey, localOfKey, otherOfKey)) {
       values = mergeArrays(ancestorkey, ourkey, theirkey, key)
     } else {
       values = mergeTextAttribute(ancestorOfKey, localOfKey, otherOfKey, key)
@@ -188,6 +191,29 @@ const mergeArrays = (
     keyBy(arr, keyField)
   )
   return mergeByKeyField(keyedAnc, keyedlocal, keyedother, attribute)
+}
+
+const mergeTextArrays = (
+  ancestor: JsonArray,
+  local: JsonArray,
+  other: JsonArray,
+  attribute: string
+): JsonArray => {
+  const localSet = new Set(local)
+  const otherSet = new Set(other)
+
+  // Simplest way to merge without removed elements
+  const removedInLocal = ancestor.filter(item => !localSet.has(item))
+  const removedInOther = ancestor.filter(item => !otherSet.has(item))
+  const removedSet = new Set([...removedInLocal, ...removedInOther])
+
+  const merged = [...new Set([...ancestor, ...local, ...other])]
+    .filter(item => !removedSet.has(item))
+    .sort()
+    .map(item => generateObj(item, attribute))
+  const obj: JsonArray = [{ [attribute]: merged }]
+
+  return isEmpty(merged) ? [] : obj
 }
 
 const mergeByKeyField = (

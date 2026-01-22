@@ -296,6 +296,13 @@ describe('MetadataService', () => {
           testObject: { name: 'TestScontrol' },
           expected: 'TestScontrol',
         },
+        // Package.xml (manifest file) extractors
+        {
+          name: 'handles types with name (for package.xml)',
+          metadataType: 'types',
+          testObject: { name: 'ApexClass', members: ['MyClass'] },
+          expected: 'ApexClass',
+        },
 
         // Complex extractors
         {

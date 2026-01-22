@@ -165,20 +165,47 @@ git merge ...
 ## Commands
 
 <!-- commands -->
+* [`sf git merge driver disable`](#sf-git-merge-driver-disable)
+* [`sf git merge driver enable`](#sf-git-merge-driver-enable)
 * [`sf git merge driver install`](#sf-git-merge-driver-install)
 * [`sf git merge driver run`](#sf-git-merge-driver-run)
 * [`sf git merge driver uninstall`](#sf-git-merge-driver-uninstall)
 
-## `sf git merge driver install`
+## `sf git merge driver disable`
+
+Uninstalls the local git merge driver for the given org and branch.
+
+```
+USAGE
+  $ sf git merge driver disable [--json] [--flags-dir <value>]
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Uninstalls the local git merge driver for the given org and branch.
+
+  Uninstalls the local git merge driver for the given org and branch, by removing the merge driver content in the
+  `.git/info/attributes` files in the project, deleting the merge driver configuration from the `.git/config` of the
+  project, and removing the installed binary from the node_modules/.bin directory.
+
+ALIASES
+  $ sf git merge driver disable
+
+EXAMPLES
+  Uninstall the driver for a given project:
+
+    $ sf git merge driver disable
+```
+
+## `sf git merge driver enable`
 
 Installs a local git merge driver for the given org and branch.
 
 ```
 USAGE
-  $ sf git merge driver install [--json] [--flags-dir <value>]
-
-ALIASES
-  $ sf git merge driver enable
+  $ sf git merge driver enable [--json] [--flags-dir <value>]
 
 GLOBAL FLAGS
   --flags-dir=<value>  Import flag values from a directory.
@@ -191,13 +218,44 @@ DESCRIPTION
   project, creating a new merge driver configuration in the `.git/config` of the project, and installing the binary in
   the node_modules/.bin directory.
 
+ALIASES
+  $ sf git merge driver enable
+
+EXAMPLES
+  Install the driver for a given project:
+
+    $ sf git merge driver enable
+```
+
+## `sf git merge driver install`
+
+Installs a local git merge driver for the given org and branch.
+
+```
+USAGE
+  $ sf git merge driver install [--json] [--flags-dir <value>]
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Installs a local git merge driver for the given org and branch.
+
+  Installs a local git merge driver for the given org and branch, by updating the `.git/info/attributes` files in the
+  project, creating a new merge driver configuration in the `.git/config` of the project, and installing the binary in
+  the node_modules/.bin directory.
+
+ALIASES
+  $ sf git merge driver enable
+
 EXAMPLES
   Install the driver for a given project:
 
     $ sf git merge driver install
 ```
 
-_See code: [src/commands/git/merge/driver/install.ts](https://github.com/scolladon/sf-git-merge-driver/blob/main/src/commands/git/merge/driver/install.ts)_
+_See code: [src/commands/git/merge/driver/install.ts](https://github.com/scolladon/sf-git-merge-driver/blob/v1.3.0/src/commands/git/merge/driver/install.ts)_
 
 ## `sf git merge driver run`
 
@@ -241,7 +299,7 @@ EXAMPLES
   - output-file is the path to the file where the merged content will be written
 ```
 
-_See code: [src/commands/git/merge/driver/run.ts](https://github.com/scolladon/sf-git-merge-driver/blob/main/src/commands/git/merge/driver/run.ts)_
+_See code: [src/commands/git/merge/driver/run.ts](https://github.com/scolladon/sf-git-merge-driver/blob/v1.3.0/src/commands/git/merge/driver/run.ts)_
 
 ## `sf git merge driver uninstall`
 
@@ -250,9 +308,6 @@ Uninstalls the local git merge driver for the given org and branch.
 ```
 USAGE
   $ sf git merge driver uninstall [--json] [--flags-dir <value>]
-
-ALIASES
-  $ sf git merge driver disable
 
 GLOBAL FLAGS
   --flags-dir=<value>  Import flag values from a directory.
@@ -265,13 +320,16 @@ DESCRIPTION
   `.git/info/attributes` files in the project, deleting the merge driver configuration from the `.git/config` of the
   project, and removing the installed binary from the node_modules/.bin directory.
 
+ALIASES
+  $ sf git merge driver disable
+
 EXAMPLES
   Uninstall the driver for a given project:
 
     $ sf git merge driver uninstall
 ```
 
-_See code: [src/commands/git/merge/driver/uninstall.ts](https://github.com/scolladon/sf-git-merge-driver/blob/main/src/commands/git/merge/driver/uninstall.ts)_
+_See code: [src/commands/git/merge/driver/uninstall.ts](https://github.com/scolladon/sf-git-merge-driver/blob/v1.3.0/src/commands/git/merge/driver/uninstall.ts)_
 <!-- commandsstop -->
 ## Changelog
 
