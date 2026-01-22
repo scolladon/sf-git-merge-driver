@@ -4,10 +4,7 @@ import {
   DRIVER_NAME,
   RUN_PLUGIN_COMMAND,
 } from '../../../src/constant/driverConstant.js'
-import {
-  MANIFEST_PATTERNS,
-  METADATA_TYPES_PATTERNS,
-} from '../../../src/constant/metadataConstant.js'
+import { METADATA_TYPES_PATTERNS } from '../../../src/constant/metadataConstant.js'
 import { InstallService } from '../../../src/service/installService.js'
 import { getGitAttributesPath } from '../../../src/utils/gitUtils.js'
 
@@ -53,13 +50,10 @@ describe('InstallService', () => {
     expect(appendFileMocked).toHaveBeenCalledTimes(1)
 
     // Generate the expected content for .gitattributes
-    const expectedMetadataPatterns = METADATA_TYPES_PATTERNS.map(
+    const expectedPatterns = METADATA_TYPES_PATTERNS.map(
       pattern => `*.${pattern}-meta.xml merge=${DRIVER_NAME}`
     ).join('\n')
-    const expectedManifestPatterns = MANIFEST_PATTERNS.map(
-      pattern => `${pattern} merge=${DRIVER_NAME}`
-    ).join('\n')
-    const expectedContent = `${expectedMetadataPatterns}\n${expectedManifestPatterns}\n`
+    const expectedContent = `${expectedPatterns}\n`
 
     expect(appendFileMocked).toHaveBeenCalledWith(
       '.git/info/attributes',

@@ -13,12 +13,7 @@ export const isObject = (
   local: JsonValue | undefined | null,
   other: JsonValue | undefined | null
 ): boolean =>
-  [ancestor, local, other].some(ele => {
-    if (isNil(ele) || typeof ele !== 'object') {
-      return false
-    }
-    return !Array.isArray(ele) || ele.every(item => typeof item === 'object')
-  })
+  typeof [ancestor, other, local].find(ele => !isNil(ele)) === 'object'
 
 export const ensureArray = (value: JsonValue): JsonArray =>
   isNil(value) ? [] : (castArray(value) as JsonArray)

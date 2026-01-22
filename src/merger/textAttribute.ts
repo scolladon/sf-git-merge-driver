@@ -1,18 +1,15 @@
 import { deepEqual } from 'fast-equals'
 import { isNil } from 'lodash-es'
 import { TEXT_TAG } from '../constant/parserConstant.js'
-import type { JsonArray, JsonValue } from '../types/jsonTypes.js'
+import type { JsonArray, JsonObject, JsonValue } from '../types/jsonTypes.js'
 import { getScenario, MergeScenario } from '../types/mergeScenario.js'
-import { ensureArray } from '../utils/mergeUtils.js'
 import { ConflictMarker } from './conflictMarker.js'
 
 export const generateObj = (
   value: JsonValue | null,
   attrib: string
-): JsonArray => {
-  return isNil(value)
-    ? []
-    : ensureArray(value).map(v => ({ [attrib]: [{ [TEXT_TAG]: v }] }))
+): JsonObject => {
+  return isNil(value) ? {} : { [attrib]: [{ [TEXT_TAG]: value }] }
 }
 
 export const mergeTextAttribute = (
@@ -21,9 +18,9 @@ export const mergeTextAttribute = (
   other: JsonValue | null,
   attrib: string
 ): JsonArray => {
-  const objAnc: JsonArray = generateObj(ancestor, attrib)
-  const objlocal: JsonArray = generateObj(local, attrib)
-  const objother: JsonArray = generateObj(other, attrib)
+  const objAnc: JsonObject = generateObj(ancestor, attrib)
+  const objlocal: JsonObject = generateObj(local, attrib)
+  const objother: JsonObject = generateObj(other, attrib)
   const scenario: MergeScenario = getScenario(objAnc, objlocal, objother)
   const acc: JsonArray = []
 
@@ -33,17 +30,17 @@ export const mergeTextAttribute = (
     (scenario === MergeScenario.LOCAL_AND_OTHER ||
       scenario === MergeScenario.ALL)
   ) {
-    return objlocal
+    return [objlocal]
   }
 
   // Handle specific merge scenarios
   switch (scenario) {
     case MergeScenario.OTHER_ONLY:
-      acc.push(...objother)
+      acc.push(objother)
       break
 
     case MergeScenario.LOCAL_ONLY:
-      acc.push(...objlocal)
+      acc.push(objlocal)
       break
 
     case MergeScenario.LOCAL_AND_OTHER:
@@ -64,9 +61,9 @@ export const mergeTextAttribute = (
 
     case MergeScenario.ALL:
       if (ancestor === local) {
-        acc.push(...objother)
+        acc.push(objother)
       } else if (ancestor === other) {
-        acc.push(...objlocal)
+        acc.push(objlocal)
       } else {
         ConflictMarker.addConflictMarkers(acc, objlocal, objAnc, objother)
       }

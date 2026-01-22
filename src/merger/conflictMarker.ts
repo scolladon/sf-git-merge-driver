@@ -9,7 +9,6 @@ import { SALESFORCE_EOL } from '../constant/metadataConstant.js'
 import { TEXT_TAG } from '../constant/parserConstant.js'
 import { conflicConfig } from '../types/conflictTypes.js'
 import type { JsonArray, JsonObject } from '../types/jsonTypes.js'
-import { ensureArray } from '../utils/mergeUtils.js'
 
 const buildMarker = (marker: string, size: number, tag: string): string => {
   return `${marker.repeat(size)} ${tag}`
@@ -17,17 +16,6 @@ const buildMarker = (marker: string, size: number, tag: string): string => {
 
 const buildSeparator = (size: number): string => {
   return `${SEPARATOR.repeat(size)}`
-}
-
-const getEmptyValue = (): JsonArray => {
-  return [{ [TEXT_TAG]: SALESFORCE_EOL }]
-}
-
-const getMarkerValue = (
-  marker: string,
-  withEol: boolean = false
-): JsonObject => {
-  return { [TEXT_TAG]: `${withEol ? SALESFORCE_EOL : ''}${marker}` }
 }
 
 export class ConflictMarker {
@@ -43,24 +31,18 @@ export class ConflictMarker {
 
   public static addConflictMarkers(
     acc: JsonArray,
-    local: JsonArray | JsonObject,
-    ancestor: JsonArray | JsonObject,
-    other: JsonArray | JsonObject
+    local: JsonObject | JsonArray,
+    ancestor: JsonObject | JsonArray,
+    other: JsonObject | JsonArray
   ): void {
     ConflictMarker.hasConflict = true
-    const [localValue, ancestorValue, otherValue] = [
-      local,
-      ancestor,
-      other,
-    ].map(value => (isEmpty(value) ? getEmptyValue() : ensureArray(value)))
-
-    acc.push(getMarkerValue(ConflictMarker.localMarker, true))
-    acc.push(...localValue)
-    acc.push(getMarkerValue(ConflictMarker.baseMarker))
-    acc.push(...ancestorValue)
-    acc.push(getMarkerValue(ConflictMarker.separatorMarker))
-    acc.push(...otherValue)
-    acc.push(getMarkerValue(ConflictMarker.otherMarker))
+    acc.push({ [TEXT_TAG]: `${SALESFORCE_EOL}${ConflictMarker.localMarker}` })
+    acc.push(isEmpty(local) ? { [TEXT_TAG]: SALESFORCE_EOL } : local)
+    acc.push({ [TEXT_TAG]: ConflictMarker.baseMarker })
+    acc.push(isEmpty(ancestor) ? { [TEXT_TAG]: SALESFORCE_EOL } : ancestor)
+    acc.push({ [TEXT_TAG]: ConflictMarker.separatorMarker })
+    acc.push(isEmpty(other) ? { [TEXT_TAG]: SALESFORCE_EOL } : other)
+    acc.push({ [TEXT_TAG]: ConflictMarker.otherMarker })
   }
 
   public static setConflictConfig(conflictConfig: conflicConfig): void {
