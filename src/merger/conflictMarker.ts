@@ -18,6 +18,17 @@ const buildSeparator = (size: number): string => {
   return `${SEPARATOR.repeat(size)}`
 }
 
+const getEmptyValue = (): JsonObject => {
+  return { [TEXT_TAG]: SALESFORCE_EOL }
+}
+
+const getMarkerValue = (
+  marker: string,
+  withEol: boolean = false
+): JsonObject => {
+  return { [TEXT_TAG]: `${withEol ? SALESFORCE_EOL : ''}${marker}` }
+}
+
 export class ConflictMarker {
   private static hasConflict = false
   private static baseMarker: string
@@ -36,13 +47,19 @@ export class ConflictMarker {
     other: JsonObject | JsonArray
   ): void {
     ConflictMarker.hasConflict = true
-    acc.push({ [TEXT_TAG]: `${SALESFORCE_EOL}${ConflictMarker.localMarker}` })
-    acc.push(isEmpty(local) ? { [TEXT_TAG]: SALESFORCE_EOL } : local)
-    acc.push({ [TEXT_TAG]: ConflictMarker.baseMarker })
-    acc.push(isEmpty(ancestor) ? { [TEXT_TAG]: SALESFORCE_EOL } : ancestor)
-    acc.push({ [TEXT_TAG]: ConflictMarker.separatorMarker })
-    acc.push(isEmpty(other) ? { [TEXT_TAG]: SALESFORCE_EOL } : other)
-    acc.push({ [TEXT_TAG]: ConflictMarker.otherMarker })
+    const [localValue, ancestorValue, otherValue] = [
+      local,
+      ancestor,
+      other,
+    ].map(value => (isEmpty(value) ? getEmptyValue() : value))
+
+    acc.push(getMarkerValue(ConflictMarker.localMarker, true))
+    acc.push(localValue)
+    acc.push(getMarkerValue(ConflictMarker.baseMarker))
+    acc.push(ancestorValue)
+    acc.push(getMarkerValue(ConflictMarker.separatorMarker))
+    acc.push(otherValue)
+    acc.push(getMarkerValue(ConflictMarker.otherMarker))
   }
 
   public static setConflictConfig(conflictConfig: conflicConfig): void {
