@@ -18,7 +18,6 @@ const parserOptions = {
   numberParseOptions: { leadingZeros: false, hex: false },
   parseAttributeValue: false,
   parseTagValue: false,
-  // preserveOrder: true,
 }
 
 const builderOptions = {

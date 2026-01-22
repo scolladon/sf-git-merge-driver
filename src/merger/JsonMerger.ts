@@ -35,13 +35,13 @@ export class JsonMerger {
         case MergeScenario.ANCESTOR_ONLY:
           break
         case MergeScenario.LOCAL_AND_OTHER:
-          acc.push(handlelocalAndother(key, local, other))
+          acc.push(handleLocalAndOther(key, local, other))
           break
         case MergeScenario.ANCESTOR_AND_OTHER:
-          acc.push(handleAncestorAndother(key, ancestor, other))
+          acc.push(handleAncestorAndOther(key, ancestor, other))
           break
         case MergeScenario.ANCESTOR_AND_LOCAL:
-          acc.push(handleAncestorAndlocal(key, ancestor, local))
+          acc.push(handleAncestorAndLocal(key, ancestor, local))
           break
         default: {
           const obj = {
@@ -75,15 +75,15 @@ function merge(
     const localOfKey = local[key]
     const otherOfKey = other[key]
 
-    const [ancestorkey, ourkey, theirkey] = [
+    const [ancestorArr, localArr, otherArr] = [
       ancestorOfKey,
       localOfKey,
       otherOfKey,
     ].map(ensureArray)
     if (isStringArray(ancestorOfKey, localOfKey, otherOfKey)) {
-      values = mergeTextArrays(ancestorkey, ourkey, theirkey, key)
+      values = mergeTextArrays(ancestorArr, localArr, otherArr, key)
     } else if (isObject(ancestorOfKey, localOfKey, otherOfKey)) {
-      values = mergeArrays(ancestorkey, ourkey, theirkey, key)
+      values = mergeArrays(ancestorArr, localArr, otherArr, key)
     } else {
       values = mergeTextAttribute(ancestorOfKey, localOfKey, otherOfKey, key)
     }
@@ -114,7 +114,7 @@ function toJsonArray(inputObj: JsonObject | JsonArray): JsonArray {
   return acc.flat()
 }
 
-const handlelocalAndother = (
+const handleLocalAndOther = (
   key: string,
   local: JsonObject | JsonArray,
   other: JsonObject | JsonArray
@@ -128,7 +128,7 @@ const handlelocalAndother = (
   return acc
 }
 
-const handleAncestorAndother = (
+const handleAncestorAndOther = (
   key: string,
   ancestor: JsonObject | JsonArray,
   other: JsonObject | JsonArray
@@ -146,7 +146,7 @@ const handleAncestorAndother = (
   return acc
 }
 
-const handleAncestorAndlocal = (
+const handleAncestorAndLocal = (
   key: string,
   ancestor: JsonObject | JsonArray,
   local: JsonObject | JsonArray
@@ -172,11 +172,7 @@ const mergeArrays = (
 ): JsonArray => {
   const keyField = MetadataService.getKeyFieldExtractor(attribute)
   if (!keyField) {
-    // const scenario: MergeScenario = getScenario(ancestor, local, other)
     const arr: JsonArray = []
-    // obj[attribute] = unionWith(local, other, deepEqual)
-    // obj[attribute] = mergeTextAttribute(local, other, deepEqual, attribute)
-    // obj[attribute] = []
     ConflictMarker.addConflictMarkers(
       arr,
       toJsonArray({ [attribute]: local }),
@@ -184,13 +180,12 @@ const mergeArrays = (
       toJsonArray({ [attribute]: other })
     )
     return arr.flat()
-    // return mergeTextAttribute(ancestor, local, other, attribute).flat()
   }
 
-  const [keyedAnc, keyedlocal, keyedother] = [ancestor, local, other].map(arr =>
-    keyBy(arr, keyField)
+  const [keyedAncestor, keyedLocal, keyedOther] = [ancestor, local, other].map(
+    arr => keyBy(arr, keyField)
   )
-  return mergeByKeyField(keyedAnc, keyedlocal, keyedother, attribute)
+  return mergeByKeyField(keyedAncestor, keyedLocal, keyedOther, attribute)
 }
 
 const mergeTextArrays = (

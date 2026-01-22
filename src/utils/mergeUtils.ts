@@ -13,7 +13,6 @@ export const isObject = (
   local: JsonValue | undefined | null,
   other: JsonValue | undefined | null
 ): boolean =>
-  // typeof [ancestor, other, local].find(ele => !isNil(ele)) === 'object'
   [ancestor, local, other].some(ele => !isNil(ele) && typeof ele === 'object')
 
 export const isStringArray = (
@@ -21,7 +20,6 @@ export const isStringArray = (
   local: JsonValue | undefined | null,
   other: JsonValue | undefined | null
 ): boolean =>
-  // typeof [ancestor, other, local].find(ele => !isNil(ele)) === 'object'
   [ancestor, local, other].some(
     ele =>
       !isNil(ele) &&
