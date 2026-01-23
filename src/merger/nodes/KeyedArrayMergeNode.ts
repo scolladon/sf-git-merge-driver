@@ -72,6 +72,7 @@ export class KeyedArrayMergeNode implements MergeNode {
         this.attribute
       )
 
+      // istanbul ignore else -- defensive: all current conflict strategies return non-empty output
       if (result.output.length > 0) {
         results.push({
           output: [{ [this.attribute]: result.output }],
