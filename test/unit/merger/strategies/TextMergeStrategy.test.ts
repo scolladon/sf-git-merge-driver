@@ -112,11 +112,41 @@ describe('TextMergeStrategy', () => {
       const objOther = { field: [{ [TEXT_TAG]: 'otherValue' }] }
 
       // Act
-      const result = strategy.handle(defaultConfig, {}, objLocal, objOther)
+      const result = strategy.handle(
+        defaultConfig,
+        {},
+        objLocal,
+        objOther,
+        null,
+        'localValue',
+        'otherValue'
+      )
 
       // Assert
       expect(result.hasConflict).toBe(true)
       expect(result.output).toHaveLength(7) // conflict markers structure
+    })
+
+    it('should return no conflict when local and other are equal', () => {
+      // Arrange
+      const strategy = new LocalAndOtherStrategy()
+      const objLocal = { field: [{ [TEXT_TAG]: 'sameValue' }] }
+      const objOther = { field: [{ [TEXT_TAG]: 'sameValue' }] }
+
+      // Act
+      const result = strategy.handle(
+        defaultConfig,
+        {},
+        objLocal,
+        objOther,
+        null,
+        'sameValue',
+        'sameValue'
+      )
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      expect(result.output).toEqual([objLocal])
     })
   })
 

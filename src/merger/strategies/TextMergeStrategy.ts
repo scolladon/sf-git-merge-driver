@@ -43,8 +43,15 @@ export class LocalAndOtherStrategy implements TextMergeStrategy {
     config: MergeConfig,
     _objAncestor: JsonObject,
     objLocal: JsonObject,
-    objOther: JsonObject
+    objOther: JsonObject,
+    _ancestor: unknown,
+    local: unknown,
+    other: unknown
   ): MergeResult {
+    // If both sides added the same value, no conflict
+    if (local === other) {
+      return noConflict([objLocal])
+    }
     return withConflict(buildConflictMarkers(config, objLocal, {}, objOther))
   }
 }
@@ -96,12 +103,19 @@ export class AllPresentStrategy implements TextMergeStrategy {
     local: unknown,
     other: unknown
   ): MergeResult {
+    // No change in local - take other's value
     if (ancestor === local) {
       return noConflict([objOther])
     }
+    // No change in other - take local's value
     if (ancestor === other) {
       return noConflict([objLocal])
     }
+    // Both changed to same value - no conflict
+    if (local === other) {
+      return noConflict([objLocal])
+    }
+    // Real conflict - build markers
     return withConflict(
       buildConflictMarkers(config, objLocal, objAncestor, objOther)
     )
