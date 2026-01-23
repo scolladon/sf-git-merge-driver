@@ -10,6 +10,13 @@ const generateObj = (value: JsonValue | null, attrib: string): JsonObject => {
   return isNil(value) ? {} : { [attrib]: [{ [TEXT_TAG]: value }] }
 }
 
+// Comparator for sorting - handles null/undefined by converting to string
+const compareItems = (a: JsonValue, b: JsonValue): number => {
+  const strA = String(a)
+  const strB = String(b)
+  return strA < strB ? -1 : strA > strB ? 1 : 0
+}
+
 export class TextArrayMergeNode implements MergeNode {
   constructor(
     private readonly ancestor: JsonArray,
@@ -19,21 +26,47 @@ export class TextArrayMergeNode implements MergeNode {
   ) {}
 
   merge(_config: MergeConfig): MergeResult {
+    const ancestorSet = new Set(this.ancestor)
     const localSet = new Set(this.local)
     const otherSet = new Set(this.other)
 
-    // Find elements removed in each branch
-    const removedInLocal = this.ancestor.filter(item => !localSet.has(item))
-    const removedInOther = this.ancestor.filter(item => !otherSet.has(item))
-    const removedSet = new Set([...removedInLocal, ...removedInOther])
+    // Single pass: collect items that should be in result
+    // An item is included if:
+    // - It exists in local or other (union)
+    // - AND it wasn't removed (existed in ancestor but not in local/other)
+    const resultItems: JsonValue[] = []
+    const seen = new Set<JsonValue>()
 
-    // Merge: union of all, minus removed elements, sorted
-    const merged = [
-      ...new Set([...this.ancestor, ...this.local, ...this.other]),
-    ]
-      .filter(item => !removedSet.has(item))
-      .sort()
-      .map(item => generateObj(item, this.attribute))
+    for (const item of this.ancestor) {
+      if (seen.has(item)) continue
+      seen.add(item)
+      // Keep if present in both local and other (not removed by either)
+      if (localSet.has(item) && otherSet.has(item)) {
+        resultItems.push(item)
+      }
+    }
+
+    for (const item of this.local) {
+      if (seen.has(item)) continue
+      seen.add(item)
+      // New item added in local (not in ancestor)
+      if (!ancestorSet.has(item)) {
+        resultItems.push(item)
+      }
+    }
+
+    for (const item of this.other) {
+      if (seen.has(item)) continue
+      seen.add(item)
+      // New item added in other (not in ancestor)
+      if (!ancestorSet.has(item)) {
+        resultItems.push(item)
+      }
+    }
+
+    // Sort and transform in single pass using reduce
+    resultItems.sort(compareItems)
+    const merged = resultItems.map(item => generateObj(item, this.attribute))
 
     return noConflict(merged)
   }
