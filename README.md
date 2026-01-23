@@ -62,6 +62,8 @@ This approach helps you understand:
 
 ## Installation (30 seconds)
 
+### With Salesforce CLI
+
 ```bash
 # Install plugin (one time, global)
 sf plugins install sf-git-merge-driver
@@ -70,6 +72,12 @@ sf plugins install sf-git-merge-driver
 cd my/sf/project
 sf git merge driver install
 ```
+
+### Integration in VsCode SFDX-Hardis
+
+[SFDX-Hardis VS Code extension](https://marketplace.visualstudio.com/items?itemName=NicolasVuillamy.vscode-sfdx-hardis) has integrated the sf-git-merge-driver in its default dependencies, and offers a one click activation of the merge driver from the status bar, as shown below:
+
+![VsCode SFDX-Hardis integration](./docs/media/activate-merge-driver-in-sfdx-hardis.gif)
 
 ## Usage
 
@@ -308,6 +316,172 @@ FLAGS
   -S, --ancestor-conflict-tag=<value>  [default: base] string used to tag ancestor version in conflicts
   -X, --local-conflict-tag=<value>     [default: ours] string used to tag local version in conflicts
   -Y, --other-conflict-tag=<value>     [default: theirs] string used to tag other version in conflicts
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Runs the merge driver for the specified files.
+
+  Runs the merge driver for the specified files, handling the merge conflict resolution using Salesforce-specific merge
+  strategies. This command is typically called automatically by Git when a merge conflict is detected.
+
+EXAMPLES
+  Run the merge driver for conflicting files:
+
+    $ sf git merge driver run --ancestor-file=<value> --local-file=<value> --other-file=<value> ^
+      --output-file=<value>
+
+  Where:
+  - ancestor-file is the path to the common ancestor version of the file
+  - local-file is the path to our version of the file
+  - other-file is the path to their version of the file
+  - output-file is the path to the file where the merged content will be written
+```
+
+_See code: [src/commands/git/merge/driver/run.ts](https://github.com/scolladon/sf-git-merge-driver/blob/v1.3.0/src/commands/git/merge/driver/run.ts)_
+
+## `sf git merge driver uninstall`
+
+Uninstalls the local git merge driver for the given org and branch.
+
+```
+USAGE
+  $ sf git merge driver uninstall [--json] [--flags-dir <value>]
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Uninstalls the local git merge driver for the given org and branch.
+
+  Uninstalls the local git merge driver for the given org and branch, by removing the merge driver content in the
+  `.git/info/attributes` files in the project, deleting the merge driver configuration from the `.git/config` of the
+  project, and removing the installed binary from the node_modules/.bin directory.
+
+ALIASES
+  $ sf git merge driver disable
+
+EXAMPLES
+  Uninstall the driver for a given project:
+
+    $ sf git merge driver uninstall
+```
+
+_See code: [src/commands/git/merge/driver/uninstall.ts](https://github.com/scolladon/sf-git-merge-driver/blob/v1.3.0/src/commands/git/merge/driver/uninstall.ts)_
+<!-- commandsstop -->
+* [`sf git merge driver disable`](#sf-git-merge-driver-disable)
+* [`sf git merge driver enable`](#sf-git-merge-driver-enable)
+* [`sf git merge driver install`](#sf-git-merge-driver-install)
+* [`sf git merge driver run`](#sf-git-merge-driver-run)
+* [`sf git merge driver uninstall`](#sf-git-merge-driver-uninstall)
+
+## `sf git merge driver disable`
+
+Uninstalls the local git merge driver for the given org and branch.
+
+```
+USAGE
+  $ sf git merge driver disable [--json] [--flags-dir <value>]
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Uninstalls the local git merge driver for the given org and branch.
+
+  Uninstalls the local git merge driver for the given org and branch, by removing the merge driver content in the
+  `.git/info/attributes` files in the project, deleting the merge driver configuration from the `.git/config` of the
+  project, and removing the installed binary from the node_modules/.bin directory.
+
+ALIASES
+  $ sf git merge driver disable
+
+EXAMPLES
+  Uninstall the driver for a given project:
+
+    $ sf git merge driver disable
+```
+
+## `sf git merge driver enable`
+
+Installs a local git merge driver for the given org and branch.
+
+```
+USAGE
+  $ sf git merge driver enable [--json] [--flags-dir <value>]
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Installs a local git merge driver for the given org and branch.
+
+  Installs a local git merge driver for the given org and branch, by updating the `.git/info/attributes` files in the
+  project, creating a new merge driver configuration in the `.git/config` of the project, and installing the binary in
+  the node_modules/.bin directory.
+
+ALIASES
+  $ sf git merge driver enable
+
+EXAMPLES
+  Install the driver for a given project:
+
+    $ sf git merge driver enable
+```
+
+## `sf git merge driver install`
+
+Installs a local git merge driver for the given org and branch.
+
+```
+USAGE
+  $ sf git merge driver install [--json] [--flags-dir <value>]
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Installs a local git merge driver for the given org and branch.
+
+  Installs a local git merge driver for the given org and branch, by updating the `.git/info/attributes` files in the
+  project, creating a new merge driver configuration in the `.git/config` of the project, and installing the binary in
+  the node_modules/.bin directory.
+
+ALIASES
+  $ sf git merge driver enable
+
+EXAMPLES
+  Install the driver for a given project:
+
+    $ sf git merge driver install
+```
+
+_See code: [src/commands/git/merge/driver/install.ts](https://github.com/scolladon/sf-git-merge-driver/blob/v1.3.0/src/commands/git/merge/driver/install.ts)_
+
+## `sf git merge driver run`
+
+Runs the merge driver for the specified files.
+
+```
+USAGE
+  $ sf git merge driver run -O <value> -A <value> -B <value> -P <value> [--json] [--flags-dir <value>] [-L <value>] [-S
+    <value>] [-X <value>] [-Y <value>]
+
+FLAGS
+  -A, --local-file=<value>             (required) path to our version of the file
+  -B, --other-file=<value>             (required) path to their version of the file
+  -L, --conflict-marker-size=<value>   [default: 7] number of characters to show for conflict markers
+  -O, --ancestor-file=<value>          (required) path to the common ancestor version of the file
+  -P, --output-file=<value>            (required) path to the file where the merged content will be written
+  -S, --ancestor-conflict-tag=<value>  [default: BASE] string used to tag ancestor version in conflicts
+  -X, --local-conflict-tag=<value>     [default: LOCAL] string used to tag local version in conflicts
+  -Y, --other-conflict-tag=<value>     [default: REMOTE] string used to tag other version in conflicts
 
 GLOBAL FLAGS
   --flags-dir=<value>  Import flag values from a directory.
