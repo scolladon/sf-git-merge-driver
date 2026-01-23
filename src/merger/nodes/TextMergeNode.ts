@@ -1,4 +1,3 @@
-import { deepEqual } from 'fast-equals'
 import { isNil } from 'lodash-es'
 import { TEXT_TAG } from '../../constant/parserConstant.js'
 import type { MergeConfig } from '../../types/conflictTypes.js'
@@ -28,9 +27,9 @@ export class TextMergeNode implements MergeNode {
 
     const scenario = getScenario(objAncestor, objLocal, objOther)
 
-    // Early return for identical values
+    // Early return for identical values - use strict equality for primitives
     if (
-      deepEqual(this.local, this.other) &&
+      this.local === this.other &&
       (scenario === MergeScenario.LOCAL_AND_OTHER ||
         scenario === MergeScenario.ALL)
     ) {

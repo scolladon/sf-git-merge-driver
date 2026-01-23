@@ -1,4 +1,3 @@
-import { deepEqual } from 'fast-equals'
 import { isNil } from 'lodash-es'
 import { TEXT_TAG } from '../constant/parserConstant.js'
 import type { JsonArray, JsonObject, JsonValue } from '../types/jsonTypes.js'
@@ -25,9 +24,9 @@ export const mergeTextAttribute = (
   const scenario: MergeScenario = getScenario(objAncestor, objLocal, objOther)
   const acc: JsonArray = []
 
-  // Early return for identical values
+  // Early return for identical values - use strict equality for primitives
   if (
-    deepEqual(local, other) &&
+    local === other &&
     (scenario === MergeScenario.LOCAL_AND_OTHER ||
       scenario === MergeScenario.ALL)
   ) {
