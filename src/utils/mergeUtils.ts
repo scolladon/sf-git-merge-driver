@@ -1,48 +1,10 @@
-import { castArray, isNil } from 'lodash-es'
 import { EOL } from 'os'
-import type { JsonArray, JsonObject, JsonValue } from '../types/jsonTypes.js'
 
 const CR = '\r'
 const LF = '\n'
 const CRLF = `${CR}${LF}`
 const RE_CRLF = /\r\n/g
 const RE_LF_OR_CRLF = /\r\n|\n/g
-
-export const isObject = (
-  ancestor: JsonValue | undefined | null,
-  local: JsonValue | undefined | null,
-  other: JsonValue | undefined | null
-): boolean =>
-  [ancestor, local, other].some(ele => !isNil(ele) && typeof ele === 'object')
-
-export const isStringArray = (
-  ancestor: JsonValue | undefined | null,
-  local: JsonValue | undefined | null,
-  other: JsonValue | undefined | null
-): boolean =>
-  [ancestor, local, other].some(
-    ele =>
-      !isNil(ele) &&
-      Array.isArray(ele) &&
-      ele.every(item => typeof item === 'string' || item instanceof String)
-  )
-
-export const ensureArray = (value: JsonValue): JsonArray =>
-  isNil(value) ? [] : (castArray(value) as JsonArray)
-
-export const getUniqueSortedProps = (
-  ...objects: (JsonObject | JsonArray)[]
-): string[] =>
-  Array.from(
-    new Set(
-      [...objects]
-        .filter(
-          jsonElement => ![undefined, null].includes(jsonElement as never)
-        )
-        .map(Object.keys)
-        .flat()
-    )
-  ).sort()
 
 export const detectEol = (text: string): string => {
   if (!text) {

@@ -7,7 +7,7 @@ import {
 } from '../constant/conflictConstant.js'
 import { SALESFORCE_EOL } from '../constant/metadataConstant.js'
 import { TEXT_TAG } from '../constant/parserConstant.js'
-import { conflicConfig } from '../types/conflictTypes.js'
+import type { MergeConfig } from '../types/conflictTypes.js'
 import type { JsonArray, JsonObject } from '../types/jsonTypes.js'
 
 const buildMarker = (marker: string, size: number, tag: string): string => {
@@ -30,56 +30,54 @@ const getMarkerValue = (
 }
 
 export class ConflictMarker {
-  private static hasConflict = false
-  private static baseMarker: string
-  private static localMarker: string
-  private static otherMarker: string
-  private static separatorMarker: string
+  private hasConflict = false
+  private readonly baseMarker: string
+  private readonly localMarker: string
+  private readonly otherMarker: string
+  private readonly separatorMarker: string
 
-  public static hasConflictMarker(): boolean {
-    return ConflictMarker.hasConflict
+  constructor(config: MergeConfig) {
+    this.localMarker = buildMarker(
+      LOCAL_CONFLICT_MARKER,
+      config.conflictMarkerSize,
+      config.localConflictTag
+    )
+    this.baseMarker = buildMarker(
+      ANCESTOR_CONFLICT_MARKER,
+      config.conflictMarkerSize,
+      config.ancestorConflictTag
+    )
+    this.otherMarker = buildMarker(
+      OTHER_CONFLICT_MARKER,
+      config.conflictMarkerSize,
+      config.otherConflictTag
+    )
+    this.separatorMarker = buildSeparator(config.conflictMarkerSize)
   }
 
-  public static addConflictMarkers(
+  public hasConflictMarker(): boolean {
+    return this.hasConflict
+  }
+
+  public addConflictMarkers(
     acc: JsonArray,
     local: JsonObject | JsonArray,
     ancestor: JsonObject | JsonArray,
     other: JsonObject | JsonArray
   ): void {
-    ConflictMarker.hasConflict = true
+    this.hasConflict = true
     const [localValue, ancestorValue, otherValue] = [
       local,
       ancestor,
       other,
     ].map(value => (isEmpty(value) ? getEmptyValue() : value))
 
-    acc.push(getMarkerValue(ConflictMarker.localMarker, true))
+    acc.push(getMarkerValue(this.localMarker, true))
     acc.push(localValue)
-    acc.push(getMarkerValue(ConflictMarker.baseMarker))
+    acc.push(getMarkerValue(this.baseMarker))
     acc.push(ancestorValue)
-    acc.push(getMarkerValue(ConflictMarker.separatorMarker))
+    acc.push(getMarkerValue(this.separatorMarker))
     acc.push(otherValue)
-    acc.push(getMarkerValue(ConflictMarker.otherMarker))
-  }
-
-  public static setConflictConfig(conflictConfig: conflicConfig): void {
-    ConflictMarker.baseMarker = buildMarker(
-      ANCESTOR_CONFLICT_MARKER,
-      conflictConfig.conflictMarkerSize,
-      conflictConfig.ancestorConflictTag
-    )
-    ConflictMarker.localMarker = buildMarker(
-      LOCAL_CONFLICT_MARKER,
-      conflictConfig.conflictMarkerSize,
-      conflictConfig.localConflictTag
-    )
-    ConflictMarker.otherMarker = buildMarker(
-      OTHER_CONFLICT_MARKER,
-      conflictConfig.conflictMarkerSize,
-      conflictConfig.otherConflictTag
-    )
-    ConflictMarker.separatorMarker = buildSeparator(
-      conflictConfig.conflictMarkerSize
-    )
+    acc.push(getMarkerValue(this.otherMarker))
   }
 }

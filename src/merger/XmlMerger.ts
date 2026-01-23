@@ -5,6 +5,7 @@ import {
   XML_DECL,
   XML_INDENT,
 } from '../constant/parserConstant.js'
+import type { MergeConfig } from '../types/conflictTypes.js'
 import { log } from '../utils/LoggingDecorator.js'
 import { JsonMerger } from './JsonMerger.js'
 
@@ -57,6 +58,8 @@ const formatXmlOutput = pipe(
 )
 
 export class XmlMerger {
+  constructor(private readonly config: MergeConfig) {}
+
   @log
   mergeThreeWay(
     ancestorContent: string,
@@ -70,7 +73,7 @@ export class XmlMerger {
     const theirObj = parser.parse(theirContent)
 
     // Perform deep merge of XML objects
-    const jsonMerger = new JsonMerger()
+    const jsonMerger = new JsonMerger(this.config)
     const mergedResult = jsonMerger.mergeThreeWay(ancestorObj, ourObj, theirObj)
 
     // Convert back to XML and format

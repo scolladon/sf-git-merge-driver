@@ -1,6 +1,13 @@
 import { XMLBuilder, XMLParser } from 'fast-xml-parser'
+import {
+  DEFAULT_ANCESTOR_CONFLICT_TAG,
+  DEFAULT_CONFLICT_MARKER_SIZE,
+  DEFAULT_LOCAL_CONFLICT_TAG,
+  DEFAULT_OTHER_CONFLICT_TAG,
+} from '../../../src/constant/conflictConstant.js'
 import { JsonMerger } from '../../../src/merger/JsonMerger.js'
 import { XmlMerger } from '../../../src/merger/XmlMerger.js'
+import type { MergeConfig } from '../../../src/types/conflictTypes.js'
 
 jest.mock('fast-xml-parser', () => {
   return {
@@ -28,11 +35,18 @@ jest.mock('../../../src/merger/JsonMerger.js', () => {
   }
 })
 
+const defaultConfig: MergeConfig = {
+  conflictMarkerSize: DEFAULT_CONFLICT_MARKER_SIZE,
+  ancestorConflictTag: DEFAULT_ANCESTOR_CONFLICT_TAG,
+  localConflictTag: DEFAULT_LOCAL_CONFLICT_TAG,
+  otherConflictTag: DEFAULT_OTHER_CONFLICT_TAG,
+}
+
 describe('MergeDriver', () => {
   let sut: XmlMerger
 
   beforeEach(() => {
-    sut = new XmlMerger()
+    sut = new XmlMerger(defaultConfig)
   })
 
   describe('mergeThreeWay', () => {
@@ -50,6 +64,7 @@ describe('MergeDriver', () => {
       expect(XMLParser).toHaveBeenCalledTimes(1)
       expect(XMLBuilder).toHaveBeenCalledTimes(1)
       expect(JsonMerger).toHaveBeenCalledTimes(1)
+      expect(JsonMerger).toHaveBeenCalledWith(defaultConfig)
     })
 
     it('should throw an error when mergeThreeWay fails', () => {

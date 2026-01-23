@@ -1,15 +1,27 @@
+import {
+  DEFAULT_ANCESTOR_CONFLICT_TAG,
+  DEFAULT_CONFLICT_MARKER_SIZE,
+  DEFAULT_LOCAL_CONFLICT_TAG,
+  DEFAULT_OTHER_CONFLICT_TAG,
+} from '../../../src/constant/conflictConstant.js'
 import { SALESFORCE_EOL } from '../../../src/constant/metadataConstant.js'
-import { ConflictMarker } from '../../../src/merger/conflictMarker.js'
 import { JsonMerger } from '../../../src/merger/JsonMerger.js'
+import type { MergeConfig } from '../../../src/types/conflictTypes.js'
 import { JsonValue } from '../../../src/types/jsonTypes.js'
+
+const defaultConfig: MergeConfig = {
+  conflictMarkerSize: DEFAULT_CONFLICT_MARKER_SIZE,
+  ancestorConflictTag: DEFAULT_ANCESTOR_CONFLICT_TAG,
+  localConflictTag: DEFAULT_LOCAL_CONFLICT_TAG,
+  otherConflictTag: DEFAULT_OTHER_CONFLICT_TAG,
+}
 
 describe('JsonMerger', () => {
   let sut: JsonMerger
 
   beforeEach(() => {
-    // Arrange
-    sut = new JsonMerger()
-    ConflictMarker['hasConflict'] = false
+    // Arrange - Fresh instance per test, no manual state reset needed!
+    sut = new JsonMerger(defaultConfig)
   })
 
   describe('Merging objects with nested arrays containing key fields', () => {
@@ -1720,13 +1732,9 @@ describe('JsonMerger', () => {
           Package: [
             {
               types: [
-                {
-                  members: [
-                    { members: [{ '#text': 'SelectorClass' }] },
-                    { members: [{ '#text': 'ServiceClass' }] },
-                    { members: [{ '#text': 'ServiceClass2' }] },
-                  ],
-                },
+                { members: [{ '#text': 'SelectorClass' }] },
+                { members: [{ '#text': 'ServiceClass' }] },
+                { members: [{ '#text': 'ServiceClass2' }] },
                 { name: [{ '#text': 'ApexTrigger' }] },
               ],
             },
@@ -1775,12 +1783,8 @@ describe('JsonMerger', () => {
           Package: [
             {
               types: [
-                {
-                  members: [
-                    { members: [{ '#text': 'NewLocalClass' }] },
-                    { members: [{ '#text': 'ServiceClass' }] },
-                  ],
-                },
+                { members: [{ '#text': 'NewLocalClass' }] },
+                { members: [{ '#text': 'ServiceClass' }] },
                 { name: [{ '#text': 'ApexTrigger' }] },
               ],
             },
@@ -1825,13 +1829,9 @@ describe('JsonMerger', () => {
           Package: [
             {
               types: [
-                {
-                  members: [
-                    { members: [{ '#text': 'LocalMember' }] },
-                    { members: [{ '#text': 'OnlyMember' }] },
-                    { members: [{ '#text': 'RemoteMember' }] },
-                  ],
-                },
+                { members: [{ '#text': 'LocalMember' }] },
+                { members: [{ '#text': 'OnlyMember' }] },
+                { members: [{ '#text': 'RemoteMember' }] },
                 { name: [{ '#text': 'ApexClass' }] },
               ],
             },

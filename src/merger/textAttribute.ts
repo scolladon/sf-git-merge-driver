@@ -3,7 +3,7 @@ import { isNil } from 'lodash-es'
 import { TEXT_TAG } from '../constant/parserConstant.js'
 import type { JsonArray, JsonObject, JsonValue } from '../types/jsonTypes.js'
 import { getScenario, MergeScenario } from '../types/mergeScenario.js'
-import { ConflictMarker } from './conflictMarker.js'
+import type { ConflictMarker } from './conflictMarker.js'
 
 export const generateObj = (
   value: JsonValue | null,
@@ -13,6 +13,7 @@ export const generateObj = (
 }
 
 export const mergeTextAttribute = (
+  conflictMarker: ConflictMarker,
   ancestor: JsonValue | null,
   local: JsonValue | null,
   other: JsonValue | null,
@@ -44,18 +45,18 @@ export const mergeTextAttribute = (
       break
 
     case MergeScenario.LOCAL_AND_OTHER:
-      ConflictMarker.addConflictMarkers(acc, objLocal, {}, objOther)
+      conflictMarker.addConflictMarkers(acc, objLocal, {}, objOther)
       break
 
     case MergeScenario.ANCESTOR_AND_OTHER:
       if (ancestor !== other) {
-        ConflictMarker.addConflictMarkers(acc, {}, objAncestor, objOther)
+        conflictMarker.addConflictMarkers(acc, {}, objAncestor, objOther)
       }
       break
 
     case MergeScenario.ANCESTOR_AND_LOCAL:
       if (ancestor !== local) {
-        ConflictMarker.addConflictMarkers(acc, objLocal, objAncestor, {})
+        conflictMarker.addConflictMarkers(acc, objLocal, objAncestor, {})
       }
       break
 
@@ -65,7 +66,7 @@ export const mergeTextAttribute = (
       } else if (ancestor === other) {
         acc.push(objLocal)
       } else {
-        ConflictMarker.addConflictMarkers(acc, objLocal, objAncestor, objOther)
+        conflictMarker.addConflictMarkers(acc, objLocal, objAncestor, objOther)
       }
       break
   }
