@@ -77,6 +77,7 @@
     "dependencies:upgrade": "npx npm-check-updates -u ; npm update ; npm audit fix",
     "lint": "wireit",
     "lint:dependencies": "wireit",
+    "lint:duplicates": "wireit",
     "lint:fix": "wireit",
     "lint:staged": "wireit",
     "postpack": "shx rm -f oclif.manifest.json",
@@ -162,6 +163,18 @@
         "knip.config.ts"
       ],
       "output": [],
+      "dependencies": [
+        "lint"
+      ]
+    },
+    "lint:duplicates": {
+      "command": "npx jscpd src",
+      "files": [
+        "src/**/*.ts"
+      ],
+      "output": [
+        "reports/cpd/**"
+      ],
       "dependencies": [
         "lint"
       ]

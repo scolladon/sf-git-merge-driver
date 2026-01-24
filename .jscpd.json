@@ -1,6 +1,8 @@
 {
     "threshold": 0,
-    "reporters": ["html", "markdown"],
+    "path": ["src"],
+    "reporters": ["html", "json"],
+    "output": "reports/cpd",
     "ignore": [
       ".git/**",
       ".github/**",
