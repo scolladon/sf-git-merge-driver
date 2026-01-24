@@ -54,11 +54,9 @@ export class XmlMerger {
     const ourObj = parser.parse(ourContent)
     const theirObj = parser.parse(theirContent)
 
-    // Perform deep merge of XML objects
     const jsonMerger = new JsonMerger(this.config)
     const mergedResult = jsonMerger.mergeThreeWay(ancestorObj, ourObj, theirObj)
 
-    // Convert back to XML and format
     const builder = new XMLBuilder(builderOptions)
     const mergedXml: string = builder.build(mergedResult.output)
     return {

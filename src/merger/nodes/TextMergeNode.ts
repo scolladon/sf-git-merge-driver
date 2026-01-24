@@ -1,17 +1,12 @@
-import { isNil } from 'lodash-es'
-import { TEXT_TAG } from '../../constant/parserConstant.js'
 import type { MergeConfig } from '../../types/conflictTypes.js'
-import type { JsonObject, JsonValue } from '../../types/jsonTypes.js'
+import type { JsonValue } from '../../types/jsonTypes.js'
 import type { MergeResult } from '../../types/mergeResult.js'
 import { noConflict } from '../../types/mergeResult.js'
 import { MergeScenario } from '../../types/mergeScenario.js'
 import { getScenario } from '../MergeScenarioFactory.js'
 import { getTextMergeStrategy } from '../strategies/TextMergeStrategy.js'
 import type { MergeNode } from './MergeNode.js'
-
-const generateObj = (value: JsonValue | null, attrib: string): JsonObject => {
-  return isNil(value) ? {} : { [attrib]: [{ [TEXT_TAG]: value }] }
-}
+import { generateObj } from './nodeUtils.js'
 
 export class TextMergeNode implements MergeNode {
   constructor(
@@ -28,7 +23,6 @@ export class TextMergeNode implements MergeNode {
 
     const scenario = getScenario(objAncestor, objLocal, objOther)
 
-    // Early return for identical values - use strict equality for primitives
     if (
       this.local === this.other &&
       (scenario === MergeScenario.LOCAL_AND_OTHER ||

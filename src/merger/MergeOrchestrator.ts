@@ -28,7 +28,6 @@ export class MergeOrchestrator {
   ): MergeResult {
     const scenario = getScenario(ancestor, local, other)
 
-    // Early termination: if all three are equal, skip merge
     if (scenario === MergeScenario.ALL) {
       if (deepEqual(ancestor, local) && deepEqual(local, other)) {
         return this.buildEarlyResult(local, rootKey)

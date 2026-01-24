@@ -18,18 +18,14 @@ export class ConflictMarkerFormatter {
   constructor(config: MergeConfig) {
     const size = config.conflictMarkerSize
 
-    // Build marker strings from config size
     this.localMarker = LOCAL_CONFLICT_MARKER.repeat(size)
     this.ancestorMarker = ANCESTOR_CONFLICT_MARKER.repeat(size)
     this.separator = SEPARATOR.repeat(size)
     this.otherMarker = OTHER_CONFLICT_MARKER.repeat(size)
 
-    // Build entity-escaped versions for XML processing
     this.localEntity = '&lt;'.repeat(size)
     this.otherEntity = '&gt;'.repeat(size)
 
-    // Build regex pattern for indent correction
-    // Matches any of the conflict markers at start of content
     const escapedMarkers = [
       this.escapeRegex(this.localMarker),
       this.escapeRegex(this.ancestorMarker),
