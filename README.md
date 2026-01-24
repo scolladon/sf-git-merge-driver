@@ -36,6 +36,30 @@ sequenceDiagram
     Git->>Dev: Clean commit (no conflicts)
 ```
 
+## Conflict Style
+
+This merge driver follows the **zdiff3** conflict style philosophy:
+
+- **Shows the most compact diff possible**: Only the specific conflicting elements are marked, not entire file sections
+- **Includes ancestor context**: Conflicts display the base (ancestor) version alongside local and remote changes
+- **Respects Git configuration**: Conflict marker size and labels are configurable via Git's standard parameters (`-L`, `-S`, `-X`, `-Y` flags)
+
+Example conflict output:
+```xml
+<<<<<<< LOCAL
+    <field>localValue</field>
+||||||| BASE
+    <field>originalValue</field>
+=======
+    <field>remoteValue</field>
+>>>>>>> REMOTE
+```
+
+This approach helps you understand:
+1. What the original value was (BASE)
+2. What your branch changed it to (LOCAL)
+3. What the other branch changed it to (REMOTE)
+
 ## Installation (30 seconds)
 
 ```bash

@@ -7,6 +7,7 @@ import {
 } from '../constant/parserConstant.js'
 import type { MergeConfig } from '../types/conflictTypes.js'
 import { log } from '../utils/LoggingDecorator.js'
+import { ConflictMarkerFormatter } from './ConflictMarkerFormatter.js'
 import { JsonMerger } from './JsonMerger.js'
 
 const baseOptions = {
@@ -34,31 +35,12 @@ const builderOptions = {
 const correctComments = (xml: string): string =>
   xml.includes('<!--') ? xml.replace(/\s+<!--(.*?)-->\s+/g, '<!--$1-->') : xml
 
-const correctConflictIndent = (xml: string): string =>
-  xml
-    .replace(/[ \t]+(<<<<<<<|\|\|\|\|\|\|\||=======|>>>>>>>)/g, '$1')
-    .replace(/^[ \t]*[\n\r]+/gm, '')
-
-const handleSpecialEntities = (xml: string): string =>
-  xml
-    .replaceAll('&amp;#160;', '&#160;')
-    .replaceAll('&lt;&lt;&lt;&lt;&lt;&lt;&lt;', '<<<<<<<')
-    .replaceAll('&gt;&gt;&gt;&gt;&gt;&gt;&gt;', '>>>>>>>')
-
-const pipe =
-  (...fns: ((xml: string) => string)[]) =>
-  (input: string): string =>
-    fns.reduce((acc, fn) => fn(acc), input)
-
-const formatXmlOutput = pipe(
-  (xml: string) => XML_DECL.concat(xml),
-  handleSpecialEntities,
-  correctComments,
-  correctConflictIndent
-)
-
 export class XmlMerger {
-  constructor(private readonly config: MergeConfig) {}
+  private readonly formatter: ConflictMarkerFormatter
+
+  constructor(private readonly config: MergeConfig) {
+    this.formatter = new ConflictMarkerFormatter(config)
+  }
 
   @log
   mergeThreeWay(
@@ -80,8 +62,16 @@ export class XmlMerger {
     const builder = new XMLBuilder(builderOptions)
     const mergedXml: string = builder.build(mergedResult.output)
     return {
-      output: mergedXml.length ? formatXmlOutput(mergedXml) : '',
+      output: mergedXml.length ? this.formatXmlOutput(mergedXml) : '',
       hasConflict: mergedResult.hasConflict,
     }
+  }
+
+  private formatXmlOutput(xml: string): string {
+    let result = XML_DECL.concat(xml)
+    result = this.formatter.handleSpecialEntities(result)
+    result = correctComments(result)
+    result = this.formatter.correctConflictIndent(result)
+    return result
   }
 }
