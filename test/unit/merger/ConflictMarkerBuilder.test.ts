@@ -30,14 +30,14 @@ describe('ConflictMarkerBuilder', () => {
       // Assert
       expect(result).toHaveLength(7)
       expect(result[0]).toEqual({
-        [TEXT_TAG]: `${SALESFORCE_EOL}<<<<<<< LOCAL`,
+        [TEXT_TAG]: `${SALESFORCE_EOL}<<<<<<< ours`,
       })
       expect(result[1]).toEqual(local)
-      expect(result[2]).toEqual({ [TEXT_TAG]: '||||||| BASE' })
+      expect(result[2]).toEqual({ [TEXT_TAG]: '||||||| base' })
       expect(result[3]).toEqual(ancestor)
       expect(result[4]).toEqual({ [TEXT_TAG]: '=======' })
       expect(result[5]).toEqual(other)
-      expect(result[6]).toEqual({ [TEXT_TAG]: '>>>>>>> REMOTE' })
+      expect(result[6]).toEqual({ [TEXT_TAG]: '>>>>>>> theirs' })
     })
 
     it('should use empty value placeholder when local is empty', () => {
@@ -93,10 +93,10 @@ describe('ConflictMarkerBuilder', () => {
       const result = buildConflictMarkers(config, local, ancestor, other)
 
       // Assert
-      expect(result[0]).toEqual({ [TEXT_TAG]: `${SALESFORCE_EOL}<<< LOCAL` })
-      expect(result[2]).toEqual({ [TEXT_TAG]: '||| BASE' })
+      expect(result[0]).toEqual({ [TEXT_TAG]: `${SALESFORCE_EOL}<<< ours` })
+      expect(result[2]).toEqual({ [TEXT_TAG]: '||| base' })
       expect(result[4]).toEqual({ [TEXT_TAG]: '===' })
-      expect(result[6]).toEqual({ [TEXT_TAG]: '>>> REMOTE' })
+      expect(result[6]).toEqual({ [TEXT_TAG]: '>>> theirs' })
     })
 
     it('should respect custom conflict tags', () => {

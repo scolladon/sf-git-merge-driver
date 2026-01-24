@@ -404,21 +404,21 @@ describe('JsonMerger', () => {
             },
             {
               fieldPermissions: [
-                { '#text': SALESFORCE_EOL + '<<<<<<< LOCAL' },
+                { '#text': SALESFORCE_EOL + '<<<<<<< ours' },
                 { editable: [{ '#text': 'true' }] },
-                { '#text': '||||||| BASE' },
+                { '#text': '||||||| base' },
                 { '#text': SALESFORCE_EOL },
                 { '#text': '=======' },
                 { editable: [{ '#text': 'false' }] },
-                { '#text': '>>>>>>> REMOTE' },
+                { '#text': '>>>>>>> theirs' },
                 { field: [{ '#text': 'Account.Name' }] },
-                { '#text': SALESFORCE_EOL + '<<<<<<< LOCAL' },
+                { '#text': SALESFORCE_EOL + '<<<<<<< ours' },
                 { readable: [{ '#text': 'true' }] },
-                { '#text': '||||||| BASE' },
+                { '#text': '||||||| base' },
                 { '#text': SALESFORCE_EOL },
                 { '#text': '=======' },
                 { readable: [{ '#text': 'false' }] },
-                { '#text': '>>>>>>> REMOTE' },
+                { '#text': '>>>>>>> theirs' },
               ],
             },
             {
@@ -465,13 +465,13 @@ describe('JsonMerger', () => {
           Profile: [
             {
               fieldPermissions: [
-                { '#text': SALESFORCE_EOL + '<<<<<<< LOCAL' },
+                { '#text': SALESFORCE_EOL + '<<<<<<< ours' },
                 { editable: [{ '#text': 'true' }] },
-                { '#text': '||||||| BASE' },
+                { '#text': '||||||| base' },
                 { '#text': SALESFORCE_EOL },
                 { '#text': '=======' },
                 { editable: [{ '#text': 'false' }] },
-                { '#text': '>>>>>>> REMOTE' },
+                { '#text': '>>>>>>> theirs' },
                 { field: [{ '#text': 'Account.Name' }] },
                 { readable: [{ '#text': 'true' }] },
               ],
@@ -511,7 +511,7 @@ describe('JsonMerger', () => {
       expect(result.output).toEqual([
         {
           Profile: [
-            { '#text': SALESFORCE_EOL + '<<<<<<< LOCAL' },
+            { '#text': SALESFORCE_EOL + '<<<<<<< ours' },
             {
               unknown: [
                 { editable: [{ '#text': 'true' }] },
@@ -519,7 +519,7 @@ describe('JsonMerger', () => {
                 { readable: [{ '#text': 'true' }] },
               ],
             },
-            { '#text': '||||||| BASE' },
+            { '#text': '||||||| base' },
             { '#text': SALESFORCE_EOL },
             { '#text': '=======' },
             {
@@ -529,7 +529,7 @@ describe('JsonMerger', () => {
                 { readable: [{ '#text': 'true' }] },
               ],
             },
-            { '#text': '>>>>>>> REMOTE' },
+            { '#text': '>>>>>>> theirs' },
           ],
         },
       ])
@@ -567,7 +567,7 @@ describe('JsonMerger', () => {
       expect(result.output).toEqual([
         {
           Profile: [
-            { '#text': SALESFORCE_EOL + '<<<<<<< LOCAL' },
+            { '#text': SALESFORCE_EOL + '<<<<<<< ours' },
             {
               fieldPermissions: [
                 { editable: [{ '#text': 'false' }] },
@@ -575,7 +575,7 @@ describe('JsonMerger', () => {
                 { readable: [{ '#text': 'true' }] },
               ],
             },
-            { '#text': '||||||| BASE' },
+            { '#text': '||||||| base' },
             {
               fieldPermissions: [
                 { editable: [{ '#text': 'true' }] },
@@ -585,7 +585,7 @@ describe('JsonMerger', () => {
             },
             { '#text': '=======' },
             { '#text': SALESFORCE_EOL },
-            { '#text': '>>>>>>> REMOTE' },
+            { '#text': '>>>>>>> theirs' },
           ],
         },
       ])
@@ -620,7 +620,7 @@ describe('JsonMerger', () => {
 
       // Assert
       expect(result.output).toEqual([
-        { '#text': SALESFORCE_EOL + '<<<<<<< LOCAL' },
+        { '#text': SALESFORCE_EOL + '<<<<<<< ours' },
         {
           Profile: [
             {
@@ -639,7 +639,7 @@ describe('JsonMerger', () => {
             },
           ],
         },
-        { '#text': '||||||| BASE' },
+        { '#text': '||||||| base' },
         {
           Profile: [
             { description: [{ '#text': 'Their description' }] },
@@ -661,7 +661,7 @@ describe('JsonMerger', () => {
         },
         { '#text': '=======' },
         { '#text': SALESFORCE_EOL },
-        { '#text': '>>>>>>> REMOTE' },
+        { '#text': '>>>>>>> theirs' },
       ])
       expect(result.hasConflict).toBe(true)
     })
@@ -697,9 +697,9 @@ describe('JsonMerger', () => {
       expect(result.output).toEqual([
         {
           Profile: [
-            { '#text': SALESFORCE_EOL + '<<<<<<< LOCAL' },
+            { '#text': SALESFORCE_EOL + '<<<<<<< ours' },
             { '#text': SALESFORCE_EOL },
-            { '#text': '||||||| BASE' },
+            { '#text': '||||||| base' },
             {
               fieldPermissions: [
                 { editable: [{ '#text': 'true' }] },
@@ -715,7 +715,7 @@ describe('JsonMerger', () => {
                 { readable: [{ '#text': 'true' }] },
               ],
             },
-            { '#text': '>>>>>>> REMOTE' },
+            { '#text': '>>>>>>> theirs' },
           ],
         },
       ])
@@ -750,9 +750,9 @@ describe('JsonMerger', () => {
 
       // Assert
       expect(result.output).toEqual([
-        { '#text': SALESFORCE_EOL + '<<<<<<< LOCAL' },
+        { '#text': SALESFORCE_EOL + '<<<<<<< ours' },
         { '#text': SALESFORCE_EOL },
-        { '#text': '||||||| BASE' },
+        { '#text': '||||||| base' },
         {
           Profile: [
             { description: [{ '#text': 'Their description' }] },
@@ -791,7 +791,7 @@ describe('JsonMerger', () => {
             },
           ],
         },
-        { '#text': '>>>>>>> REMOTE' },
+        { '#text': '>>>>>>> theirs' },
       ])
       expect(result.hasConflict).toBe(true)
     })
@@ -1066,17 +1066,17 @@ describe('JsonMerger', () => {
       expect(result.output).toEqual([
         {
           Profile: [
-            { '#text': SALESFORCE_EOL + '<<<<<<< LOCAL' },
+            { '#text': SALESFORCE_EOL + '<<<<<<< ours' },
             {
               description: [{ '#text': 'Our description' }],
             },
-            { '#text': '||||||| BASE' },
+            { '#text': '||||||| base' },
             { '#text': SALESFORCE_EOL },
             { '#text': '=======' },
             {
               description: [{ '#text': 'Their description' }],
             },
-            { '#text': '>>>>>>> REMOTE' },
+            { '#text': '>>>>>>> theirs' },
           ],
         },
       ])
@@ -1108,9 +1108,9 @@ describe('JsonMerger', () => {
       expect(result.output).toEqual([
         {
           Profile: [
-            { '#text': SALESFORCE_EOL + '<<<<<<< LOCAL' },
+            { '#text': SALESFORCE_EOL + '<<<<<<< ours' },
             { '#text': SALESFORCE_EOL },
-            { '#text': '||||||| BASE' },
+            { '#text': '||||||| base' },
             {
               description: [{ '#text': 'Original description' }],
             },
@@ -1118,7 +1118,7 @@ describe('JsonMerger', () => {
             {
               description: [{ '#text': 'Their description' }],
             },
-            { '#text': '>>>>>>> REMOTE' },
+            { '#text': '>>>>>>> theirs' },
           ],
         },
       ])
@@ -1150,17 +1150,17 @@ describe('JsonMerger', () => {
       expect(result.output).toEqual([
         {
           Profile: [
-            { '#text': SALESFORCE_EOL + '<<<<<<< LOCAL' },
+            { '#text': SALESFORCE_EOL + '<<<<<<< ours' },
             {
               description: [{ '#text': 'Our description' }],
             },
-            { '#text': '||||||| BASE' },
+            { '#text': '||||||| base' },
             {
               description: [{ '#text': 'Original description' }],
             },
             { '#text': '=======' },
             { '#text': SALESFORCE_EOL },
-            { '#text': '>>>>>>> REMOTE' },
+            { '#text': '>>>>>>> theirs' },
           ],
         },
       ])
@@ -1194,11 +1194,11 @@ describe('JsonMerger', () => {
       expect(result.output).toEqual([
         {
           Profile: [
-            { '#text': SALESFORCE_EOL + '<<<<<<< LOCAL' },
+            { '#text': SALESFORCE_EOL + '<<<<<<< ours' },
             {
               description: [{ '#text': 'Our description' }],
             },
-            { '#text': '||||||| BASE' },
+            { '#text': '||||||| base' },
             {
               description: [{ '#text': 'Original description' }],
             },
@@ -1206,7 +1206,7 @@ describe('JsonMerger', () => {
             {
               description: [{ '#text': 'Their description' }],
             },
-            { '#text': '>>>>>>> REMOTE' },
+            { '#text': '>>>>>>> theirs' },
           ],
         },
       ])
@@ -1535,11 +1535,11 @@ describe('JsonMerger', () => {
       expect(result.output).toEqual([
         {
           Package: [
-            { '#text': SALESFORCE_EOL + '<<<<<<< LOCAL' },
+            { '#text': SALESFORCE_EOL + '<<<<<<< ours' },
             {
               version: [{ '#text': '60.0' }],
             },
-            { '#text': '||||||| BASE' },
+            { '#text': '||||||| base' },
             {
               version: [{ '#text': '59.0' }],
             },
@@ -1547,7 +1547,7 @@ describe('JsonMerger', () => {
             {
               version: [{ '#text': '61.0' }],
             },
-            { '#text': '>>>>>>> REMOTE' },
+            { '#text': '>>>>>>> theirs' },
           ],
         },
       ])

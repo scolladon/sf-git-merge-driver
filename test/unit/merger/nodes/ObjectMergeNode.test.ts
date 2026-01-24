@@ -129,7 +129,7 @@ describe('NestedObjectMergeNode', () => {
       const hasLocalMarker = output.some(
         item =>
           typeof item === 'object' &&
-          String(item[TEXT_TAG] ?? '').includes('LOCAL')
+          String(item[TEXT_TAG] ?? '').includes('ours')
       )
       expect(hasLocalMarker).toBe(true)
     })

@@ -83,9 +83,9 @@ describe('ConflictMarkerFormatter', () => {
 
       it('should handle multiple replacements in same string', () => {
         const input =
-          '&lt;&lt;&lt;&lt;&lt;&lt;&lt; LOCAL\ncontent\n&gt;&gt;&gt;&gt;&gt;&gt;&gt; REMOTE'
+          '&lt;&lt;&lt;&lt;&lt;&lt;&lt; ours\ncontent\n&gt;&gt;&gt;&gt;&gt;&gt;&gt; theirs'
         const result = formatter.handleSpecialEntities(input)
-        expect(result).toBe('<<<<<<< LOCAL\ncontent\n>>>>>>> REMOTE')
+        expect(result).toBe('<<<<<<< ours\ncontent\n>>>>>>> theirs')
       })
 
       it('should not modify content without special entities', () => {
