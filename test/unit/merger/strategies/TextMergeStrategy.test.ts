@@ -309,5 +309,28 @@ describe('TextMergeStrategy', () => {
       expect(result.hasConflict).toBe(true)
       expect(result.output).toHaveLength(7)
     })
+
+    it('should return local when both local and other changed to same value', () => {
+      // Arrange - covers line 116: both changed to same value
+      const strategy = new AllPresentStrategy()
+      const objAncestor = { field: [{ [TEXT_TAG]: 'originalValue' }] }
+      const objLocal = { field: [{ [TEXT_TAG]: 'newValue' }] }
+      const objOther = { field: [{ [TEXT_TAG]: 'newValue' }] }
+
+      // Act
+      const result = strategy.handle(
+        defaultConfig,
+        objAncestor,
+        objLocal,
+        objOther,
+        'originalValue',
+        'newValue',
+        'newValue'
+      )
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      expect(result.output).toEqual([objLocal])
+    })
   })
 })

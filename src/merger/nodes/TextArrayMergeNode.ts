@@ -14,7 +14,9 @@ const generateObj = (value: JsonValue | null, attrib: string): JsonObject => {
 const compareItems = (a: JsonValue, b: JsonValue): number => {
   const strA = String(a)
   const strB = String(b)
-  return strA < strB ? -1 : strA > strB ? 1 : 0
+  if (strA < strB) return -1
+  if (strA > strB) return 1
+  return 0
 }
 
 export class TextArrayMergeNode implements MergeNode {
@@ -26,7 +28,6 @@ export class TextArrayMergeNode implements MergeNode {
   ) {}
 
   merge(_config: MergeConfig): MergeResult {
-    const ancestorSet = new Set(this.ancestor)
     const localSet = new Set(this.local)
     const otherSet = new Set(this.other)
 
@@ -46,22 +47,18 @@ export class TextArrayMergeNode implements MergeNode {
       }
     }
 
+    // Items from local not yet seen are new additions (not in ancestor)
     for (const item of this.local) {
       if (seen.has(item)) continue
       seen.add(item)
-      // New item added in local (not in ancestor)
-      if (!ancestorSet.has(item)) {
-        resultItems.push(item)
-      }
+      resultItems.push(item)
     }
 
+    // Items from other not yet seen are new additions (not in ancestor)
     for (const item of this.other) {
       if (seen.has(item)) continue
       seen.add(item)
-      // New item added in other (not in ancestor)
-      if (!ancestorSet.has(item)) {
-        resultItems.push(item)
-      }
+      resultItems.push(item)
     }
 
     // Sort and transform in single pass using reduce
