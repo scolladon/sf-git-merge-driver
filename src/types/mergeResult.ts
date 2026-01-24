@@ -1,3 +1,4 @@
+import { isEmpty } from 'lodash-es'
 import type { JsonArray } from './jsonTypes.js'
 
 export interface MergeResult {
@@ -15,7 +16,7 @@ const EMPTY_NO_CONFLICT: MergeResult = {
 
 export const combineResults = (results: MergeResult[]): MergeResult => {
   // Fast path: no results
-  if (results.length === 0) {
+  if (isEmpty(results)) {
     return EMPTY_NO_CONFLICT
   }
   // Fast path: single result
@@ -30,7 +31,7 @@ export const combineResults = (results: MergeResult[]): MergeResult => {
 
 export const noConflict = (output: JsonArray): MergeResult => {
   // Reuse constant for empty arrays
-  if (output.length === 0) {
+  if (isEmpty(output)) {
     return EMPTY_NO_CONFLICT
   }
   return { output, hasConflict: false }

@@ -1,3 +1,4 @@
+import { isEmpty } from 'lodash-es'
 import { MetadataService } from '../../service/MetadataService.js'
 import type { MergeConfig } from '../../types/conflictTypes.js'
 import type { JsonArray, JsonObject } from '../../types/jsonTypes.js'
@@ -81,14 +82,11 @@ export class KeyedArrayMergeNode implements MergeNode {
         this.attribute
       )
 
-      // istanbul ignore else -- defensive: all current conflict strategies return non-empty output
-      if (result.output.length > 0) {
+      if (!isEmpty(result.output)) {
         results.push({
           output: [{ [this.attribute]: result.output }],
           hasConflict: result.hasConflict,
         })
-      } else if (result.hasConflict) {
-        results.push(result)
       }
     }
 

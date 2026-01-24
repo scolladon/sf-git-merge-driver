@@ -1,4 +1,5 @@
 import { deepEqual } from 'fast-equals'
+import { isEmpty } from 'lodash-es'
 import type { JsonArray, JsonObject } from '../../types/jsonTypes.js'
 import type { MergeResult } from '../../types/mergeResult.js'
 import { combineResults, noConflict } from '../../types/mergeResult.js'
@@ -28,7 +29,7 @@ export class LocalAndOtherStrategy implements ScenarioStrategy {
 
     // Root level: wrap result with key
     if (context.rootKey) {
-      if (result.output.length > 0) {
+      if (!isEmpty(result.output)) {
         return {
           output: [{ [context.rootKey.name]: result.output }],
           hasConflict: result.hasConflict,

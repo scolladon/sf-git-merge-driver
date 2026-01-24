@@ -1,4 +1,5 @@
 import { deepEqual } from 'fast-equals'
+import { isEmpty } from 'lodash-es'
 import type { JsonArray, JsonObject } from '../../types/jsonTypes.js'
 import type { MergeResult } from '../../types/mergeResult.js'
 import { noConflict, withConflict } from '../../types/mergeResult.js'
@@ -40,7 +41,7 @@ export class AncestorAndOtherStrategy implements ScenarioStrategy {
 
       // Local key exists with empty value - delegate to nested merge, wrap result
       const result = this.executeNested(context)
-      if (result.output.length > 0) {
+      if (!isEmpty(result.output)) {
         return {
           output: [{ [name]: result.output }],
           hasConflict: result.hasConflict,
