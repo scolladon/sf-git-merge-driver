@@ -3,8 +3,9 @@ import type { MergeConfig } from '../types/conflictTypes.js'
 import type { JsonArray, JsonObject, JsonValue } from '../types/jsonTypes.js'
 import type { MergeResult } from '../types/mergeResult.js'
 import { noConflict } from '../types/mergeResult.js'
-import { getScenario, MergeScenario } from '../types/mergeScenario.js'
+import { MergeScenario } from '../types/mergeScenario.js'
 import type { MergeContext, RootKeyInfo } from './MergeContext.js'
+import { getScenario } from './MergeScenarioFactory.js'
 import {
   defaultNodeFactory,
   type MergeNodeFactory,

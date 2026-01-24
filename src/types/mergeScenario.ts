@@ -1,5 +1,3 @@
-import { isEmpty } from 'lodash-es'
-
 /**
  * Enum representing different merge scenarios based on content presence:
  * - First position: Ancestor content present (1) or absent (0)
@@ -15,25 +13,4 @@ export enum MergeScenario {
   ANCESTOR_AND_OTHER = 101, // Ancestor and other have content, no local (101)
   ANCESTOR_AND_LOCAL = 110, // Ancestor and local have content, no other (110)
   ALL = 111, // All three sources have content (111)
-}
-
-export const getScenario = (
-  // biome-ignore lint/suspicious/noExplicitAny: can be any metadata in json format
-  ancestor: any,
-  // biome-ignore lint/suspicious/noExplicitAny: can be any metadata in json format
-  local: any,
-  // biome-ignore lint/suspicious/noExplicitAny: can be any metadata in json format
-  other: any
-): MergeScenario => {
-  let scenario: MergeScenario = MergeScenario.NONE
-  if (!isEmpty(ancestor)) {
-    scenario += 100
-  }
-  if (!isEmpty(local)) {
-    scenario += 10
-  }
-  if (!isEmpty(other)) {
-    scenario += 1
-  }
-  return scenario
 }
