@@ -1,16 +1,11 @@
 import { deepEqual } from 'fast-equals'
 import type { JsonArray, JsonObject } from '../../types/jsonTypes.js'
 import type { MergeResult } from '../../types/mergeResult.js'
-import { combineResults } from '../../types/mergeResult.js'
 import type { MergeContext } from '../MergeContext.js'
-import {
-  buildEarlyResult,
-  getUniqueSortedProps,
-  wrapWithRootKey,
-} from '../nodes/nodeUtils.js'
-import type { ScenarioStrategy } from './ScenarioStrategy.js'
+import { buildEarlyResult } from '../nodes/nodeUtils.js'
+import { AbstractMergeStrategy } from './AbstractMergeStrategy.js'
 
-export class LocalAndOtherStrategy implements ScenarioStrategy {
+export class LocalAndOtherStrategy extends AbstractMergeStrategy {
   execute(context: MergeContext): MergeResult {
     const local = context.local as JsonObject | JsonArray
     const other = context.other as JsonObject | JsonArray
@@ -19,30 +14,6 @@ export class LocalAndOtherStrategy implements ScenarioStrategy {
       return buildEarlyResult(local, context.rootKey)
     }
 
-    const result = this.mergeChildren(context)
-    if (context.rootKey) {
-      return wrapWithRootKey(result, context.rootKey.name)
-    }
-    return result
-  }
-
-  private mergeChildren(context: MergeContext): MergeResult {
-    const local = context.local as JsonObject | JsonArray
-    const other = context.other as JsonObject | JsonArray
-    const props = getUniqueSortedProps({}, local, other)
-    const results: MergeResult[] = []
-
-    for (const key of props) {
-      const childNode = context.nodeFactory.createNode(
-        undefined as never,
-        local[key],
-        other[key],
-        key
-      )
-      const childResult = childNode.merge(context.config)
-      results.push(childResult)
-    }
-
-    return combineResults(results)
+    return this.mergeChildren(context, undefined)
   }
 }
