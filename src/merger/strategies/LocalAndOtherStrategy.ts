@@ -1,11 +1,11 @@
 import { deepEqual } from 'fast-equals'
 import type { JsonArray, JsonObject } from '../../types/jsonTypes.js'
 import type { MergeResult } from '../../types/mergeResult.js'
-import { combineResults, noConflict } from '../../types/mergeResult.js'
+import { combineResults } from '../../types/mergeResult.js'
 import type { MergeContext } from '../MergeContext.js'
 import {
+  buildEarlyResult,
   getUniqueSortedProps,
-  toJsonArray,
   wrapWithRootKey,
 } from '../nodes/nodeUtils.js'
 import type { ScenarioStrategy } from './ScenarioStrategy.js'
@@ -16,11 +16,7 @@ export class LocalAndOtherStrategy implements ScenarioStrategy {
     const other = context.other as JsonObject | JsonArray
 
     if (deepEqual(local, other)) {
-      const content = toJsonArray(other)
-      if (context.rootKey) {
-        return noConflict([{ [context.rootKey.name]: content }])
-      }
-      return noConflict(content)
+      return buildEarlyResult(local, context.rootKey)
     }
 
     const result = this.mergeChildren(context)

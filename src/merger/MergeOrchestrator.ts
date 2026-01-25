@@ -1,16 +1,12 @@
-import { deepEqual } from 'fast-equals'
 import type { MergeConfig } from '../types/conflictTypes.js'
 import type { JsonArray, JsonObject, JsonValue } from '../types/jsonTypes.js'
 import type { MergeResult } from '../types/mergeResult.js'
-import { noConflict } from '../types/mergeResult.js'
-import { MergeScenario } from '../types/mergeScenario.js'
 import type { MergeContext, RootKeyInfo } from './MergeContext.js'
 import { getScenario } from './MergeScenarioFactory.js'
 import {
   defaultNodeFactory,
   type MergeNodeFactory,
 } from './nodes/MergeNodeFactory.js'
-import { toJsonArray } from './nodes/nodeUtils.js'
 import { getScenarioStrategy } from './strategies/ScenarioStrategyFactory.js'
 
 export class MergeOrchestrator {
@@ -27,13 +23,6 @@ export class MergeOrchestrator {
     rootKey?: RootKeyInfo
   ): MergeResult {
     const scenario = getScenario(ancestor, local, other)
-
-    if (scenario === MergeScenario.ALL) {
-      if (deepEqual(ancestor, local) && deepEqual(local, other)) {
-        return this.buildEarlyResult(local, rootKey)
-      }
-    }
-
     const strategy = getScenarioStrategy(scenario)
 
     const context: MergeContext = {
@@ -47,17 +36,6 @@ export class MergeOrchestrator {
     }
 
     return strategy.execute(context)
-  }
-
-  private buildEarlyResult(
-    value: JsonValue,
-    rootKey?: RootKeyInfo
-  ): MergeResult {
-    const content = toJsonArray(value as JsonObject | JsonArray)
-    if (rootKey) {
-      return noConflict([{ [rootKey.name]: content }])
-    }
-    return noConflict(content)
   }
 
   mergeObject(

@@ -88,7 +88,7 @@ describe('AncestorAndLocalStrategy', () => {
   })
 
   describe('with rootKey', () => {
-    it('should return empty when other missing and local unchanged', () => {
+    it('should return empty key when other missing and local unchanged', () => {
       // Arrange
       const context = createContext({
         ancestor: { key: 'value' },

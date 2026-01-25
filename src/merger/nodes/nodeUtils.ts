@@ -13,6 +13,7 @@ import { TEXT_TAG } from '../../constant/parserConstant.js'
 import type { JsonArray, JsonObject, JsonValue } from '../../types/jsonTypes.js'
 import type { MergeResult } from '../../types/mergeResult.js'
 import { noConflict } from '../../types/mergeResult.js'
+import type { RootKeyInfo } from '../MergeContext.js'
 
 export const ensureArray = (value: JsonValue): JsonArray =>
   isNil(value) ? [] : (castArray(value) as JsonArray)
@@ -65,3 +66,14 @@ export const toJsonArray = (inputObj: JsonObject | JsonArray): JsonArray =>
 
     return generateObj(inputObjOfAttr, attribute)
   })
+
+export const buildEarlyResult = (
+  value: JsonValue,
+  rootKey?: RootKeyInfo
+): MergeResult => {
+  const content = toJsonArray(value as JsonObject | JsonArray)
+  if (rootKey) {
+    return noConflict([{ [rootKey.name]: content }])
+  }
+  return noConflict(content)
+}

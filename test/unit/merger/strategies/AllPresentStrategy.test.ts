@@ -63,6 +63,22 @@ describe('AllPresentStrategy', () => {
       expect(result.hasConflict).toBe(false)
     })
 
+    it('should return early when ancestor, local, and other are identical', () => {
+      // Arrange
+      const context = createContext({
+        ancestor: { a: 'same' },
+        local: { a: 'same' },
+        other: { a: 'same' },
+      })
+
+      // Act
+      const result = strategy.execute(context)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      expect(result.output).toBeDefined()
+    })
+
     it('should detect conflict when both sides change differently', () => {
       // Arrange
       const context = createContext({

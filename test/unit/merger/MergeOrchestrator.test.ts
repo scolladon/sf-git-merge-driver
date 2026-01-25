@@ -5,8 +5,18 @@ import {
   DEFAULT_OTHER_CONFLICT_TAG,
 } from '../../../src/constant/conflictConstant.js'
 import { MergeOrchestrator } from '../../../src/merger/MergeOrchestrator.js'
+import { getScenario } from '../../../src/merger/MergeScenarioFactory.js'
 import { defaultNodeFactory } from '../../../src/merger/nodes/MergeNodeFactory.js'
+import { getScenarioStrategy } from '../../../src/merger/strategies/ScenarioStrategyFactory.js'
 import type { MergeConfig } from '../../../src/types/conflictTypes.js'
+import type { MergeResult } from '../../../src/types/mergeResult.js'
+import { MergeScenario } from '../../../src/types/mergeScenario.js'
+
+jest.mock('../../../src/merger/MergeScenarioFactory.js')
+jest.mock('../../../src/merger/strategies/ScenarioStrategyFactory.js')
+
+const mockedGetScenario = getScenario as jest.Mock
+const mockedGetScenarioStrategy = getScenarioStrategy as jest.Mock
 
 const defaultConfig: MergeConfig = {
   conflictMarkerSize: DEFAULT_CONFLICT_MARKER_SIZE,
@@ -16,95 +26,110 @@ const defaultConfig: MergeConfig = {
 }
 
 describe('MergeOrchestrator', () => {
-  describe('constructor', () => {
-    it('should use default nodeFactory when not provided', () => {
-      // Arrange & Act - covers the default parameter branch
-      const orchestrator = new MergeOrchestrator(defaultConfig)
+  const mockStrategy = {
+    execute: jest.fn(),
+  }
+  const mockResult: MergeResult = { hasConflict: false, output: [] }
 
-      // Assert - verify it works with default factory
-      const result = orchestrator.merge({ key: 'value' }, { key: 'value' }, {})
-
-      expect(result.hasConflict).toBe(false)
-    })
-
-    it('should use provided nodeFactory when specified', () => {
-      // Arrange & Act
-      const orchestrator = new MergeOrchestrator(
-        defaultConfig,
-        defaultNodeFactory
-      )
-
-      // Assert
-      const result = orchestrator.merge({ key: 'value' }, {}, { key: 'value' })
-
-      expect(result.hasConflict).toBe(false)
-    })
+  beforeEach(() => {
+    jest.clearAllMocks()
+    mockedGetScenarioStrategy.mockReturnValue(mockStrategy)
+    mockStrategy.execute.mockReturnValue(mockResult)
   })
 
   describe('merge', () => {
-    it('should merge with rootKey parameter', () => {
+    it('should delegate to the correct strategy with proper context', () => {
       // Arrange
       const orchestrator = new MergeOrchestrator(defaultConfig)
+      const ancestor = { key: 'ancestor' }
+      const local = { key: 'local' }
+      const other = { key: 'other' }
+      const attribute = 'testAttr'
+      const rootKey = {
+        name: 'testKey',
+        existsInLocal: true,
+        existsInOther: true,
+      }
+      const scenario = MergeScenario.ALL
+
+      mockedGetScenario.mockReturnValue(scenario)
 
       // Act
       const result = orchestrator.merge(
-        { key: 'ancestor' },
-        { key: 'local' },
-        { key: 'other' },
-        undefined,
-        {
-          name: 'testKey',
-          existsInLocal: true,
-          existsInOther: true,
-        }
+        ancestor,
+        local,
+        other,
+        attribute,
+        rootKey
       )
 
       // Assert
-      expect(result.output).toBeDefined()
+      expect(mockedGetScenario).toHaveBeenCalledWith(ancestor, local, other)
+      expect(mockedGetScenarioStrategy).toHaveBeenCalledWith(scenario)
+      expect(mockStrategy.execute).toHaveBeenCalledWith({
+        config: defaultConfig,
+        ancestor,
+        local,
+        other,
+        attribute,
+        nodeFactory: defaultNodeFactory,
+        rootKey,
+      })
+      expect(result).toBe(mockResult)
     })
 
-    it('should merge with attribute parameter', () => {
+    it('should use provided nodeFactory in context', () => {
       // Arrange
-      const orchestrator = new MergeOrchestrator(defaultConfig)
+      const customNodeFactory = { createNode: jest.fn() }
+      const orchestrator = new MergeOrchestrator(
+        defaultConfig,
+        customNodeFactory
+      )
+      const ancestor = {}
+      const local = {}
+      const other = {}
+
+      mockedGetScenario.mockReturnValue(MergeScenario.NONE)
 
       // Act
-      const result = orchestrator.merge(
-        { key: 'ancestor' },
-        { key: 'local' },
-        { key: 'other' },
-        'testAttr'
-      )
+      orchestrator.merge(ancestor, local, other)
 
       // Assert
-      expect(result).toBeDefined()
+      expect(mockStrategy.execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          nodeFactory: customNodeFactory,
+        })
+      )
     })
   })
 
   describe('mergeObject', () => {
-    it('should merge objects', () => {
+    it('should delegate to merge', () => {
       // Arrange
       const orchestrator = new MergeOrchestrator(defaultConfig)
+      const ancestor = { a: 'ancestor' }
+      const local = { a: 'local' }
+      const other = { a: 'other' }
+      const scenario = MergeScenario.ANCESTOR_AND_LOCAL
+
+      mockedGetScenario.mockReturnValue(scenario)
 
       // Act
-      const result = orchestrator.mergeObject(
-        { a: 'ancestor' },
-        { a: 'local' },
-        { a: 'other' }
-      )
+      const result = orchestrator.mergeObject(ancestor, local, other)
 
       // Assert
-      expect(result).toBeDefined()
-    })
-
-    it('should merge arrays', () => {
-      // Arrange
-      const orchestrator = new MergeOrchestrator(defaultConfig)
-
-      // Act
-      const result = orchestrator.mergeObject(['a'], ['b'], ['c'])
-
-      // Assert
-      expect(result).toBeDefined()
+      expect(mockedGetScenario).toHaveBeenCalledWith(ancestor, local, other)
+      expect(mockedGetScenarioStrategy).toHaveBeenCalledWith(scenario)
+      expect(mockStrategy.execute).toHaveBeenCalledWith({
+        config: defaultConfig,
+        ancestor,
+        local,
+        other,
+        attribute: undefined,
+        nodeFactory: defaultNodeFactory,
+        rootKey: undefined,
+      })
+      expect(result).toBe(mockResult)
     })
   })
 })

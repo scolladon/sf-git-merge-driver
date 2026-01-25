@@ -1,12 +1,24 @@
+import { deepEqual } from 'fast-equals'
 import type { JsonArray, JsonObject } from '../../types/jsonTypes.js'
 import type { MergeResult } from '../../types/mergeResult.js'
 import { combineResults } from '../../types/mergeResult.js'
 import type { MergeContext } from '../MergeContext.js'
-import { getUniqueSortedProps, wrapWithRootKey } from '../nodes/nodeUtils.js'
+import {
+  buildEarlyResult,
+  getUniqueSortedProps,
+  wrapWithRootKey,
+} from '../nodes/nodeUtils.js'
 import type { ScenarioStrategy } from './ScenarioStrategy.js'
 
 export class AllPresentStrategy implements ScenarioStrategy {
   execute(context: MergeContext): MergeResult {
+    if (
+      deepEqual(context.ancestor, context.local) &&
+      deepEqual(context.local, context.other)
+    ) {
+      return buildEarlyResult(context.local, context.rootKey)
+    }
+
     const result = this.mergeChildren(context)
     if (context.rootKey) {
       return wrapWithRootKey(result, context.rootKey.name)
