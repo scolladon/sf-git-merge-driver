@@ -24,31 +24,17 @@ export class TextArrayMergeNode implements MergeNode {
   merge(_config: MergeConfig): MergeResult {
     const localSet = new Set(this.local)
     const otherSet = new Set(this.other)
-    const resultItems: JsonValue[] = []
-    const seen = new Set<JsonValue>()
+    const ancestorSet = new Set(this.ancestor)
 
-    for (const item of this.ancestor) {
-      if (seen.has(item)) continue
-      seen.add(item)
-      if (localSet.has(item) && otherSet.has(item)) {
-        resultItems.push(item)
-      }
-    }
+    const resultItems = new Set([
+      ...this.ancestor.filter(item => localSet.has(item) && otherSet.has(item)),
+      ...this.local.filter(item => !ancestorSet.has(item)),
+      ...this.other.filter(item => !ancestorSet.has(item)),
+    ])
 
-    for (const item of this.local) {
-      if (seen.has(item)) continue
-      seen.add(item)
-      resultItems.push(item)
-    }
-
-    for (const item of this.other) {
-      if (seen.has(item)) continue
-      seen.add(item)
-      resultItems.push(item)
-    }
-
-    resultItems.sort(compareItems)
-    const merged = resultItems.map(item => generateObj(item, this.attribute))
+    const merged = [...resultItems]
+      .sort(compareItems)
+      .map(item => generateObj(item, this.attribute))
 
     return noConflict(merged)
   }
