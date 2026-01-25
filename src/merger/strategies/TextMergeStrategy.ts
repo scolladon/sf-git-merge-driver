@@ -5,7 +5,7 @@ import { noConflict, withConflict } from '../../types/mergeResult.js'
 import { MergeScenario } from '../../types/mergeScenario.js'
 import { buildConflictMarkers } from '../ConflictMarkerBuilder.js'
 
-export interface TextMergeStrategy {
+interface TextMergeStrategy {
   handle(
     config: MergeConfig,
     objAncestor: JsonObject,
