@@ -166,6 +166,15 @@ You can check if the merge driver is enabled by running the following command:
 grep "merge=salesforce-source" .git/info/attributes
 ```
 
+## Behavior when the merge driver does not know the key
+
+If the merge driver encounters a list of elements (like fields in a profile, or permissions in a permission set) but does not know which field acts as the "key" (unique identifier) for that type, it will fallback to standard conflict behavior.
+This means you might see a conflict block containing the entire array instead of a smart merge of individual elements.
+
+**If you encounter this behavior for a Salesforce metadata type the driver is supposed to handle, please open an issue!** We can add the missing key definition to support smart merging for that type.
+
+**If you encounter this behavior for a Salesforce metadata type the driver does not already handle, please open an issue!** We can evaluate how to support smart merging for that type.
+
 ## Troubleshooting
 
 The plugin uses the [Salesforce CLI logging system](https://developer.salesforce.com/docs/atlas.en-us.sfdx_setup.meta/sfdx_setup/sfdx_dev_cli_log_messages.htm) to log information.
