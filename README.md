@@ -62,6 +62,8 @@ This approach helps you understand:
 
 ## Installation (30 seconds)
 
+### With Salesforce CLI
+
 ```bash
 # Install plugin (one time, global)
 sf plugins install sf-git-merge-driver
@@ -70,6 +72,12 @@ sf plugins install sf-git-merge-driver
 cd my/sf/project
 sf git merge driver install
 ```
+
+### Integration in VsCode SFDX-Hardis
+
+[SFDX-Hardis VS Code extension](https://marketplace.visualstudio.com/items?itemName=NicolasVuillamy.vscode-sfdx-hardis) has integrated the sf-git-merge-driver in its default dependencies, and offers a one click activation of the merge driver from the status bar, as shown below:
+
+![VsCode SFDX-Hardis integration](./docs/media/activate-merge-driver-in-sfdx-hardis.gif)
 
 ## Usage
 
