@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.1](https://github.com/scolladon/sf-git-merge-driver/compare/v1.4.0...v1.4.1) (2026-01-26)
+
+
+### Bug Fixes
+
+* explain CI/CD specificities ([#160](https://github.com/scolladon/sf-git-merge-driver/issues/160)) ([17b8ad6](https://github.com/scolladon/sf-git-merge-driver/commit/17b8ad6c01e0d094cdf06602fffa72ee35934402))
+* manifest merge ([#159](https://github.com/scolladon/sf-git-merge-driver/issues/159)) ([924eda8](https://github.com/scolladon/sf-git-merge-driver/commit/924eda82ac81991ae75422eeff0a47ddce3b6374))
+
 ## [1.4.0](https://github.com/scolladon/sf-git-merge-driver/compare/v1.3.0...v1.4.0) (2026-01-22)
 
 
