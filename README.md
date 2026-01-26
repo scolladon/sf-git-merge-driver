@@ -174,6 +174,12 @@ You can check if the merge driver is enabled by running the following command:
 grep "merge=salesforce-source" .git/info/attributes
 ```
 
+## Specificities in CI/CD context
+
+The plugin will add content in the file `$GIT_DIR/info/attributes` to enable the merge driver.
+This files need to be present for the plugin to be installed.
+Ensure the repository is properly cloned / checked out in CI/CD context before installing the plugin.
+
 ## Behavior when the merge driver does not know the key
 
 If the merge driver encounters a list of elements (like fields in a profile, or permissions in a permission set) but does not know which field acts as the "key" (unique identifier) for that type, it will fallback to standard conflict behavior.
