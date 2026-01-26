@@ -27,7 +27,12 @@ export default {
   coverageDirectory: 'reports/coverage',
 
   // An array of regexp pattern strings used to skip coverage collection
-  coveragePathIgnorePatterns: ['/node_modules/', '/test/utils/', '/reports/', '/e2e/'],
+  coveragePathIgnorePatterns: [
+    '/node_modules/',
+    '/test/utils/',
+    '/reports/',
+    '/e2e/',
+  ],
 
   // A list of reporter names that Jest uses when writing coverage reports
   coverageReporters: [
@@ -128,7 +133,7 @@ export default {
   // runner: "jest-runner",
 
   // The paths to modules that run some code to configure or set up the testing environment before each test
-  setupFiles: ['./test/utils/setupConflictMarker.ts'],
+  // setupFiles: [],
 
   // A list of paths to modules that run some code to configure or set up the testing framework before each test
   // setupFilesAfterEnv: [],

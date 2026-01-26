@@ -1,8 +1,7 @@
+import { isEmpty } from 'lodash-es'
+import { NAMESPACE_PREFIX, NAMESPACE_ROOT } from '../constant/parserConstant.js'
 import type { JsonArray, JsonObject } from '../types/jsonTypes.js'
 import { log } from '../utils/LoggingDecorator.js'
-
-const NAMESPACE_PREFIX = '@_'
-const NAMESPACE_ROOT = ':@'
 
 export class NamespaceHandler {
   @log
@@ -32,7 +31,7 @@ export class NamespaceHandler {
 
   @log
   public addNamespacesToResult(acc: JsonArray, namespaces: JsonObject): void {
-    if (Object.keys(namespaces).length > 0 && acc.length > 0) {
+    if (!isEmpty(namespaces) && !isEmpty(acc)) {
       // Create a root object if needed
       const rootObject = acc[0] as JsonObject
 

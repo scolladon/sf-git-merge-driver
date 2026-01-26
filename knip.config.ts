@@ -10,5 +10,5 @@ export default {
   ],
   project: ['**/*.{ts,js,json,yml}'],
   ignoreDependencies: ['@commitlint/config-conventional', 'lodash'],
-  ignoreBinaries: ['commitlint', 'npm-check-updates'],
+  ignoreBinaries: ['commitlint', 'jscpd', 'npm-check-updates'],
 }

@@ -1,11 +1,14 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { normalize } from 'node:path'
 import { XmlMerger } from '../merger/XmlMerger.js'
+import type { MergeConfig } from '../types/conflictTypes.js'
 import { log } from '../utils/LoggingDecorator.js'
 import { Logger } from '../utils/LoggingService.js'
 import { detectEol, normalizeEol } from '../utils/mergeUtils.js'
 
 export class MergeDriver {
+  constructor(private readonly config: MergeConfig) {}
+
   @log
   async mergeFiles(
     ancestorFile: string,
@@ -19,7 +22,7 @@ export class MergeDriver {
         .map(path => readFile(path, 'utf8'))
     )
 
-    const xmlMerger = new XmlMerger()
+    const xmlMerger = new XmlMerger(this.config)
 
     try {
       const mergedContent = xmlMerger.mergeThreeWay(

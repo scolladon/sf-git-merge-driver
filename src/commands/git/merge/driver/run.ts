@@ -8,8 +8,7 @@ import {
 } from '../../../../constant/conflictConstant.js'
 import { PLUGIN_NAME } from '../../../../constant/pluginConstant.js'
 import { MergeDriver } from '../../../../driver/MergeDriver.js'
-import { ConflictMarker } from '../../../../merger/conflictMarker.js'
-import { conflicConfig } from '../../../../types/conflictTypes.js'
+import type { MergeConfig } from '../../../../types/conflictTypes.js'
 import { log } from '../../../../utils/LoggingDecorator.js'
 import { Logger } from '../../../../utils/LoggingService.js'
 
@@ -77,18 +76,18 @@ export default class Run extends SfCommand<void> {
   public async run(): Promise<void> {
     Logger.info('Merge starting')
     const { flags } = await this.parse(Run)
-    const conflicConfig: conflicConfig = {
+
+    const config: MergeConfig = {
       conflictMarkerSize: flags['conflict-marker-size'],
       ancestorConflictTag: flags['ancestor-conflict-tag'],
       localConflictTag: flags['local-conflict-tag'],
       otherConflictTag: flags['other-conflict-tag'],
     }
-    ConflictMarker.setConflictConfig(conflicConfig)
 
     Logger.debug(`flags: ${JSON.stringify(flags)}`)
-    Logger.debug(`conflicConfig: ${JSON.stringify(conflicConfig)}`)
+    Logger.debug(`config: ${JSON.stringify(config)}`)
 
-    const mergeDriver = new MergeDriver()
+    const mergeDriver = new MergeDriver(config)
     const hasConflict = await mergeDriver.mergeFiles(
       flags['ancestor-file'],
       flags['local-file'],
