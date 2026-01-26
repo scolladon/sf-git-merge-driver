@@ -36,6 +36,30 @@ sequenceDiagram
     Git->>Dev: Clean commit (no conflicts)
 ```
 
+## Conflict Style
+
+This merge driver follows the **zdiff3** conflict style philosophy:
+
+- **Shows the most compact diff possible**: Only the specific conflicting elements are marked, not entire file sections
+- **Includes ancestor context**: Conflicts display the base (ancestor) version alongside local and remote changes
+- **Respects Git configuration**: Conflict marker size and labels are configurable via Git's standard parameters (`-L`, `-S`, `-X`, `-Y` flags)
+
+Example conflict output:
+```xml
+<<<<<<< ours
+    <field>localValue</field>
+||||||| base
+    <field>originalValue</field>
+=======
+    <field>remoteValue</field>
+>>>>>>> theirs
+```
+
+This approach helps you understand:
+1. What the original value was (`base`)
+2. What your branch changed it to (`ours`)
+3. What the other branch changed it to (`theirs`)
+
 ## Installation (30 seconds)
 
 ```bash
@@ -141,6 +165,15 @@ You can check if the merge driver is enabled by running the following command:
 ```sh
 grep "merge=salesforce-source" .git/info/attributes
 ```
+
+## Behavior when the merge driver does not know the key
+
+If the merge driver encounters a list of elements (like fields in a profile, or permissions in a permission set) but does not know which field acts as the "key" (unique identifier) for that type, it will fallback to standard conflict behavior.
+This means you might see a conflict block containing the entire array instead of a smart merge of individual elements.
+
+**If you encounter this behavior for a Salesforce metadata type the driver is supposed to handle, please open an issue!** We can add the missing key definition to support smart merging for that type.
+
+**If you encounter this behavior for a Salesforce metadata type the driver does not already handle, please open an issue!** We can evaluate how to support smart merging for that type.
 
 ## Troubleshooting
 
@@ -255,7 +288,7 @@ EXAMPLES
     $ sf git merge driver install
 ```
 
-_See code: [src/commands/git/merge/driver/install.ts](https://github.com/scolladon/sf-git-merge-driver/blob/v1.3.0/src/commands/git/merge/driver/install.ts)_
+_See code: [src/commands/git/merge/driver/install.ts](https://github.com/scolladon/sf-git-merge-driver/blob/main/src/commands/git/merge/driver/install.ts)_
 
 ## `sf git merge driver run`
 
@@ -272,9 +305,9 @@ FLAGS
   -L, --conflict-marker-size=<value>   [default: 7] number of characters to show for conflict markers
   -O, --ancestor-file=<value>          (required) path to the common ancestor version of the file
   -P, --output-file=<value>            (required) path to the file where the merged content will be written
-  -S, --ancestor-conflict-tag=<value>  [default: BASE] string used to tag ancestor version in conflicts
-  -X, --local-conflict-tag=<value>     [default: LOCAL] string used to tag local version in conflicts
-  -Y, --other-conflict-tag=<value>     [default: REMOTE] string used to tag other version in conflicts
+  -S, --ancestor-conflict-tag=<value>  [default: base] string used to tag ancestor version in conflicts
+  -X, --local-conflict-tag=<value>     [default: ours] string used to tag local version in conflicts
+  -Y, --other-conflict-tag=<value>     [default: theirs] string used to tag other version in conflicts
 
 GLOBAL FLAGS
   --flags-dir=<value>  Import flag values from a directory.
@@ -299,7 +332,7 @@ EXAMPLES
   - output-file is the path to the file where the merged content will be written
 ```
 
-_See code: [src/commands/git/merge/driver/run.ts](https://github.com/scolladon/sf-git-merge-driver/blob/v1.3.0/src/commands/git/merge/driver/run.ts)_
+_See code: [src/commands/git/merge/driver/run.ts](https://github.com/scolladon/sf-git-merge-driver/blob/main/src/commands/git/merge/driver/run.ts)_
 
 ## `sf git merge driver uninstall`
 
@@ -329,7 +362,7 @@ EXAMPLES
     $ sf git merge driver uninstall
 ```
 
-_See code: [src/commands/git/merge/driver/uninstall.ts](https://github.com/scolladon/sf-git-merge-driver/blob/v1.3.0/src/commands/git/merge/driver/uninstall.ts)_
+_See code: [src/commands/git/merge/driver/uninstall.ts](https://github.com/scolladon/sf-git-merge-driver/blob/main/src/commands/git/merge/driver/uninstall.ts)_
 <!-- commandsstop -->
 ## Changelog
 

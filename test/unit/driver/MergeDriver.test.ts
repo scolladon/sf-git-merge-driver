@@ -1,4 +1,11 @@
+import {
+  DEFAULT_ANCESTOR_CONFLICT_TAG,
+  DEFAULT_CONFLICT_MARKER_SIZE,
+  DEFAULT_LOCAL_CONFLICT_TAG,
+  DEFAULT_OTHER_CONFLICT_TAG,
+} from '../../../src/constant/conflictConstant.js'
 import { MergeDriver } from '../../../src/driver/MergeDriver.js'
+import type { MergeConfig } from '../../../src/types/conflictTypes.js'
 
 const mockReadFile = jest.fn()
 const mockWriteFile = jest.fn()
@@ -14,11 +21,18 @@ jest.mock('../../../src/merger/XmlMerger.js', () => ({
   })),
 }))
 
+const defaultConfig: MergeConfig = {
+  conflictMarkerSize: DEFAULT_CONFLICT_MARKER_SIZE,
+  ancestorConflictTag: DEFAULT_ANCESTOR_CONFLICT_TAG,
+  localConflictTag: DEFAULT_LOCAL_CONFLICT_TAG,
+  otherConflictTag: DEFAULT_OTHER_CONFLICT_TAG,
+}
+
 describe('MergeDriver', () => {
   let sut: MergeDriver
 
   beforeEach(() => {
-    sut = new MergeDriver()
+    sut = new MergeDriver(defaultConfig)
   })
 
   describe('mergeFiles', () => {
