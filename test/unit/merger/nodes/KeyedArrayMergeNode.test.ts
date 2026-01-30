@@ -4,9 +4,12 @@ import {
   DEFAULT_LOCAL_CONFLICT_TAG,
   DEFAULT_OTHER_CONFLICT_TAG,
 } from '../../../../src/constant/conflictConstant.js'
+import { TEXT_TAG } from '../../../../src/constant/parserConstant.js'
+import { buildConflictMarkers } from '../../../../src/merger/ConflictMarkerBuilder.js'
 import { KeyedArrayMergeNode } from '../../../../src/merger/nodes/KeyedArrayMergeNode.js'
+import { generateObj } from '../../../../src/merger/nodes/nodeUtils.js'
 import type { MergeConfig } from '../../../../src/types/conflictTypes.js'
-import type { JsonArray } from '../../../../src/types/jsonTypes.js'
+import type { JsonArray, JsonObject } from '../../../../src/types/jsonTypes.js'
 
 const defaultConfig: MergeConfig = {
   conflictMarkerSize: DEFAULT_CONFLICT_MARKER_SIZE,
@@ -14,6 +17,15 @@ const defaultConfig: MergeConfig = {
   localConflictTag: DEFAULT_LOCAL_CONFLICT_TAG,
   otherConflictTag: DEFAULT_OTHER_CONFLICT_TAG,
 }
+
+const extractFrom =
+  (item: JsonObject) => (key: string) => (attribut: string) => {
+    const customValue = item[key] as JsonArray
+    const nameObj = customValue.find(
+      i => (i as JsonObject)[attribut]
+    ) as JsonObject
+    return ((nameObj[attribut] as JsonArray)[0] as JsonObject)[TEXT_TAG]
+  }
 
 describe('KeyedArrayMergeNode', () => {
   describe('merge with key field (fieldPermissions)', () => {
@@ -321,6 +333,133 @@ describe('KeyedArrayMergeNode', () => {
       // Assert - deletion in both branches should not cause conflict
       expect(result.hasConflict).toBe(false)
       expect(result.output.length).toBe(1)
+    })
+  })
+
+  describe('deterministic ordering specific algorithm', () => {
+    it('when switching order of elements, in Local, should sort keys in deterministic order', () => {
+      // Arrange
+      const ancestor = [
+        { fullName: 'Name', default: 'false', label: 'Name' },
+        { fullName: 'Type', default: 'true', label: 'Type' },
+      ]
+      const local = [
+        { fullName: 'Type', default: 'true', label: 'Type' },
+        { fullName: 'Name', default: 'false', label: 'Name' },
+      ]
+      const other = ancestor
+      const node = new KeyedArrayMergeNode(
+        ancestor,
+        local,
+        other,
+        'customValue'
+      )
+
+      // Act
+      const result = node.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      expect(result.output.length).toBe(2)
+
+      const firstFullName = extractFrom(result.output[0] as JsonObject)(
+        'customValue'
+      )('fullName')
+      const secondFullName = extractFrom(result.output[1] as JsonObject)(
+        'customValue'
+      )('fullName')
+      expect(firstFullName).toBe('Type')
+      expect(secondFullName).toBe('Name')
+    })
+
+    it('when switching order of elements, in Others, should sort keys in deterministic order', () => {
+      // Arrange
+      const ancestor = [
+        { fullName: 'Name', default: 'false', label: 'Name' },
+        { fullName: 'Type', default: 'true', label: 'Type' },
+      ]
+      const local = ancestor
+      const other = [
+        { fullName: 'Type', default: 'true', label: 'Type' },
+        { fullName: 'Name', default: 'false', label: 'Name' },
+      ]
+      const node = new KeyedArrayMergeNode(
+        ancestor,
+        local,
+        other,
+        'customValue'
+      )
+
+      // Act
+      const result = node.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      expect(result.output.length).toBe(2)
+
+      const firstFullName = extractFrom(result.output[0] as JsonObject)(
+        'customValue'
+      )('fullName')
+      const secondFullName = extractFrom(result.output[1] as JsonObject)(
+        'customValue'
+      )('fullName')
+      expect(firstFullName).toBe('Type')
+      expect(secondFullName).toBe('Name')
+    })
+
+    it(' should sort keys in deterministic order', () => {
+      // Arrange
+      const ancestor = [
+        { fullName: 'Name', default: 'false', label: 'Name' },
+        { fullName: 'Type', default: 'true', label: 'Type' },
+      ]
+      const local = [
+        { fullName: 'Name', default: 'false', label: 'Name' },
+        { fullName: 'Local', default: 'false', label: 'Local' },
+        { fullName: 'Type', default: 'true', label: 'Type' },
+      ]
+      const other = [
+        { fullName: 'Name', default: 'false', label: 'Name' },
+        { fullName: 'Other', default: 'false', label: 'Other' },
+        { fullName: 'Type', default: 'true', label: 'Type' },
+      ]
+      const node = new KeyedArrayMergeNode(
+        ancestor,
+        local,
+        other,
+        'customValue'
+      )
+
+      // Act
+      const result = node.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      expect(result.output.length).toBe(4)
+
+      const conflictMarkers = buildConflictMarkers(
+        defaultConfig,
+        local[1],
+        {},
+        other[1]
+      )
+      expect(result.output).toEqual([
+        {
+          customValue: [
+            generateObj('fullName', 'Name'),
+            generateObj('default', 'false'),
+            generateObj('label', 'Name'),
+          ],
+        },
+        ...conflictMarkers,
+        {
+          customValue: [
+            generateObj('fullName', 'Type'),
+            generateObj('default', 'true'),
+            generateObj('label', 'Type'),
+          ],
+        },
+      ])
     })
   })
 })
