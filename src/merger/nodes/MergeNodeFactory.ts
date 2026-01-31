@@ -5,10 +5,11 @@ import {
   isObject as lodashIsObject,
   some,
 } from 'lodash-es'
-import type { JsonArray, JsonValue } from '../../types/jsonTypes.js'
+import type { JsonArray, JsonObject, JsonValue } from '../../types/jsonTypes.js'
 import { KeyedArrayMergeNode } from './KeyedArrayMergeNode.js'
 import type { MergeNode } from './MergeNode.js'
 import { ensureArray } from './nodeUtils.js'
+import { ObjectMergeNode } from './ObjectMergeNode.js'
 import { TextArrayMergeNode } from './TextArrayMergeNode.js'
 import { TextMergeNode } from './TextMergeNode.js'
 
@@ -37,6 +38,7 @@ export class DefaultMergeNodeFactory implements MergeNodeFactory {
     const [ancestorArr, localArr, otherArr] = [ancestor, local, other].map(
       ensureArray
     )
+    // ...
 
     if (hasStringArray(ancestor, local, other)) {
       return new TextArrayMergeNode(
@@ -44,6 +46,21 @@ export class DefaultMergeNodeFactory implements MergeNodeFactory {
         localArr as JsonArray,
         otherArr as JsonArray,
         attribute
+      )
+    }
+
+    // New logic: Check if purely objects (not arrays)
+    const isPureObject = (val: JsonValue | undefined) =>
+      lodashIsObject(val) && !isArray(val)
+
+    if (
+      some([ancestor, local, other], isPureObject) &&
+      !some([ancestor, local, other], isArray)
+    ) {
+      return new ObjectMergeNode(
+        ancestor as JsonObject,
+        local as JsonObject,
+        other as JsonObject
       )
     }
 
