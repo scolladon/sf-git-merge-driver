@@ -436,6 +436,121 @@ describe('KeyedArrayMergeNode', () => {
         expect(result.hasConflict).toBe(false)
         expect(extractLabels(result.output)).toEqual(['A_MOD'])
       })
+
+      // M4: Only local adds element in gap
+      it('M4: One-Sided Addition (Local)', () => {
+        const ancestor = [
+          { fullName: 'A', label: 'A' },
+          { fullName: 'C', label: 'C' },
+        ]
+        const local = [
+          { fullName: 'A', label: 'A' },
+          { fullName: 'B', label: 'B' }, // B added by local
+          { fullName: 'C', label: 'C' },
+        ]
+        const other = [
+          { fullName: 'A', label: 'A' },
+          { fullName: 'C', label: 'C' },
+        ] // unchanged
+
+        const node = createNode(ancestor, local, other)
+        const result = node.merge(defaultConfig)
+
+        expect(result.hasConflict).toBe(false)
+        expect(extractLabels(result.output)).toEqual(['A', 'B', 'C'])
+      })
+
+      // M5: Only other adds element in gap
+      it('M5: One-Sided Addition (Other)', () => {
+        const ancestor = [
+          { fullName: 'A', label: 'A' },
+          { fullName: 'C', label: 'C' },
+        ]
+        const local = [
+          { fullName: 'A', label: 'A' },
+          { fullName: 'C', label: 'C' },
+        ] // unchanged
+        const other = [
+          { fullName: 'A', label: 'A' },
+          { fullName: 'B', label: 'B' }, // B added by other
+          { fullName: 'C', label: 'C' },
+        ]
+
+        const node = createNode(ancestor, local, other)
+        const result = node.merge(defaultConfig)
+
+        expect(result.hasConflict).toBe(false)
+        expect(extractLabels(result.output)).toEqual(['A', 'B', 'C'])
+      })
+
+      // M6: Both sides add the same element in gap
+      it('M6: Identical Addition (Both)', () => {
+        const ancestor = [{ fullName: 'A', label: 'A' }]
+        const local = [
+          { fullName: 'A', label: 'A' },
+          { fullName: 'B', label: 'B' }, // B added
+        ]
+        const other = [
+          { fullName: 'A', label: 'A' },
+          { fullName: 'B', label: 'B' }, // Same B added
+        ]
+
+        const node = createNode(ancestor, local, other)
+        const result = node.merge(defaultConfig)
+
+        expect(result.hasConflict).toBe(false)
+        expect(extractLabels(result.output)).toEqual(['A', 'B'])
+      })
+
+      // M7: Other deletes element, local keeps unchanged (accepts deletion)
+      it('M7: One-Sided Deletion (Other)', () => {
+        const ancestor = [
+          { fullName: 'A', label: 'A' },
+          { fullName: 'B', label: 'B' },
+          { fullName: 'C', label: 'C' },
+        ]
+        const local = [
+          { fullName: 'A', label: 'A' },
+          { fullName: 'B', label: 'B' }, // B kept unchanged
+          { fullName: 'C', label: 'C' },
+        ]
+        const other = [
+          { fullName: 'A', label: 'A' },
+          // B deleted
+          { fullName: 'C', label: 'C' },
+        ]
+
+        const node = createNode(ancestor, local, other)
+        const result = node.merge(defaultConfig)
+
+        expect(result.hasConflict).toBe(false)
+        expect(extractLabels(result.output)).toEqual(['A', 'C']) // B removed
+      })
+
+      // M8: Both sides delete the same element (setsEqual returns true)
+      it('M8: Identical Deletion (Both)', () => {
+        const ancestor = [
+          { fullName: 'A', label: 'A' },
+          { fullName: 'B', label: 'B' },
+          { fullName: 'C', label: 'C' },
+        ]
+        const local = [
+          { fullName: 'A', label: 'A' },
+          // B deleted
+          { fullName: 'C', label: 'C' },
+        ]
+        const other = [
+          { fullName: 'A', label: 'A' },
+          // B deleted (same deletion)
+          { fullName: 'C', label: 'C' },
+        ]
+
+        const node = createNode(ancestor, local, other)
+        const result = node.merge(defaultConfig)
+
+        expect(result.hasConflict).toBe(false)
+        expect(extractLabels(result.output)).toEqual(['A', 'C'])
+      })
     })
 
     describe('Conflicts', () => {
