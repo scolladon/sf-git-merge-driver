@@ -5,6 +5,7 @@ import {
   isObject as lodashIsObject,
   some,
 } from 'lodash-es'
+import { MetadataService } from '../../service/MetadataService.js'
 import type { JsonArray, JsonObject, JsonValue } from '../../types/jsonTypes.js'
 import { KeyedArrayMergeNode } from './KeyedArrayMergeNode.js'
 import type { MergeNode } from './MergeNode.js'
@@ -13,11 +14,31 @@ import { ObjectMergeNode } from './ObjectMergeNode.js'
 import { TextArrayMergeNode } from './TextArrayMergeNode.js'
 import { TextMergeNode } from './TextMergeNode.js'
 
-const hasObject = (...values: (JsonValue | undefined | null)[]): boolean =>
+const isKnownObject = (...values: (JsonValue | undefined | null)[]): boolean =>
   some(values, lodashIsObject)
 
-const hasStringArray = (...values: (JsonValue | undefined | null)[]): boolean =>
+const isStringArray = (...values: (JsonValue | undefined | null)[]): boolean =>
   some(values, value => isArray(value) && every(value, isString))
+
+const isPureObject = (val: JsonValue | undefined | null): boolean =>
+  lodashIsObject(val) && !isArray(val)
+
+/**
+ * Check if values should be merged as pure objects (property-by-property).
+ * Returns true when all values are objects (not arrays) AND the attribute
+ * has no key extractor defined (otherwise it should be a keyed array).
+ */
+const isPureUnknown = (
+  values: (JsonValue | undefined | null)[],
+  attribute: string
+): boolean => {
+  const hasKeyExtractor =
+    MetadataService.getKeyFieldExtractor(attribute) !== undefined
+  const hasPureObject = some(values, isPureObject)
+  const hasArray = some(values, isArray)
+
+  return !hasKeyExtractor && hasPureObject && !hasArray
+}
 
 export interface MergeNodeFactory {
   createNode(
@@ -35,12 +56,11 @@ export class DefaultMergeNodeFactory implements MergeNodeFactory {
     other: JsonValue,
     attribute: string
   ): MergeNode {
-    const [ancestorArr, localArr, otherArr] = [ancestor, local, other].map(
-      ensureArray
-    )
-    // ...
-
-    if (hasStringArray(ancestor, local, other)) {
+    // String arrays → TextArrayMergeNode
+    if (isStringArray(ancestor, local, other)) {
+      const [ancestorArr, localArr, otherArr] = [ancestor, local, other].map(
+        ensureArray
+      )
       return new TextArrayMergeNode(
         ancestorArr as JsonArray,
         localArr as JsonArray,
@@ -49,14 +69,8 @@ export class DefaultMergeNodeFactory implements MergeNodeFactory {
       )
     }
 
-    // New logic: Check if purely objects (not arrays)
-    const isPureObject = (val: JsonValue | undefined) =>
-      lodashIsObject(val) && !isArray(val)
-
-    if (
-      some([ancestor, local, other], isPureObject) &&
-      !some([ancestor, local, other], isArray)
-    ) {
+    // Pure objects without key extractor → ObjectMergeNode (property-by-property)
+    if (isPureUnknown([ancestor, local, other], attribute)) {
       return new ObjectMergeNode(
         ancestor as JsonObject,
         local as JsonObject,
@@ -64,7 +78,11 @@ export class DefaultMergeNodeFactory implements MergeNodeFactory {
       )
     }
 
-    if (hasObject(ancestor, local, other)) {
+    // Arrays/objects containing objects with known key extractor → KeyedArrayMergeNode
+    if (isKnownObject(ancestor, local, other)) {
+      const [ancestorArr, localArr, otherArr] = [ancestor, local, other].map(
+        ensureArray
+      )
       return new KeyedArrayMergeNode(
         ancestorArr as JsonArray,
         localArr as JsonArray,
