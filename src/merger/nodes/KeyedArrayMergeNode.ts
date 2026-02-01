@@ -18,31 +18,16 @@ import { toJsonArray } from './nodeUtils.js'
 
 type KeyExtractor = (item: JsonObject) => string
 
-/**
- * Context holding the three-way merge state for ordered arrays.
- */
-interface MergeContext {
-  ancestorKeys: string[]
-  localKeys: string[]
-  otherKeys: string[]
-  ancestorMap: Map<string, JsonObject>
-  localMap: Map<string, JsonObject>
-  otherMap: Map<string, JsonObject>
-}
+// ============================================================================
+// Strategy Interface
+// ============================================================================
 
-/**
- * Set operations result for a gap
- */
-interface GapSets {
-  localDeleted: Set<string>
-  otherDeleted: Set<string>
-  localAdded: Set<string>
-  otherAdded: Set<string>
-  allKeys: Set<string>
+interface KeyedArrayMergeStrategy {
+  merge(config: MergeConfig): MergeResult
 }
 
 // ============================================================================
-// Pure utility functions
+// Shared Helpers
 // ============================================================================
 
 const filterEmptyTextNodes = (markers: JsonArray): JsonArray =>
@@ -65,6 +50,108 @@ const buildKeyedMap = (
   }
   return map
 }
+
+// ============================================================================
+// Unkeyed Conflict Strategy
+// ============================================================================
+
+class UnkeyedConflictStrategy implements KeyedArrayMergeStrategy {
+  constructor(
+    private readonly ancestor: JsonArray,
+    private readonly local: JsonArray,
+    private readonly other: JsonArray,
+    private readonly attribute: string
+  ) {}
+
+  merge(config: MergeConfig): MergeResult {
+    const unwrap = (arr: JsonArray) =>
+      (arr.length === 1 ? arr[0] : arr) as JsonObject | JsonArray
+
+    return withConflict(
+      buildConflictMarkers(
+        config,
+        unwrap(toJsonArray({ [this.attribute]: this.local })),
+        unwrap(toJsonArray({ [this.attribute]: this.ancestor })),
+        unwrap(toJsonArray({ [this.attribute]: this.other }))
+      )
+    )
+  }
+}
+
+// ============================================================================
+// Unordered Strategy
+// ============================================================================
+
+class UnorderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
+  constructor(
+    private readonly ancestor: JsonArray,
+    private readonly local: JsonArray,
+    private readonly other: JsonArray,
+    private readonly attribute: string,
+    private readonly keyField: KeyExtractor
+  ) {}
+
+  merge(config: MergeConfig): MergeResult {
+    const allKeys = this.collectAllKeys()
+    const keyedAncestor = buildKeyedMap(this.ancestor, this.keyField)
+    const keyedLocal = buildKeyedMap(this.local, this.keyField)
+    const keyedOther = buildKeyedMap(this.other, this.keyField)
+
+    const results: MergeResult[] = []
+    const orchestrator = new MergeOrchestrator(config, defaultNodeFactory)
+
+    for (const key of Array.from(allKeys).sort()) {
+      const result = orchestrator.merge(
+        keyedAncestor.get(key) ?? {},
+        keyedLocal.get(key) ?? {},
+        keyedOther.get(key) ?? {},
+        this.attribute
+      )
+
+      if (!isEmpty(result.output)) {
+        results.push({
+          output: [{ [this.attribute]: result.output }],
+          hasConflict: result.hasConflict,
+        })
+      }
+    }
+
+    return combineResults(results)
+  }
+
+  private collectAllKeys(): Set<string> {
+    const allKeys = new Set<string>()
+    for (const arr of [this.ancestor, this.local, this.other]) {
+      for (const item of arr) {
+        allKeys.add(this.keyField(item as JsonObject))
+      }
+    }
+    return allKeys
+  }
+}
+
+// ============================================================================
+// Ordered Strategy
+// ============================================================================
+
+interface MergeContext {
+  ancestorKeys: string[]
+  localKeys: string[]
+  otherKeys: string[]
+  ancestorMap: Map<string, JsonObject>
+  localMap: Map<string, JsonObject>
+  otherMap: Map<string, JsonObject>
+}
+
+interface GapSets {
+  localDeleted: Set<string>
+  otherDeleted: Set<string>
+  localAdded: Set<string>
+  otherAdded: Set<string>
+  allKeys: Set<string>
+}
+
+// Ordered strategy helpers
 
 const hasSameOrder = (a: string[], b: string[]): boolean => {
   const bSet = new Set(b)
@@ -140,94 +227,17 @@ const setsIntersect = (a: Set<string>, b: Set<string>): boolean => {
   return false
 }
 
-// ============================================================================
-// KeyedArrayMergeNode
-// ============================================================================
-
-export class KeyedArrayMergeNode implements MergeNode {
+class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   constructor(
     private readonly ancestor: JsonArray,
     private readonly local: JsonArray,
     private readonly other: JsonArray,
-    private readonly attribute: string
+    private readonly attribute: string,
+    private readonly keyField: KeyExtractor
   ) {}
 
   merge(config: MergeConfig): MergeResult {
-    const keyField = MetadataService.getKeyFieldExtractor(this.attribute)
-
-    if (!keyField) {
-      return this.buildUnkeyedConflict(config)
-    }
-
-    return MetadataService.isOrderedAttribute(this.attribute)
-      ? this.mergeOrdered(config, keyField)
-      : this.mergeUnordered(config, keyField)
-  }
-
-  // ==========================================================================
-  // Entry points
-  // ==========================================================================
-
-  private buildUnkeyedConflict(config: MergeConfig): MergeResult {
-    const unwrap = (arr: JsonArray) =>
-      (arr.length === 1 ? arr[0] : arr) as JsonObject | JsonArray
-
-    return withConflict(
-      buildConflictMarkers(
-        config,
-        unwrap(toJsonArray({ [this.attribute]: this.local })),
-        unwrap(toJsonArray({ [this.attribute]: this.ancestor })),
-        unwrap(toJsonArray({ [this.attribute]: this.other }))
-      )
-    )
-  }
-
-  private mergeUnordered(
-    config: MergeConfig,
-    keyField: KeyExtractor
-  ): MergeResult {
-    const allKeys = new Set<string>()
-    for (const arr of [this.ancestor, this.local, this.other]) {
-      for (const item of arr) {
-        allKeys.add(keyField(item as JsonObject))
-      }
-    }
-
-    const keyedAncestor = buildKeyedMap(this.ancestor, keyField)
-    const keyedLocal = buildKeyedMap(this.local, keyField)
-    const keyedOther = buildKeyedMap(this.other, keyField)
-
-    const results: MergeResult[] = []
-    const orchestrator = new MergeOrchestrator(config, defaultNodeFactory)
-
-    for (const key of Array.from(allKeys).sort()) {
-      const result = orchestrator.merge(
-        keyedAncestor.get(key) ?? {},
-        keyedLocal.get(key) ?? {},
-        keyedOther.get(key) ?? {},
-        this.attribute
-      )
-
-      if (!isEmpty(result.output)) {
-        results.push({
-          output: [{ [this.attribute]: result.output }],
-          hasConflict: result.hasConflict,
-        })
-      }
-    }
-
-    return combineResults(results)
-  }
-
-  // ==========================================================================
-  // Ordered merge algorithm
-  // ==========================================================================
-
-  private mergeOrdered(
-    config: MergeConfig,
-    keyField: KeyExtractor
-  ): MergeResult {
-    const ctx = this.buildMergeContext(keyField)
+    const ctx = this.buildMergeContext()
 
     if (!hasSameOrder(ctx.localKeys, ctx.otherKeys)) {
       return this.buildFullArrayConflict(config, ctx)
@@ -241,37 +251,38 @@ export class KeyedArrayMergeNode implements MergeNode {
     return this.processSpine(config, spine, ctx)
   }
 
-  private buildMergeContext(keyField: KeyExtractor): MergeContext {
+  private buildMergeContext(): MergeContext {
     return {
-      ancestorKeys: this.ancestor.map(item => keyField(item as JsonObject)),
-      localKeys: this.local.map(item => keyField(item as JsonObject)),
-      otherKeys: this.other.map(item => keyField(item as JsonObject)),
-      ancestorMap: buildKeyedMap(this.ancestor, keyField),
-      localMap: buildKeyedMap(this.local, keyField),
-      otherMap: buildKeyedMap(this.other, keyField),
+      ancestorKeys: this.ancestor.map(item =>
+        this.keyField(item as JsonObject)
+      ),
+      localKeys: this.local.map(item => this.keyField(item as JsonObject)),
+      otherKeys: this.other.map(item => this.keyField(item as JsonObject)),
+      ancestorMap: buildKeyedMap(this.ancestor, this.keyField),
+      localMap: buildKeyedMap(this.local, this.keyField),
+      otherMap: buildKeyedMap(this.other, this.keyField),
     }
+  }
+
+  private wrapKeys(keys: string[], map: Map<string, JsonObject>): JsonArray {
+    return keys.map(k => ({ [this.attribute]: map.get(k)! }))
   }
 
   private buildFullArrayConflict(
     config: MergeConfig,
     ctx: MergeContext
   ): MergeResult {
-    const wrapKeys = (keys: string[], map: Map<string, JsonObject>) =>
-      keys.map(k => ({ [this.attribute]: map.get(k) }))
-
     return withConflict(
       buildConflictMarkers(
         config,
-        wrapKeys(ctx.localKeys, ctx.localMap) as JsonArray,
-        wrapKeys(ctx.ancestorKeys, ctx.ancestorMap) as JsonArray,
-        wrapKeys(ctx.otherKeys, ctx.otherMap) as JsonArray
+        this.wrapKeys(ctx.localKeys, ctx.localMap),
+        this.wrapKeys(ctx.ancestorKeys, ctx.ancestorMap),
+        this.wrapKeys(ctx.otherKeys, ctx.otherMap)
       )
     )
   }
 
-  // ==========================================================================
   // Spine processing
-  // ==========================================================================
 
   private processSpine(
     config: MergeConfig,
@@ -333,9 +344,7 @@ export class KeyedArrayMergeNode implements MergeNode {
     return result
   }
 
-  // ==========================================================================
   // Gap merging
-  // ==========================================================================
 
   private mergeGap(
     config: MergeConfig,
@@ -400,16 +409,13 @@ export class KeyedArrayMergeNode implements MergeNode {
     gapO: string[],
     ctx: MergeContext
   ): MergeResult {
-    const wrapKeys = (keys: string[], map: Map<string, JsonObject>) =>
-      keys.map(k => ({ [this.attribute]: map.get(k) }))
-
     return withConflict(
       filterEmptyTextNodes(
         buildConflictMarkers(
           config,
-          wrapKeys(gapL, ctx.localMap) as JsonArray,
-          wrapKeys(gapA, ctx.ancestorMap) as JsonArray,
-          wrapKeys(gapO, ctx.otherMap) as JsonArray
+          this.wrapKeys(gapL, ctx.localMap),
+          this.wrapKeys(gapA, ctx.ancestorMap),
+          this.wrapKeys(gapO, ctx.otherMap)
         )
       )
     )
@@ -473,13 +479,10 @@ export class KeyedArrayMergeNode implements MergeNode {
     if (!inA && inL && !inO) return noConflict([this.wrapElement(lVal!)])
 
     // Only other added
-    // (!inA && !inL && inO) - this is the only remaining case
     return noConflict([this.wrapElement(oVal!)])
   }
 
-  // ==========================================================================
   // Element helpers
-  // ==========================================================================
 
   private wrapElement(value: JsonObject): JsonObject {
     return { [this.attribute]: value }
@@ -531,5 +534,45 @@ export class KeyedArrayMergeNode implements MergeNode {
         buildConflictMarkers(config, wrap(lVal), wrap(aVal), wrap(oVal))
       )
     )
+  }
+}
+
+// ============================================================================
+// KeyedArrayMergeNode
+// ============================================================================
+
+export class KeyedArrayMergeNode implements MergeNode {
+  constructor(
+    private readonly ancestor: JsonArray,
+    private readonly local: JsonArray,
+    private readonly other: JsonArray,
+    private readonly attribute: string
+  ) {}
+
+  merge(config: MergeConfig): MergeResult {
+    const keyField = MetadataService.getKeyFieldExtractor(this.attribute)
+
+    if (!keyField) {
+      return new UnkeyedConflictStrategy(
+        this.ancestor,
+        this.local,
+        this.other,
+        this.attribute
+      ).merge(config)
+    }
+
+    const args = [
+      this.ancestor,
+      this.local,
+      this.other,
+      this.attribute,
+      keyField,
+    ] as const
+
+    const strategy = MetadataService.isOrderedAttribute(this.attribute)
+      ? new OrderedKeyedArrayMergeStrategy(...args)
+      : new UnorderedKeyedArrayMergeStrategy(...args)
+
+    return strategy.merge(config)
   }
 }
