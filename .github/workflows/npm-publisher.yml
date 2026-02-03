@@ -94,7 +94,7 @@ jobs:
       - name: Publish to npm
         env:
           VERSION_TAG: ${{ inputs.version-tag }}
-        run: npm publish --provenance --access public --tag "$VERSION_TAG"
+        run: npm publish --access public --tag "$VERSION_TAG"
 
   deprecate:
     if: ${{ inputs.action == 'deprecate' }}
