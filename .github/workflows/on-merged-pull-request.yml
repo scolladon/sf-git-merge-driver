@@ -39,6 +39,7 @@ jobs:
       - name: Trigger dist-tag removal
         uses: peter-evans/repository-dispatch@v3
         with:
+          token: ${{ secrets.RELEASE_PAT }}
           event-type: npm-dist-tag-rm
           client-payload: '{"tag": "${{ steps.set-dev-channel.outputs.DEV_CHANNEL }}"}'
 
@@ -55,7 +56,7 @@ jobs:
         if: ${{ steps.get-versions.outputs.DEV_VERSIONS != '' }}
         env:
           DEV_VERSIONS: ${{ steps.get-versions.outputs.DEV_VERSIONS }}
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
         run: |
           for DEV_VERSION in ${DEV_VERSIONS}; do
             gh api repos/${{ github.repository }}/dispatches \

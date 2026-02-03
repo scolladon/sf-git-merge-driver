@@ -122,6 +122,7 @@ jobs:
       - name: Trigger npm dev publish
         uses: peter-evans/repository-dispatch@v3
         with:
+          token: ${{ secrets.RELEASE_PAT }}
           event-type: npm-publish-dev
           client-payload: '{"dev_channel": "dev-${{ steps.pr-number.outputs.pr }}", "ref": "${{ github.event.pull_request.head.sha }}"}'
 
