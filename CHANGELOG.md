@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.2](https://github.com/scolladon/sf-git-merge-driver/compare/v1.4.1...v1.4.2) (2026-02-03)
+
+
+### Bug Fixes
+
+* configure release as trusted publisher ([#163](https://github.com/scolladon/sf-git-merge-driver/issues/163)) ([eaeb3d3](https://github.com/scolladon/sf-git-merge-driver/commit/eaeb3d3a7975a195c6ac8699d5423b9ebcdfdb0a))
+
 ## [1.4.1](https://github.com/scolladon/sf-git-merge-driver/compare/v1.4.0...v1.4.1) (2026-01-26)
 
 
