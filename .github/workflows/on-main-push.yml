@@ -36,20 +36,11 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ needs.prepare-release.outputs.release_created == 'true' }}
     steps:
-      - name: Checkout sources
-        uses: actions/checkout@v6
-
-      - name: Setup node
-        uses: actions/setup-node@v6
+      - name: Trigger npm publish
+        uses: peter-evans/repository-dispatch@v3
         with:
-          node-version: 20
-          registry-url: 'https://registry.npmjs.org'
-
-      - name: Setup dependencies, cache and install
-        uses: ./.github/actions/install
-
-      - name: Publish to npm
-        run: npm publish --access public --tag latest-rc
+          event-type: npm-publish-release
+          client-payload: '{"tag": "latest-rc"}'
 
   test-release:
     uses: ./.github/workflows/run-e2e-tests.yml

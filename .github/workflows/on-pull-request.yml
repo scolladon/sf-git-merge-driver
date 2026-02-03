@@ -112,38 +112,23 @@ jobs:
     permissions:
       pull-requests: write
     steps:
-      - name: Checkout sources
-        uses: actions/checkout@v6
-
-      - name: Setup node
-        uses: actions/setup-node@v6
-        with:
-          node-version: 20
-          registry-url: "https://registry.npmjs.org"
-
-      - name: Setup dependencies, cache and install
-        uses: ./.github/actions/install
-
       - uses: jwalton/gh-find-current-pr@master
         id: pr-number
 
       - name: Set dev channel value
-        run: echo "DEV_CHANNEL=dev-${{ steps.pr-number.outputs.pr }}" >> "$GITHUB_ENV"
+        id: define_dev_channel
+        run: echo "DEV_CHANNEL=dev-${{ steps.pr-number.outputs.pr }}" >> "$GITHUB_OUTPUT"
 
-      - name: Setup github user
-        run: |
-          git config --global user.email "${{ env.DEV_CHANNEL }}@github.com"
-          git config --global user.name "${{ env.DEV_CHANNEL }}"
-
-      - name: NPM Publish dev channel
-        run: |
-          CURRENT_VERSION=$(jq -r '.version' package.json)
-          DEV_TAG="${{ env.DEV_CHANNEL }}.${{ github.run_id }}-${{ github.run_attempt }}"
-          npm version "${CURRENT_VERSION}-${DEV_TAG}"
-          npm publish --access public --tag "${{ env.DEV_CHANNEL }}"
+      - name: Trigger npm dev publish
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          event-type: npm-publish-dev
+          client-payload: '{"dev_channel": "dev-${{ steps.pr-number.outputs.pr }}", "ref": "${{ github.event.pull_request.head.sha }}"}'
 
       - name: Comment PR dev channel
         uses: thollander/actions-comment-pull-request@v3
+        env:
+          DEV_CHANNEL: dev-${{ steps.pr-number.outputs.pr }}
         with:
           message: |
             Published under `${{ env.DEV_CHANNEL }}` npm channel.
@@ -152,10 +137,6 @@ jobs:
             ```
           comment-tag: dev-publish
           mode: recreate
-
-      - name: Set dev channel value
-        id: define_dev_channel
-        run: echo "DEV_CHANNEL=${{ env.DEV_CHANNEL }}" >> "$GITHUB_OUTPUT"
 
   e2e-check:
     uses: ./.github/workflows/run-e2e-tests.yml
