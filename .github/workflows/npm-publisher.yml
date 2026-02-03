@@ -65,6 +65,17 @@ jobs:
     if: github.event_name == 'repository_dispatch' && github.event.action == 'npm-publish-dev'
     runs-on: ubuntu-latest
     steps:
+      - name: Set pending commit status
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.event.client_payload.ref }}
+        run: |
+          gh api repos/${{ github.repository }}/statuses/$SHA \
+            -f state=pending \
+            -f context=npm-publish-dev \
+            -f description="Publishing dev version to npm..." \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
       - name: Checkout sources
         uses: actions/checkout@v6
         with:
@@ -101,6 +112,30 @@ jobs:
         env:
           DEV_CHANNEL: ${{ github.event.client_payload.dev_channel }}
         run: npm publish --provenance --access public --tag "$DEV_CHANNEL"
+
+      - name: Set success commit status
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.event.client_payload.ref }}
+        run: |
+          gh api repos/${{ github.repository }}/statuses/$SHA \
+            -f state=success \
+            -f context=npm-publish-dev \
+            -f description="Dev version published to npm" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      - name: Set failure commit status
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.event.client_payload.ref }}
+        run: |
+          gh api repos/${{ github.repository }}/statuses/$SHA \
+            -f state=failure \
+            -f context=npm-publish-dev \
+            -f description="Failed to publish dev version" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
   dist-tag-add:
     if: |

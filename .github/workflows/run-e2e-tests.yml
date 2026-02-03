@@ -6,6 +6,10 @@ on:
       channel:
         type: string
         default: latest-rc
+      commit_sha:
+        type: string
+        description: "Commit SHA to wait for publish status (optional)"
+        required: false
 
 jobs:
   e2e-test:
@@ -37,22 +41,16 @@ jobs:
       - name: Install cli
         run: npm install -g @salesforce/cli
 
-      - name: Wait for package to be available on npm
-        shell: bash
-        env:
-          CHANNEL: ${{ inputs.channel }}
-        run: |
-          echo "Waiting for sf-git-merge-driver@$CHANNEL to be available on npm..."
-          for i in $(seq 1 30); do
-            if npm view "sf-git-merge-driver@$CHANNEL" version 2>/dev/null; then
-              echo "Package is available!"
-              exit 0
-            fi
-            echo "Attempt $i/30 - Package not yet available, waiting 10s..."
-            sleep 10
-          done
-          echo "Package not available after 5 minutes"
-          exit 1
+      - name: Wait for npm publish to complete
+        if: ${{ inputs.commit_sha != '' }}
+        uses: lewagon/wait-on-check-action@v1.3.4
+        with:
+          ref: ${{ inputs.commit_sha }}
+          check-name: npm-publish-dev
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 5
+          allowed-conclusions: success
+          timeout: 30
 
       - name: Install new plugin version
         run: echo y | sf plugins install sf-git-merge-driver@${{ inputs.channel }}

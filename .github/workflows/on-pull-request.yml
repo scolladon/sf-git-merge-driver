@@ -144,4 +144,5 @@ jobs:
     needs: [publish-dev]
     with:
       channel: ${{ needs.publish-dev.outputs.devChannel }}
+      commit_sha: ${{ github.event.pull_request.head.sha }}
     secrets: inherit
