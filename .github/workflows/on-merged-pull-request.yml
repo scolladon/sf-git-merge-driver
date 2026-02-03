@@ -1,10 +1,6 @@
 ---
 name: Package dev version cleaner
 
-permissions:
-  contents: 'read'
-  id-token: 'write'
-
 on:
   pull_request_target:
     branches:
@@ -16,15 +12,12 @@ on:
       - closed
 
 jobs:
-  clean-npm-dev-version:
+  get-pr-info:
     if: ${{ github.event.pull_request.merged }}
     runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
+    outputs:
+      dev_channel: ${{ steps.set-dev-channel.outputs.DEV_CHANNEL }}
     steps:
-      - name: Checkout sources
-        uses: actions/checkout@v6
-
       - uses: jwalton/gh-find-current-pr@master
         id: pr-number
         with:
@@ -32,42 +25,29 @@ jobs:
 
       - name: Set dev channel value
         id: set-dev-channel
-        run: |
-          echo "CURRENT_VERSION=$(jq -r '.version' package.json)" >> "$GITHUB_OUTPUT"
-          echo "DEV_CHANNEL=dev-${{ steps.pr-number.outputs.pr }}" >> "$GITHUB_OUTPUT"
+        run: echo "DEV_CHANNEL=dev-${{ steps.pr-number.outputs.pr }}" >> "$GITHUB_OUTPUT"
 
-      - name: Trigger dist-tag removal
-        uses: peter-evans/repository-dispatch@v3
-        with:
-          token: ${{ secrets.RELEASE_PAT }}
-          event-type: npm-dist-tag-rm
-          client-payload: '{"tag": "${{ steps.set-dev-channel.outputs.DEV_CHANNEL }}"}'
+  cleanup:
+    needs: [get-pr-info]
+    if: ${{ github.event.pull_request.merged }}
+    uses: ./.github/workflows/npm-publisher.yml
+    with:
+      action: deprecate
+      version-tag: ${{ needs.get-pr-info.outputs.dev_channel }}
+      version-expression: ">0.0.0-${{ needs.get-pr-info.outputs.dev_channel }}"
+      deprecation-message: "Deprecated dev version"
 
-      - name: Get dev versions to deprecate
-        id: get-versions
-        env:
-          CURRENT_VERSION: ${{ steps.set-dev-channel.outputs.CURRENT_VERSION }}
-          DEV_CHANNEL: ${{ steps.set-dev-channel.outputs.DEV_CHANNEL }}
-        run: |
-          DEV_VERSIONS=$(npm view sf-git-merge-driver versions --json | jq -r '.[]' | grep -E "${CURRENT_VERSION}-${DEV_CHANNEL}" | tr '\n' ' ' || true)
-          echo "DEV_VERSIONS=$DEV_VERSIONS" >> "$GITHUB_OUTPUT"
-
-      - name: Trigger deprecation for each dev version
-        if: ${{ steps.get-versions.outputs.DEV_VERSIONS != '' }}
-        env:
-          DEV_VERSIONS: ${{ steps.get-versions.outputs.DEV_VERSIONS }}
-          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
-        run: |
-          for DEV_VERSION in ${DEV_VERSIONS}; do
-            gh api repos/${{ github.repository }}/dispatches \
-              -f event_type=npm-deprecate \
-              -f client_payload="{\"version\": \"${DEV_VERSION}\", \"message\": \"Deprecated dev version\"}"
-          done
-
+  delete-comment:
+    needs: [get-pr-info]
+    if: ${{ github.event.pull_request.merged }}
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
       - name: Delete package dev channel PR comment
         uses: thollander/actions-comment-pull-request@v3
         env:
-          DEV_CHANNEL: ${{ steps.set-dev-channel.outputs.DEV_CHANNEL }}
+          DEV_CHANNEL: ${{ needs.get-pr-info.outputs.dev_channel }}
         with:
           message: |
             Published under `${{ env.DEV_CHANNEL }}` npm channel.

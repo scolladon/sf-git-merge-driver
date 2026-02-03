@@ -2,13 +2,29 @@
 name: NPM Publisher
 
 on:
-  repository_dispatch:
-    types:
-      - npm-publish-release
-      - npm-publish-dev
-      - npm-dist-tag-add
-      - npm-dist-tag-rm
-      - npm-deprecate
+  workflow_call:
+    inputs:
+      action:
+        type: string
+        required: true
+        description: "Operation to perform: publish, deprecate, dist-tag-add, dist-tag-rm"
+      version-tag:
+        type: string
+        required: false
+        description: "npm tag (e.g., latest-rc, dev-166)"
+      version-expression:
+        type: string
+        required: false
+        description: "Version or semver range for deprecate/dist-tag operations"
+      deprecation-message:
+        type: string
+        required: false
+        description: "Deprecation message"
+      ref:
+        type: string
+        required: false
+        default: ''
+        description: "Git ref to checkout for publish"
   workflow_dispatch:
     inputs:
       action:
@@ -19,15 +35,15 @@ on:
           - dist-tag-add
           - dist-tag-rm
           - deprecate
-      tag:
+      version-tag:
         description: "npm tag (for dist-tag operations)"
         required: false
         type: string
-      version:
+      version-expression:
         description: "Version or semver range"
         required: false
         type: string
-      message:
+      deprecation-message:
         description: "Deprecation message (empty to un-deprecate)"
         required: false
         type: string
@@ -35,27 +51,16 @@ on:
 permissions:
   contents: read
   id-token: write
-  statuses: write
 
 jobs:
-  publish-release:
-    if: github.event_name == 'repository_dispatch' && github.event.action == 'npm-publish-release'
+  publish:
+    if: ${{ inputs.action == 'publish' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Set pending commit status
-        if: ${{ github.event.client_payload.ref != '' }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SHA: ${{ github.event.client_payload.ref }}
-        run: |
-          gh api repos/${{ github.repository }}/statuses/$SHA \
-            -f state=pending \
-            -f context=npm-publish-release \
-            -f description="Publishing release to npm..." \
-            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-
       - name: Checkout sources
         uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref || github.sha }}
 
       - name: Setup node
         uses: actions/setup-node@v6
@@ -68,55 +73,35 @@ jobs:
 
       - name: Setup dependencies, cache and install
         uses: ./.github/actions/install
+
+      - name: Setup git user for dev version
+        if: ${{ startsWith(inputs.version-tag, 'dev-') }}
+        env:
+          VERSION_TAG: ${{ inputs.version-tag }}
+        run: |
+          git config --global user.email "${VERSION_TAG}@github.com"
+          git config --global user.name "$VERSION_TAG"
+
+      - name: Compute and set dev version
+        if: ${{ startsWith(inputs.version-tag, 'dev-') }}
+        env:
+          VERSION_TAG: ${{ inputs.version-tag }}
+        run: |
+          CURRENT_VERSION=$(jq -r '.version' package.json)
+          DEV_VERSION="${CURRENT_VERSION}-${VERSION_TAG}.${{ github.run_id }}-${{ github.run_attempt }}"
+          npm version "$DEV_VERSION" --no-git-tag-version
 
       - name: Publish to npm
         env:
-          NPM_TAG: ${{ github.event.client_payload.tag || 'latest-rc' }}
-        run: npm publish --provenance --access public --tag "$NPM_TAG"
+          VERSION_TAG: ${{ inputs.version-tag }}
+        run: npm publish --provenance --access public --tag "$VERSION_TAG"
 
-      - name: Set success commit status
-        if: ${{ success() && github.event.client_payload.ref != '' }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SHA: ${{ github.event.client_payload.ref }}
-        run: |
-          gh api repos/${{ github.repository }}/statuses/$SHA \
-            -f state=success \
-            -f context=npm-publish-release \
-            -f description="Release published to npm" \
-            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-
-      - name: Set failure commit status
-        if: ${{ failure() && github.event.client_payload.ref != '' }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SHA: ${{ github.event.client_payload.ref }}
-        run: |
-          gh api repos/${{ github.repository }}/statuses/$SHA \
-            -f state=failure \
-            -f context=npm-publish-release \
-            -f description="Failed to publish release" \
-            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-
-  publish-dev:
-    if: github.event_name == 'repository_dispatch' && github.event.action == 'npm-publish-dev'
+  deprecate:
+    if: ${{ inputs.action == 'deprecate' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Set pending commit status
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SHA: ${{ github.event.client_payload.ref }}
-        run: |
-          gh api repos/${{ github.repository }}/statuses/$SHA \
-            -f state=pending \
-            -f context=npm-publish-dev \
-            -f description="Publishing dev version to npm..." \
-            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-
       - name: Checkout sources
         uses: actions/checkout@v6
-        with:
-          ref: ${{ github.event.client_payload.ref }}
 
       - name: Setup node
         uses: actions/setup-node@v6
@@ -127,57 +112,21 @@ jobs:
       - name: Upgrade npm for trusted publishing support
         run: npm install -g npm@latest
 
-      - name: Setup dependencies, cache and install
-        uses: ./.github/actions/install
-
-      - name: Setup git user
+      - name: Remove dist-tag
+        if: ${{ inputs.version-tag != '' }}
         env:
-          DEV_CHANNEL: ${{ github.event.client_payload.dev_channel }}
-        run: |
-          git config --global user.email "${DEV_CHANNEL}@github.com"
-          git config --global user.name "$DEV_CHANNEL"
+          VERSION_TAG: ${{ inputs.version-tag }}
+        run: npm dist-tag rm sf-git-merge-driver "$VERSION_TAG" || true
 
-      - name: Compute and set dev version
+      - name: Deprecate version(s)
+        if: ${{ inputs.version-expression != '' }}
         env:
-          DEV_CHANNEL: ${{ github.event.client_payload.dev_channel }}
-        run: |
-          CURRENT_VERSION=$(jq -r '.version' package.json)
-          DEV_TAG="${DEV_CHANNEL}.${{ github.run_id }}-${{ github.run_attempt }}"
-          npm version "${CURRENT_VERSION}-${DEV_TAG}" --no-git-tag-version
-
-      - name: Publish dev version to npm
-        env:
-          DEV_CHANNEL: ${{ github.event.client_payload.dev_channel }}
-        run: npm publish --provenance --access public --tag "$DEV_CHANNEL"
-
-      - name: Set success commit status
-        if: success()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SHA: ${{ github.event.client_payload.ref }}
-        run: |
-          gh api repos/${{ github.repository }}/statuses/$SHA \
-            -f state=success \
-            -f context=npm-publish-dev \
-            -f description="Dev version published to npm" \
-            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-
-      - name: Set failure commit status
-        if: failure()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SHA: ${{ github.event.client_payload.ref }}
-        run: |
-          gh api repos/${{ github.repository }}/statuses/$SHA \
-            -f state=failure \
-            -f context=npm-publish-dev \
-            -f description="Failed to publish dev version" \
-            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          VERSION_EXPR: ${{ inputs.version-expression }}
+          MESSAGE: ${{ inputs.deprecation-message }}
+        run: npm deprecate "sf-git-merge-driver@${VERSION_EXPR}" "$MESSAGE"
 
   dist-tag-add:
-    if: |
-      (github.event_name == 'repository_dispatch' && github.event.action == 'npm-dist-tag-add') ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'dist-tag-add')
+    if: ${{ inputs.action == 'dist-tag-add' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
@@ -188,17 +137,18 @@ jobs:
         with:
           node-version: 20
           registry-url: "https://registry.npmjs.org"
+
+      - name: Upgrade npm for trusted publishing support
+        run: npm install -g npm@latest
 
       - name: Add dist-tag
         env:
-          VERSION: ${{ github.event.client_payload.version || github.event.inputs.version }}
-          TAG: ${{ github.event.client_payload.tag || github.event.inputs.tag }}
-        run: npm dist-tag add "sf-git-merge-driver@${VERSION}" "$TAG"
+          VERSION_EXPR: ${{ inputs.version-expression }}
+          VERSION_TAG: ${{ inputs.version-tag }}
+        run: npm dist-tag add "sf-git-merge-driver@${VERSION_EXPR}" "$VERSION_TAG"
 
   dist-tag-rm:
-    if: |
-      (github.event_name == 'repository_dispatch' && github.event.action == 'npm-dist-tag-rm') ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'dist-tag-rm')
+    if: ${{ inputs.action == 'dist-tag-rm' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
@@ -209,29 +159,11 @@ jobs:
         with:
           node-version: 20
           registry-url: "https://registry.npmjs.org"
+
+      - name: Upgrade npm for trusted publishing support
+        run: npm install -g npm@latest
 
       - name: Remove dist-tag
         env:
-          TAG: ${{ github.event.client_payload.tag || github.event.inputs.tag }}
-        run: npm dist-tag rm sf-git-merge-driver "$TAG"
-
-  deprecate:
-    if: |
-      (github.event_name == 'repository_dispatch' && github.event.action == 'npm-deprecate') ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deprecate')
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v6
-
-      - name: Setup node
-        uses: actions/setup-node@v6
-        with:
-          node-version: 20
-          registry-url: "https://registry.npmjs.org"
-
-      - name: Deprecate version(s)
-        env:
-          VERSION: ${{ github.event.client_payload.version || github.event.inputs.version }}
-          MESSAGE: ${{ github.event.client_payload.message || github.event.inputs.message }}
-        run: npm deprecate "sf-git-merge-driver@${VERSION}" "$MESSAGE"
+          VERSION_TAG: ${{ inputs.version-tag }}
+        run: npm dist-tag rm sf-git-merge-driver "$VERSION_TAG"

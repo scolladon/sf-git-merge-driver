@@ -24,6 +24,9 @@ jobs:
       release_created: ${{ steps.release.outputs.release_created }}
       prs_created: ${{ steps.release.outputs.prs_created }}
       version: ${{ steps.release.outputs.version }}
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - uses: googleapis/release-please-action@v4
         id: release
@@ -33,21 +36,16 @@ jobs:
 
   release:
     needs: [prepare-release]
-    runs-on: ubuntu-latest
     if: ${{ needs.prepare-release.outputs.release_created == 'true' }}
-    steps:
-      - name: Trigger npm publish
-        uses: peter-evans/repository-dispatch@v3
-        with:
-          token: ${{ secrets.RELEASE_PAT }}
-          event-type: npm-publish-release
-          client-payload: '{"tag": "latest-rc", "ref": "${{ github.sha }}"}'
+    uses: ./.github/workflows/npm-publisher.yml
+    with:
+      action: publish
+      version-tag: latest-rc
+      ref: ${{ github.sha }}
 
   test-release:
-    uses: ./.github/workflows/run-e2e-tests.yml
     needs: [prepare-release, release]
+    if: ${{ needs.prepare-release.outputs.release_created == 'true' }}
+    uses: ./.github/workflows/run-e2e-tests.yml
     with:
       channel: ${{ needs.prepare-release.outputs.version }}
-      commit_sha: ${{ github.sha }}
-      status_context: npm-publish-release
-    secrets: inherit
