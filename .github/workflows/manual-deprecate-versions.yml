@@ -27,5 +27,3 @@ jobs:
 
       - name: Change version
         run: npm deprecate sf-git-merge-driver@$"${{ github.event.inputs.version-expression }}" "${{ github.event.inputs.rationale }}"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

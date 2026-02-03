@@ -137,8 +137,6 @@ jobs:
           DEV_TAG="${{ env.DEV_CHANNEL }}.${{ github.run_id }}-${{ github.run_attempt }}"
           npm version "${CURRENT_VERSION}-${DEV_TAG}"
           npm publish --access public --tag "${{ env.DEV_CHANNEL }}"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Comment PR dev channel
         uses: thollander/actions-comment-pull-request@v3
