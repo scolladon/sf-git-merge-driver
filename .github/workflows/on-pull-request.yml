@@ -10,7 +10,6 @@ on:
 
 permissions:
   contents: 'read'
-  id-token: 'write'
 
 # Manage concurrency to stop running jobs and start new ones in case of new commit pushed
 concurrency:
@@ -102,39 +101,3 @@ jobs:
   build:
     uses: ./.github/workflows/reusable-build.yml
     secrets: inherit
-
-  publish-dev:
-    needs: [build]
-    if: ${{ github.event.pull_request.merged != true && github.actor != 'dependabot[bot]' }}
-    uses: ./.github/workflows/npm-publisher.yml
-    with:
-      action: publish
-      version-tag: dev-${{ github.event.pull_request.number }}
-      ref: ${{ github.event.pull_request.head.sha }}
-
-  comment-pr:
-    needs: [build]
-    if: ${{ github.event.pull_request.merged != true && github.actor != 'dependabot[bot]' }}
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
-    steps:
-      - name: Comment PR dev channel
-        uses: thollander/actions-comment-pull-request@v3
-        env:
-          DEV_CHANNEL: dev-${{ github.event.pull_request.number }}
-        with:
-          message: |
-            Published under `${{ env.DEV_CHANNEL }}` npm channel.
-            ```sh
-            $ sf plugins install sf-git-merge-driver@${{ env.DEV_CHANNEL }}
-            ```
-          comment-tag: dev-publish
-          mode: recreate
-
-  e2e-check:
-    needs: [publish-dev]
-    if: ${{ github.event.pull_request.merged != true && github.actor != 'dependabot[bot]' }}
-    uses: ./.github/workflows/run-e2e-tests.yml
-    with:
-      channel: dev-${{ github.event.pull_request.number }}

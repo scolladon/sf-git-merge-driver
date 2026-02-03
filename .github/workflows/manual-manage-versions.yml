@@ -1,0 +1,44 @@
+---
+name: Manage versions
+
+on:
+  workflow_dispatch:
+    inputs:
+      version-alias:
+        description: version alias to map to a version number
+        required: true
+        type: choice
+        options:
+          - stable
+          - latest
+          - latest-rc
+      version-number:
+        description: version number (semver format)
+        required: true
+        default: vX.Y.Z
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  add-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v6
+
+      - name: Setup node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          registry-url: "https://registry.npmjs.org"
+
+      - run: npm install -g npm@latest
+
+      - name: Add dist-tag
+        env:
+          VERSION_NUMBER: ${{ github.event.inputs.version-number }}
+          VERSION_ALIAS: ${{ github.event.inputs.version-alias }}
+        run: npm dist-tag add "sf-git-merge-driver@${VERSION_NUMBER}" "$VERSION_ALIAS"

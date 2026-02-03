@@ -10,7 +10,6 @@ on:
 
 permissions:
   contents: 'read'
-  id-token: 'write'
 
 jobs:
   build:
@@ -20,32 +19,11 @@ jobs:
   prepare-release:
     needs: [build]
     runs-on: ubuntu-latest
-    outputs:
-      release_created: ${{ steps.release.outputs.release_created }}
-      prs_created: ${{ steps.release.outputs.prs_created }}
-      version: ${{ steps.release.outputs.version }}
     permissions:
       contents: write
       pull-requests: write
     steps:
       - uses: googleapis/release-please-action@v4
-        id: release
         with:
           token: ${{ secrets.RELEASE_PAT }}
           release-type: node
-
-  release:
-    needs: [prepare-release]
-    if: ${{ needs.prepare-release.outputs.release_created == 'true' }}
-    uses: ./.github/workflows/npm-publisher.yml
-    with:
-      action: publish
-      version-tag: latest-rc
-      ref: ${{ github.sha }}
-
-  test-release:
-    needs: [prepare-release, release]
-    if: ${{ needs.prepare-release.outputs.release_created == 'true' }}
-    uses: ./.github/workflows/run-e2e-tests.yml
-    with:
-      channel: ${{ needs.prepare-release.outputs.version }}

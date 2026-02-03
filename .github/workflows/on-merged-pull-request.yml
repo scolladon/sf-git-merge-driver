@@ -11,13 +11,20 @@ on:
     types:
       - closed
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   get-pr-info:
     if: ${{ github.event.pull_request.merged }}
     runs-on: ubuntu-latest
     outputs:
       dev_channel: ${{ steps.set-dev-channel.outputs.DEV_CHANNEL }}
+      current_version: ${{ steps.set-dev-channel.outputs.CURRENT_VERSION }}
     steps:
+      - uses: actions/checkout@v6
+
       - uses: jwalton/gh-find-current-pr@master
         id: pr-number
         with:
@@ -25,17 +32,37 @@ jobs:
 
       - name: Set dev channel value
         id: set-dev-channel
-        run: echo "DEV_CHANNEL=dev-${{ steps.pr-number.outputs.pr }}" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "CURRENT_VERSION=$(jq -r '.version' package.json)" >> "$GITHUB_OUTPUT"
+          echo "DEV_CHANNEL=dev-${{ steps.pr-number.outputs.pr }}" >> "$GITHUB_OUTPUT"
 
   cleanup:
     needs: [get-pr-info]
     if: ${{ github.event.pull_request.merged }}
-    uses: ./.github/workflows/npm-publisher.yml
-    with:
-      action: deprecate
-      version-tag: ${{ needs.get-pr-info.outputs.dev_channel }}
-      version-expression: ">0.0.0-${{ needs.get-pr-info.outputs.dev_channel }}"
-      deprecation-message: "Deprecated dev version"
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          registry-url: "https://registry.npmjs.org"
+
+      - run: npm install -g npm@latest
+
+      - name: Remove dist-tag
+        env:
+          DEV_CHANNEL: ${{ needs.get-pr-info.outputs.dev_channel }}
+        run: npm dist-tag rm sf-git-merge-driver "$DEV_CHANNEL" || true
+
+      - name: Deprecate related dev versions
+        env:
+          CURRENT_VERSION: ${{ needs.get-pr-info.outputs.current_version }}
+          DEV_CHANNEL: ${{ needs.get-pr-info.outputs.dev_channel }}
+        run: npm deprecate "sf-git-merge-driver@>0.0.0-${DEV_CHANNEL}" "Deprecated dev version"
 
   delete-comment:
     needs: [get-pr-info]

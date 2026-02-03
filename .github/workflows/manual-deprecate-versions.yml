@@ -1,0 +1,38 @@
+---
+name: Deprecate versions
+
+on:
+  workflow_dispatch:
+    inputs:
+      version-expression:
+        description: version number (semver format) or range to deprecate
+        required: true
+        type: string
+      rationale:
+        description: explain why this version is deprecated. No message content will un-deprecate the version
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deprecate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v6
+
+      - name: Setup node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          registry-url: "https://registry.npmjs.org"
+
+      - run: npm install -g npm@latest
+
+      - name: Deprecate version
+        env:
+          VERSION_EXPR: ${{ github.event.inputs.version-expression }}
+          RATIONALE: ${{ github.event.inputs.rationale }}
+        run: npm deprecate "sf-git-merge-driver@${VERSION_EXPR}" "$RATIONALE"
