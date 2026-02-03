@@ -1,0 +1,159 @@
+---
+name: NPM Publisher
+
+on:
+  repository_dispatch:
+    types:
+      - npm-publish-release
+      - npm-publish-dev
+      - npm-dist-tag-add
+      - npm-dist-tag-rm
+      - npm-deprecate
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Operation to perform"
+        required: true
+        type: choice
+        options:
+          - dist-tag-add
+          - dist-tag-rm
+          - deprecate
+      tag:
+        description: "npm tag (for dist-tag operations)"
+        required: false
+        type: string
+      version:
+        description: "Version or semver range"
+        required: false
+        type: string
+      message:
+        description: "Deprecation message (empty to un-deprecate)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish-release:
+    if: github.event_type == 'repository_dispatch' && github.event.action == 'npm-publish-release'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v6
+
+      - name: Setup node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Setup dependencies, cache and install
+        uses: ./.github/actions/install
+
+      - name: Publish to npm
+        env:
+          NPM_TAG: ${{ github.event.client_payload.tag || 'latest-rc' }}
+        run: npm publish --provenance --access public --tag "$NPM_TAG"
+
+  publish-dev:
+    if: github.event_type == 'repository_dispatch' && github.event.action == 'npm-publish-dev'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.client_payload.ref }}
+
+      - name: Setup node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Setup dependencies, cache and install
+        uses: ./.github/actions/install
+
+      - name: Setup git user
+        env:
+          DEV_CHANNEL: ${{ github.event.client_payload.dev_channel }}
+        run: |
+          git config --global user.email "${DEV_CHANNEL}@github.com"
+          git config --global user.name "$DEV_CHANNEL"
+
+      - name: Compute and set dev version
+        env:
+          DEV_CHANNEL: ${{ github.event.client_payload.dev_channel }}
+        run: |
+          CURRENT_VERSION=$(jq -r '.version' package.json)
+          DEV_TAG="${DEV_CHANNEL}.${{ github.run_id }}-${{ github.run_attempt }}"
+          npm version "${CURRENT_VERSION}-${DEV_TAG}" --no-git-tag-version
+
+      - name: Publish dev version to npm
+        env:
+          DEV_CHANNEL: ${{ github.event.client_payload.dev_channel }}
+        run: npm publish --provenance --access public --tag "$DEV_CHANNEL"
+
+  dist-tag-add:
+    if: |
+      (github.event_type == 'repository_dispatch' && github.event.action == 'npm-dist-tag-add') ||
+      (github.event_type == 'workflow_dispatch' && github.event.inputs.action == 'dist-tag-add')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v6
+
+      - name: Setup node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Add dist-tag
+        env:
+          VERSION: ${{ github.event.client_payload.version || github.event.inputs.version }}
+          TAG: ${{ github.event.client_payload.tag || github.event.inputs.tag }}
+        run: npm dist-tag add "sf-git-merge-driver@${VERSION}" "$TAG"
+
+  dist-tag-rm:
+    if: |
+      (github.event_type == 'repository_dispatch' && github.event.action == 'npm-dist-tag-rm') ||
+      (github.event_type == 'workflow_dispatch' && github.event.inputs.action == 'dist-tag-rm')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v6
+
+      - name: Setup node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Remove dist-tag
+        env:
+          TAG: ${{ github.event.client_payload.tag || github.event.inputs.tag }}
+        run: npm dist-tag rm sf-git-merge-driver "$TAG"
+
+  deprecate:
+    if: |
+      (github.event_type == 'repository_dispatch' && github.event.action == 'npm-deprecate') ||
+      (github.event_type == 'workflow_dispatch' && github.event.inputs.action == 'deprecate')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v6
+
+      - name: Setup node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Deprecate version(s)
+        env:
+          VERSION: ${{ github.event.client_payload.version || github.event.inputs.version }}
+          MESSAGE: ${{ github.event.client_payload.message || github.event.inputs.message }}
+        run: npm deprecate "sf-git-merge-driver@${VERSION}" "$MESSAGE"
