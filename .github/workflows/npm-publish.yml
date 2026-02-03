@@ -20,9 +20,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Dev publish on PR
-  publish-dev:
-    if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
+  publish:
+    if: github.event_name == 'release' || github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     outputs:
       channel: ${{ steps.publish.outputs.channel }}
@@ -38,7 +37,10 @@ jobs:
           registry-url: "https://registry.npmjs.org"
       - run: npm install -g npm@latest
       - uses: ./.github/actions/install
+
+      # Dev version setup (PR only)
       - name: Compute dev version
+        if: github.event_name == 'pull_request'
         id: version
         run: |
           CURRENT_VERSION=$(jq -r '.version' package.json)
@@ -46,21 +48,40 @@ jobs:
           DEV_VERSION="${CURRENT_VERSION}-${DEV_CHANNEL}.${{ github.run_id }}-${{ github.run_attempt }}"
           echo "channel=$DEV_CHANNEL" >> "$GITHUB_OUTPUT"
           echo "version=$DEV_VERSION" >> "$GITHUB_OUTPUT"
-      - name: Set version
+
+      - name: Set dev version
+        if: github.event_name == 'pull_request'
         env:
           DEV_CHANNEL: ${{ steps.version.outputs.channel }}
         run: |
           git config --global user.email "${DEV_CHANNEL}@github.com"
           git config --global user.name "$DEV_CHANNEL"
           npm version "${{ steps.version.outputs.version }}" --no-git-tag-version
+
+      # Publish (unified with conditional channel)
       - name: Publish
         id: publish
         env:
-          CHANNEL: ${{ steps.version.outputs.channel }}
+          DEV_CHANNEL: ${{ steps.version.outputs.channel }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            CHANNEL="$DEV_CHANNEL"
+          else
+            CHANNEL="latest-rc"
+          fi
           npm publish --provenance --access public --tag "$CHANNEL"
-          echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
+          # For e2e: PR uses dev channel, release uses tag name (e.g., v1.5.0)
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            echo "channel=$DEV_CHANNEL" >> "$GITHUB_OUTPUT"
+          else
+            echo "channel=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Comment PR (PR only)
       - name: Comment PR
+        if: github.event_name == 'pull_request'
         uses: thollander/actions-comment-pull-request@v3
         env:
           DEV_CHANNEL: ${{ steps.version.outputs.channel }}
@@ -73,38 +94,8 @@ jobs:
           comment-tag: dev-publish
           mode: recreate
 
-  # Release publish on release event
-  publish-release:
-    if: github.event_name == 'release'
-    runs-on: ubuntu-latest
-    outputs:
-      channel: ${{ github.event.release.tag_name }}
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 20
-          registry-url: "https://registry.npmjs.org"
-      - run: npm install -g npm@latest
-      - uses: ./.github/actions/install
-      - name: Publish
-        run: npm publish --provenance --access public --tag latest-rc
-
-  # E2E tests after dev publish
-  e2e-dev:
-    needs: [publish-dev]
-    if: github.event_name == 'pull_request'
+  e2e:
+    needs: [publish]
     uses: ./.github/workflows/run-e2e-tests.yml
     with:
-      channel: ${{ needs.publish-dev.outputs.channel }}
-
-  # E2E tests after release publish
-  e2e-release:
-    needs: [publish-release]
-    if: github.event_name == 'release'
-    uses: ./.github/workflows/run-e2e-tests.yml
-    with:
-      channel: ${{ needs.publish-release.outputs.channel }}
+      channel: ${{ needs.publish.outputs.channel }}
