@@ -11,7 +11,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Setup node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 20
 
@@ -35,7 +35,7 @@ jobs:
       - name: Integration test
         run: npm run test:nut
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: coverage-test-report
           path: reports/coverage

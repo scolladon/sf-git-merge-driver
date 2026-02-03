@@ -23,7 +23,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node }}
 
@@ -51,5 +51,3 @@ jobs:
 
       - name: Display current state
         run: git status
-
-          
