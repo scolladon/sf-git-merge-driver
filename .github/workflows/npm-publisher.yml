@@ -50,6 +50,9 @@ jobs:
           node-version: 20
           registry-url: "https://registry.npmjs.org"
 
+      - name: Upgrade npm for trusted publishing support
+        run: npm install -g npm@latest
+
       - name: Setup dependencies, cache and install
         uses: ./.github/actions/install
 
@@ -72,6 +75,9 @@ jobs:
         with:
           node-version: 20
           registry-url: "https://registry.npmjs.org"
+
+      - name: Upgrade npm for trusted publishing support
+        run: npm install -g npm@latest
 
       - name: Setup dependencies, cache and install
         uses: ./.github/actions/install
