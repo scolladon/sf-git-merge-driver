@@ -38,7 +38,7 @@ permissions:
 
 jobs:
   publish-release:
-    if: github.event_type == 'repository_dispatch' && github.event.action == 'npm-publish-release'
+    if: github.event_name == 'repository_dispatch' && github.event.action == 'npm-publish-release'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
@@ -59,7 +59,7 @@ jobs:
         run: npm publish --provenance --access public --tag "$NPM_TAG"
 
   publish-dev:
-    if: github.event_type == 'repository_dispatch' && github.event.action == 'npm-publish-dev'
+    if: github.event_name == 'repository_dispatch' && github.event.action == 'npm-publish-dev'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
@@ -98,8 +98,8 @@ jobs:
 
   dist-tag-add:
     if: |
-      (github.event_type == 'repository_dispatch' && github.event.action == 'npm-dist-tag-add') ||
-      (github.event_type == 'workflow_dispatch' && github.event.inputs.action == 'dist-tag-add')
+      (github.event_name == 'repository_dispatch' && github.event.action == 'npm-dist-tag-add') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'dist-tag-add')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
@@ -119,8 +119,8 @@ jobs:
 
   dist-tag-rm:
     if: |
-      (github.event_type == 'repository_dispatch' && github.event.action == 'npm-dist-tag-rm') ||
-      (github.event_type == 'workflow_dispatch' && github.event.inputs.action == 'dist-tag-rm')
+      (github.event_name == 'repository_dispatch' && github.event.action == 'npm-dist-tag-rm') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'dist-tag-rm')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
@@ -139,8 +139,8 @@ jobs:
 
   deprecate:
     if: |
-      (github.event_type == 'repository_dispatch' && github.event.action == 'npm-deprecate') ||
-      (github.event_type == 'workflow_dispatch' && github.event.inputs.action == 'deprecate')
+      (github.event_name == 'repository_dispatch' && github.event.action == 'npm-deprecate') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deprecate')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
