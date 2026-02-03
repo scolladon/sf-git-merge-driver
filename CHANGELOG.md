@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.4.2](https://github.com/scolladon/sf-git-merge-driver/compare/v1.4.1...v1.4.2) (2026-02-03)
+
+
+### Bug Fixes
+
+* add statuses:write permission for commit status API ([ae39341](https://github.com/scolladon/sf-git-merge-driver/commit/ae39341e100bd5d09e12902ae6edb1da6ef4b5c3))
+* configure release as trusted publisher ([#165](https://github.com/scolladon/sf-git-merge-driver/issues/165)) ([9054a82](https://github.com/scolladon/sf-git-merge-driver/commit/9054a82e3dac6ae674ada3b380a1eea19c6fc861))
+* consolidate npm publishing into single OIDC workflow ([60e7756](https://github.com/scolladon/sf-git-merge-driver/commit/60e7756081aea62d1d59777989f64d598da86a45))
+* remove --provenance flag from npm publish ([2036681](https://github.com/scolladon/sf-git-merge-driver/commit/2036681a4d048a7b530354197594cb2852be3229))
+* simplify npm-publish workflow with unified jobs ([c35e4b7](https://github.com/scolladon/sf-git-merge-driver/commit/c35e4b7d2eeabe448be43007df76a0779a4faa09))
+* simplify npm-publisher as synchronous reusable workflow ([84c383b](https://github.com/scolladon/sf-git-merge-driver/commit/84c383b6da66a0ae09dd5f65af839faae063907d))
+* upgrade npm for trusted publishing support ([218126a](https://github.com/scolladon/sf-git-merge-driver/commit/218126a01cd7287804535e2de521bbb92c2f1d72))
+* use bash script for wait with 30s timeout ([cbbe9a5](https://github.com/scolladon/sf-git-merge-driver/commit/cbbe9a5248f868a006a09b5cfb6f8711a937c1be))
+* use commit status to sync npm publish with e2e tests ([896989d](https://github.com/scolladon/sf-git-merge-driver/commit/896989d553ad0d0a9e0645fe6a51524d2d298679))
+* use github.event_name instead of github.event_type ([9f4aa54](https://github.com/scolladon/sf-git-merge-driver/commit/9f4aa54b88dd62c16c70c531dac00ce88df6776f))
+* wait for package availability before e2e tests ([072cb06](https://github.com/scolladon/sf-git-merge-driver/commit/072cb062d690e70fe41b6cb7b224ffe6b3e41609))
+
 ## [1.4.1](https://github.com/scolladon/sf-git-merge-driver/compare/v1.4.0...v1.4.1) (2026-01-26)
 
 
