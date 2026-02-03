@@ -145,4 +145,5 @@ jobs:
     with:
       channel: ${{ needs.publish-dev.outputs.devChannel }}
       commit_sha: ${{ github.event.pull_request.head.sha }}
+      status_context: npm-publish-dev
     secrets: inherit

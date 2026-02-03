@@ -42,6 +42,18 @@ jobs:
     if: github.event_name == 'repository_dispatch' && github.event.action == 'npm-publish-release'
     runs-on: ubuntu-latest
     steps:
+      - name: Set pending commit status
+        if: ${{ github.event.client_payload.ref != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.event.client_payload.ref }}
+        run: |
+          gh api repos/${{ github.repository }}/statuses/$SHA \
+            -f state=pending \
+            -f context=npm-publish-release \
+            -f description="Publishing release to npm..." \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
       - name: Checkout sources
         uses: actions/checkout@v6
 
@@ -61,6 +73,30 @@ jobs:
         env:
           NPM_TAG: ${{ github.event.client_payload.tag || 'latest-rc' }}
         run: npm publish --provenance --access public --tag "$NPM_TAG"
+
+      - name: Set success commit status
+        if: ${{ success() && github.event.client_payload.ref != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.event.client_payload.ref }}
+        run: |
+          gh api repos/${{ github.repository }}/statuses/$SHA \
+            -f state=success \
+            -f context=npm-publish-release \
+            -f description="Release published to npm" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      - name: Set failure commit status
+        if: ${{ failure() && github.event.client_payload.ref != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.event.client_payload.ref }}
+        run: |
+          gh api repos/${{ github.repository }}/statuses/$SHA \
+            -f state=failure \
+            -f context=npm-publish-release \
+            -f description="Failed to publish release" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
   publish-dev:
     if: github.event_name == 'repository_dispatch' && github.event.action == 'npm-publish-dev'

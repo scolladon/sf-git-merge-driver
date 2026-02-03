@@ -8,7 +8,11 @@ on:
         default: latest-rc
       commit_sha:
         type: string
-        description: "Commit SHA to wait for publish status (optional)"
+        description: "Commit SHA to wait for publish status"
+        required: false
+      status_context:
+        type: string
+        description: "Commit status context to wait for (e.g., npm-publish-dev, npm-publish-release)"
         required: false
 
 jobs:
@@ -42,15 +46,16 @@ jobs:
         run: npm install -g @salesforce/cli
 
       - name: Wait for npm publish to complete
-        if: ${{ inputs.commit_sha != '' }}
+        if: ${{ inputs.commit_sha != '' && inputs.status_context != '' }}
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COMMIT_SHA: ${{ inputs.commit_sha }}
+          STATUS_CONTEXT: ${{ inputs.status_context }}
         run: |
-          echo "Waiting for npm-publish-dev status on $COMMIT_SHA (timeout: 30s)..."
+          echo "Waiting for $STATUS_CONTEXT status on $COMMIT_SHA (timeout: 30s)..."
           for i in $(seq 1 6); do
-            STATUS=$(gh api repos/${{ github.repository }}/commits/$COMMIT_SHA/status --jq '.statuses[] | select(.context == "npm-publish-dev") | .state' 2>/dev/null || echo "")
+            STATUS=$(gh api "repos/${{ github.repository }}/commits/$COMMIT_SHA/status" --jq ".statuses[] | select(.context == \"$STATUS_CONTEXT\") | .state" 2>/dev/null || echo "")
             echo "Attempt $i/6 - Status: ${STATUS:-not found}"
             if [ "$STATUS" = "success" ]; then
               echo "Publish succeeded!"
@@ -61,7 +66,7 @@ jobs:
             fi
             sleep 5
           done
-          echo "Timeout waiting for npm-publish-dev status"
+          echo "Timeout waiting for $STATUS_CONTEXT status"
           exit 1
 
       - name: Install new plugin version
