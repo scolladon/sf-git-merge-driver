@@ -209,6 +209,7 @@ For ordered metadata types (e.g., `GlobalValueSet`, `StandardValueSet`), the dri
 2. **Value-based comparison** — elements are compared by their key field, not position
 3. **Disjoint change detection** — non-overlapping reorderings can be merged automatically
 4. **Conflict on overlap** — when both sides move the same elements differently, conflict
+5. **Positional conflict detection** — concurrent additions at different positions trigger conflict
 
 ### Algorithm Overview
 
@@ -216,40 +217,61 @@ The `OrderedKeyedArrayMergeStrategy` handles ordered arrays through these steps:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Check Order Compatibility                 │
+│                    Build Merge Context                       │
 ├─────────────────────────────────────────────────────────────┤
-│  1. Compare local vs other ordering                          │
-│  2. If identical → proceed with spine-based merge            │
-│  3. If different → analyze moved elements                    │
+│  Extract keys and build position maps for O(1) lookups:     │
+│  - ancestorKeys, localKeys, otherKeys                       │
+│  - ancestorPos, localPos, otherPos (Map<key, index>)        │
+│  - ancestorMap, localMap, otherMap (Map<key, JsonObject>)   │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    Detect Moved Elements                     │
+│                    Analyze Orderings                         │
 ├─────────────────────────────────────────────────────────────┤
-│  For each version (local, other) vs ancestor:               │
-│  - Element X is "moved" if its relative order with any      │
-│    element Y changed (X before Y → X after Y, or vice versa)│
+│  1. Fast path: if local and other have same order → spine   │
+│  2. Detect moved elements in each version vs ancestor       │
+│  3. Check for overlapping moves (C4 conflict)               │
+│  4. Check for positional conflicts in additions (C6)        │
 └─────────────────────────────────────────────────────────────┘
                               │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    Check for Overlap                         │
-├─────────────────────────────────────────────────────────────┤
-│  localMoved ∩ otherMoved = ∅ ?                              │
-│  - Yes → Disjoint, can merge automatically                  │
-│  - No  → Conflict (C4: Divergent Moves)                     │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    Merge Disjoint Orderings                  │
-├─────────────────────────────────────────────────────────────┤
-│  Build merged order by traversing ancestor:                 │
-│  - For elements in localMoved: use local's relative order   │
-│  - For elements in otherMoved: use other's relative order   │
-│  - For unchanged elements: preserve ancestor position       │
-└─────────────────────────────────────────────────────────────┘
+              ┌───────────────┼───────────────┐
+              ▼               ▼               ▼
+┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+│  Cannot Merge   │ │ Diverged Orders │ │  Same Ordering  │
+│  (C4 or C6)     │ │ (Disjoint)      │ │                 │
+├─────────────────┤ ├─────────────────┤ ├─────────────────┤
+│ Full array      │ │ Compute merged  │ │ Use LCS spine   │
+│ conflict        │ │ key order       │ │ algorithm       │
+└─────────────────┘ └─────────────────┘ └─────────────────┘
+```
+
+### Moved Element Detection
+
+An element is considered "moved" if its relative order with any other element changed between ancestor and modified version. Uses upper-triangle optimization to avoid redundant pair comparisons:
+
+```typescript
+// For each pair (a, b) where a comes before b in ancestor:
+// If a comes after b in modified → both a and b are "moved"
+for (i = 0; i < ancestorKeys.length; i++) {
+  for (j = i + 1; j < ancestorKeys.length; j++) {
+    if (modifiedPos[a] > modifiedPos[b]) {
+      moved.add(a); moved.add(b)
+    }
+  }
+}
+```
+
+### Positional Conflict Detection (C6)
+
+When both sides add the same element but at different relative positions, a conflict is triggered. This is detected by comparing the relative order of added elements against all common elements:
+
+```typescript
+// For element added by both sides:
+// Check if its position relative to any common element differs
+if (addedLocalPos < keyLocalPos !== addedOtherPos < keyOtherPos) {
+  return true // Positional conflict
+}
 ```
 
 ### Merge Scenarios
@@ -259,6 +281,7 @@ The `OrderedKeyedArrayMergeStrategy` handles ordered arrays through these steps:
 | M1-M9 | Standard merges | Additions, deletions, modifications handled by spine algorithm |
 | M10 | Disjoint swaps | Local swaps {A,B}, other swaps {C,D} → merge both |
 | C4 | Divergent moves | Both sides move same element differently → conflict |
+| C6 | Positional conflict | Both sides add same element at different positions → conflict |
 
 ### Example: M10 Disjoint Swaps
 
@@ -278,13 +301,33 @@ Merge:
 - Result: [B, A, D, C]
 ```
 
+### Example: C6 Positional Conflict
+
+```
+Ancestor: [A, B]
+Local:    [A, X, B]     ← added X between A and B
+Other:    [X, A, B]     ← added X before A
+
+Analysis:
+- X added by both, but at different positions
+- In local: X is after A
+- In other: X is before A
+- Relative order conflict → full array conflict
+```
+
 ### Implementation
 
-Key functions in `KeyedArrayMergeNode.ts`:
+Key methods in `OrderedKeyedArrayMergeStrategy`:
 
-- `getMovedElements(base, modified)` — Returns set of elements that changed relative order
-- `mergeDisjointOrderings(ancestor, local, other, localMoved, otherMoved)` — Computes merged key order
-- `processMergedOrder(config, ctx, mergedKeys)` — Processes elements in merged order
+| Method | Purpose |
+|--------|---------|
+| `buildMergeContext()` | Extracts keys and builds position maps for O(1) lookups |
+| `analyzeOrderings(ctx)` | Returns `{canMerge, localMoved, otherMoved}` |
+| `getMovedElements(ctx, modifiedPos)` | Finds elements that changed relative order |
+| `hasAddedElementPositionalConflict(ctx)` | Detects C6 scenario |
+| `computeMergedKeyOrder(ctx, analysis)` | Builds merged key order for disjoint moves |
+| `processKeyOrder(config, ctx, keys)` | Processes elements in computed order |
+| `processWithSpine(config, ctx)` | Uses LCS for spine-based merge |
 
 ### Applicable Metadata Types
 
