@@ -227,6 +227,77 @@ const setsIntersect = (a: Set<string>, b: Set<string>): boolean => {
   return false
 }
 
+// Find elements that changed relative order between base and modified arrays
+const getMovedElements = (base: string[], modified: string[]): Set<string> => {
+  const moved = new Set<string>()
+  const basePos = new Map(base.map((k, i) => [k, i]))
+  const modPos = new Map(modified.map((k, i) => [k, i]))
+
+  for (const a of base) {
+    for (const b of base) {
+      if (a === b) continue
+      const aBase = basePos.get(a)
+      const bBase = basePos.get(b)
+      const aMod = modPos.get(a)
+      const bMod = modPos.get(b)
+
+      if (
+        aBase === undefined ||
+        bBase === undefined ||
+        aMod === undefined ||
+        bMod === undefined
+      ) {
+        continue
+      }
+
+      // If relative order changed, both elements are considered "moved"
+      if (aBase < bBase !== aMod < bMod) {
+        moved.add(a)
+        moved.add(b)
+      }
+    }
+  }
+  return moved
+}
+
+// Merge disjoint reorderings from local and other
+const mergeDisjointOrderings = (
+  ancestorKeys: string[],
+  localKeys: string[],
+  otherKeys: string[],
+  localMoved: Set<string>,
+  otherMoved: Set<string>
+): string[] => {
+  // Get the relative ordering for each moved set from the version that moved them
+  const localMovedOrdered = localKeys.filter(k => localMoved.has(k))
+  const otherMovedOrdered = otherKeys.filter(k => otherMoved.has(k))
+
+  const result: string[] = []
+  let localMovedInserted = false
+  let otherMovedInserted = false
+
+  for (const key of ancestorKeys) {
+    if (localMoved.has(key)) {
+      // Insert all localMoved elements at first occurrence
+      if (!localMovedInserted) {
+        result.push(...localMovedOrdered)
+        localMovedInserted = true
+      }
+    } else if (otherMoved.has(key)) {
+      // Insert all otherMoved elements at first occurrence
+      if (!otherMovedInserted) {
+        result.push(...otherMovedOrdered)
+        otherMovedInserted = true
+      }
+    } else {
+      // Unchanged element
+      result.push(key)
+    }
+  }
+
+  return result
+}
+
 class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   constructor(
     private readonly ancestor: JsonArray,
@@ -240,7 +311,25 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     const ctx = this.buildMergeContext()
 
     if (!hasSameOrder(ctx.localKeys, ctx.otherKeys)) {
-      return this.buildFullArrayConflict(config, ctx)
+      // Check if ordering changes are disjoint (can be merged)
+      const localMoved = getMovedElements(ctx.ancestorKeys, ctx.localKeys)
+      const otherMoved = getMovedElements(ctx.ancestorKeys, ctx.otherKeys)
+
+      // If moved sets overlap, it's a conflict (C4 scenario)
+      if (setsIntersect(localMoved, otherMoved)) {
+        return this.buildFullArrayConflict(config, ctx)
+      }
+
+      // Disjoint reorderings - compute merged order and process
+      const mergedKeys = mergeDisjointOrderings(
+        ctx.ancestorKeys,
+        ctx.localKeys,
+        ctx.otherKeys,
+        localMoved,
+        otherMoved
+      )
+
+      return this.processMergedOrder(config, ctx, mergedKeys)
     }
 
     const spine = lcs(
@@ -280,6 +369,24 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
         this.wrapKeys(ctx.otherKeys, ctx.otherMap)
       )
     )
+  }
+
+  // Process merged order when disjoint reorderings are detected
+  private processMergedOrder(
+    config: MergeConfig,
+    ctx: MergeContext,
+    mergedKeys: string[]
+  ): MergeResult {
+    const results: MergeResult[] = []
+
+    for (const key of mergedKeys) {
+      const result = this.mergeElement(config, key, ctx)
+      if (!isEmpty(result.output)) {
+        results.push(result)
+      }
+    }
+
+    return combineResults(results)
   }
 
   // Spine processing

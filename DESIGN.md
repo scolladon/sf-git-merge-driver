@@ -198,3 +198,99 @@ The `MergeContext` is immutable, ensuring strategies cannot accidentally modify 
 ### 5. Configurable Conflict Markers
 
 Conflict marker size and labels are configurable via Git's standard parameters (`-L`, `-S`, `-X`, `-Y` flags), allowing integration with existing Git workflows.
+
+## Deterministic Ordering Algorithm
+
+For ordered metadata types (e.g., `GlobalValueSet`, `StandardValueSet`), the driver implements a deterministic three-way merge algorithm that preserves element ordering while detecting and merging compatible changes.
+
+### Core Principles
+
+1. **User decides order** — never auto-resolve ambiguous ordering conflicts
+2. **Value-based comparison** — elements are compared by their key field, not position
+3. **Disjoint change detection** — non-overlapping reorderings can be merged automatically
+4. **Conflict on overlap** — when both sides move the same elements differently, conflict
+
+### Algorithm Overview
+
+The `OrderedKeyedArrayMergeStrategy` handles ordered arrays through these steps:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Check Order Compatibility                 │
+├─────────────────────────────────────────────────────────────┤
+│  1. Compare local vs other ordering                          │
+│  2. If identical → proceed with spine-based merge            │
+│  3. If different → analyze moved elements                    │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Detect Moved Elements                     │
+├─────────────────────────────────────────────────────────────┤
+│  For each version (local, other) vs ancestor:               │
+│  - Element X is "moved" if its relative order with any      │
+│    element Y changed (X before Y → X after Y, or vice versa)│
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Check for Overlap                         │
+├─────────────────────────────────────────────────────────────┤
+│  localMoved ∩ otherMoved = ∅ ?                              │
+│  - Yes → Disjoint, can merge automatically                  │
+│  - No  → Conflict (C4: Divergent Moves)                     │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Merge Disjoint Orderings                  │
+├─────────────────────────────────────────────────────────────┤
+│  Build merged order by traversing ancestor:                 │
+│  - For elements in localMoved: use local's relative order   │
+│  - For elements in otherMoved: use other's relative order   │
+│  - For unchanged elements: preserve ancestor position       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Merge Scenarios
+
+| ID | Scenario | Behavior |
+|----|----------|----------|
+| M1-M9 | Standard merges | Additions, deletions, modifications handled by spine algorithm |
+| M10 | Disjoint swaps | Local swaps {A,B}, other swaps {C,D} → merge both |
+| C4 | Divergent moves | Both sides move same element differently → conflict |
+
+### Example: M10 Disjoint Swaps
+
+```
+Ancestor: [A, B, C, D]
+Local:    [B, A, C, D]  ← swapped A↔B
+Other:    [A, B, D, C]  ← swapped C↔D
+
+Analysis:
+- localMoved  = {A, B}  (A and B changed relative order)
+- otherMoved  = {C, D}  (C and D changed relative order)
+- Intersection = ∅      (disjoint changes)
+
+Merge:
+- Apply local's order for {A,B}: [B, A]
+- Apply other's order for {C,D}: [D, C]
+- Result: [B, A, D, C]
+```
+
+### Implementation
+
+Key functions in `KeyedArrayMergeNode.ts`:
+
+- `getMovedElements(base, modified)` — Returns set of elements that changed relative order
+- `mergeDisjointOrderings(ancestor, local, other, localMoved, otherMoved)` — Computes merged key order
+- `processMergedOrder(config, ctx, mergedKeys)` — Processes elements in merged order
+
+### Applicable Metadata Types
+
+Ordered merging applies to metadata with position-significant arrays:
+
+- `GlobalValueSet` → `customValue` (key: `fullName`)
+- `StandardValueSet` → `standardValue` (key: `fullName`)
+- `CustomField` → `valueSet.customValue` (key: `fullName`)
+- `RecordType` → `picklistValues.values` (key: `fullName`)
