@@ -785,6 +785,45 @@ describe('KeyedArrayMergeNode', () => {
           'D',
         ])
       })
+
+      // C6: Same element added at different positions
+      it('C6: Concurrent Addition at Different Positions', () => {
+        const ancestor = [
+          { fullName: 'A', label: 'A' },
+          { fullName: 'C', label: 'C' },
+        ]
+        // Local adds B between A and C
+        const local = [
+          { fullName: 'A', label: 'A' },
+          { fullName: 'B', label: 'B' },
+          { fullName: 'C', label: 'C' },
+        ]
+        // Other adds B after C
+        const other = [
+          { fullName: 'A', label: 'A' },
+          { fullName: 'C', label: 'C' },
+          { fullName: 'B', label: 'B' },
+        ]
+
+        const node = createNode(ancestor, local, other)
+        const result = node.merge(defaultConfig)
+
+        expect(result.hasConflict).toBe(true)
+        expect(extractLabels(result.output)).toEqual([
+          expect.stringContaining(LOCAL_CONFLICT_MARKER),
+          'A',
+          'B',
+          'C',
+          expect.stringContaining(ANCESTOR_CONFLICT_MARKER),
+          'A',
+          'C',
+          expect.stringContaining(SEPARATOR),
+          'A',
+          'C',
+          'B',
+          expect.stringContaining(OTHER_CONFLICT_MARKER),
+        ])
+      })
     })
   })
 })

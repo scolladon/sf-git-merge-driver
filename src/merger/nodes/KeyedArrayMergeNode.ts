@@ -296,14 +296,73 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
       }
     }
 
-    // Detect which elements moved in each version
+    // Detect which elements moved in each version (relative to ancestor)
     const localMoved = this.getMovedElements(ctx.ancestorKeys, ctx.localKeys)
     const otherMoved = this.getMovedElements(ctx.ancestorKeys, ctx.otherKeys)
 
     // Overlapping moves = conflict (C4 scenario)
-    const canMerge = !setsIntersect(localMoved, otherMoved)
+    if (setsIntersect(localMoved, otherMoved)) {
+      return { canMerge: false, localMoved, otherMoved }
+    }
 
-    return { canMerge, localMoved, otherMoved }
+    // If orderings differ but no ancestor elements moved, check for positional
+    // conflicts in added elements (C6 scenario: same element added at different positions)
+    if (localMoved.size === 0 && otherMoved.size === 0) {
+      const hasPositionalConflict = this.hasAddedElementPositionalConflict(ctx)
+      if (hasPositionalConflict) {
+        return { canMerge: false, localMoved, otherMoved }
+      }
+    }
+
+    return { canMerge: true, localMoved, otherMoved }
+  }
+
+  /**
+   * Checks if elements added by both sides appear at different positions.
+   * This happens when both add the same element but in different places.
+   */
+  private hasAddedElementPositionalConflict(ctx: MergeContext): boolean {
+    const ancestorSet = new Set(ctx.ancestorKeys)
+
+    // Find elements added by both sides (not in ancestor, but in both local and other)
+    const addedByBoth: string[] = []
+    for (const key of ctx.localKeys) {
+      if (!ancestorSet.has(key) && ctx.otherMap.has(key)) {
+        addedByBoth.push(key)
+      }
+    }
+
+    if (addedByBoth.length === 0) {
+      return false
+    }
+
+    // Check if any commonly added element has different relative positions
+    const localPos = new Map(ctx.localKeys.map((k, i) => [k, i]))
+    const otherPos = new Map(ctx.otherKeys.map((k, i) => [k, i]))
+
+    // Compare relative order of added elements with other elements
+    for (const added of addedByBoth) {
+      const addedLocalPos = localPos.get(added)!
+      const addedOtherPos = otherPos.get(added)!
+
+      // Check against all common elements (elements in both local and other)
+      for (const key of ctx.localKeys) {
+        if (key === added || !ctx.otherMap.has(key)) continue
+
+        const keyLocalPos = localPos.get(key)!
+        const keyOtherPos = otherPos.get(key)!
+
+        // If relative order differs, there's a positional conflict
+        const localOrder = addedLocalPos < keyLocalPos
+        const otherOrder = addedOtherPos < keyOtherPos
+
+        if (localOrder !== otherOrder) {
+          return true
+        }
+      }
+    }
+
+    return false
   }
 
   /**
