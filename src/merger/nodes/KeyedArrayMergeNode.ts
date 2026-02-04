@@ -233,6 +233,35 @@ const setsIntersect = (a: Set<string>, b: Set<string>): boolean => {
 }
 
 // ============================================================================
+// Element Presence Pattern
+// ============================================================================
+
+/**
+ * Enum representing element presence across versions.
+ * Pattern: [Ancestor][Local][Other] where 1=present, 0=absent
+ */
+enum ElementPresence {
+  NONE = 0, // Element doesn't exist (shouldn't happen)
+  OTHER_ONLY = 1, // Only other has element (001)
+  LOCAL_ONLY = 10, // Only local has element (010)
+  BOTH_ADDED = 11, // Local and other added (011)
+  ANCESTOR_ONLY = 100, // Only ancestor has element - both deleted (100)
+  ANCESTOR_OTHER = 101, // Ancestor + other - local deleted (101)
+  ANCESTOR_LOCAL = 110, // Ancestor + local - other deleted (110)
+  ALL = 111, // All three have element (111)
+}
+
+const computeElementPresence = (
+  inAncestor: boolean,
+  inLocal: boolean,
+  inOther: boolean
+): ElementPresence => {
+  return ((inAncestor ? 100 : 0) +
+    (inLocal ? 10 : 0) +
+    (inOther ? 1 : 0)) as ElementPresence
+}
+
+// ============================================================================
 // Ordering Analysis
 // ============================================================================
 
@@ -710,7 +739,7 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
 
   /**
    * Merges a single element based on its presence pattern across versions.
-   * Pattern: 3-bit mask where bit 2=ancestor, bit 1=local, bit 0=other
+   * Uses ElementPresence enum for readable pattern matching.
    */
   private mergeGapElement(
     config: MergeConfig,
@@ -721,41 +750,48 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     const lVal = ctx.localMap.get(key)
     const oVal = ctx.otherMap.get(key)
 
-    // Compute presence pattern: A=4, L=2, O=1
-    const pattern =
-      (aVal !== undefined ? 4 : 0) |
-      (lVal !== undefined ? 2 : 0) |
-      (oVal !== undefined ? 1 : 0)
+    const presence = computeElementPresence(
+      aVal !== undefined,
+      lVal !== undefined,
+      oVal !== undefined
+    )
 
-    switch (pattern) {
-      case 0b100: // Only in ancestor (both deleted)
+    switch (presence) {
+      case ElementPresence.ANCESTOR_ONLY:
+        // Both deleted - nothing to output
         return null
 
-      case 0b111: // In all three
+      case ElementPresence.ALL:
+        // In all three - standard merge
         return this.mergeElement(config, key, ctx)
 
-      case 0b101: // Ancestor + other (local deleted)
+      case ElementPresence.ANCESTOR_OTHER:
+        // Local deleted - conflict if other modified
         return deepEqual(aVal, oVal)
-          ? null // Deleted unchanged element
+          ? null
           : this.buildElementConflict(config, null, aVal, oVal)
 
-      case 0b110: // Ancestor + local (other deleted)
+      case ElementPresence.ANCESTOR_LOCAL:
+        // Other deleted - conflict if local modified
         return deepEqual(aVal, lVal)
-          ? null // Deleted unchanged element
+          ? null
           : this.buildElementConflict(config, lVal, aVal, null)
 
-      case 0b011: // Local + other (both added)
+      case ElementPresence.BOTH_ADDED:
+        // Both added - accept if identical, conflict otherwise
         return deepEqual(lVal, oVal)
           ? noConflict([this.wrapElement(lVal!)])
           : this.buildElementConflict(config, lVal, null, oVal)
 
-      case 0b010: // Only local added
+      case ElementPresence.LOCAL_ONLY:
+        // Only local added
         return noConflict([this.wrapElement(lVal!)])
 
-      case 0b001: // Only other added
+      case ElementPresence.OTHER_ONLY:
+        // Only other added
         return noConflict([this.wrapElement(oVal!)])
 
-      default: // 0b000 - shouldn't happen
+      default:
         return null
     }
   }
