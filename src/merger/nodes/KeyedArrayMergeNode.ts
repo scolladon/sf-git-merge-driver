@@ -141,6 +141,11 @@ interface MergeContext {
   ancestorMap: Map<string, JsonObject>
   localMap: Map<string, JsonObject>
   otherMap: Map<string, JsonObject>
+  // Position maps for O(1) lookups - computed once, reused everywhere
+  ancestorPos: Map<string, number>
+  localPos: Map<string, number>
+  otherPos: Map<string, number>
+  ancestorSet: Set<string>
 }
 
 interface GapSets {
@@ -270,15 +275,24 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   // ============================================================================
 
   private buildMergeContext(): MergeContext {
+    const ancestorKeys = this.ancestor.map(item =>
+      this.keyField(item as JsonObject)
+    )
+    const localKeys = this.local.map(item => this.keyField(item as JsonObject))
+    const otherKeys = this.other.map(item => this.keyField(item as JsonObject))
+
     return {
-      ancestorKeys: this.ancestor.map(item =>
-        this.keyField(item as JsonObject)
-      ),
-      localKeys: this.local.map(item => this.keyField(item as JsonObject)),
-      otherKeys: this.other.map(item => this.keyField(item as JsonObject)),
+      ancestorKeys,
+      localKeys,
+      otherKeys,
       ancestorMap: buildKeyedMap(this.ancestor, this.keyField),
       localMap: buildKeyedMap(this.local, this.keyField),
       otherMap: buildKeyedMap(this.other, this.keyField),
+      // Position maps computed once for O(1) lookups
+      ancestorPos: new Map(ancestorKeys.map((k, i) => [k, i])),
+      localPos: new Map(localKeys.map((k, i) => [k, i])),
+      otherPos: new Map(otherKeys.map((k, i) => [k, i])),
+      ancestorSet: new Set(ancestorKeys),
     }
   }
 
@@ -297,8 +311,8 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     }
 
     // Detect which elements moved in each version (relative to ancestor)
-    const localMoved = this.getMovedElements(ctx.ancestorKeys, ctx.localKeys)
-    const otherMoved = this.getMovedElements(ctx.ancestorKeys, ctx.otherKeys)
+    const localMoved = this.getMovedElements(ctx, ctx.localPos)
+    const otherMoved = this.getMovedElements(ctx, ctx.otherPos)
 
     // Overlapping moves = conflict (C4 scenario)
     if (setsIntersect(localMoved, otherMoved)) {
@@ -320,43 +334,26 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   /**
    * Checks if elements added by both sides appear at different positions.
    * This happens when both add the same element but in different places.
+   * Uses context's precomputed position maps for O(1) lookups.
    */
   private hasAddedElementPositionalConflict(ctx: MergeContext): boolean {
-    const ancestorSet = new Set(ctx.ancestorKeys)
-
     // Find elements added by both sides (not in ancestor, but in both local and other)
-    const addedByBoth: string[] = []
-    for (const key of ctx.localKeys) {
-      if (!ancestorSet.has(key) && ctx.otherMap.has(key)) {
-        addedByBoth.push(key)
-      }
-    }
+    // and check for positional conflicts in a single pass
+    for (const added of ctx.localKeys) {
+      if (ctx.ancestorSet.has(added) || !ctx.otherMap.has(added)) continue
 
-    if (addedByBoth.length === 0) {
-      return false
-    }
+      const addedLocalPos = ctx.localPos.get(added)!
+      const addedOtherPos = ctx.otherPos.get(added)!
 
-    // Check if any commonly added element has different relative positions
-    const localPos = new Map(ctx.localKeys.map((k, i) => [k, i]))
-    const otherPos = new Map(ctx.otherKeys.map((k, i) => [k, i]))
-
-    // Compare relative order of added elements with other elements
-    for (const added of addedByBoth) {
-      const addedLocalPos = localPos.get(added)!
-      const addedOtherPos = otherPos.get(added)!
-
-      // Check against all common elements (elements in both local and other)
+      // Check against all common elements for relative order differences
       for (const key of ctx.localKeys) {
         if (key === added || !ctx.otherMap.has(key)) continue
 
-        const keyLocalPos = localPos.get(key)!
-        const keyOtherPos = otherPos.get(key)!
+        const keyLocalPos = ctx.localPos.get(key)!
+        const keyOtherPos = ctx.otherPos.get(key)!
 
         // If relative order differs, there's a positional conflict
-        const localOrder = addedLocalPos < keyLocalPos
-        const otherOrder = addedOtherPos < keyOtherPos
-
-        if (localOrder !== otherOrder) {
+        if (addedLocalPos < keyLocalPos !== addedOtherPos < keyOtherPos) {
           return true
         }
       }
@@ -366,26 +363,28 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   }
 
   /**
-   * Finds elements that changed relative order between base and modified arrays.
+   * Finds elements that changed relative order between ancestor and modified arrays.
    * Uses upper triangle optimization to avoid redundant pair comparisons.
    * Complexity: O(n²) for n elements - acceptable for typical metadata array sizes.
    */
-  private getMovedElements(base: string[], modified: string[]): Set<string> {
+  private getMovedElements(
+    ctx: MergeContext,
+    modifiedPos: Map<string, number>
+  ): Set<string> {
     const moved = new Set<string>()
-    const modPos = new Map(modified.map((k, i) => [k, i]))
 
     // Only check upper triangle (i < j) to avoid duplicate comparisons
-    for (let i = 0; i < base.length; i++) {
-      const a = base[i]
-      const aMod = modPos.get(a)
+    for (let i = 0; i < ctx.ancestorKeys.length; i++) {
+      const a = ctx.ancestorKeys[i]
+      const aMod = modifiedPos.get(a)
       if (aMod === undefined) continue
 
-      for (let j = i + 1; j < base.length; j++) {
-        const b = base[j]
-        const bMod = modPos.get(b)
+      for (let j = i + 1; j < ctx.ancestorKeys.length; j++) {
+        const b = ctx.ancestorKeys[j]
+        const bMod = modifiedPos.get(b)
         if (bMod === undefined) continue
 
-        // In base: a comes before b (i < j)
+        // In ancestor: a comes before b (i < j)
         // Check if order reversed in modified
         if (aMod > bMod) {
           moved.add(a)
@@ -426,12 +425,10 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     const localAdditions: string[] = []
     const otherAdditions: string[] = []
 
-    const ancestorSet = new Set(ctx.ancestorKeys)
-
     for (const key of ctx.localKeys) {
       if (localMoved.has(key)) {
         localMovedOrdered.push(key)
-      } else if (!ancestorSet.has(key)) {
+      } else if (!ctx.ancestorSet.has(key)) {
         localAdditions.push(key)
       }
     }
@@ -439,7 +436,7 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     for (const key of ctx.otherKeys) {
       if (otherMoved.has(key)) {
         otherMovedOrdered.push(key)
-      } else if (!ancestorSet.has(key) && !ctx.localMap.has(key)) {
+      } else if (!ctx.ancestorSet.has(key) && !ctx.localMap.has(key)) {
         // Only add if not already added by local
         otherAdditions.push(key)
       }
@@ -711,50 +708,56 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     return combineResults(results)
   }
 
+  /**
+   * Merges a single element based on its presence pattern across versions.
+   * Pattern: 3-bit mask where bit 2=ancestor, bit 1=local, bit 0=other
+   */
   private mergeGapElement(
     config: MergeConfig,
     key: string,
     ctx: MergeContext
   ): MergeResult | null {
-    const inA = ctx.ancestorMap.has(key)
-    const inL = ctx.localMap.has(key)
-    const inO = ctx.otherMap.has(key)
     const aVal = ctx.ancestorMap.get(key)
     const lVal = ctx.localMap.get(key)
     const oVal = ctx.otherMap.get(key)
 
-    // Both deleted
-    if (inA && !inL && !inO) return null
+    // Compute presence pattern: A=4, L=2, O=1
+    const pattern =
+      (aVal !== undefined ? 4 : 0) |
+      (lVal !== undefined ? 2 : 0) |
+      (oVal !== undefined ? 1 : 0)
 
-    // In all three
-    if (inA && inL && inO) return this.mergeElement(config, key, ctx)
+    switch (pattern) {
+      case 0b100: // Only in ancestor (both deleted)
+        return null
 
-    // Local deleted, other kept
-    if (inA && !inL && inO) {
-      return deepEqual(aVal, oVal)
-        ? null
-        : this.buildElementConflict(config, null, aVal, oVal)
+      case 0b111: // In all three
+        return this.mergeElement(config, key, ctx)
+
+      case 0b101: // Ancestor + other (local deleted)
+        return deepEqual(aVal, oVal)
+          ? null // Deleted unchanged element
+          : this.buildElementConflict(config, null, aVal, oVal)
+
+      case 0b110: // Ancestor + local (other deleted)
+        return deepEqual(aVal, lVal)
+          ? null // Deleted unchanged element
+          : this.buildElementConflict(config, lVal, aVal, null)
+
+      case 0b011: // Local + other (both added)
+        return deepEqual(lVal, oVal)
+          ? noConflict([this.wrapElement(lVal!)])
+          : this.buildElementConflict(config, lVal, null, oVal)
+
+      case 0b010: // Only local added
+        return noConflict([this.wrapElement(lVal!)])
+
+      case 0b001: // Only other added
+        return noConflict([this.wrapElement(oVal!)])
+
+      default: // 0b000 - shouldn't happen
+        return null
     }
-
-    // Other deleted, local kept
-    if (inA && inL && !inO) {
-      return deepEqual(aVal, lVal)
-        ? null
-        : this.buildElementConflict(config, lVal, aVal, null)
-    }
-
-    // Both added
-    if (!inA && inL && inO) {
-      return deepEqual(lVal, oVal)
-        ? noConflict([this.wrapElement(lVal!)])
-        : this.buildElementConflict(config, lVal, null, oVal)
-    }
-
-    // Only local added
-    if (!inA && inL && !inO) return noConflict([this.wrapElement(lVal!)])
-
-    // Only other added
-    return noConflict([this.wrapElement(oVal!)])
   }
 
   // Element helpers
