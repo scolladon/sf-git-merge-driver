@@ -502,8 +502,33 @@ describe('KeyedArrayMergeNode', () => {
         expect(extractLabels(result.output)).toEqual(['A', 'B'])
       })
 
-      // M7: Other deletes element, local keeps unchanged (accepts deletion)
-      it('M7: One-Sided Deletion (Other)', () => {
+      // M7: Local deletes element, other keeps unchanged (accepts deletion)
+      it('M7: One-Sided Deletion (Local)', () => {
+        const ancestor = [
+          { fullName: 'A', label: 'A' },
+          { fullName: 'B', label: 'B' },
+          { fullName: 'C', label: 'C' },
+        ]
+        const local = [
+          { fullName: 'A', label: 'A' },
+          // B deleted
+          { fullName: 'C', label: 'C' },
+        ]
+        const other = [
+          { fullName: 'A', label: 'A' },
+          { fullName: 'B', label: 'B' }, // B kept unchanged
+          { fullName: 'C', label: 'C' },
+        ]
+
+        const node = createNode(ancestor, local, other)
+        const result = node.merge(defaultConfig)
+
+        expect(result.hasConflict).toBe(false)
+        expect(extractLabels(result.output)).toEqual(['A', 'C']) // B removed
+      })
+
+      // M8: Other deletes element, local keeps unchanged (accepts deletion)
+      it('M8: One-Sided Deletion (Other)', () => {
         const ancestor = [
           { fullName: 'A', label: 'A' },
           { fullName: 'B', label: 'B' },
@@ -527,8 +552,8 @@ describe('KeyedArrayMergeNode', () => {
         expect(extractLabels(result.output)).toEqual(['A', 'C']) // B removed
       })
 
-      // M8: Both sides delete the same element (setsEqual returns true)
-      it('M8: Identical Deletion (Both)', () => {
+      // M9: Both sides delete the same element (setsEqual returns true)
+      it('M9: Identical Deletion', () => {
         const ancestor = [
           { fullName: 'A', label: 'A' },
           { fullName: 'B', label: 'B' },
@@ -550,6 +575,36 @@ describe('KeyedArrayMergeNode', () => {
 
         expect(result.hasConflict).toBe(false)
         expect(extractLabels(result.output)).toEqual(['A', 'C'])
+      })
+
+      // M10: Swap Elements - disjoint swaps in local and other should both apply
+      it('M10: Swap Elements', () => {
+        const ancestor = [
+          { fullName: 'A', label: 'A' },
+          { fullName: 'B', label: 'B' },
+          { fullName: 'C', label: 'C' },
+          { fullName: 'D', label: 'D' },
+        ]
+        // Local swaps A and B
+        const local = [
+          { fullName: 'B', label: 'B' },
+          { fullName: 'A', label: 'A' },
+          { fullName: 'C', label: 'C' },
+          { fullName: 'D', label: 'D' },
+        ]
+        // Other swaps C and D
+        const other = [
+          { fullName: 'A', label: 'A' },
+          { fullName: 'B', label: 'B' },
+          { fullName: 'D', label: 'D' },
+          { fullName: 'C', label: 'C' },
+        ]
+
+        const node = createNode(ancestor, local, other)
+        const result = node.merge(defaultConfig)
+
+        expect(result.hasConflict).toBe(false)
+        expect(extractLabels(result.output)).toEqual(['B', 'A', 'D', 'C'])
       })
     })
 
