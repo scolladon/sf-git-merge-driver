@@ -386,443 +386,186 @@ describe('KeyedArrayMergeNode', () => {
       return new KeyedArrayMergeNode(ancestor, local, other, 'customValue')
     }
 
+    // Helper to create element: 'A' -> { fullName: 'A', label: 'A' }, 'A:A_MOD' -> { fullName: 'A', label: 'A_MOD' }
+    const el = (s: string) => {
+      const [name, label] = s.split(':')
+      return { fullName: name, label: label ?? name }
+    }
+    const toElements = (arr: string[]) => arr.map(el)
+
+    type GracefulMergeScenario = [
+      name: string,
+      ancestor: string[],
+      local: string[],
+      other: string[],
+      expectedOutput: string[],
+    ]
+
+    const gracefulMergeScenarios: GracefulMergeScenario[] = [
+      // [name, ancestor, local, other, expectedOutput]
+      [
+        'M1: Disjoint Changes',
+        ['A', 'B', 'C'],
+        ['A:A_MOD', 'B', 'C'],
+        ['A', 'B', 'C:C_MOD'],
+        ['A_MOD', 'B', 'C_MOD'],
+      ],
+      ['M2: Identical Changes', ['A'], ['A:A_MOD'], ['A:A_MOD'], ['A_MOD']],
+      ['M3: One-Sided Change', ['A'], ['A'], ['A:A_MOD'], ['A_MOD']],
+      [
+        'M4: One-Sided Addition (Local)',
+        ['A', 'C'],
+        ['A', 'B', 'C'],
+        ['A', 'C'],
+        ['A', 'B', 'C'],
+      ],
+      [
+        'M5: One-Sided Addition (Other)',
+        ['A', 'C'],
+        ['A', 'C'],
+        ['A', 'B', 'C'],
+        ['A', 'B', 'C'],
+      ],
+      [
+        'M6: Identical Addition (Both)',
+        ['A'],
+        ['A', 'B'],
+        ['A', 'B'],
+        ['A', 'B'],
+      ],
+      [
+        'M7: One-Sided Deletion (Local)',
+        ['A', 'B', 'C'],
+        ['A', 'C'],
+        ['A', 'B', 'C'],
+        ['A', 'C'],
+      ],
+      [
+        'M8: One-Sided Deletion (Other)',
+        ['A', 'B', 'C'],
+        ['A', 'B', 'C'],
+        ['A', 'C'],
+        ['A', 'C'],
+      ],
+      [
+        'M9: Identical Deletion',
+        ['A', 'B', 'C'],
+        ['A', 'C'],
+        ['A', 'C'],
+        ['A', 'C'],
+      ],
+      [
+        'M10: Swap Elements',
+        ['A', 'B', 'C', 'D'],
+        ['B', 'A', 'C', 'D'],
+        ['A', 'B', 'D', 'C'],
+        ['B', 'A', 'D', 'C'],
+      ],
+      [
+        'M10+: Swap Elements with additions',
+        ['A', 'B'],
+        ['B', 'A', 'X'],
+        ['A', 'B', 'Y'],
+        ['B', 'A', 'X', 'Y'],
+      ],
+    ]
+
     describe('Graceful Merges', () => {
-      // M1: Disjoint Changes (Non-overlapping)
-      it('M1: Disjoint Changes', () => {
-        const ancestor = [
-          { fullName: 'A', label: 'A' },
-          { fullName: 'B', label: 'B' },
-          { fullName: 'C', label: 'C' },
-        ]
-        const local = [
-          { fullName: 'A', label: 'A_MOD' }, // Modify A
-          { fullName: 'B', label: 'B' },
-          { fullName: 'C', label: 'C' },
-        ]
-        const other = [
-          { fullName: 'A', label: 'A' },
-          { fullName: 'B', label: 'B' },
-          { fullName: 'C', label: 'C_MOD' }, // Modify C
-        ]
-        const node = createNode(ancestor, local, other)
+      it.each(
+        gracefulMergeScenarios
+      )('%s', (_name, ancestor, local, other, expectedOutput) => {
+        // Arrange
+        const node = createNode(
+          toElements(ancestor),
+          toElements(local),
+          toElements(other)
+        )
+
+        // Act
         const result = node.merge(defaultConfig)
 
+        // Assert
         expect(result.hasConflict).toBe(false)
-        expect(extractLabels(result.output)).toEqual(['A_MOD', 'B', 'C_MOD'])
-      })
-
-      // M2: Identical Changes (Idempotency)
-      it('M2: Identical Changes', () => {
-        const ancestor = [{ fullName: 'A', label: 'A' }]
-        const local = [{ fullName: 'A', label: 'A_MOD' }]
-        const other = [{ fullName: 'A', label: 'A_MOD' }]
-
-        const node = createNode(ancestor, local, other)
-        const result = node.merge(defaultConfig)
-
-        expect(result.hasConflict).toBe(false)
-        expect(extractLabels(result.output)).toEqual(['A_MOD'])
-      })
-
-      // M3: One-Sided Change (Efficiency)
-      it('M3: One-Sided Change', () => {
-        const ancestor = [{ fullName: 'A', label: 'A' }]
-        const local = [{ fullName: 'A', label: 'A' }]
-        const other = [{ fullName: 'A', label: 'A_MOD' }] // Only Other changes
-
-        const node = createNode(ancestor, local, other)
-        const result = node.merge(defaultConfig)
-
-        expect(result.hasConflict).toBe(false)
-        expect(extractLabels(result.output)).toEqual(['A_MOD'])
-      })
-
-      // M4: Only local adds element in gap
-      it('M4: One-Sided Addition (Local)', () => {
-        const ancestor = [
-          { fullName: 'A', label: 'A' },
-          { fullName: 'C', label: 'C' },
-        ]
-        const local = [
-          { fullName: 'A', label: 'A' },
-          { fullName: 'B', label: 'B' }, // B added by local
-          { fullName: 'C', label: 'C' },
-        ]
-        const other = [
-          { fullName: 'A', label: 'A' },
-          { fullName: 'C', label: 'C' },
-        ] // unchanged
-
-        const node = createNode(ancestor, local, other)
-        const result = node.merge(defaultConfig)
-
-        expect(result.hasConflict).toBe(false)
-        expect(extractLabels(result.output)).toEqual(['A', 'B', 'C'])
-      })
-
-      // M5: Only other adds element in gap
-      it('M5: One-Sided Addition (Other)', () => {
-        const ancestor = [
-          { fullName: 'A', label: 'A' },
-          { fullName: 'C', label: 'C' },
-        ]
-        const local = [
-          { fullName: 'A', label: 'A' },
-          { fullName: 'C', label: 'C' },
-        ] // unchanged
-        const other = [
-          { fullName: 'A', label: 'A' },
-          { fullName: 'B', label: 'B' }, // B added by other
-          { fullName: 'C', label: 'C' },
-        ]
-
-        const node = createNode(ancestor, local, other)
-        const result = node.merge(defaultConfig)
-
-        expect(result.hasConflict).toBe(false)
-        expect(extractLabels(result.output)).toEqual(['A', 'B', 'C'])
-      })
-
-      // M6: Both sides add the same element in gap
-      it('M6: Identical Addition (Both)', () => {
-        const ancestor = [{ fullName: 'A', label: 'A' }]
-        const local = [
-          { fullName: 'A', label: 'A' },
-          { fullName: 'B', label: 'B' }, // B added
-        ]
-        const other = [
-          { fullName: 'A', label: 'A' },
-          { fullName: 'B', label: 'B' }, // Same B added
-        ]
-
-        const node = createNode(ancestor, local, other)
-        const result = node.merge(defaultConfig)
-
-        expect(result.hasConflict).toBe(false)
-        expect(extractLabels(result.output)).toEqual(['A', 'B'])
-      })
-
-      // M7: Local deletes element, other keeps unchanged (accepts deletion)
-      it('M7: One-Sided Deletion (Local)', () => {
-        const ancestor = [
-          { fullName: 'A', label: 'A' },
-          { fullName: 'B', label: 'B' },
-          { fullName: 'C', label: 'C' },
-        ]
-        const local = [
-          { fullName: 'A', label: 'A' },
-          // B deleted
-          { fullName: 'C', label: 'C' },
-        ]
-        const other = [
-          { fullName: 'A', label: 'A' },
-          { fullName: 'B', label: 'B' }, // B kept unchanged
-          { fullName: 'C', label: 'C' },
-        ]
-
-        const node = createNode(ancestor, local, other)
-        const result = node.merge(defaultConfig)
-
-        expect(result.hasConflict).toBe(false)
-        expect(extractLabels(result.output)).toEqual(['A', 'C']) // B removed
-      })
-
-      // M8: Other deletes element, local keeps unchanged (accepts deletion)
-      it('M8: One-Sided Deletion (Other)', () => {
-        const ancestor = [
-          { fullName: 'A', label: 'A' },
-          { fullName: 'B', label: 'B' },
-          { fullName: 'C', label: 'C' },
-        ]
-        const local = [
-          { fullName: 'A', label: 'A' },
-          { fullName: 'B', label: 'B' }, // B kept unchanged
-          { fullName: 'C', label: 'C' },
-        ]
-        const other = [
-          { fullName: 'A', label: 'A' },
-          // B deleted
-          { fullName: 'C', label: 'C' },
-        ]
-
-        const node = createNode(ancestor, local, other)
-        const result = node.merge(defaultConfig)
-
-        expect(result.hasConflict).toBe(false)
-        expect(extractLabels(result.output)).toEqual(['A', 'C']) // B removed
-      })
-
-      // M9: Both sides delete the same element (setsEqual returns true)
-      it('M9: Identical Deletion', () => {
-        const ancestor = [
-          { fullName: 'A', label: 'A' },
-          { fullName: 'B', label: 'B' },
-          { fullName: 'C', label: 'C' },
-        ]
-        const local = [
-          { fullName: 'A', label: 'A' },
-          // B deleted
-          { fullName: 'C', label: 'C' },
-        ]
-        const other = [
-          { fullName: 'A', label: 'A' },
-          // B deleted (same deletion)
-          { fullName: 'C', label: 'C' },
-        ]
-
-        const node = createNode(ancestor, local, other)
-        const result = node.merge(defaultConfig)
-
-        expect(result.hasConflict).toBe(false)
-        expect(extractLabels(result.output)).toEqual(['A', 'C'])
-      })
-
-      // M10: Swap Elements - disjoint swaps in local and other should both apply
-      it('M10: Swap Elements', () => {
-        const ancestor = [
-          { fullName: 'A', label: 'A' },
-          { fullName: 'B', label: 'B' },
-          { fullName: 'C', label: 'C' },
-          { fullName: 'D', label: 'D' },
-        ]
-        // Local swaps A and B
-        const local = [
-          { fullName: 'B', label: 'B' },
-          { fullName: 'A', label: 'A' },
-          { fullName: 'C', label: 'C' },
-          { fullName: 'D', label: 'D' },
-        ]
-        // Other swaps C and D
-        const other = [
-          { fullName: 'A', label: 'A' },
-          { fullName: 'B', label: 'B' },
-          { fullName: 'D', label: 'D' },
-          { fullName: 'C', label: 'C' },
-        ]
-
-        const node = createNode(ancestor, local, other)
-        const result = node.merge(defaultConfig)
-
-        expect(result.hasConflict).toBe(false)
-        expect(extractLabels(result.output)).toEqual(['B', 'A', 'D', 'C'])
-      })
-
-      // M10+: Swap Elements with additions - disjoint swaps plus additions from both sides
-      it('M10: Swap Elements with additions', () => {
-        const ancestor = [
-          { fullName: 'A', label: 'A' },
-          { fullName: 'B', label: 'B' },
-        ]
-        // Local swaps A and B, adds X
-        const local = [
-          { fullName: 'B', label: 'B' },
-          { fullName: 'A', label: 'A' },
-          { fullName: 'X', label: 'X' },
-        ]
-        // Other keeps order, adds Y
-        const other = [
-          { fullName: 'A', label: 'A' },
-          { fullName: 'B', label: 'B' },
-          { fullName: 'Y', label: 'Y' },
-        ]
-
-        const node = createNode(ancestor, local, other)
-        const result = node.merge(defaultConfig)
-
-        expect(result.hasConflict).toBe(false)
-        // Expect: B, A (local's swap), X (local's addition), Y (other's addition)
-        expect(extractLabels(result.output)).toEqual(['B', 'A', 'X', 'Y'])
+        expect(extractLabels(result.output)).toEqual(expectedOutput)
       })
     })
 
+    type ConflictScenario = [
+      name: string,
+      ancestor: string[],
+      local: string[],
+      other: string[],
+      expectedOutput: (string | ReturnType<typeof expect.stringContaining>)[],
+    ]
+
+    const L = expect.stringContaining(LOCAL_CONFLICT_MARKER)
+    const A = expect.stringContaining(ANCESTOR_CONFLICT_MARKER)
+    const S = expect.stringContaining(SEPARATOR)
+    const O = expect.stringContaining(OTHER_CONFLICT_MARKER)
+
+    const conflictScenarios: ConflictScenario[] = [
+      // [name, ancestor, local, other, expectedOutput]
+      [
+        'C1: Concurrent Modification',
+        ['A'],
+        ['A:A_LOCAL'],
+        ['A:A_OTHER'],
+        [L, 'A_LOCAL', A, 'A', S, 'A_OTHER', O],
+      ],
+      [
+        'C2: Concurrent Insertion',
+        ['A'],
+        ['A', 'B'],
+        ['A', 'C'],
+        ['A', L, 'B', A, S, 'C', O],
+      ],
+      [
+        'C3: Delete vs Modify',
+        ['A'],
+        [],
+        ['A:A_MOD'],
+        [L, A, 'A', S, 'A_MOD', O],
+      ],
+      [
+        'C4: Divergent Moves',
+        ['A', 'B', 'C'],
+        ['B', 'A', 'C'],
+        ['A', 'C', 'B'],
+        [L, 'B', 'A', 'C', A, 'A', 'B', 'C', S, 'A', 'C', 'B', O],
+      ],
+      [
+        'C5: Partially Overlapping Hunks',
+        ['A', 'B', 'C', 'D'],
+        ['A', 'D'],
+        ['A', 'B', 'D'],
+        ['A', L, A, 'B', 'C', S, 'B', O, 'D'],
+      ],
+      [
+        'C6: Concurrent Addition at Different Positions',
+        ['A', 'C'],
+        ['A', 'B', 'C'],
+        ['A', 'C', 'B'],
+        [L, 'A', 'B', 'C', A, 'A', 'C', S, 'A', 'C', 'B', O],
+      ],
+    ]
+
     describe('Conflicts', () => {
-      // C1: Concurrent Element Modification
-      it('C1: Concurrent Modification', () => {
-        const ancestor = [{ fullName: 'A', label: 'A' }]
-        const local = [{ fullName: 'A', label: 'A_LOCAL' }]
-        const other = [{ fullName: 'A', label: 'A_OTHER' }]
+      it.each(
+        conflictScenarios
+      )('%s', (_name, ancestor, local, other, expectedOutput) => {
+        // Arrange
+        const node = createNode(
+          toElements(ancestor),
+          toElements(local),
+          toElements(other)
+        )
 
-        const node = createNode(ancestor, local, other)
+        // Act
         const result = node.merge(defaultConfig)
 
+        // Assert
         expect(result.hasConflict).toBe(true)
-        expect(extractLabels(result.output)).toEqual([
-          expect.stringContaining(LOCAL_CONFLICT_MARKER),
-          'A_LOCAL',
-          expect.stringContaining(ANCESTOR_CONFLICT_MARKER),
-          'A',
-          expect.stringContaining(SEPARATOR),
-          'A_OTHER',
-          expect.stringContaining(OTHER_CONFLICT_MARKER),
-        ])
-      })
-
-      // C2: Concurrent Insertion (Collision in gap)
-      it('C2: Concurrent Insertion', () => {
-        const ancestor = [{ fullName: 'A', label: 'A' }]
-        const local = [
-          { fullName: 'A', label: 'A' },
-          { fullName: 'B', label: 'B' }, // Insert B after A
-        ]
-        const other = [
-          { fullName: 'A', label: 'A' },
-          { fullName: 'C', label: 'C' }, // Insert C after A
-        ]
-
-        const node = createNode(ancestor, local, other)
-        const result = node.merge(defaultConfig)
-
-        expect(result.hasConflict).toBe(true)
-        expect(extractLabels(result.output)).toEqual([
-          'A',
-          expect.stringContaining(LOCAL_CONFLICT_MARKER),
-          'B',
-          expect.stringContaining(ANCESTOR_CONFLICT_MARKER),
-          expect.stringContaining(SEPARATOR),
-          'C',
-          expect.stringContaining(OTHER_CONFLICT_MARKER),
-        ])
-      })
-
-      // C3: Delete vs Modify
-      it('C3: Delete vs Modify', () => {
-        const ancestor = [{ fullName: 'A', label: 'A' }]
-        const local: JsonArray = [] // Delete A
-        const other = [{ fullName: 'A', label: 'A_MOD' }] // Modify A
-
-        const node = createNode(ancestor, local, other)
-        const result = node.merge(defaultConfig)
-
-        expect(result.hasConflict).toBe(true)
-        expect(extractLabels(result.output)).toEqual([
-          expect.stringContaining(LOCAL_CONFLICT_MARKER),
-          expect.stringContaining(ANCESTOR_CONFLICT_MARKER),
-          'A',
-          expect.stringContaining(SEPARATOR),
-          'A_MOD',
-          expect.stringContaining(OTHER_CONFLICT_MARKER),
-        ])
-      })
-
-      // C4: Divergent Moves
-      it('C4: Divergent Moves', () => {
-        const ancestor = [
-          { fullName: 'A', label: 'A' },
-          { fullName: 'B', label: 'B' },
-          { fullName: 'C', label: 'C' },
-        ]
-        // Local moves B before A
-        const local = [
-          { fullName: 'B', label: 'B' },
-          { fullName: 'A', label: 'A' },
-          { fullName: 'C', label: 'C' },
-        ]
-        // Other moves B after C
-        const other = [
-          { fullName: 'A', label: 'A' },
-          { fullName: 'C', label: 'C' },
-          { fullName: 'B', label: 'B' },
-        ]
-
-        const node = createNode(ancestor, local, other)
-        const result = node.merge(defaultConfig)
-
-        expect(result.hasConflict).toBe(true)
-        expect(extractLabels(result.output)).toEqual([
-          expect.stringContaining(LOCAL_CONFLICT_MARKER),
-          'B',
-          'A',
-          'C',
-          expect.stringContaining(ANCESTOR_CONFLICT_MARKER),
-          'A',
-          'B',
-          'C',
-          expect.stringContaining(SEPARATOR),
-          'A',
-          'C',
-          'B',
-          expect.stringContaining(OTHER_CONFLICT_MARKER),
-        ])
-      })
-
-      // C5: Partially Overlapping Hunks (Hunk granularity test)
-      // Local deletes B, C. Other deletes C. Conflict on B?
-      // Actually, if Local deletes B and C, and Other just deletes C (keeps B), then B is "Delete vs Keep".
-      // And C is "Delete vs Delete" (Merge).
-      // So distinct conflict on B.
-      it('C5: Partially Overlapping Hunks', () => {
-        const ancestor = [
-          { fullName: 'A', label: 'A' },
-          { fullName: 'B', label: 'B' },
-          { fullName: 'C', label: 'C' },
-          { fullName: 'D', label: 'D' },
-        ]
-        // Local deletes B, C
-        const local = [
-          { fullName: 'A', label: 'A' },
-          { fullName: 'D', label: 'D' },
-        ]
-        // Other deletes C (Keeps B)
-        const other = [
-          { fullName: 'A', label: 'A' },
-          { fullName: 'B', label: 'B' },
-          { fullName: 'D', label: 'D' },
-        ]
-
-        const node = createNode(ancestor, local, other)
-        const result = node.merge(defaultConfig)
-
-        expect(result.hasConflict).toBe(true)
-        expect(extractLabels(result.output)).toEqual([
-          'A',
-          expect.stringContaining(LOCAL_CONFLICT_MARKER),
-          expect.stringContaining(ANCESTOR_CONFLICT_MARKER),
-          'B',
-          'C',
-          expect.stringContaining(SEPARATOR),
-          'B',
-          expect.stringContaining(OTHER_CONFLICT_MARKER),
-          'D',
-        ])
-      })
-
-      // C6: Same element added at different positions
-      it('C6: Concurrent Addition at Different Positions', () => {
-        const ancestor = [
-          { fullName: 'A', label: 'A' },
-          { fullName: 'C', label: 'C' },
-        ]
-        // Local adds B between A and C
-        const local = [
-          { fullName: 'A', label: 'A' },
-          { fullName: 'B', label: 'B' },
-          { fullName: 'C', label: 'C' },
-        ]
-        // Other adds B after C
-        const other = [
-          { fullName: 'A', label: 'A' },
-          { fullName: 'C', label: 'C' },
-          { fullName: 'B', label: 'B' },
-        ]
-
-        const node = createNode(ancestor, local, other)
-        const result = node.merge(defaultConfig)
-
-        expect(result.hasConflict).toBe(true)
-        expect(extractLabels(result.output)).toEqual([
-          expect.stringContaining(LOCAL_CONFLICT_MARKER),
-          'A',
-          'B',
-          'C',
-          expect.stringContaining(ANCESTOR_CONFLICT_MARKER),
-          'A',
-          'C',
-          expect.stringContaining(SEPARATOR),
-          'A',
-          'C',
-          'B',
-          expect.stringContaining(OTHER_CONFLICT_MARKER),
-        ])
+        expect(extractLabels(result.output)).toEqual(expectedOutput)
       })
     })
   })
