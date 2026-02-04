@@ -606,6 +606,33 @@ describe('KeyedArrayMergeNode', () => {
         expect(result.hasConflict).toBe(false)
         expect(extractLabels(result.output)).toEqual(['B', 'A', 'D', 'C'])
       })
+
+      // M10+: Swap Elements with additions - disjoint swaps plus additions from both sides
+      it('M10: Swap Elements with additions', () => {
+        const ancestor = [
+          { fullName: 'A', label: 'A' },
+          { fullName: 'B', label: 'B' },
+        ]
+        // Local swaps A and B, adds X
+        const local = [
+          { fullName: 'B', label: 'B' },
+          { fullName: 'A', label: 'A' },
+          { fullName: 'X', label: 'X' },
+        ]
+        // Other keeps order, adds Y
+        const other = [
+          { fullName: 'A', label: 'A' },
+          { fullName: 'B', label: 'B' },
+          { fullName: 'Y', label: 'Y' },
+        ]
+
+        const node = createNode(ancestor, local, other)
+        const result = node.merge(defaultConfig)
+
+        expect(result.hasConflict).toBe(false)
+        // Expect: B, A (local's swap), X (local's addition), Y (other's addition)
+        expect(extractLabels(result.output)).toEqual(['B', 'A', 'X', 'Y'])
+      })
     })
 
     describe('Conflicts', () => {
