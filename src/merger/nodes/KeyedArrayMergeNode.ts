@@ -10,6 +10,7 @@ import {
   noConflict,
   withConflict,
 } from '../../types/mergeResult.js'
+import { pushAll } from '../../utils/arrayUtils.js'
 import { buildConflictMarkers } from '../ConflictMarkerBuilder.js'
 import { MergeOrchestrator } from '../MergeOrchestrator.js'
 import type { MergeNode } from './MergeNode.js'
@@ -435,17 +436,23 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     analysis: OrderingAnalysis
   ): MergeResult {
     const mergedKeys = this.computeMergedKeyOrder(ctx, analysis)
+
+    if (mergedKeys === null) {
+      return this.buildFullArrayConflict(config, ctx)
+    }
+
     return this.processKeyOrder(config, ctx, mergedKeys)
   }
 
   /**
    * Computes merged key order by combining disjoint reorderings.
    * Also includes elements added in local or other (not in ancestor).
+   * Returns null if concurrent disjoint additions are detected (conflict).
    */
   private computeMergedKeyOrder(
     ctx: MergeContext,
     analysis: OrderingAnalysis
-  ): string[] {
+  ): string[] | null {
     const { localMoved, otherMoved } = analysis
 
     // Build ordered lists for moved elements in a single pass each
@@ -471,6 +478,11 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
       }
     }
 
+    // Conflict: both sides added different elements - ambiguous ordering
+    if (localAdditions.length > 0 && otherAdditions.length > 0) {
+      return null
+    }
+
     // Build result by traversing ancestor and inserting moved groups
     const result: string[] = []
     let localMovedInserted = false
@@ -479,12 +491,12 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     for (const key of ctx.ancestorKeys) {
       if (localMoved.has(key)) {
         if (!localMovedInserted) {
-          result.push(...localMovedOrdered)
+          pushAll(result, localMovedOrdered)
           localMovedInserted = true
         }
       } else if (otherMoved.has(key)) {
         if (!otherMovedInserted) {
-          result.push(...otherMovedOrdered)
+          pushAll(result, otherMovedOrdered)
           otherMovedInserted = true
         }
       } else {
@@ -493,8 +505,7 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     }
 
     // Append additions at the end (preserving their relative order)
-    result.push(...localAdditions, ...otherAdditions)
-
+    pushAll(result, localAdditions, otherAdditions)
     return result
   }
 

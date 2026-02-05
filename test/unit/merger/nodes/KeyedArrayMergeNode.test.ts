@@ -461,13 +461,6 @@ describe('KeyedArrayMergeNode', () => {
         ['A', 'B', 'D', 'C'],
         ['B', 'A', 'D', 'C'],
       ],
-      [
-        'M10+: Swap Elements with additions',
-        ['A', 'B'],
-        ['B', 'A', 'X'],
-        ['A', 'B', 'Y'],
-        ['B', 'A', 'X', 'Y'],
-      ],
     ]
 
     describe('Graceful Merges', () => {
@@ -546,6 +539,13 @@ describe('KeyedArrayMergeNode', () => {
         ['A', 'B', 'C'],
         ['A', 'C', 'B'],
         [L, 'A', 'B', 'C', A, 'A', 'C', S, 'A', 'C', 'B', O],
+      ],
+      [
+        'C7: Concurrent Addition with Diverged Orderings',
+        ['A', 'B'],
+        ['B', 'A', 'X'],
+        ['A', 'B', 'Y'],
+        [L, 'B', 'A', 'X', A, 'A', 'B', S, 'A', 'B', 'Y', O],
       ],
     ]
 

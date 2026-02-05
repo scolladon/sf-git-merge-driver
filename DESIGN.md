@@ -282,6 +282,7 @@ if (addedLocalPos < keyLocalPos !== addedOtherPos < keyOtherPos) {
 | M10 | Disjoint swaps | Local swaps {A,B}, other swaps {C,D} → merge both |
 | C4 | Divergent moves | Both sides move same element differently → conflict |
 | C6 | Positional conflict | Both sides add same element at different positions → conflict |
+| C7 | Concurrent addition with diverged orderings | Both sides add different elements while orderings diverge → conflict |
 
 ### Example: M10 Disjoint Swaps
 
@@ -313,6 +314,20 @@ Analysis:
 - In local: X is after A
 - In other: X is before A
 - Relative order conflict → full array conflict
+```
+
+### Example: C7 Concurrent Addition with Diverged Orderings
+
+```
+Ancestor: [A, B]
+Local:    [B, A, X]     ← swapped A↔B, added X
+Other:    [A, B, Y]     ← added Y
+
+Analysis:
+- localMoved = {A, B} (swapped)
+- Both sides added different elements (X vs Y)
+- Ambiguous: should result be [B, A, X, Y] or [B, A, Y, X]?
+- Concurrent additions with diverged orderings → full array conflict
 ```
 
 ### Implementation
