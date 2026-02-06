@@ -12,21 +12,21 @@ The merge driver implements a three-way merge algorithm specifically designed fo
 
 The merge logic uses the **Strategy Pattern** to handle different merge scenarios. Each scenario (based on which versions have content) has its own strategy implementation.
 
-```
-┌─────────────────────┐
-│  ScenarioStrategy   │ (interface)
-├─────────────────────┤
-│ + execute(context)  │
-└─────────────────────┘
-          △
-          │ implements
-          │
-    ┌─────┴─────┬─────────────┬─────────────┬─────────────┐
-    │           │             │             │             │
-┌───┴───┐ ┌─────┴─────┐ ┌─────┴─────┐ ┌─────┴─────┐ ┌─────┴─────┐
-│ None  │ │ LocalOnly │ │ OtherOnly │ │ AllPresent│ │    ...    │
-│Strategy│ │ Strategy  │ │ Strategy  │ │ Strategy  │ │           │
-└───────┘ └───────────┘ └───────────┘ └───────────┘ └───────────┘
+```mermaid
+classDiagram
+    class ScenarioStrategy {
+        <<interface>>
+        +execute(context) MergeResult
+    }
+
+    ScenarioStrategy <|.. NoneStrategy
+    ScenarioStrategy <|.. LocalOnlyStrategy
+    ScenarioStrategy <|.. OtherOnlyStrategy
+    ScenarioStrategy <|.. AncestorOnlyStrategy
+    ScenarioStrategy <|.. LocalAndOtherStrategy
+    ScenarioStrategy <|.. AncestorAndLocalStrategy
+    ScenarioStrategy <|.. AncestorAndOtherStrategy
+    ScenarioStrategy <|.. AllPresentStrategy
 ```
 
 **Strategies:**
@@ -43,43 +43,41 @@ The merge logic uses the **Strategy Pattern** to handle different merge scenario
 
 The merge nodes implement the **Composite Pattern** to handle different data structures uniformly.
 
-```
-┌─────────────────────┐
-│     MergeNode       │ (interface)
-├─────────────────────┤
-│ + merge(config)     │
-└─────────────────────┘
-          △
-          │ implements
-          │
-    ┌─────┴─────┬─────────────────┬─────────────────┐
-    │           │                 │                 │
-┌───┴───────┐ ┌─┴───────────────┐ ┌┴────────────────┐
-│ TextMerge │ │ KeyedArrayMerge │ │ TextArrayMerge  │
-│   Node    │ │      Node       │ │      Node       │
-└───────────┘ └─────────────────┘ └─────────────────┘
+```mermaid
+classDiagram
+    class MergeNode {
+        <<interface>>
+        +merge(config) MergeResult
+    }
+
+    MergeNode <|.. TextMergeNode
+    MergeNode <|.. TextArrayMergeNode
+    MergeNode <|.. KeyedArrayMergeNode
+    MergeNode <|.. ObjectMergeNode
 ```
 
 **Node Types:**
 - `TextMergeNode` - Handles scalar/primitive values
-- `KeyedArrayMergeNode` - Handles arrays of objects with key fields (e.g., `fieldPermissions` with `field` key)
 - `TextArrayMergeNode` - Handles arrays of primitive values (e.g., `members` in package.xml)
-- `ObjectMergeNode` / `NestedObjectMergeNode` - Handles nested object structures
+- `KeyedArrayMergeNode` - Handles arrays of objects with key fields (e.g., `fieldPermissions` with `field` key)
+- `ObjectMergeNode` - Handles pure objects without key extractor (property-by-property merge)
 
 ### Factory Pattern
 
 The `MergeNodeFactory` creates the appropriate node type based on the data structure:
 
-```typescript
-interface MergeNodeFactory {
-  createNode(ancestor, local, other, attribute): MergeNode
-}
+```mermaid
+flowchart TD
+    Start["createNode()"] --> IsStringArray{{"Is string array?"}}
+    IsStringArray -->|Yes| TextArray["TextArrayMergeNode"]
+    IsStringArray -->|No| IsPureObject{{"Pure object without key extractor?"}}
+    IsPureObject -->|Yes| Object["ObjectMergeNode"]
+    IsPureObject -->|No| IsObject{{"Contains objects?"}}
+    IsObject -->|Yes| KeyedArray["KeyedArrayMergeNode"]
+    IsObject -->|No| Text["TextMergeNode"]
 ```
 
-Decision logic:
-1. If any value is a string array → `TextArrayMergeNode`
-2. If any value is an object → `KeyedArrayMergeNode`
-3. Otherwise → `TextMergeNode`
+Implementation: [MergeNodeFactory.ts](src/merger/nodes/MergeNodeFactory.ts)
 
 ## Core Components
 
@@ -146,32 +144,34 @@ The `ConflictMarkerBuilder` constructs these markers, and `ConflictMarkerFormatt
 
 ## Data Flow
 
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│  XML Input  │────▶│ JSON Parse  │────▶│   Merge     │
-│  (3 files)  │     │ (fast-xml)  │     │ Orchestrator│
-└─────────────┘     └─────────────┘     └──────┬──────┘
-                                               │
-                    ┌──────────────────────────┘
-                    ▼
-         ┌─────────────────────┐
-         │  Scenario Strategy  │
-         │  (based on content) │
-         └──────────┬──────────┘
-                    │
-         ┌──────────┴──────────┐
-         ▼                     ▼
-┌─────────────────┐   ┌─────────────────┐
-│   MergeNode     │   │ ConflictMarker  │
-│   (recursive)   │   │    Builder      │
-└────────┬────────┘   └────────┬────────┘
-         │                     │
-         └──────────┬──────────┘
-                    ▼
-         ┌─────────────────────┐
-         │   XML Output        │
-         │   (merged file)     │
-         └─────────────────────┘
+```mermaid
+flowchart TD
+    subgraph Input
+        XML["XML Input (3 files)"]
+    end
+
+    subgraph Parse
+        JSON["JSON Parse (fast-xml-parser)"]
+    end
+
+    subgraph Merge
+        Orchestrator["MergeOrchestrator"]
+        Strategy["ScenarioStrategy"]
+        Nodes["MergeNode (recursive)"]
+        Conflict["ConflictMarkerBuilder"]
+    end
+
+    subgraph Output
+        Result["XML Output (merged file)"]
+    end
+
+    XML --> JSON
+    JSON --> Orchestrator
+    Orchestrator --> Strategy
+    Strategy --> Nodes
+    Strategy --> Conflict
+    Nodes --> Result
+    Conflict --> Result
 ```
 
 ## Key Design Decisions
@@ -215,35 +215,30 @@ For ordered metadata types (e.g., `GlobalValueSet`, `StandardValueSet`), the dri
 
 The `OrderedKeyedArrayMergeStrategy` handles ordered arrays through these steps:
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Build Merge Context                       │
-├─────────────────────────────────────────────────────────────┤
-│  Extract keys and build position maps for O(1) lookups:     │
-│  - ancestorKeys, localKeys, otherKeys                       │
-│  - ancestorPos, localPos, otherPos (Map<key, index>)        │
-│  - ancestorMap, localMap, otherMap (Map<key, JsonObject>)   │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    Analyze Orderings                         │
-├─────────────────────────────────────────────────────────────┤
-│  1. Fast path: if local and other have same order → spine   │
-│  2. Detect moved elements in each version vs ancestor       │
-│  3. Check for overlapping moves (C4 conflict)               │
-│  4. Check for positional conflicts in additions (C6)        │
-└─────────────────────────────────────────────────────────────┘
-                              │
-              ┌───────────────┼───────────────┐
-              ▼               ▼               ▼
-┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
-│  Cannot Merge   │ │ Diverged Orders │ │  Same Ordering  │
-│  (C4 or C6)     │ │ (Disjoint)      │ │                 │
-├─────────────────┤ ├─────────────────┤ ├─────────────────┤
-│ Full array      │ │ Compute merged  │ │ Use LCS spine   │
-│ conflict        │ │ key order       │ │ algorithm       │
-└─────────────────┘ └─────────────────┘ └─────────────────┘
+```mermaid
+flowchart TD
+    subgraph Build["Build Merge Context"]
+        Extract["Extract keys: ancestorKeys, localKeys, otherKeys"]
+        Maps["Build position maps: ancestorPos, localPos, otherPos"]
+        ObjMaps["Build object maps: ancestorMap, localMap, otherMap"]
+        Extract --> Maps --> ObjMaps
+    end
+
+    subgraph Analyze["Analyze Orderings"]
+        FastPath{{"Same order in local & other?"}}
+        Moved["Detect moved elements vs ancestor"]
+        Overlap{{"Overlapping moves? (C4)"}}
+        Position{{"Positional conflict? (C6/C7)"}}
+    end
+
+    Build --> FastPath
+    FastPath -->|Yes| Spine["Use LCS spine algorithm"]
+    FastPath -->|No| Moved
+    Moved --> Overlap
+    Overlap -->|Yes| Conflict["Full array conflict"]
+    Overlap -->|No| Position
+    Position -->|Yes| Conflict
+    Position -->|No| Disjoint["Compute merged key order"]
 ```
 
 ### Moved Element Detection
@@ -332,17 +327,66 @@ Analysis:
 
 ### Implementation
 
-Key methods in `OrderedKeyedArrayMergeStrategy`:
+Key methods in `OrderedKeyedArrayMergeStrategy` ([KeyedArrayMergeNode.ts](src/merger/nodes/KeyedArrayMergeNode.ts)):
 
 | Method | Purpose |
 |--------|---------|
-| `buildMergeContext()` | Extracts keys and builds position maps for O(1) lookups |
+| `buildMergeContext()` | Extracts keys and builds position/object maps for O(1) lookups |
 | `analyzeOrderings(ctx)` | Returns `{canMerge, localMoved, otherMoved}` |
 | `getMovedElements(ctx, modifiedPos)` | Finds elements that changed relative order |
-| `hasAddedElementPositionalConflict(ctx)` | Detects C6 scenario |
-| `computeMergedKeyOrder(ctx, analysis)` | Builds merged key order for disjoint moves |
-| `processKeyOrder(config, ctx, keys)` | Processes elements in computed order |
+| `hasAddedElementPositionalConflict(ctx)` | Detects C6 scenario (same element added at different positions) |
+| `computeMergedKeyOrder(ctx, analysis)` | Builds merged key order; returns null for C7 conflict |
+| `processDivergedOrderings(config, ctx, analysis)` | Handles disjoint reorderings |
 | `processWithSpine(config, ctx)` | Uses LCS for spine-based merge |
+| `processSpine(config, spine, ctx)` | Iterates spine anchors, processes gaps between them |
+
+### Spine-Based Merge Algorithm
+
+The spine-based merge uses the [Longest Common Subsequence (LCS)](https://en.wikipedia.org/wiki/Longest_common_subsequence) algorithm to identify stable anchor points between versions.
+
+#### Spine Computation
+
+The **spine** is the stable backbone of elements present in all versions with preserved relative order:
+
+```typescript
+spine = lcs(lcs(ancestor, local), lcs(ancestor, other))
+```
+
+Implementation: [KeyedArrayMergeNode.ts:170](src/merger/nodes/KeyedArrayMergeNode.ts#L170)
+
+#### Process Flow
+
+```mermaid
+flowchart TD
+    Start["processWithSpine()"] --> Compute["Compute spine via double-LCS"]
+    Compute --> Process["processSpine()"]
+
+    Process --> ForEach["For each anchor in spine"]
+    ForEach --> CollectGaps["Collect gaps before anchor"]
+    CollectGaps --> MergeGap["mergeGap(): additions/deletions"]
+    MergeGap --> MergeAnchor["mergeElement(): merge anchor"]
+    MergeAnchor --> ForEach
+
+    ForEach --> Trailing["Process trailing elements"]
+    Trailing --> Combine["combineResults()"]
+```
+
+#### Example
+
+```
+Ancestor: [A, B, C, D, E]
+Local:    [A, X, B, D]      ← deleted C, E; added X
+Other:    [A, B, Y, D, E]   ← added Y
+
+spine = [A, B, D]
+
+Gaps processed:
+  before B: local adds X
+  before D: other adds Y, local deletes C
+  trailing: local deletes E
+
+Result: [A, X, B, Y, D]
+```
 
 ### Applicable Metadata Types
 
