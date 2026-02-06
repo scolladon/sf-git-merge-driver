@@ -10,7 +10,18 @@ export class MetadataService {
         ]
       : undefined
   }
+
+  public static isOrderedAttribute(attribute: string): boolean {
+    return ORDERED_ATTRIBUTES.has(attribute)
+  }
 }
+
+const ORDERED_ATTRIBUTES = new Set([
+  'customValue', // GlobalValueSet, Picklist CustomField
+  'standardValue', // StandardValueSet
+  'value', // Picklist CustomField
+  'values', // RecordType
+])
 
 const getPropertyValue = (el: JsonValue, property: string) =>
   String((el as Record<string, unknown>)[property])
@@ -142,6 +153,8 @@ const METADATA_KEY_EXTRACTORS = {
   fieldSets: (el: JsonValue) => getPropertyValue(el, 'name'), // CustomObjectTranslation
   fields: (el: JsonValue) => getPropertyValue(el, 'name'), // CustomObjectTranslation
   picklistValues: (el: JsonValue) => getPropertyValue(el, 'masterLabel'), // CustomObjectTranslation
+  values: (el: JsonValue) => getPropertyValue(el, 'fullName'), // RecordType
+  value: (el: JsonValue) => getPropertyValue(el, 'fullName'), // CustomField
   layouts: (el: JsonValue) => getPropertyValue(el, 'layout'), // CustomObjectTranslation
   quickActionParametersTranslation: (el: JsonValue) =>
     getPropertyValue(el, 'name'), // CustomObjectTranslation

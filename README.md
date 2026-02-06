@@ -60,6 +60,21 @@ This approach helps you understand:
 2. What your branch changed it to (`ours`)
 3. What the other branch changed it to (`theirs`)
 
+## Deterministic Ordering
+
+For metadata types where **element order matters** (like picklist values), the merge driver preserves ordering while intelligently merging changes:
+
+- **Disjoint reorderings merge automatically**: If one branch reorders elements A↔B and another reorders C↔D, both changes are preserved
+- **Conflicting reorderings trigger conflict**: If both branches move the same element to different positions, a conflict is raised for manual resolution
+- **Additions respect position**: New elements are inserted at their intended position
+
+**Supported ordered metadata:**
+- `GlobalValueSet` / `StandardValueSet` → picklist values
+- `CustomField` → value set entries
+- `RecordType` → picklist value assignments
+
+This ensures picklist value ordering in your org matches what you expect after a merge.
+
 ## Installation (30 seconds)
 
 ### With Salesforce CLI
@@ -302,7 +317,7 @@ EXAMPLES
     $ sf git merge driver install
 ```
 
-_See code: [src/commands/git/merge/driver/install.ts](https://github.com/scolladon/sf-git-merge-driver/blob/main/src/commands/git/merge/driver/install.ts)_
+_See code: [src/commands/git/merge/driver/install.ts](https://github.com/scolladon/sf-git-merge-driver/blob/v1.4.1/src/commands/git/merge/driver/install.ts)_
 
 ## `sf git merge driver run`
 
@@ -346,7 +361,7 @@ EXAMPLES
   - output-file is the path to the file where the merged content will be written
 ```
 
-_See code: [src/commands/git/merge/driver/run.ts](https://github.com/scolladon/sf-git-merge-driver/blob/main/src/commands/git/merge/driver/run.ts)_
+_See code: [src/commands/git/merge/driver/run.ts](https://github.com/scolladon/sf-git-merge-driver/blob/v1.4.1/src/commands/git/merge/driver/run.ts)_
 
 ## `sf git merge driver uninstall`
 
@@ -376,7 +391,7 @@ EXAMPLES
     $ sf git merge driver uninstall
 ```
 
-_See code: [src/commands/git/merge/driver/uninstall.ts](https://github.com/scolladon/sf-git-merge-driver/blob/main/src/commands/git/merge/driver/uninstall.ts)_
+_See code: [src/commands/git/merge/driver/uninstall.ts](https://github.com/scolladon/sf-git-merge-driver/blob/v1.4.1/src/commands/git/merge/driver/uninstall.ts)_
 <!-- commandsstop -->
 ## Changelog
 
