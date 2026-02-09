@@ -1,7 +1,7 @@
 {
   "name": "sf-git-merge-driver",
   "description": "Git merge driver for Salesforce metadata XML files - automatically resolves merge conflicts in profiles, permission sets, and 50+ metadata types",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "exports": "./lib/driver/MergeDriver.js",
   "type": "module",
   "author": "Sébastien Colladon (colladonsebastien@gmail.com)",
