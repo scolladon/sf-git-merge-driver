@@ -577,11 +577,7 @@ describe('MetadataService', () => {
         },
       ]
 
-      test.each(testCases)('$name', ({
-        metadataType,
-        testObject,
-        expected,
-      }) => {
+      it.each(testCases)('$name', ({ metadataType, testObject, expected }) => {
         // Act
         const extractor = MetadataService.getKeyFieldExtractor(metadataType)
 
@@ -602,6 +598,42 @@ describe('MetadataService', () => {
         // Assert
         expect(extractor).toBeUndefined()
       })
+    })
+  })
+
+  describe('isOrderedAttribute', () => {
+    it.each([
+      'customValue',
+      'standardValue',
+      'values',
+      'value',
+    ])('should return true for %s', attribute => {
+      // Act
+      const result = MetadataService.isOrderedAttribute(attribute)
+
+      // Assert
+      expect(result).toBe(true)
+    })
+
+    it.each([
+      'fullName',
+      'masterLabel',
+      'dataCategoryGroup',
+      'application',
+      'profile',
+      'field',
+      'recordType',
+      'sharingReason',
+      'standardField',
+      'validationRule',
+      'webLink',
+      'workflowTask',
+    ])('should return false for %s', attribute => {
+      // Act
+      const result = MetadataService.isOrderedAttribute(attribute)
+
+      // Assert
+      expect(result).toBe(false)
     })
   })
 })
