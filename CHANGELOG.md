@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/scolladon/sf-git-merge-driver/compare/v1.4.1...v1.5.0) (2026-02-09)
+
+
+### Features
+
+* implement deterministic ordering algorithm ([#162](https://github.com/scolladon/sf-git-merge-driver/issues/162)) ([c1d75cb](https://github.com/scolladon/sf-git-merge-driver/commit/c1d75cb3b94170ad46388c67410b17f121b70cc6))
+
 ## [1.4.1](https://github.com/scolladon/sf-git-merge-driver/compare/v1.4.0...v1.4.1) (2026-01-26)
 
 
