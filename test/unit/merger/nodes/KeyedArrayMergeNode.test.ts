@@ -547,6 +547,20 @@ describe('KeyedArrayMergeNode', () => {
         ['A', 'B', 'Y'],
         [L, 'B', 'A', 'X', A, 'A', 'B', S, 'A', 'B', 'Y', O],
       ],
+      [
+        'C8: Delete vs Modify (Other Deletes)',
+        ['A', 'B'],
+        ['A', 'B:B_MOD'],
+        ['A'],
+        ['A', L, 'B_MOD', A, 'B', S, O],
+      ],
+      [
+        'C9: Concurrent Addition of Same Key with Different Values',
+        ['A'],
+        ['A', 'B:B_LOCAL'],
+        ['A', 'B:B_OTHER'],
+        ['A', L, 'B_LOCAL', A, S, 'B_OTHER', O],
+      ],
     ]
 
     describe('Conflicts', () => {
@@ -602,40 +616,6 @@ describe('KeyedArrayMergeNode', () => {
         // Assert
         expect(result.hasConflict).toBe(false)
         expect(extractLabels(result.output)).toEqual(['C', 'A'])
-      })
-    })
-
-    describe('Spine gap element presence patterns', () => {
-      it('should conflict when other deletes element modified by local', () => {
-        // Arrange
-        // Other deletes B while local modifies it.
-        const node = createNode(
-          toElements(['A', 'B']),
-          toElements(['A', 'B:B_MOD']),
-          toElements(['A'])
-        )
-
-        // Act
-        const result = node.merge(defaultConfig)
-
-        // Assert
-        expect(result.hasConflict).toBe(true)
-      })
-
-      it('should conflict when both add same key with different values', () => {
-        // Arrange
-        // Both add B but with different labels.
-        const node = createNode(
-          toElements(['A']),
-          toElements(['A', 'B:B_LOCAL']),
-          toElements(['A', 'B:B_OTHER'])
-        )
-
-        // Act
-        const result = node.merge(defaultConfig)
-
-        // Assert
-        expect(result.hasConflict).toBe(true)
       })
     })
   })
