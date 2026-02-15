@@ -568,5 +568,75 @@ describe('KeyedArrayMergeNode', () => {
         expect(extractLabels(result.output)).toEqual(expectedOutput)
       })
     })
+
+    describe('Diverged orderings with partial moves and deletions', () => {
+      it('should merge when only some ancestor elements moved and a new element is added', () => {
+        // Arrange
+        // Local moves B before A, and adds D. Other unchanged.
+        const node = createNode(
+          toElements(['A', 'B', 'C']),
+          toElements(['B', 'A', 'C', 'D']),
+          toElements(['A', 'B', 'C'])
+        )
+
+        // Act
+        const result = node.merge(defaultConfig)
+
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(extractLabels(result.output)).toEqual(['B', 'A', 'C', 'D'])
+      })
+
+      it('should handle moves when one version deletes an ancestor element', () => {
+        // Arrange
+        // Local moves C before A and deletes B.
+        const node = createNode(
+          toElements(['A', 'B', 'C']),
+          toElements(['C', 'A']),
+          toElements(['A', 'B', 'C'])
+        )
+
+        // Act
+        const result = node.merge(defaultConfig)
+
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(extractLabels(result.output)).toEqual(['C', 'A'])
+      })
+    })
+
+    describe('Spine gap element presence patterns', () => {
+      it('should conflict when other deletes element modified by local', () => {
+        // Arrange
+        // Other deletes B while local modifies it.
+        const node = createNode(
+          toElements(['A', 'B']),
+          toElements(['A', 'B:B_MOD']),
+          toElements(['A'])
+        )
+
+        // Act
+        const result = node.merge(defaultConfig)
+
+        // Assert
+        expect(result.hasConflict).toBe(true)
+      })
+
+      it('should conflict when both add same key with different values', () => {
+        // Arrange
+        // Both add B but with different labels.
+        const node = createNode(
+          toElements(['A']),
+          toElements(['A', 'B:B_LOCAL']),
+          toElements(['A', 'B:B_OTHER'])
+        )
+
+        // Act
+        const result = node.merge(defaultConfig)
+
+        // Assert
+        expect(result.hasConflict).toBe(true)
+      })
+    })
   })
 })
