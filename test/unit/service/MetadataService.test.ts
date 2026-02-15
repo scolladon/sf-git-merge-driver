@@ -575,6 +575,18 @@ describe('MetadataService', () => {
           testObject: { name: 'TestWorkflowTask' },
           expected: 'TestWorkflowTask',
         },
+        {
+          name: 'handles values with fullName (RecordType)',
+          metadataType: 'values',
+          testObject: { fullName: 'TestRecordTypeValue' },
+          expected: 'TestRecordTypeValue',
+        },
+        {
+          name: 'handles value with fullName (CustomField)',
+          metadataType: 'value',
+          testObject: { fullName: 'TestCustomFieldValue' },
+          expected: 'TestCustomFieldValue',
+        },
       ]
 
       it.each(testCases)('$name', ({ metadataType, testObject, expected }) => {
