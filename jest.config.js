@@ -87,7 +87,7 @@ export default {
   extensionsToTreatAsEsm: ['.ts'],
   // A map from regular expressions to module names that allow to stub out resources with a single module
   moduleNameMapper: {
-    '(.+)\\.js': '$1',
+    '^(\\.{1,2}/.*)\\.js$': '$1',
     '^lodash-es$': 'lodash', // FIXME: Huge workaround to allow compile lodash-es module when testing https://stackoverflow.com/a/54117206/1809659
   },
 
