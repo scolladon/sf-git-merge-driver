@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1](https://github.com/scolladon/sf-git-merge-driver/compare/v1.5.0...v1.5.1) (2026-02-16)
+
+
+### Bug Fixes
+
+* improve deterministic ordering and remove dead code ([#168](https://github.com/scolladon/sf-git-merge-driver/issues/168)) ([a9fe834](https://github.com/scolladon/sf-git-merge-driver/commit/a9fe8346d2478dabd49b0ee827429afc1978817f))
+
 ## [1.5.0](https://github.com/scolladon/sf-git-merge-driver/compare/v1.4.1...v1.5.0) (2026-02-09)
 
 
