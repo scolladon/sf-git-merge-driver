@@ -464,24 +464,23 @@ describe('KeyedArrayMergeNode', () => {
     ]
 
     describe('Graceful Merges', () => {
-      it.each(gracefulMergeScenarios)(
-        '%s',
-        (_name, ancestor, local, other, expectedOutput) => {
-          // Arrange
-          const node = createNode(
-            toElements(ancestor),
-            toElements(local),
-            toElements(other)
-          )
+      it.each(
+        gracefulMergeScenarios
+      )('%s', (_name, ancestor, local, other, expectedOutput) => {
+        // Arrange
+        const node = createNode(
+          toElements(ancestor),
+          toElements(local),
+          toElements(other)
+        )
 
-          // Act
-          const result = node.merge(defaultConfig)
+        // Act
+        const result = node.merge(defaultConfig)
 
-          // Assert
-          expect(result.hasConflict).toBe(false)
-          expect(extractLabels(result.output)).toEqual(expectedOutput)
-        }
-      )
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(extractLabels(result.output)).toEqual(expectedOutput)
+      })
     })
 
     type ConflictScenario = [
@@ -565,24 +564,23 @@ describe('KeyedArrayMergeNode', () => {
     ]
 
     describe('Conflicts', () => {
-      it.each(conflictScenarios)(
-        '%s',
-        (_name, ancestor, local, other, expectedOutput) => {
-          // Arrange
-          const node = createNode(
-            toElements(ancestor),
-            toElements(local),
-            toElements(other)
-          )
+      it.each(
+        conflictScenarios
+      )('%s', (_name, ancestor, local, other, expectedOutput) => {
+        // Arrange
+        const node = createNode(
+          toElements(ancestor),
+          toElements(local),
+          toElements(other)
+        )
 
-          // Act
-          const result = node.merge(defaultConfig)
+        // Act
+        const result = node.merge(defaultConfig)
 
-          // Assert
-          expect(result.hasConflict).toBe(true)
-          expect(extractLabels(result.output)).toEqual(expectedOutput)
-        }
-      )
+        // Assert
+        expect(result.hasConflict).toBe(true)
+        expect(extractLabels(result.output)).toEqual(expectedOutput)
+      })
     })
 
     describe('Diverged orderings with partial moves and deletions', () => {
