@@ -692,12 +692,12 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     const oVal = ctx.otherMap.get(key)
 
     if (aVal !== undefined) {
-      // Both deleted - nothing to output
-      if (lVal === undefined && oVal === undefined) {
-        return null
-      }
-      // Local deleted - conflict if other modified
       if (lVal === undefined) {
+        // Both deleted - nothing to output
+        if (oVal === undefined) {
+          return null
+        }
+        // Local deleted - conflict if other modified
         return deepEqual(aVal, oVal)
           ? null
           : this.buildElementConflict(config, null, aVal, oVal)
