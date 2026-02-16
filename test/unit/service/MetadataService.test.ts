@@ -619,6 +619,9 @@ describe('MetadataService', () => {
       'standardValue',
       'values',
       'value',
+      'filterItems',
+      'summaryFilterItems',
+      'valueSettings',
     ])('should return true for %s', attribute => {
       // Act
       const result = MetadataService.isOrderedAttribute(attribute)
