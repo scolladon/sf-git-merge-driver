@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.2](https://github.com/scolladon/sf-git-merge-driver/compare/v1.5.1...v1.5.2) (2026-02-16)
+
+
+### Bug Fixes
+
+* missing picklist elements ([#170](https://github.com/scolladon/sf-git-merge-driver/issues/170)) ([8cf3667](https://github.com/scolladon/sf-git-merge-driver/commit/8cf3667d0f456f3a9e7417f8ac29e8507b98752d))
+
 ## [1.5.1](https://github.com/scolladon/sf-git-merge-driver/compare/v1.5.0...v1.5.1) (2026-02-16)
 
 
