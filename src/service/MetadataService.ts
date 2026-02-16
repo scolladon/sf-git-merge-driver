@@ -23,7 +23,6 @@ const ORDERED_ATTRIBUTES = new Set([
   'values', // RecordType
   'filterItems', // CustomField
   'summaryFilterItems', // CustomField
-  'valueSettings', // CustomField
 ])
 
 const getPropertyValue = (el: JsonValue, property: string) =>
