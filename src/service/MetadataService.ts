@@ -21,10 +21,23 @@ const ORDERED_ATTRIBUTES = new Set([
   'standardValue', // StandardValueSet
   'value', // Picklist CustomField
   'values', // RecordType
+  'filterItems', // CustomField
+  'summaryFilterItems', // CustomField
+  'valueSettings', // CustomField
 ])
 
 const getPropertyValue = (el: JsonValue, property: string) =>
   String((el as Record<string, unknown>)[property])
+
+const getFilterItemKey = (el: JsonValue) => {
+  const field = getPropertyValue(el, 'field')
+  const operation = getPropertyValue(el, 'operation')
+  const value = getPropertyValue(el, 'value')
+  const valueField = getPropertyValue(el, 'valueField')
+  return [field, operation, value, valueField]
+    .filter(x => x !== String(undefined))
+    .join('.')
+}
 
 const METADATA_KEY_EXTRACTORS = {
   labels: (el: JsonValue) => getPropertyValue(el, 'fullName'), // CustomLabels
@@ -66,15 +79,10 @@ const METADATA_KEY_EXTRACTORS = {
   sharingGuestRules: (el: JsonValue) => getPropertyValue(el, 'fullName'), // SharingRules
   sharingOwnerRules: (el: JsonValue) => getPropertyValue(el, 'fullName'), // SharingRules
   sharingTerritoryRules: (el: JsonValue) => getPropertyValue(el, 'fullName'), // SharingRules
-  criteriaItems: (el: JsonValue) => {
-    const field = getPropertyValue(el, 'field')
-    const operation = getPropertyValue(el, 'operation')
-    const value = getPropertyValue(el, 'value')
-    const valueField = getPropertyValue(el, 'valueField')
-    return [field, operation, value, valueField]
-      .filter(x => x !== String(undefined))
-      .join('.')
-  }, // SharingRules // AssignmentRules // AutoResponseRules // EscalationRules
+  criteriaItems: getFilterItemKey, // SharingRules // AssignmentRules // AutoResponseRules // EscalationRules
+  filterItems: getFilterItemKey, // CustomField
+  summaryFilterItems: getFilterItemKey, // CustomField
+  valueSettings: (el: JsonValue) => getPropertyValue(el, 'valueName'), // CustomField
   // sharedTo: it should be a complete pure object compare and not an array comparison // SharingRules
   // accountSettings: it should be a complete pure object compare and not an array comparison // SharingRules
   alerts: (el: JsonValue) => getPropertyValue(el, 'fullName'), // Workflow
