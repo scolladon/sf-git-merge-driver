@@ -56,4 +56,6 @@ export const METADATA_TYPES_PATTERNS = [
   'standardValueSetTranslation',
   'translation', // Translations
   'objectTranslation', // CustomObjectTranslation
+  'recordType', // RecordType
+  'field', // CustomField
 ]
