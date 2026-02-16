@@ -234,35 +234,6 @@ const setsIntersect = (a: Set<string>, b: Set<string>): boolean => {
 }
 
 // ============================================================================
-// Element Presence Pattern
-// ============================================================================
-
-/**
- * Enum representing element presence across versions.
- * Pattern: [Ancestor][Local][Other] where 1=present, 0=absent
- */
-enum ElementPresence {
-  NONE = 0, // Element doesn't exist (shouldn't happen)
-  OTHER_ONLY = 1, // Only other has element (001)
-  LOCAL_ONLY = 10, // Only local has element (010)
-  BOTH_ADDED = 11, // Local and other added (011)
-  ANCESTOR_ONLY = 100, // Only ancestor has element - both deleted (100)
-  ANCESTOR_OTHER = 101, // Ancestor + other - local deleted (101)
-  ANCESTOR_LOCAL = 110, // Ancestor + local - other deleted (110)
-  ALL = 111, // All three have element (111)
-}
-
-const computeElementPresence = (
-  inAncestor: boolean,
-  inLocal: boolean,
-  inOther: boolean
-): ElementPresence => {
-  return ((inAncestor ? 100 : 0) +
-    (inLocal ? 10 : 0) +
-    (inOther ? 1 : 0)) as ElementPresence
-}
-
-// ============================================================================
 // Ordering Analysis
 // ============================================================================
 
@@ -349,47 +320,13 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
       return { canMerge: false, localMoved, otherMoved }
     }
 
-    // If orderings differ but no ancestor elements moved, check for positional
-    // conflicts in added elements (C6 scenario: same element added at different positions)
+    // If orderings differ but no ancestor elements moved, the difference
+    // must come from added elements at different positions (C6 scenario)
     if (localMoved.size === 0 && otherMoved.size === 0) {
-      const hasPositionalConflict = this.hasAddedElementPositionalConflict(ctx)
-      if (hasPositionalConflict) {
-        return { canMerge: false, localMoved, otherMoved }
-      }
+      return { canMerge: false, localMoved, otherMoved }
     }
 
     return { canMerge: true, localMoved, otherMoved }
-  }
-
-  /**
-   * Checks if elements added by both sides appear at different positions.
-   * This happens when both add the same element but in different places.
-   * Uses context's precomputed position maps for O(1) lookups.
-   */
-  private hasAddedElementPositionalConflict(ctx: MergeContext): boolean {
-    // Find elements added by both sides (not in ancestor, but in both local and other)
-    // and check for positional conflicts in a single pass
-    for (const added of ctx.localKeys) {
-      if (ctx.ancestorSet.has(added) || !ctx.otherMap.has(added)) continue
-
-      const addedLocalPos = ctx.localPos.get(added)!
-      const addedOtherPos = ctx.otherPos.get(added)!
-
-      // Check against all common elements for relative order differences
-      for (const key of ctx.localKeys) {
-        if (key === added || !ctx.otherMap.has(key)) continue
-
-        const keyLocalPos = ctx.localPos.get(key)!
-        const keyOtherPos = ctx.otherPos.get(key)!
-
-        // If relative order differs, there's a positional conflict
-        if (addedLocalPos < keyLocalPos !== addedOtherPos < keyOtherPos) {
-          return true
-        }
-      }
-    }
-
-    return false
   }
 
   /**
@@ -539,12 +476,8 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     keys: string[]
   ): MergeResult {
     const results: MergeResult[] = []
-    const processedKeys = new Set<string>()
 
     for (const key of keys) {
-      if (processedKeys.has(key)) continue
-      processedKeys.add(key)
-
       const result = this.mergeElementWithPresenceCheck(config, key, ctx)
       if (result && !isEmpty(result.output)) {
         results.push(result)
@@ -620,10 +553,7 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
         results.push(gapResult)
       }
 
-      const anchorResult = this.mergeElement(config, anchor, ctx)
-      if (!isEmpty(anchorResult.output)) {
-        results.push(anchorResult)
-      }
+      results.push(this.mergeElement(config, anchor, ctx))
 
       aIdx++
       lIdx++
@@ -761,50 +691,32 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     const lVal = ctx.localMap.get(key)
     const oVal = ctx.otherMap.get(key)
 
-    const presence = computeElementPresence(
-      aVal !== undefined,
-      lVal !== undefined,
-      oVal !== undefined
-    )
-
-    switch (presence) {
-      case ElementPresence.ANCESTOR_ONLY:
+    if (aVal !== undefined) {
+      if (lVal === undefined) {
         // Both deleted - nothing to output
-        return null
-
-      case ElementPresence.ALL:
-        // In all three - standard merge
-        return this.mergeElement(config, key, ctx)
-
-      case ElementPresence.ANCESTOR_OTHER:
+        if (oVal === undefined) {
+          return null
+        }
         // Local deleted - conflict if other modified
         return deepEqual(aVal, oVal)
           ? null
           : this.buildElementConflict(config, null, aVal, oVal)
-
-      case ElementPresence.ANCESTOR_LOCAL:
-        // Other deleted - conflict if local modified
-        return deepEqual(aVal, lVal)
-          ? null
-          : this.buildElementConflict(config, lVal, aVal, null)
-
-      case ElementPresence.BOTH_ADDED:
-        // Both added - accept if identical, conflict otherwise
-        return deepEqual(lVal, oVal)
-          ? noConflict([this.wrapElement(lVal!)])
-          : this.buildElementConflict(config, lVal, null, oVal)
-
-      case ElementPresence.LOCAL_ONLY:
-        // Only local added
-        return noConflict([this.wrapElement(lVal!)])
-
-      case ElementPresence.OTHER_ONLY:
-        // Only other added
-        return noConflict([this.wrapElement(oVal!)])
-
-      default:
-        return null
+      }
+      // Other deleted - conflict if local modified
+      return deepEqual(aVal, lVal)
+        ? null
+        : this.buildElementConflict(config, lVal, aVal, null)
     }
+
+    // Both added - accept if identical, conflict otherwise
+    if (lVal !== undefined && oVal !== undefined) {
+      return deepEqual(lVal, oVal)
+        ? noConflict([this.wrapElement(lVal)])
+        : this.buildElementConflict(config, lVal, null, oVal)
+    }
+
+    // Only one side added
+    return noConflict([this.wrapElement(lVal ?? oVal!)])
   }
 
   // Element helpers
@@ -824,7 +736,7 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
 
     // All equal
     if (deepEqual(aVal, lVal) && deepEqual(lVal, oVal)) {
-      return lVal ? noConflict([this.wrapElement(lVal)]) : noConflict([])
+      return noConflict([this.wrapElement(lVal!)])
     }
 
     // Other unchanged → take local
@@ -839,7 +751,7 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
 
     // Both changed to same
     if (deepEqual(lVal, oVal)) {
-      return lVal ? noConflict([this.wrapElement(lVal)]) : noConflict([])
+      return noConflict([this.wrapElement(lVal!)])
     }
 
     return this.buildElementConflict(config, lVal, aVal, oVal)

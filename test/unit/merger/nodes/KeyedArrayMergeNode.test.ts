@@ -547,6 +547,20 @@ describe('KeyedArrayMergeNode', () => {
         ['A', 'B', 'Y'],
         [L, 'B', 'A', 'X', A, 'A', 'B', S, 'A', 'B', 'Y', O],
       ],
+      [
+        'C8: Delete vs Modify (Other Deletes)',
+        ['A', 'B'],
+        ['A', 'B:B_MOD'],
+        ['A'],
+        ['A', L, 'B_MOD', A, 'B', S, O],
+      ],
+      [
+        'C9: Concurrent Addition of Same Key with Different Values',
+        ['A'],
+        ['A', 'B:B_LOCAL'],
+        ['A', 'B:B_OTHER'],
+        ['A', L, 'B_LOCAL', A, S, 'B_OTHER', O],
+      ],
     ]
 
     describe('Conflicts', () => {
@@ -566,6 +580,42 @@ describe('KeyedArrayMergeNode', () => {
         // Assert
         expect(result.hasConflict).toBe(true)
         expect(extractLabels(result.output)).toEqual(expectedOutput)
+      })
+    })
+
+    describe('Diverged orderings with partial moves and deletions', () => {
+      it('should merge when only some ancestor elements moved and a new element is added', () => {
+        // Arrange
+        // Local moves B before A, and adds D. Other unchanged.
+        const node = createNode(
+          toElements(['A', 'B', 'C']),
+          toElements(['B', 'A', 'C', 'D']),
+          toElements(['A', 'B', 'C'])
+        )
+
+        // Act
+        const result = node.merge(defaultConfig)
+
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(extractLabels(result.output)).toEqual(['B', 'A', 'C', 'D'])
+      })
+
+      it('should handle moves when one version deletes an ancestor element', () => {
+        // Arrange
+        // Local moves C before A and deletes B.
+        const node = createNode(
+          toElements(['A', 'B', 'C']),
+          toElements(['C', 'A']),
+          toElements(['A', 'B', 'C'])
+        )
+
+        // Act
+        const result = node.merge(defaultConfig)
+
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(extractLabels(result.output)).toEqual(['C', 'A'])
       })
     })
   })

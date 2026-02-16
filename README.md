@@ -8,9 +8,11 @@ An intelligent Git merge driver specifically designed for Salesforce metadata fi
 ## Demo
 
 ### Without sf-git-merge-driver
+
 ![Demo without sf-git-merge-driver](./docs/media/demo-without-sf-git-merge-driver.gif)
 
 ### With sf-git-merge-driver
+
 ![Demo with sf-git-merge-driver](./docs/media/demo-with-sf-git-merge-driver.gif)
 
 ## Why use this plugin?
@@ -45,6 +47,7 @@ This merge driver follows the **zdiff3** conflict style philosophy:
 - **Respects Git configuration**: Conflict marker size and labels are configurable via Git's standard parameters (`-L`, `-S`, `-X`, `-Y` flags)
 
 Example conflict output:
+
 ```xml
 <<<<<<< ours
     <field>localValue</field>
@@ -56,6 +59,7 @@ Example conflict output:
 ```
 
 This approach helps you understand:
+
 1. What the original value was (`base`)
 2. What your branch changed it to (`ours`)
 3. What the other branch changed it to (`theirs`)
@@ -69,6 +73,7 @@ For metadata types where **element order matters** (like picklist values), the m
 - **Additions respect position**: New elements are inserted at their intended position
 
 **Supported ordered metadata:**
+
 - `GlobalValueSet` / `StandardValueSet` → picklist values
 - `CustomField` → value set entries
 - `RecordType` → picklist value assignments
@@ -97,9 +102,11 @@ sf git merge driver install
 ## Usage
 
 The merge driver activates **automatically** for conflicts on:
+
 - [Full list of supported metadata](#configuration)
 
 **No additional steps required!** Works during normal Git operations:
+
 ```bash
 git pull  # Conflicts resolved automatically
 git merge # Same here
@@ -108,6 +115,7 @@ git merge # Same here
 ## Configuration
 
 Configured for these metadata files by default:
+
 ```gitattributes
 *.profile-meta.xml merge=salesforce-source
 *.permissionset-meta.xml merge=salesforce-source
@@ -161,6 +169,7 @@ Configured for these metadata files by default:
 ## How to disable it for a specific merge
 
 When you don't want to use the merge driver for a specific merge, just backup the `.git/info/attributes` file and put it back after the merge.
+
 ```sh
 mv .git/info/attributes .git/info/attributes.bak
 git merge <branch>
@@ -168,11 +177,13 @@ mv .git/info/attributes.bak .git/info/attributes
 ```
 
 If you want to disable the merge driver for a specific file, just comment the merge driver configuration from the `.git/info/attributes` file.
+
 ```sh
 # *.profile-meta.xml merge=salesforce-source
 ```
 
-If you want to disable it for all the project, just uninstall the driver: 
+If you want to disable it for all the project, just uninstall the driver:
+
 ```sh
 sf git merge driver uninstall
 ```
@@ -180,11 +191,13 @@ sf git merge driver uninstall
 ## How to know if it is installed and enabled ?
 
 You can check if the merge driver is installed by running the following command:
+
 ```sh
 git config --show-origin --get-regexp '^merge.salesforce-source(\..*)?'
 ```
 
 You can check if the merge driver is enabled by running the following command:
+
 ```sh
 grep "merge=salesforce-source" .git/info/attributes
 ```
@@ -317,7 +330,7 @@ EXAMPLES
     $ sf git merge driver install
 ```
 
-_See code: [src/commands/git/merge/driver/install.ts](https://github.com/scolladon/sf-git-merge-driver/blob/v1.4.1/src/commands/git/merge/driver/install.ts)_
+_See code: [src/commands/git/merge/driver/install.ts](https://github.com/scolladon/sf-git-merge-driver/blob/main/src/commands/git/merge/driver/install.ts)_
 
 ## `sf git merge driver run`
 
@@ -361,7 +374,7 @@ EXAMPLES
   - output-file is the path to the file where the merged content will be written
 ```
 
-_See code: [src/commands/git/merge/driver/run.ts](https://github.com/scolladon/sf-git-merge-driver/blob/v1.4.1/src/commands/git/merge/driver/run.ts)_
+_See code: [src/commands/git/merge/driver/run.ts](https://github.com/scolladon/sf-git-merge-driver/blob/main/src/commands/git/merge/driver/run.ts)_
 
 ## `sf git merge driver uninstall`
 
@@ -391,8 +404,9 @@ EXAMPLES
     $ sf git merge driver uninstall
 ```
 
-_See code: [src/commands/git/merge/driver/uninstall.ts](https://github.com/scolladon/sf-git-merge-driver/blob/v1.4.1/src/commands/git/merge/driver/uninstall.ts)_
+_See code: [src/commands/git/merge/driver/uninstall.ts](https://github.com/scolladon/sf-git-merge-driver/blob/main/src/commands/git/merge/driver/uninstall.ts)_
 <!-- commandsstop -->
+
 ## Changelog
 
 [changelog.md](CHANGELOG.md) is available for consultation.

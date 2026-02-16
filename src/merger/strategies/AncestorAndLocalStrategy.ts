@@ -12,7 +12,7 @@ export class AncestorAndLocalStrategy extends AbstractAncestorStrategy {
   }
 
   protected getExistsInSecondary(context: MergeContext): boolean {
-    return context.rootKey ? context.rootKey.existsInOther : false
+    return context.rootKey!.existsInOther
   }
 
   protected buildConflict(
