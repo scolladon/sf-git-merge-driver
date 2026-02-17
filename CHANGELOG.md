@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.3](https://github.com/scolladon/sf-git-merge-driver/compare/v1.5.2...v1.5.3) (2026-02-17)
+
+
+### Bug Fixes
+
+* simplify [@log](https://github.com/log) decorator and defer debug serialization ([#172](https://github.com/scolladon/sf-git-merge-driver/issues/172)) ([07a8ce2](https://github.com/scolladon/sf-git-merge-driver/commit/07a8ce2de714baa6e5ed3ca8f7876caddab7292f))
+
 ## [1.5.2](https://github.com/scolladon/sf-git-merge-driver/compare/v1.5.1...v1.5.2) (2026-02-16)
 
 
