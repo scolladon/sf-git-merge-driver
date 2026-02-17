@@ -587,6 +587,12 @@ describe('MetadataService', () => {
           testObject: { fullName: 'TestCustomFieldValue' },
           expected: 'TestCustomFieldValue',
         },
+        {
+          name: 'handles valueSettings with valueName (CustomField)',
+          metadataType: 'valueSettings',
+          testObject: { valueName: 'TestValueSetting' },
+          expected: 'TestValueSetting',
+        },
       ]
 
       it.each(testCases)('$name', ({ metadataType, testObject, expected }) => {

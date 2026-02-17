@@ -10,7 +10,7 @@ import { PLUGIN_NAME } from '../../../../constant/pluginConstant.js'
 import { MergeDriver } from '../../../../driver/MergeDriver.js'
 import type { MergeConfig } from '../../../../types/conflictTypes.js'
 import { log } from '../../../../utils/LoggingDecorator.js'
-import { Logger } from '../../../../utils/LoggingService.js'
+import { Logger, lazy } from '../../../../utils/LoggingService.js'
 
 Messages.importMessagesDirectoryFromMetaUrl(import.meta.url)
 const messages = Messages.loadMessages(PLUGIN_NAME, 'run')
@@ -84,8 +84,8 @@ export default class Run extends SfCommand<void> {
       otherConflictTag: flags['other-conflict-tag'],
     }
 
-    Logger.debug(`flags: ${JSON.stringify(flags)}`)
-    Logger.debug(`config: ${JSON.stringify(config)}`)
+    Logger.debug(lazy`flags: ${() => JSON.stringify(flags)}`)
+    Logger.debug(lazy`config: ${() => JSON.stringify(config)}`)
 
     const mergeDriver = new MergeDriver(config)
     const hasConflict = await mergeDriver.mergeFiles(
