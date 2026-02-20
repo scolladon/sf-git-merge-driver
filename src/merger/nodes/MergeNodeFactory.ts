@@ -74,7 +74,8 @@ export class DefaultMergeNodeFactory implements MergeNodeFactory {
       return new ObjectMergeNode(
         ancestor as JsonObject,
         local as JsonObject,
-        other as JsonObject
+        other as JsonObject,
+        attribute
       )
     }
 

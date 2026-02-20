@@ -12,7 +12,8 @@ export class ObjectMergeNode implements MergeNode {
   constructor(
     private readonly ancestor: JsonObject | JsonArray,
     private readonly local: JsonObject | JsonArray,
-    private readonly other: JsonObject | JsonArray
+    private readonly other: JsonObject | JsonArray,
+    private readonly attribute: string
   ) {}
 
   merge(config: MergeConfig): MergeResult {
@@ -20,9 +21,9 @@ export class ObjectMergeNode implements MergeNode {
     const results: MergeResult[] = []
 
     for (const key of props) {
-      const ancestorOfKey = this.ancestor[key]
-      const localOfKey = this.local[key]
-      const otherOfKey = this.other[key]
+      const ancestorOfKey = this.ancestor?.[key]
+      const localOfKey = this.local?.[key]
+      const otherOfKey = this.other?.[key]
 
       const childNode = defaultNodeFactory.createNode(
         ancestorOfKey,
@@ -32,13 +33,14 @@ export class ObjectMergeNode implements MergeNode {
       )
       const childResult = childNode.merge(config)
 
-      results.push({
-        output: childResult.output.map(item => ({ [key]: item })),
-        hasConflict: childResult.hasConflict,
-      })
+      results.push(childResult)
     }
 
-    return combineResults(results)
+    const combined = combineResults(results)
+    return {
+      output: [{ [this.attribute]: combined.output }],
+      hasConflict: combined.hasConflict,
+    }
   }
 }
 
