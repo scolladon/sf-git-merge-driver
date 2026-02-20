@@ -1,3 +1,4 @@
+import { XMLParser } from 'fast-xml-parser'
 import {
   DEFAULT_ANCESTOR_CONFLICT_TAG,
   DEFAULT_CONFLICT_MARKER_SIZE,
@@ -13,6 +14,9 @@ const defaultConfig: MergeConfig = {
   localConflictTag: DEFAULT_LOCAL_CONFLICT_TAG,
   otherConflictTag: DEFAULT_OTHER_CONFLICT_TAG,
 }
+
+const parseXml = (xml: string) =>
+  new XMLParser({ ignoreAttributes: false }).parse(xml)
 
 describe('CustomField picklist merge (issue #174)', () => {
   describe('given a CustomField with inline picklist valueSet', () => {
@@ -142,57 +146,45 @@ describe('CustomField picklist merge (issue #174)', () => {
         expect(result.hasConflict).toBe(false)
       })
 
-      it('should preserve the valueSet container', () => {
+      it('should produce well-formed XML matching other version structure', () => {
         // Arrange
         const merger = new XmlMerger(defaultConfig)
 
         // Act
         const result = merger.mergeThreeWay(ancestor, local, other)
+        const parsed = parseXml(result.output)
+        const field = parsed.CustomField
+        const valueSet = field.valueSet
+        const definition = valueSet.valueSetDefinition
+        const values: { fullName: string }[] = definition.value
 
         // Assert
-        expect(result.output).toContain('<valueSet>')
-        expect(result.output).toContain('</valueSet>')
+        expect(valueSet).toBeDefined()
+        expect(valueSet.restricted).toBe(true)
+        expect(definition).toBeDefined()
+        expect(definition.sorted).toBe(false)
+        expect(values).toHaveLength(5)
+        expect(values.map(v => v.fullName)).toEqual([
+          'Date de facture',
+          'Fin de mois',
+          'Fin de mois 45 jours',
+          'Fin de decade',
+          'Paiement immediat',
+        ])
       })
 
-      it('should take other restricted value (true)', () => {
+      it('should not leak valueSet children to CustomField level', () => {
         // Arrange
         const merger = new XmlMerger(defaultConfig)
 
         // Act
         const result = merger.mergeThreeWay(ancestor, local, other)
+        const field = parseXml(result.output).CustomField
 
         // Assert
-        expect(result.output).toContain('<restricted>true</restricted>')
-      })
-
-      it('should contain only the 5 values from other', () => {
-        // Arrange
-        const merger = new XmlMerger(defaultConfig)
-
-        // Act
-        const result = merger.mergeThreeWay(ancestor, local, other)
-
-        // Assert
-        const valueMatches = result.output.match(/<fullName>/g)
-        // 1 field fullName + 5 value fullNames = 6
-        expect(valueMatches?.length).toBe(6)
-      })
-
-      it('should produce well-formed XML with correct structure', () => {
-        // Arrange
-        const merger = new XmlMerger(defaultConfig)
-
-        // Act
-        const result = merger.mergeThreeWay(ancestor, local, other)
-
-        // Assert
-        expect(result.output).toContain('<valueSetDefinition>')
-        expect(result.output).toContain('</valueSetDefinition>')
-        // restricted must be inside valueSet, not a direct child of CustomField
-        const betweenFieldAndValueSet = result.output.match(
-          /<CustomField[^>]*>([\s\S]*?)<valueSet>/
-        )?.[1]
-        expect(betweenFieldAndValueSet).not.toContain('<restricted>')
+        expect(field).not.toHaveProperty('restricted')
+        expect(field).not.toHaveProperty('valueSetDefinition')
+        expect(field).not.toHaveProperty('sorted')
       })
     })
   })
