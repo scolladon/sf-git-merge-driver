@@ -3,7 +3,7 @@ import {
   DefaultMergeNodeFactory,
   defaultNodeFactory,
 } from '../../../../src/merger/nodes/MergeNodeFactory.js'
-import { ObjectMergeNode } from '../../../../src/merger/nodes/ObjectMergeNode.js'
+import { PropertyMergeNode } from '../../../../src/merger/nodes/PropertyMergeNode.js'
 import { TextArrayMergeNode } from '../../../../src/merger/nodes/TextArrayMergeNode.js'
 import { TextMergeNode } from '../../../../src/merger/nodes/TextMergeNode.js'
 
@@ -38,7 +38,7 @@ describe('MergeNodeFactory', () => {
         expect(node).toBeInstanceOf(TextArrayMergeNode)
       })
 
-      it('given objects when createNode then returns ObjectMergeNode', () => {
+      it('given objects when createNode then returns PropertyMergeNode', () => {
         // Arrange
         const ancestor = { a: 1 }
         const local = { b: 2 }
@@ -48,10 +48,10 @@ describe('MergeNodeFactory', () => {
         const node = factory.createNode(ancestor, local, other, 'attr')
 
         // Assert
-        expect(node).toBeInstanceOf(ObjectMergeNode)
+        expect(node).toBeInstanceOf(PropertyMergeNode)
       })
 
-      it('given one object when createNode then returns ObjectMergeNode', () => {
+      it('given one object when createNode then returns PropertyMergeNode', () => {
         // Arrange
         const ancestor = null
         const local = { a: 1 }
@@ -61,7 +61,7 @@ describe('MergeNodeFactory', () => {
         const node = factory.createNode(ancestor, local, other, 'attr')
 
         // Assert
-        expect(node).toBeInstanceOf(ObjectMergeNode)
+        expect(node).toBeInstanceOf(PropertyMergeNode)
       })
 
       it('given primitives when createNode then returns TextMergeNode', () => {
