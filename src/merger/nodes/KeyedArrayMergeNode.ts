@@ -510,7 +510,9 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   }
 
   private wrapKeys(keys: string[], map: Map<string, JsonObject>): JsonArray {
-    return keys.map(k => ({ [this.attribute]: map.get(k)! }))
+    return keys.map(k => ({
+      [this.attribute]: toJsonArray(map.get(k)!),
+    }))
   }
 
   private buildFullArrayConflict(
@@ -722,7 +724,7 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   // Element helpers
 
   private wrapElement(value: JsonObject): JsonObject {
-    return { [this.attribute]: value }
+    return { [this.attribute]: toJsonArray(value) }
   }
 
   private mergeElement(
