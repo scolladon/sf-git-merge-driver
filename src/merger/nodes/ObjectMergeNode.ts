@@ -1,7 +1,7 @@
 import type { MergeConfig } from '../../types/conflictTypes.js'
 import type { JsonArray, JsonObject } from '../../types/jsonTypes.js'
 import type { MergeResult } from '../../types/mergeResult.js'
-import { combineResults } from '../../types/mergeResult.js'
+import { combineResults, noConflict } from '../../types/mergeResult.js'
 import type { MergeContext } from '../MergeContext.js'
 import { MergeOrchestrator } from '../MergeOrchestrator.js'
 import type { MergeNode } from './MergeNode.js'
@@ -40,7 +40,11 @@ export class ObjectMergeNode implements MergeNode {
       results.push(childResult)
     }
 
-    return wrapWithRootKey(combineResults(results), this.attribute)
+    const combined = combineResults(results)
+    if (combined.output.length === 0) {
+      return noConflict([])
+    }
+    return wrapWithRootKey(combined, this.attribute)
   }
 }
 

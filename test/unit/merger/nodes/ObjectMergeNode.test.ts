@@ -273,7 +273,7 @@ describe('ObjectMergeNode', () => {
     expect(result.hasConflict).toBe(false)
   })
 
-  it('should handle empty objects', () => {
+  it('should omit container when all children resolve to nothing', () => {
     // Arrange
     const node = new ObjectMergeNode({}, {}, {}, 'container')
 
@@ -282,6 +282,6 @@ describe('ObjectMergeNode', () => {
 
     // Assert
     expect(result.hasConflict).toBe(false)
-    expect(result.output).toEqual([{ container: [] }])
+    expect(result.output).toEqual([])
   })
 })
