@@ -226,23 +226,37 @@ describe('NestedObjectMergeNode', () => {
 })
 
 describe('ObjectMergeNode', () => {
-  it('should merge objects and wrap results with property key', () => {
+  it('should merge objects and wrap results with attribute key', () => {
     // Arrange
     const ancestor = { prop: { field: 'ancestorValue' } }
     const local = { prop: { field: 'localValue' } }
     const other = { prop: { field: 'otherValue' } }
-    const node = new ObjectMergeNode(ancestor, local, other)
+    const node = new ObjectMergeNode(ancestor, local, other, 'container')
 
     // Act
     const result = node.merge(defaultConfig)
 
     // Assert
     expect(result.hasConflict).toBe(true)
-    // Result should have 'prop' key wrapping the content
-    const hasPropKey = result.output.some(
-      item => typeof item === 'object' && 'prop' in (item as object)
-    )
-    expect(hasPropKey).toBe(true)
+    expect(result.output.length).toBe(1)
+    expect(result.output[0]).toHaveProperty('container')
+  })
+
+  it('should not double-wrap child output with property key', () => {
+    // Arrange
+    const ancestor = { field: 'ancestorValue' }
+    const local = { field: 'localValue' }
+    const other = { field: 'ancestorValue' }
+    const node = new ObjectMergeNode(ancestor, local, other, 'wrapper')
+
+    // Act
+    const result = node.merge(defaultConfig)
+
+    // Assert
+    expect(result.hasConflict).toBe(false)
+    expect(result.output).toEqual([
+      { wrapper: [{ field: [{ [TEXT_TAG]: 'localValue' }] }] },
+    ])
   })
 
   it('should handle string arrays', () => {
@@ -250,7 +264,7 @@ describe('ObjectMergeNode', () => {
     const ancestor = { items: ['a', 'b'] }
     const local = { items: ['a', 'b', 'c'] }
     const other = { items: ['a', 'b'] }
-    const node = new ObjectMergeNode(ancestor, local, other)
+    const node = new ObjectMergeNode(ancestor, local, other, 'container')
 
     // Act
     const result = node.merge(defaultConfig)
@@ -261,13 +275,13 @@ describe('ObjectMergeNode', () => {
 
   it('should handle empty objects', () => {
     // Arrange
-    const node = new ObjectMergeNode({}, {}, {})
+    const node = new ObjectMergeNode({}, {}, {}, 'container')
 
     // Act
     const result = node.merge(defaultConfig)
 
     // Assert
     expect(result.hasConflict).toBe(false)
-    expect(result.output).toEqual([])
+    expect(result.output).toEqual([{ container: [] }])
   })
 })

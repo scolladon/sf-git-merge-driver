@@ -368,9 +368,15 @@ describe('KeyedArrayMergeNode', () => {
 
         // Unwrap customValue if present
         const wrapped = obj['customValue']
-        const content = wrapped
-          ? ((Array.isArray(wrapped) ? wrapped[0] : wrapped) as JsonObject)
-          : obj
+        let content: JsonObject
+        if (wrapped && Array.isArray(wrapped)) {
+          // Builder format: merge all elements into one object
+          content = Object.assign({}, ...(wrapped as JsonObject[]))
+        } else if (wrapped) {
+          content = wrapped as JsonObject
+        } else {
+          content = obj
+        }
 
         const label =
           getTextContent(content, 'label') ??
