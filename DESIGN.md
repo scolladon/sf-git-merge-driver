@@ -53,14 +53,14 @@ classDiagram
     MergeNode <|.. TextMergeNode
     MergeNode <|.. TextArrayMergeNode
     MergeNode <|.. KeyedArrayMergeNode
-    MergeNode <|.. ObjectMergeNode
+    MergeNode <|.. PropertyMergeNode
 ```
 
 **Node Types:**
 - `TextMergeNode` - Handles scalar/primitive values
 - `TextArrayMergeNode` - Handles arrays of primitive values (e.g., `members` in package.xml)
 - `KeyedArrayMergeNode` - Handles arrays of objects with key fields (e.g., `fieldPermissions` with `field` key)
-- `ObjectMergeNode` - Handles pure objects without key extractor (property-by-property merge)
+- `PropertyMergeNode` - Handles pure objects without key extractor (property-by-property merge)
 
 ### Factory Pattern
 
@@ -71,7 +71,7 @@ flowchart TD
     Start["createNode()"] --> IsStringArray{{"Is string array?"}}
     IsStringArray -->|Yes| TextArray["TextArrayMergeNode"]
     IsStringArray -->|No| IsPureObject{{"Pure object without key extractor?"}}
-    IsPureObject -->|Yes| Object["ObjectMergeNode"]
+    IsPureObject -->|Yes| Object["PropertyMergeNode"]
     IsPureObject -->|No| IsObject{{"Contains objects?"}}
     IsObject -->|Yes| KeyedArray["KeyedArrayMergeNode"]
     IsObject -->|No| Text["TextMergeNode"]
