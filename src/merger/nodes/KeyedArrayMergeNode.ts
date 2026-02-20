@@ -135,7 +135,7 @@ class UnorderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
 // Ordered Strategy
 // ============================================================================
 
-interface MergeContext {
+interface ArrayMergeState {
   ancestorKeys: string[]
   localKeys: string[]
   otherKeys: string[]
@@ -253,7 +253,7 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   ) {}
 
   merge(config: MergeConfig): MergeResult {
-    const ctx = this.buildMergeContext()
+    const ctx = this.buildArrayMergeState()
     const orderingAnalysis = this.analyzeOrderings(ctx)
 
     if (!orderingAnalysis.canMerge) {
@@ -275,7 +275,7 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   // Context Building
   // ============================================================================
 
-  private buildMergeContext(): MergeContext {
+  private buildArrayMergeState(): ArrayMergeState {
     const ancestorKeys = this.ancestor.map(item =>
       this.keyField(item as JsonObject)
     )
@@ -301,7 +301,7 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   // Ordering Analysis
   // ============================================================================
 
-  private analyzeOrderings(ctx: MergeContext): OrderingAnalysis {
+  private analyzeOrderings(ctx: ArrayMergeState): OrderingAnalysis {
     // Fast path: identical orderings
     if (hasSameOrder(ctx.localKeys, ctx.otherKeys)) {
       return {
@@ -335,7 +335,7 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
    * Complexity: O(n²) for n elements - acceptable for typical metadata array sizes.
    */
   private getMovedElements(
-    ctx: MergeContext,
+    ctx: ArrayMergeState,
     modifiedPos: Map<string, number>
   ): Set<string> {
     const moved = new Set<string>()
@@ -369,7 +369,7 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
 
   private processDivergedOrderings(
     config: MergeConfig,
-    ctx: MergeContext,
+    ctx: ArrayMergeState,
     analysis: OrderingAnalysis
   ): MergeResult {
     const mergedKeys = this.computeMergedKeyOrder(ctx, analysis)
@@ -387,7 +387,7 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
    * Returns null if concurrent disjoint additions are detected (conflict).
    */
   private computeMergedKeyOrder(
-    ctx: MergeContext,
+    ctx: ArrayMergeState,
     analysis: OrderingAnalysis
   ): string[] | null {
     const { localMoved, otherMoved } = analysis
@@ -452,7 +452,7 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
 
   private processWithSpine(
     config: MergeConfig,
-    ctx: MergeContext
+    ctx: ArrayMergeState
   ): MergeResult {
     const spine = lcs(
       lcs(ctx.ancestorKeys, ctx.localKeys),
@@ -472,7 +472,7 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
    */
   private processKeyOrder(
     config: MergeConfig,
-    ctx: MergeContext,
+    ctx: ArrayMergeState,
     keys: string[]
   ): MergeResult {
     const results: MergeResult[] = []
@@ -494,7 +494,7 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   private mergeElementWithPresenceCheck(
     config: MergeConfig,
     key: string,
-    ctx: MergeContext
+    ctx: ArrayMergeState
   ): MergeResult | null {
     const inA = ctx.ancestorMap.has(key)
     const inL = ctx.localMap.has(key)
@@ -517,7 +517,7 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
 
   private buildFullArrayConflict(
     config: MergeConfig,
-    ctx: MergeContext
+    ctx: ArrayMergeState
   ): MergeResult {
     return withConflict(
       buildConflictMarkers(
@@ -534,7 +534,7 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   private processSpine(
     config: MergeConfig,
     spine: string[],
-    ctx: MergeContext
+    ctx: ArrayMergeState
   ): MergeResult {
     const results: MergeResult[] = []
     let aIdx = 0
@@ -595,7 +595,7 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     gapA: string[],
     gapL: string[],
     gapO: string[],
-    ctx: MergeContext
+    ctx: ArrayMergeState
   ): MergeResult {
     if (gapA.length === 0 && gapL.length === 0 && gapO.length === 0) {
       return noConflict([])
@@ -624,7 +624,7 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     gapA: string[],
     gapO: string[],
     sets: GapSets,
-    ctx: MergeContext
+    ctx: ArrayMergeState
   ): MergeResult | null {
     const { localDeleted, otherDeleted, localAdded, otherAdded } = sets
 
@@ -651,7 +651,7 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     gapL: string[],
     gapA: string[],
     gapO: string[],
-    ctx: MergeContext
+    ctx: ArrayMergeState
   ): MergeResult {
     return withConflict(
       filterEmptyTextNodes(
@@ -668,7 +668,7 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   private mergeGapElements(
     config: MergeConfig,
     sets: GapSets,
-    ctx: MergeContext
+    ctx: ArrayMergeState
   ): MergeResult {
     const results: MergeResult[] = []
     for (const key of sets.allKeys) {
@@ -687,7 +687,7 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   private mergeGapElement(
     config: MergeConfig,
     key: string,
-    ctx: MergeContext
+    ctx: ArrayMergeState
   ): MergeResult | null {
     const aVal = ctx.ancestorMap.get(key)
     const lVal = ctx.localMap.get(key)
@@ -730,7 +730,7 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   private mergeElement(
     config: MergeConfig,
     key: string,
-    ctx: MergeContext
+    ctx: ArrayMergeState
   ): MergeResult {
     const aVal = ctx.ancestorMap.get(key)
     const lVal = ctx.localMap.get(key)
