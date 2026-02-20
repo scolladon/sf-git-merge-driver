@@ -3,9 +3,9 @@ import {
   DEFAULT_CONFLICT_MARKER_SIZE,
   DEFAULT_LOCAL_CONFLICT_TAG,
   DEFAULT_OTHER_CONFLICT_TAG,
-} from '../../../src/constant/conflictConstant.js'
-import { XmlMerger } from '../../../src/merger/XmlMerger.js'
-import type { MergeConfig } from '../../../src/types/conflictTypes.js'
+} from '../../src/constant/conflictConstant.js'
+import { XmlMerger } from '../../src/merger/XmlMerger.js'
+import type { MergeConfig } from '../../src/types/conflictTypes.js'
 
 const defaultConfig: MergeConfig = {
   conflictMarkerSize: DEFAULT_CONFLICT_MARKER_SIZE,
