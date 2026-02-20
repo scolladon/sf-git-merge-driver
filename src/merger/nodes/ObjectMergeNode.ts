@@ -6,7 +6,7 @@ import type { MergeContext } from '../MergeContext.js'
 import { MergeOrchestrator } from '../MergeOrchestrator.js'
 import type { MergeNode } from './MergeNode.js'
 import { defaultNodeFactory } from './MergeNodeFactory.js'
-import { getUniqueSortedProps } from './nodeUtils.js'
+import { getUniqueSortedProps, wrapWithRootKey } from './nodeUtils.js'
 
 export class ObjectMergeNode implements MergeNode {
   constructor(
@@ -36,11 +36,7 @@ export class ObjectMergeNode implements MergeNode {
       results.push(childResult)
     }
 
-    const combined = combineResults(results)
-    return {
-      output: [{ [this.attribute]: combined.output }],
-      hasConflict: combined.hasConflict,
-    }
+    return wrapWithRootKey(combineResults(results), this.attribute)
   }
 }
 
