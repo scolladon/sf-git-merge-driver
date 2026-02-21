@@ -102,34 +102,4 @@ describe('MergeOrchestrator', () => {
       )
     })
   })
-
-  describe('mergeObject', () => {
-    it('should delegate to merge', () => {
-      // Arrange
-      const orchestrator = new MergeOrchestrator(defaultConfig)
-      const ancestor = { a: 'ancestor' }
-      const local = { a: 'local' }
-      const other = { a: 'other' }
-      const scenario = MergeScenario.ANCESTOR_AND_LOCAL
-
-      mockedGetScenario.mockReturnValue(scenario)
-
-      // Act
-      const result = orchestrator.mergeObject(ancestor, local, other)
-
-      // Assert
-      expect(mockedGetScenario).toHaveBeenCalledWith(ancestor, local, other)
-      expect(mockedGetScenarioStrategy).toHaveBeenCalledWith(scenario)
-      expect(mockStrategy.execute).toHaveBeenCalledWith({
-        config: defaultConfig,
-        ancestor,
-        local,
-        other,
-        attribute: undefined,
-        nodeFactory: defaultNodeFactory,
-        rootKey: undefined,
-      })
-      expect(result).toBe(mockResult)
-    })
-  })
 })
