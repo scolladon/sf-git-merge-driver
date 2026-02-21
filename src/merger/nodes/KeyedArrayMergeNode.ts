@@ -7,6 +7,7 @@ import type { JsonArray, JsonObject } from '../../types/jsonTypes.js'
 import type { MergeResult } from '../../types/mergeResult.js'
 import {
   combineResults,
+  isNonEmpty,
   noConflict,
   withConflict,
 } from '../../types/mergeResult.js'
@@ -558,7 +559,7 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
 
       const gaps: GapKeys = { ancestor: gapA, local: gapL, other: gapO }
       const gapResult = this.mergeGap(config, gaps, ctx)
-      if (gapResult.output.length > 0 || gapResult.hasConflict) {
+      if (isNonEmpty(gapResult)) {
         results.push(gapResult)
       }
 
@@ -575,7 +576,7 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
       other: ctx.otherKeys.slice(oIdx),
     }
     const finalResult = this.mergeGap(config, finalGaps, ctx)
-    if (finalResult.output.length > 0 || finalResult.hasConflict) {
+    if (isNonEmpty(finalResult)) {
       results.push(finalResult)
     }
 
