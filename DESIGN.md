@@ -86,7 +86,7 @@ Implementation: [MergeNodeFactory.ts](src/merger/nodes/MergeNodeFactory.ts)
 The central coordinator that:
 1. Determines the merge scenario using `MergeScenarioFactory`
 2. Applies early termination optimization when all inputs are equal
-3. Selects the appropriate strategy via `ScenarioStrategyFactory`
+3. Selects the appropriate strategy via `getScenarioStrategy()`
 4. Builds the `MergeContext` and executes the strategy
 
 ```typescript
@@ -327,7 +327,7 @@ Analysis:
 
 ### Implementation
 
-Key methods in `OrderedKeyedArrayMergeStrategy` ([KeyedArrayMergeNode.ts](src/merger/nodes/KeyedArrayMergeNode.ts)):
+Key methods in `OrderedKeyedArrayMergeStrategy` ([OrderedKeyedArrayMergeStrategy.ts](src/merger/nodes/OrderedKeyedArrayMergeStrategy.ts)):
 
 | Method | Purpose |
 |--------|---------|
@@ -352,7 +352,7 @@ The **spine** is the stable backbone of elements present in all versions with pr
 spine = lcs(lcs(ancestor, local), lcs(ancestor, other))
 ```
 
-Implementation: [KeyedArrayMergeNode.ts:170](src/merger/nodes/KeyedArrayMergeNode.ts#L170)
+Implementation: [OrderedKeyedArrayMergeStrategy.ts](src/merger/nodes/OrderedKeyedArrayMergeStrategy.ts)
 
 #### Process Flow
 
