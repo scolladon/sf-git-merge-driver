@@ -1,6 +1,5 @@
 import { deepEqual } from 'fast-equals'
 import { isEmpty } from 'lodash-es'
-import { TEXT_TAG } from '../../constant/parserConstant.js'
 import { MetadataService } from '../../service/MetadataService.js'
 import type { MergeConfig } from '../../types/conflictTypes.js'
 import type { JsonArray, JsonObject } from '../../types/jsonTypes.js'
@@ -11,12 +10,17 @@ import {
   noConflict,
   withConflict,
 } from '../../types/mergeResult.js'
-import { pushAll } from '../../utils/arrayUtils.js'
+import { hasSameOrder, lcs, pushAll } from '../../utils/arrayUtils.js'
+import { setsEqual, setsIntersect } from '../../utils/setUtils.js'
 import { buildConflictMarkers } from '../ConflictMarkerBuilder.js'
 import { MergeOrchestrator } from '../MergeOrchestrator.js'
 import type { MergeNode } from './MergeNode.js'
 import { defaultNodeFactory } from './MergeNodeFactory.js'
-import { toJsonArray } from './nodeUtils.js'
+import {
+  buildKeyedMap,
+  filterEmptyTextNodes,
+  toJsonArray,
+} from './nodeUtils.js'
 
 type KeyExtractor = (item: JsonObject) => string
 
@@ -26,31 +30,6 @@ type KeyExtractor = (item: JsonObject) => string
 
 interface KeyedArrayMergeStrategy {
   merge(config: MergeConfig): MergeResult
-}
-
-// ============================================================================
-// Shared Helpers
-// ============================================================================
-
-const filterEmptyTextNodes = (markers: JsonArray): JsonArray =>
-  markers.filter(item => {
-    if (item && typeof item === 'object' && TEXT_TAG in item) {
-      const text = (item as JsonObject)[TEXT_TAG]
-      return !(typeof text === 'string' && text.trim() === '')
-    }
-    return true
-  }) as JsonArray
-
-const buildKeyedMap = (
-  arr: JsonArray,
-  keyField: KeyExtractor
-): Map<string, JsonObject> => {
-  const map = new Map<string, JsonObject>()
-  for (const item of arr) {
-    const key = keyField(item as JsonObject)
-    map.set(key, item as JsonObject)
-  }
-  return map
 }
 
 // ============================================================================
@@ -164,49 +143,6 @@ interface GapSets {
   allKeys: Set<string>
 }
 
-// Ordered strategy helpers
-
-const hasSameOrder = (a: string[], b: string[]): boolean => {
-  const bSet = new Set(b)
-  const aFiltered = a.filter(k => bSet.has(k))
-  const aSet = new Set(a)
-  const bFiltered = b.filter(k => aSet.has(k))
-  return deepEqual(aFiltered, bFiltered)
-}
-
-const lcs = (a: string[], b: string[]): string[] => {
-  const m = a.length
-  const n = b.length
-  const dp: number[][] = Array.from({ length: m + 1 }, () =>
-    Array(n + 1).fill(0)
-  )
-
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      dp[i][j] =
-        a[i - 1] === b[j - 1]
-          ? dp[i - 1][j - 1] + 1
-          : Math.max(dp[i - 1][j], dp[i][j - 1])
-    }
-  }
-
-  const result: string[] = []
-  let i = m
-  let j = n
-  while (i > 0 && j > 0) {
-    if (a[i - 1] === b[j - 1]) {
-      result.unshift(a[i - 1])
-      i--
-      j--
-    } else if (dp[i - 1][j] > dp[i][j - 1]) {
-      i--
-    } else {
-      j--
-    }
-  }
-  return result
-}
-
 const computeGapSets = (
   gapA: string[],
   gapL: string[],
@@ -223,21 +159,6 @@ const computeGapSets = (
     otherAdded: new Set(gapO.filter(k => !ancestorSet.has(k))),
     allKeys: new Set([...gapA, ...gapL, ...gapO]),
   }
-}
-
-const setsEqual = (a: Set<string>, b: Set<string>): boolean => {
-  if (a.size !== b.size) return false
-  for (const item of a) {
-    if (!b.has(item)) return false
-  }
-  return true
-}
-
-const setsIntersect = (a: Set<string>, b: Set<string>): boolean => {
-  for (const item of a) {
-    if (b.has(item)) return true
-  }
-  return false
 }
 
 // ============================================================================
