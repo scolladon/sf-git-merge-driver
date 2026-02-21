@@ -22,7 +22,7 @@ import {
 // Strategy Interface
 // ============================================================================
 
-export interface ScenarioStrategy {
+interface ScenarioStrategy {
   execute(context: MergeContext): MergeResult
 }
 
