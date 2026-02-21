@@ -49,7 +49,7 @@ export interface MergeNodeFactory {
   ): MergeNode
 }
 
-export class DefaultMergeNodeFactory implements MergeNodeFactory {
+class DefaultMergeNodeFactory implements MergeNodeFactory {
   createNode(
     ancestor: JsonValue,
     local: JsonValue,

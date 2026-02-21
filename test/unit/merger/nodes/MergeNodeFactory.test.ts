@@ -1,15 +1,12 @@
 import { KeyedArrayMergeNode } from '../../../../src/merger/nodes/KeyedArrayMergeNode.js'
-import {
-  DefaultMergeNodeFactory,
-  defaultNodeFactory,
-} from '../../../../src/merger/nodes/MergeNodeFactory.js'
+import { defaultNodeFactory } from '../../../../src/merger/nodes/MergeNodeFactory.js'
 import { PropertyMergeNode } from '../../../../src/merger/nodes/PropertyMergeNode.js'
 import { TextArrayMergeNode } from '../../../../src/merger/nodes/TextArrayMergeNode.js'
 import { TextMergeNode } from '../../../../src/merger/nodes/TextMergeNode.js'
 
 describe('MergeNodeFactory', () => {
-  describe('DefaultMergeNodeFactory', () => {
-    const factory = new DefaultMergeNodeFactory()
+  describe('defaultNodeFactory', () => {
+    const factory = defaultNodeFactory
 
     describe('createNode', () => {
       it('given string arrays when createNode then returns TextArrayMergeNode', () => {
@@ -133,8 +130,9 @@ describe('MergeNodeFactory', () => {
   })
 
   describe('defaultNodeFactory', () => {
-    it('should be an instance of DefaultMergeNodeFactory', () => {
-      expect(defaultNodeFactory).toBeInstanceOf(DefaultMergeNodeFactory)
+    it('should be defined', () => {
+      expect(defaultNodeFactory).toBeDefined()
+      expect(defaultNodeFactory.createNode).toBeDefined()
     })
   })
 })

@@ -17,7 +17,7 @@ interface TextMergeStrategy {
   ): MergeResult
 }
 
-export class OtherOnlyStrategy implements TextMergeStrategy {
+class OtherOnlyStrategy implements TextMergeStrategy {
   handle(
     _config: MergeConfig,
     _objAncestor: JsonObject,
@@ -28,7 +28,7 @@ export class OtherOnlyStrategy implements TextMergeStrategy {
   }
 }
 
-export class LocalOnlyStrategy implements TextMergeStrategy {
+class LocalOnlyStrategy implements TextMergeStrategy {
   handle(
     _config: MergeConfig,
     _objAncestor: JsonObject,
@@ -38,7 +38,7 @@ export class LocalOnlyStrategy implements TextMergeStrategy {
   }
 }
 
-export class LocalAndOtherStrategy implements TextMergeStrategy {
+class LocalAndOtherStrategy implements TextMergeStrategy {
   handle(
     config: MergeConfig,
     _objAncestor: JsonObject,
@@ -55,7 +55,7 @@ export class LocalAndOtherStrategy implements TextMergeStrategy {
   }
 }
 
-export class AncestorAndOtherStrategy implements TextMergeStrategy {
+class AncestorAndOtherStrategy implements TextMergeStrategy {
   handle(
     config: MergeConfig,
     objAncestor: JsonObject,
@@ -74,7 +74,7 @@ export class AncestorAndOtherStrategy implements TextMergeStrategy {
   }
 }
 
-export class AncestorAndLocalStrategy implements TextMergeStrategy {
+class AncestorAndLocalStrategy implements TextMergeStrategy {
   handle(
     config: MergeConfig,
     objAncestor: JsonObject,
@@ -92,7 +92,7 @@ export class AncestorAndLocalStrategy implements TextMergeStrategy {
   }
 }
 
-export class AllPresentStrategy implements TextMergeStrategy {
+class AllPresentStrategy implements TextMergeStrategy {
   handle(
     config: MergeConfig,
     objAncestor: JsonObject,
@@ -117,13 +117,13 @@ export class AllPresentStrategy implements TextMergeStrategy {
   }
 }
 
-export class AncestorOnlyStrategy implements TextMergeStrategy {
+class AncestorOnlyStrategy implements TextMergeStrategy {
   handle(): MergeResult {
     return noConflict([])
   }
 }
 
-export class NoneStrategy implements TextMergeStrategy {
+class NoneStrategy implements TextMergeStrategy {
   handle(): MergeResult {
     return noConflict([])
   }
