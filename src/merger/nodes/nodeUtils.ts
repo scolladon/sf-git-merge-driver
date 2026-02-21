@@ -87,7 +87,7 @@ export const filterEmptyTextNodes = (markers: JsonArray): JsonArray =>
     return true
   }) as JsonArray
 
-type KeyExtractor = (item: JsonObject) => string
+export type KeyExtractor = (item: JsonObject) => string
 
 export const buildKeyedMap = (
   arr: JsonArray,
