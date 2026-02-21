@@ -156,6 +156,20 @@ describe('OrderedKeyedArrayMergeStrategy', () => {
       ['A', 'B', 'D', 'C'],
       ['B', 'A', 'D', 'C'],
     ],
+    [
+      'M11: Partial Moves with Addition',
+      ['A', 'B', 'C'],
+      ['B', 'A', 'C', 'D'],
+      ['A', 'B', 'C'],
+      ['B', 'A', 'C', 'D'],
+    ],
+    [
+      'M12: Moves with Deletion',
+      ['A', 'B', 'C'],
+      ['C', 'A'],
+      ['A', 'B', 'C'],
+      ['C', 'A'],
+    ],
   ]
 
   describe('Graceful Merges', () => {
@@ -274,40 +288,6 @@ describe('OrderedKeyedArrayMergeStrategy', () => {
       // Assert
       expect(result.hasConflict).toBe(true)
       expect(extractLabels(result.output)).toEqual(expectedOutput)
-    })
-  })
-
-  describe('Diverged orderings with partial moves and deletions', () => {
-    it('should merge when only some ancestor elements moved and a new element is added', () => {
-      // Arrange
-      const strategy = createStrategy(
-        toElements(['A', 'B', 'C']),
-        toElements(['B', 'A', 'C', 'D']),
-        toElements(['A', 'B', 'C'])
-      )
-
-      // Act
-      const result = strategy.merge(defaultConfig)
-
-      // Assert
-      expect(result.hasConflict).toBe(false)
-      expect(extractLabels(result.output)).toEqual(['B', 'A', 'C', 'D'])
-    })
-
-    it('should handle moves when one version deletes an ancestor element', () => {
-      // Arrange
-      const strategy = createStrategy(
-        toElements(['A', 'B', 'C']),
-        toElements(['C', 'A']),
-        toElements(['A', 'B', 'C'])
-      )
-
-      // Act
-      const result = strategy.merge(defaultConfig)
-
-      // Assert
-      expect(result.hasConflict).toBe(false)
-      expect(extractLabels(result.output)).toEqual(['C', 'A'])
     })
   })
 })
