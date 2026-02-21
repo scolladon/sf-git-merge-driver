@@ -7,7 +7,7 @@ import {
   defaultNodeFactory,
   type MergeNodeFactory,
 } from './nodes/MergeNodeFactory.js'
-import { getScenarioStrategy } from './strategies/ScenarioStrategyFactory.js'
+import { getScenarioStrategy } from './strategies/ScenarioStrategy.js'
 
 export class MergeOrchestrator {
   constructor(
