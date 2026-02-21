@@ -1,8 +1,8 @@
 import { Messages } from '@salesforce/core'
 import { SfCommand } from '@salesforce/sf-plugins-core'
 import { PLUGIN_NAME } from '../../../../constant/pluginConstant.js'
-import { InstallService } from '../../../../service/installService.js'
-import { UninstallService } from '../../../../service/uninstallService.js'
+import { InstallService } from '../../../../service/InstallService.js'
+import { UninstallService } from '../../../../service/UninstallService.js'
 import { log } from '../../../../utils/LoggingDecorator.js'
 import { Logger } from '../../../../utils/LoggingService.js'
 

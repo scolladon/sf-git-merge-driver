@@ -8,7 +8,7 @@ import {
   MANIFEST_PATTERNS,
   METADATA_TYPES_PATTERNS,
 } from '../../../src/constant/metadataConstant.js'
-import { InstallService } from '../../../src/service/installService.js'
+import { InstallService } from '../../../src/service/InstallService.js'
 import { getGitAttributesPath } from '../../../src/utils/gitUtils.js'
 
 jest.mock('node:fs/promises')
