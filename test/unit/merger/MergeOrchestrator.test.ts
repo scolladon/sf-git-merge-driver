@@ -7,13 +7,13 @@ import {
 import { MergeOrchestrator } from '../../../src/merger/MergeOrchestrator.js'
 import { getScenario } from '../../../src/merger/MergeScenarioFactory.js'
 import { defaultNodeFactory } from '../../../src/merger/nodes/MergeNodeFactory.js'
-import { getScenarioStrategy } from '../../../src/merger/strategies/ScenarioStrategyFactory.js'
+import { getScenarioStrategy } from '../../../src/merger/strategies/ScenarioStrategy.js'
 import type { MergeConfig } from '../../../src/types/conflictTypes.js'
 import type { MergeResult } from '../../../src/types/mergeResult.js'
 import { MergeScenario } from '../../../src/types/mergeScenario.js'
 
 jest.mock('../../../src/merger/MergeScenarioFactory.js')
-jest.mock('../../../src/merger/strategies/ScenarioStrategyFactory.js')
+jest.mock('../../../src/merger/strategies/ScenarioStrategy.js')
 
 const mockedGetScenario = getScenario as jest.Mock
 const mockedGetScenarioStrategy = getScenarioStrategy as jest.Mock
@@ -100,36 +100,6 @@ describe('MergeOrchestrator', () => {
           nodeFactory: customNodeFactory,
         })
       )
-    })
-  })
-
-  describe('mergeObject', () => {
-    it('should delegate to merge', () => {
-      // Arrange
-      const orchestrator = new MergeOrchestrator(defaultConfig)
-      const ancestor = { a: 'ancestor' }
-      const local = { a: 'local' }
-      const other = { a: 'other' }
-      const scenario = MergeScenario.ANCESTOR_AND_LOCAL
-
-      mockedGetScenario.mockReturnValue(scenario)
-
-      // Act
-      const result = orchestrator.mergeObject(ancestor, local, other)
-
-      // Assert
-      expect(mockedGetScenario).toHaveBeenCalledWith(ancestor, local, other)
-      expect(mockedGetScenarioStrategy).toHaveBeenCalledWith(scenario)
-      expect(mockStrategy.execute).toHaveBeenCalledWith({
-        config: defaultConfig,
-        ancestor,
-        local,
-        other,
-        attribute: undefined,
-        nodeFactory: defaultNodeFactory,
-        rootKey: undefined,
-      })
-      expect(result).toBe(mockResult)
     })
   })
 })

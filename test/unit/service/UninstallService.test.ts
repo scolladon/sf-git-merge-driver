@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import simpleGit from 'simple-git'
 import { DRIVER_NAME } from '../../../src/constant/driverConstant.js'
-import { UninstallService } from '../../../src/service/uninstallService.js'
+import { UninstallService } from '../../../src/service/UninstallService.js'
 import { getGitAttributesPath } from '../../../src/utils/gitUtils.js'
 
 jest.mock('node:fs/promises')

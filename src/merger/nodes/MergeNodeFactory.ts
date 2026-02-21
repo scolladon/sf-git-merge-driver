@@ -10,7 +10,7 @@ import type { JsonArray, JsonObject, JsonValue } from '../../types/jsonTypes.js'
 import { KeyedArrayMergeNode } from './KeyedArrayMergeNode.js'
 import type { MergeNode } from './MergeNode.js'
 import { ensureArray } from './nodeUtils.js'
-import { ObjectMergeNode } from './ObjectMergeNode.js'
+import { PropertyMergeNode } from './PropertyMergeNode.js'
 import { TextArrayMergeNode } from './TextArrayMergeNode.js'
 import { TextMergeNode } from './TextMergeNode.js'
 
@@ -49,7 +49,7 @@ export interface MergeNodeFactory {
   ): MergeNode
 }
 
-export class DefaultMergeNodeFactory implements MergeNodeFactory {
+class DefaultMergeNodeFactory implements MergeNodeFactory {
   createNode(
     ancestor: JsonValue,
     local: JsonValue,
@@ -69,12 +69,13 @@ export class DefaultMergeNodeFactory implements MergeNodeFactory {
       )
     }
 
-    // Pure objects without key extractor → ObjectMergeNode (property-by-property)
+    // Pure objects without key extractor → PropertyMergeNode (property-by-property)
     if (isPureUnknown([ancestor, local, other], attribute)) {
-      return new ObjectMergeNode(
+      return new PropertyMergeNode(
         ancestor as JsonObject,
         local as JsonObject,
-        other as JsonObject
+        other as JsonObject,
+        attribute
       )
     }
 
