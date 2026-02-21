@@ -43,15 +43,15 @@ describe('TextMergeStrategy', () => {
       const strategy = getTextMergeStrategy(MergeScenario.NONE)
 
       // Act
-      const result = strategy.handle(
-        defaultConfig,
-        {},
-        {},
-        {},
-        null,
-        null,
-        null
-      )
+      const result = strategy.handle({
+        config: defaultConfig,
+        objAncestor: {},
+        objLocal: {},
+        objOther: {},
+        ancestor: null,
+        local: null,
+        other: null,
+      })
 
       // Assert
       expect(result.output).toEqual([])
@@ -66,15 +66,15 @@ describe('TextMergeStrategy', () => {
       const objOther = { field: [{ [TEXT_TAG]: 'otherValue' }] }
 
       // Act
-      const result = strategy.handle(
-        defaultConfig,
-        {},
-        {},
+      const result = strategy.handle({
+        config: defaultConfig,
+        objAncestor: {},
+        objLocal: {},
         objOther,
-        null,
-        null,
-        'otherValue'
-      )
+        ancestor: null,
+        local: null,
+        other: 'otherValue',
+      })
 
       // Assert
       expect(result.output).toEqual([objOther])
@@ -89,15 +89,15 @@ describe('TextMergeStrategy', () => {
       const objLocal = { field: [{ [TEXT_TAG]: 'localValue' }] }
 
       // Act
-      const result = strategy.handle(
-        defaultConfig,
-        {},
+      const result = strategy.handle({
+        config: defaultConfig,
+        objAncestor: {},
         objLocal,
-        {},
-        null,
-        'localValue',
-        null
-      )
+        objOther: {},
+        ancestor: null,
+        local: 'localValue',
+        other: null,
+      })
 
       // Assert
       expect(result.output).toEqual([objLocal])
@@ -111,15 +111,15 @@ describe('TextMergeStrategy', () => {
       const strategy = getTextMergeStrategy(MergeScenario.ANCESTOR_ONLY)
 
       // Act
-      const result = strategy.handle(
-        defaultConfig,
-        {},
-        {},
-        {},
-        null,
-        null,
-        null
-      )
+      const result = strategy.handle({
+        config: defaultConfig,
+        objAncestor: {},
+        objLocal: {},
+        objOther: {},
+        ancestor: null,
+        local: null,
+        other: null,
+      })
 
       // Assert
       expect(result.output).toEqual([])
@@ -135,15 +135,15 @@ describe('TextMergeStrategy', () => {
       const objOther = { field: [{ [TEXT_TAG]: 'otherValue' }] }
 
       // Act
-      const result = strategy.handle(
-        defaultConfig,
-        {},
+      const result = strategy.handle({
+        config: defaultConfig,
+        objAncestor: {},
         objLocal,
         objOther,
-        null,
-        'localValue',
-        'otherValue'
-      )
+        ancestor: null,
+        local: 'localValue',
+        other: 'otherValue',
+      })
 
       // Assert
       expect(result.hasConflict).toBe(true)
@@ -157,15 +157,15 @@ describe('TextMergeStrategy', () => {
       const objOther = { field: [{ [TEXT_TAG]: 'sameValue' }] }
 
       // Act
-      const result = strategy.handle(
-        defaultConfig,
-        {},
+      const result = strategy.handle({
+        config: defaultConfig,
+        objAncestor: {},
         objLocal,
         objOther,
-        null,
-        'sameValue',
-        'sameValue'
-      )
+        ancestor: null,
+        local: 'sameValue',
+        other: 'sameValue',
+      })
 
       // Assert
       expect(result.hasConflict).toBe(false)
@@ -181,15 +181,15 @@ describe('TextMergeStrategy', () => {
       const objOther = { field: [{ [TEXT_TAG]: 'otherValue' }] }
 
       // Act
-      const result = strategy.handle(
-        defaultConfig,
+      const result = strategy.handle({
+        config: defaultConfig,
         objAncestor,
-        {},
+        objLocal: {},
         objOther,
-        'ancestor',
-        null,
-        'other'
-      )
+        ancestor: 'ancestor',
+        local: null,
+        other: 'other',
+      })
 
       // Assert
       expect(result.hasConflict).toBe(true)
@@ -203,15 +203,15 @@ describe('TextMergeStrategy', () => {
       const objOther = { field: [{ [TEXT_TAG]: 'sameValue' }] }
 
       // Act
-      const result = strategy.handle(
-        defaultConfig,
+      const result = strategy.handle({
+        config: defaultConfig,
         objAncestor,
-        {},
+        objLocal: {},
         objOther,
-        'sameValue',
-        null,
-        'sameValue'
-      )
+        ancestor: 'sameValue',
+        local: null,
+        other: 'sameValue',
+      })
 
       // Assert
       expect(result.hasConflict).toBe(false)
@@ -227,15 +227,15 @@ describe('TextMergeStrategy', () => {
       const objLocal = { field: [{ [TEXT_TAG]: 'localValue' }] }
 
       // Act
-      const result = strategy.handle(
-        defaultConfig,
+      const result = strategy.handle({
+        config: defaultConfig,
         objAncestor,
         objLocal,
-        {},
-        'ancestor',
-        'local',
-        null
-      )
+        objOther: {},
+        ancestor: 'ancestor',
+        local: 'local',
+        other: null,
+      })
 
       // Assert
       expect(result.hasConflict).toBe(true)
@@ -249,15 +249,15 @@ describe('TextMergeStrategy', () => {
       const objLocal = { field: [{ [TEXT_TAG]: 'sameValue' }] }
 
       // Act
-      const result = strategy.handle(
-        defaultConfig,
+      const result = strategy.handle({
+        config: defaultConfig,
         objAncestor,
         objLocal,
-        {},
-        'sameValue',
-        'sameValue',
-        null
-      )
+        objOther: {},
+        ancestor: 'sameValue',
+        local: 'sameValue',
+        other: null,
+      })
 
       // Assert
       expect(result.hasConflict).toBe(false)
@@ -274,15 +274,15 @@ describe('TextMergeStrategy', () => {
       const objOther = { field: [{ [TEXT_TAG]: 'otherValue' }] }
 
       // Act
-      const result = strategy.handle(
-        defaultConfig,
+      const result = strategy.handle({
+        config: defaultConfig,
         objAncestor,
         objLocal,
         objOther,
-        'ancestorValue',
-        'ancestorValue',
-        'otherValue'
-      )
+        ancestor: 'ancestorValue',
+        local: 'ancestorValue',
+        other: 'otherValue',
+      })
 
       // Assert
       expect(result.hasConflict).toBe(false)
@@ -297,15 +297,15 @@ describe('TextMergeStrategy', () => {
       const objOther = { field: [{ [TEXT_TAG]: 'ancestorValue' }] }
 
       // Act
-      const result = strategy.handle(
-        defaultConfig,
+      const result = strategy.handle({
+        config: defaultConfig,
         objAncestor,
         objLocal,
         objOther,
-        'ancestorValue',
-        'localValue',
-        'ancestorValue'
-      )
+        ancestor: 'ancestorValue',
+        local: 'localValue',
+        other: 'ancestorValue',
+      })
 
       // Assert
       expect(result.hasConflict).toBe(false)
@@ -320,15 +320,15 @@ describe('TextMergeStrategy', () => {
       const objOther = { field: [{ [TEXT_TAG]: 'otherValue' }] }
 
       // Act
-      const result = strategy.handle(
-        defaultConfig,
+      const result = strategy.handle({
+        config: defaultConfig,
         objAncestor,
         objLocal,
         objOther,
-        'ancestorValue',
-        'localValue',
-        'otherValue'
-      )
+        ancestor: 'ancestorValue',
+        local: 'localValue',
+        other: 'otherValue',
+      })
 
       // Assert
       expect(result.hasConflict).toBe(true)
@@ -343,15 +343,15 @@ describe('TextMergeStrategy', () => {
       const objOther = { field: [{ [TEXT_TAG]: 'newValue' }] }
 
       // Act
-      const result = strategy.handle(
-        defaultConfig,
+      const result = strategy.handle({
+        config: defaultConfig,
         objAncestor,
         objLocal,
         objOther,
-        'originalValue',
-        'newValue',
-        'newValue'
-      )
+        ancestor: 'originalValue',
+        local: 'newValue',
+        other: 'newValue',
+      })
 
       // Assert
       expect(result.hasConflict).toBe(false)

@@ -5,49 +5,40 @@ import { noConflict, withConflict } from '../../types/mergeResult.js'
 import { MergeScenario } from '../../types/mergeScenario.js'
 import { buildConflictMarkers } from '../ConflictMarkerBuilder.js'
 
+interface TextMergeParams {
+  readonly config: MergeConfig
+  readonly objAncestor: JsonObject
+  readonly objLocal: JsonObject
+  readonly objOther: JsonObject
+  readonly ancestor: unknown
+  readonly local: unknown
+  readonly other: unknown
+}
+
 interface TextMergeStrategy {
-  handle(
-    config: MergeConfig,
-    objAncestor: JsonObject,
-    objLocal: JsonObject,
-    objOther: JsonObject,
-    ancestor: unknown,
-    local: unknown,
-    other: unknown
-  ): MergeResult
+  handle(params: TextMergeParams): MergeResult
 }
 
 class OtherOnlyStrategy implements TextMergeStrategy {
-  handle(
-    _config: MergeConfig,
-    _objAncestor: JsonObject,
-    _objLocal: JsonObject,
-    objOther: JsonObject
-  ): MergeResult {
+  handle({ objOther }: TextMergeParams): MergeResult {
     return noConflict([objOther])
   }
 }
 
 class LocalOnlyStrategy implements TextMergeStrategy {
-  handle(
-    _config: MergeConfig,
-    _objAncestor: JsonObject,
-    objLocal: JsonObject
-  ): MergeResult {
+  handle({ objLocal }: TextMergeParams): MergeResult {
     return noConflict([objLocal])
   }
 }
 
 class LocalAndOtherStrategy implements TextMergeStrategy {
-  handle(
-    config: MergeConfig,
-    _objAncestor: JsonObject,
-    objLocal: JsonObject,
-    objOther: JsonObject,
-    _ancestor: unknown,
-    local: unknown,
-    other: unknown
-  ): MergeResult {
+  handle({
+    config,
+    objLocal,
+    objOther,
+    local,
+    other,
+  }: TextMergeParams): MergeResult {
     if (local === other) {
       return noConflict([objLocal])
     }
@@ -56,15 +47,13 @@ class LocalAndOtherStrategy implements TextMergeStrategy {
 }
 
 class AncestorAndOtherStrategy implements TextMergeStrategy {
-  handle(
-    config: MergeConfig,
-    objAncestor: JsonObject,
-    _objLocal: JsonObject,
-    objOther: JsonObject,
-    ancestor: unknown,
-    _local: unknown,
-    other: unknown
-  ): MergeResult {
+  handle({
+    config,
+    objAncestor,
+    objOther,
+    ancestor,
+    other,
+  }: TextMergeParams): MergeResult {
     if (ancestor !== other) {
       return withConflict(
         buildConflictMarkers(config, {}, objAncestor, objOther)
@@ -75,14 +64,13 @@ class AncestorAndOtherStrategy implements TextMergeStrategy {
 }
 
 class AncestorAndLocalStrategy implements TextMergeStrategy {
-  handle(
-    config: MergeConfig,
-    objAncestor: JsonObject,
-    objLocal: JsonObject,
-    _objOther: JsonObject,
-    ancestor: unknown,
-    local: unknown
-  ): MergeResult {
+  handle({
+    config,
+    objAncestor,
+    objLocal,
+    ancestor,
+    local,
+  }: TextMergeParams): MergeResult {
     if (ancestor !== local) {
       return withConflict(
         buildConflictMarkers(config, objLocal, objAncestor, {})
@@ -93,15 +81,15 @@ class AncestorAndLocalStrategy implements TextMergeStrategy {
 }
 
 class AllPresentStrategy implements TextMergeStrategy {
-  handle(
-    config: MergeConfig,
-    objAncestor: JsonObject,
-    objLocal: JsonObject,
-    objOther: JsonObject,
-    ancestor: unknown,
-    local: unknown,
-    other: unknown
-  ): MergeResult {
+  handle({
+    config,
+    objAncestor,
+    objLocal,
+    objOther,
+    ancestor,
+    local,
+    other,
+  }: TextMergeParams): MergeResult {
     if (ancestor === local) {
       return noConflict([objOther])
     }

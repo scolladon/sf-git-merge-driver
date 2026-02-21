@@ -149,6 +149,12 @@ interface ArrayMergeState {
   ancestorSet: Set<string>
 }
 
+interface GapKeys {
+  readonly ancestor: string[]
+  readonly local: string[]
+  readonly other: string[]
+}
+
 interface GapSets {
   localDeleted: Set<string>
   otherDeleted: Set<string>
@@ -550,7 +556,8 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
       lIdx += gapL.length
       oIdx += gapO.length
 
-      const gapResult = this.mergeGap(config, gapA, gapL, gapO, ctx)
+      const gaps: GapKeys = { ancestor: gapA, local: gapL, other: gapO }
+      const gapResult = this.mergeGap(config, gaps, ctx)
       if (gapResult.output.length > 0 || gapResult.hasConflict) {
         results.push(gapResult)
       }
@@ -562,13 +569,12 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
       oIdx++
     }
 
-    const finalResult = this.mergeGap(
-      config,
-      ctx.ancestorKeys.slice(aIdx),
-      ctx.localKeys.slice(lIdx),
-      ctx.otherKeys.slice(oIdx),
-      ctx
-    )
+    const finalGaps: GapKeys = {
+      ancestor: ctx.ancestorKeys.slice(aIdx),
+      local: ctx.localKeys.slice(lIdx),
+      other: ctx.otherKeys.slice(oIdx),
+    }
+    const finalResult = this.mergeGap(config, finalGaps, ctx)
     if (finalResult.output.length > 0 || finalResult.hasConflict) {
       results.push(finalResult)
     }
@@ -592,25 +598,20 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
 
   private mergeGap(
     config: MergeConfig,
-    gapA: string[],
-    gapL: string[],
-    gapO: string[],
+    gaps: GapKeys,
     ctx: ArrayMergeState
   ): MergeResult {
-    if (gapA.length === 0 && gapL.length === 0 && gapO.length === 0) {
+    if (
+      gaps.ancestor.length === 0 &&
+      gaps.local.length === 0 &&
+      gaps.other.length === 0
+    ) {
       return noConflict([])
     }
 
-    const sets = computeGapSets(gapA, gapL, gapO)
+    const sets = computeGapSets(gaps.ancestor, gaps.local, gaps.other)
 
-    const gapConflict = this.detectGapConflict(
-      config,
-      gapL,
-      gapA,
-      gapO,
-      sets,
-      ctx
-    )
+    const gapConflict = this.detectGapConflict(config, gaps, sets, ctx)
     if (gapConflict) {
       return gapConflict
     }
@@ -620,9 +621,7 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
 
   private detectGapConflict(
     config: MergeConfig,
-    gapL: string[],
-    gapA: string[],
-    gapO: string[],
+    gaps: GapKeys,
     sets: GapSets,
     ctx: ArrayMergeState
   ): MergeResult | null {
@@ -640,7 +639,7 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
       !setsEqual(localAdded, otherAdded)
 
     if (hasDeletionConflict || hasAdditionConflict) {
-      return this.buildGapConflict(config, gapL, gapA, gapO, ctx)
+      return this.buildGapConflict(config, gaps, ctx)
     }
 
     return null
@@ -648,18 +647,16 @@ class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
 
   private buildGapConflict(
     config: MergeConfig,
-    gapL: string[],
-    gapA: string[],
-    gapO: string[],
+    gaps: GapKeys,
     ctx: ArrayMergeState
   ): MergeResult {
     return withConflict(
       filterEmptyTextNodes(
         buildConflictMarkers(
           config,
-          this.wrapKeys(gapL, ctx.localMap),
-          this.wrapKeys(gapA, ctx.ancestorMap),
-          this.wrapKeys(gapO, ctx.otherMap)
+          this.wrapKeys(gaps.local, ctx.localMap),
+          this.wrapKeys(gaps.ancestor, ctx.ancestorMap),
+          this.wrapKeys(gaps.other, ctx.otherMap)
         )
       )
     )
