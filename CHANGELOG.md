@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.4](https://github.com/scolladon/sf-git-merge-driver/compare/v1.5.3...v1.5.4) (2026-02-26)
+
+
+### Bug Fixes
+
+* picklist values corrupted in Deterministic Ordered merge ([#175](https://github.com/scolladon/sf-git-merge-driver/issues/175)) ([365c7f7](https://github.com/scolladon/sf-git-merge-driver/commit/365c7f7dd0c6a6ee600374e1cb4fb8fafc561316))
+
 ## [1.5.3](https://github.com/scolladon/sf-git-merge-driver/compare/v1.5.2...v1.5.3) (2026-02-17)
 
 
