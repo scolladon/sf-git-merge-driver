@@ -10,7 +10,7 @@ import { log } from '../utils/LoggingDecorator.js'
 
 export class InstallService {
   @log
-  public async installMergeDriver() {
+  public async installMergeDriver(): Promise<void> {
     const git = simpleGit()
     await git.addConfig(
       `merge.${DRIVER_NAME}.name`,

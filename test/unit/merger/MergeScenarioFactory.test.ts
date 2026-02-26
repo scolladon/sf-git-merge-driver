@@ -7,9 +7,6 @@ describe('MergeScenarioFactory', () => {
       // Assert
       expect(getScenario({}, {}, {})).toBe(MergeScenario.NONE)
       expect(getScenario(null, null, null)).toBe(MergeScenario.NONE)
-      expect(getScenario(undefined, undefined, undefined)).toBe(
-        MergeScenario.NONE
-      )
       expect(getScenario([], [], [])).toBe(MergeScenario.NONE)
     })
 

@@ -1,6 +1,50 @@
-import { pushAll } from '../../../src/utils/arrayUtils.js'
+import { hasSameOrder, lcs, pushAll } from '../../../src/utils/arrayUtils.js'
 
 describe('arrayUtils', () => {
+  describe('hasSameOrder', () => {
+    it('Given identical arrays, When comparing, Then returns true', () => {
+      expect(hasSameOrder(['a', 'b', 'c'], ['a', 'b', 'c'])).toBe(true)
+    })
+
+    it('Given same relative order with extra elements, When comparing, Then returns true', () => {
+      expect(hasSameOrder(['a', 'b', 'c'], ['a', 'x', 'b', 'c'])).toBe(true)
+    })
+
+    it('Given reversed order, When comparing, Then returns false', () => {
+      expect(hasSameOrder(['a', 'b'], ['b', 'a'])).toBe(false)
+    })
+
+    it('Given disjoint arrays, When comparing, Then returns true', () => {
+      expect(hasSameOrder(['a', 'b'], ['c', 'd'])).toBe(true)
+    })
+
+    it('Given empty arrays, When comparing, Then returns true', () => {
+      expect(hasSameOrder([], [])).toBe(true)
+    })
+  })
+
+  describe('lcs', () => {
+    it('Given identical arrays, When computing LCS, Then returns the full array', () => {
+      expect(lcs(['a', 'b', 'c'], ['a', 'b', 'c'])).toEqual(['a', 'b', 'c'])
+    })
+
+    it('Given disjoint arrays, When computing LCS, Then returns empty', () => {
+      expect(lcs(['a', 'b'], ['c', 'd'])).toEqual([])
+    })
+
+    it('Given partially overlapping arrays, When computing LCS, Then returns common subsequence', () => {
+      expect(lcs(['a', 'b', 'c', 'd'], ['a', 'c', 'd'])).toEqual([
+        'a',
+        'c',
+        'd',
+      ])
+    })
+
+    it('Given empty arrays, When computing LCS, Then returns empty', () => {
+      expect(lcs([], [])).toEqual([])
+    })
+  })
+
   describe('pushAll', () => {
     describe('given an empty source array', () => {
       it('should not modify target array', () => {

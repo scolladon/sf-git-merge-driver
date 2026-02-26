@@ -1,5 +1,5 @@
 import type { MergeConfig } from '../types/conflictTypes.js'
-import type { JsonArray, JsonObject, JsonValue } from '../types/jsonTypes.js'
+import type { JsonValue } from '../types/jsonTypes.js'
 import type { MergeResult } from '../types/mergeResult.js'
 import type { MergeContext, RootKeyInfo } from './MergeContext.js'
 import { getScenario } from './MergeScenarioFactory.js'
@@ -7,7 +7,7 @@ import {
   defaultNodeFactory,
   type MergeNodeFactory,
 } from './nodes/MergeNodeFactory.js'
-import { getScenarioStrategy } from './strategies/ScenarioStrategyFactory.js'
+import { getScenarioStrategy } from './strategies/ScenarioStrategy.js'
 
 export class MergeOrchestrator {
   constructor(
@@ -36,13 +36,5 @@ export class MergeOrchestrator {
     }
 
     return strategy.execute(context)
-  }
-
-  mergeObject(
-    ancestor: JsonObject | JsonArray,
-    local: JsonObject | JsonArray,
-    other: JsonObject | JsonArray
-  ): MergeResult {
-    return this.merge(ancestor, local, other)
   }
 }

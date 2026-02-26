@@ -77,3 +77,26 @@ export const buildEarlyResult = (
   }
   return noConflict(content)
 }
+
+export const filterEmptyTextNodes = (markers: JsonArray): JsonArray =>
+  markers.filter(item => {
+    if (item && typeof item === 'object' && TEXT_TAG in item) {
+      const text = (item as JsonObject)[TEXT_TAG]
+      return !(typeof text === 'string' && text.trim() === '')
+    }
+    return true
+  }) as JsonArray
+
+export type KeyExtractor = (item: JsonObject) => string
+
+export const buildKeyedMap = (
+  arr: JsonArray,
+  keyField: KeyExtractor
+): Map<string, JsonObject> => {
+  const map = new Map<string, JsonObject>()
+  for (const item of arr) {
+    const key = keyField(item as JsonObject)
+    map.set(key, item as JsonObject)
+  }
+  return map
+}

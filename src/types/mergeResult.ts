@@ -36,3 +36,6 @@ export const withConflict = (output: JsonArray): MergeResult => ({
   output,
   hasConflict: true,
 })
+
+export const isNonEmpty = (result: MergeResult): boolean =>
+  result.output.length > 0 || result.hasConflict

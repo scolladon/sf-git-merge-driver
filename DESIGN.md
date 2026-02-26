@@ -53,14 +53,14 @@ classDiagram
     MergeNode <|.. TextMergeNode
     MergeNode <|.. TextArrayMergeNode
     MergeNode <|.. KeyedArrayMergeNode
-    MergeNode <|.. ObjectMergeNode
+    MergeNode <|.. PropertyMergeNode
 ```
 
 **Node Types:**
 - `TextMergeNode` - Handles scalar/primitive values
 - `TextArrayMergeNode` - Handles arrays of primitive values (e.g., `members` in package.xml)
 - `KeyedArrayMergeNode` - Handles arrays of objects with key fields (e.g., `fieldPermissions` with `field` key)
-- `ObjectMergeNode` - Handles pure objects without key extractor (property-by-property merge)
+- `PropertyMergeNode` - Handles pure objects without key extractor (property-by-property merge)
 
 ### Factory Pattern
 
@@ -71,7 +71,7 @@ flowchart TD
     Start["createNode()"] --> IsStringArray{{"Is string array?"}}
     IsStringArray -->|Yes| TextArray["TextArrayMergeNode"]
     IsStringArray -->|No| IsPureObject{{"Pure object without key extractor?"}}
-    IsPureObject -->|Yes| Object["ObjectMergeNode"]
+    IsPureObject -->|Yes| Object["PropertyMergeNode"]
     IsPureObject -->|No| IsObject{{"Contains objects?"}}
     IsObject -->|Yes| KeyedArray["KeyedArrayMergeNode"]
     IsObject -->|No| Text["TextMergeNode"]
@@ -86,7 +86,7 @@ Implementation: [MergeNodeFactory.ts](src/merger/nodes/MergeNodeFactory.ts)
 The central coordinator that:
 1. Determines the merge scenario using `MergeScenarioFactory`
 2. Applies early termination optimization when all inputs are equal
-3. Selects the appropriate strategy via `ScenarioStrategyFactory`
+3. Selects the appropriate strategy via `getScenarioStrategy()`
 4. Builds the `MergeContext` and executes the strategy
 
 ```typescript
@@ -327,7 +327,7 @@ Analysis:
 
 ### Implementation
 
-Key methods in `OrderedKeyedArrayMergeStrategy` ([KeyedArrayMergeNode.ts](src/merger/nodes/KeyedArrayMergeNode.ts)):
+Key methods in `OrderedKeyedArrayMergeStrategy` ([OrderedKeyedArrayMergeStrategy.ts](src/merger/nodes/OrderedKeyedArrayMergeStrategy.ts)):
 
 | Method | Purpose |
 |--------|---------|
@@ -352,7 +352,7 @@ The **spine** is the stable backbone of elements present in all versions with pr
 spine = lcs(lcs(ancestor, local), lcs(ancestor, other))
 ```
 
-Implementation: [KeyedArrayMergeNode.ts:170](src/merger/nodes/KeyedArrayMergeNode.ts#L170)
+Implementation: [OrderedKeyedArrayMergeStrategy.ts](src/merger/nodes/OrderedKeyedArrayMergeStrategy.ts)
 
 #### Process Flow
 

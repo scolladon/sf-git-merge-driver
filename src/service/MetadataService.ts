@@ -1,4 +1,4 @@
-import { JsonValue } from '../types/jsonTypes.js'
+import type { JsonValue } from '../types/jsonTypes.js'
 
 export class MetadataService {
   public static getKeyFieldExtractor(

@@ -32,14 +32,14 @@ export class TextMergeNode implements MergeNode {
     }
 
     const strategy = getTextMergeStrategy(scenario)
-    return strategy.handle(
+    return strategy.handle({
       config,
       objAncestor,
       objLocal,
       objOther,
-      this.ancestor,
-      this.local,
-      this.other
-    )
+      ancestor: this.ancestor,
+      local: this.local,
+      other: this.other,
+    })
   }
 }

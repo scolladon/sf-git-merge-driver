@@ -1,13 +1,11 @@
 import { isEmpty } from 'lodash-es'
+import type { JsonValue } from '../types/jsonTypes.js'
 import { MergeScenario } from '../types/mergeScenario.js'
 
 export const getScenario = (
-  // biome-ignore lint/suspicious/noExplicitAny: can be any metadata in json format
-  ancestor: any,
-  // biome-ignore lint/suspicious/noExplicitAny: can be any metadata in json format
-  local: any,
-  // biome-ignore lint/suspicious/noExplicitAny: can be any metadata in json format
-  other: any
+  ancestor: JsonValue,
+  local: JsonValue,
+  other: JsonValue
 ): MergeScenario => {
   let scenario: MergeScenario = MergeScenario.NONE
   if (!isEmpty(ancestor)) {

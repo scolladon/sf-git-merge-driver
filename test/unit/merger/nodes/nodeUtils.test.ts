@@ -1,5 +1,8 @@
+import { TEXT_TAG } from '../../../../src/constant/parserConstant.js'
 import {
+  buildKeyedMap,
   ensureArray,
+  filterEmptyTextNodes,
   generateObj,
   getUniqueSortedProps,
   toJsonArray,
@@ -195,6 +198,69 @@ describe('nodeUtils', () => {
       // Assert
       // null generates empty object {}, 'valid' generates wrapped object
       expect(result).toContainEqual({ items: [{ '#text': 'valid' }] })
+    })
+  })
+
+  describe('filterEmptyTextNodes', () => {
+    it('Given array with empty text node, When filtering, Then removes it', () => {
+      // Arrange
+      const markers = [{ [TEXT_TAG]: '  ' }, { field: 'value' }]
+
+      // Act
+      const result = filterEmptyTextNodes(markers)
+
+      // Assert
+      expect(result).toEqual([{ field: 'value' }])
+    })
+
+    it('Given array with non-empty text node, When filtering, Then keeps it', () => {
+      // Arrange
+      const markers = [{ [TEXT_TAG]: 'content' }, { field: 'value' }]
+
+      // Act
+      const result = filterEmptyTextNodes(markers)
+
+      // Assert
+      expect(result).toEqual([{ [TEXT_TAG]: 'content' }, { field: 'value' }])
+    })
+
+    it('Given array without text nodes, When filtering, Then returns unchanged', () => {
+      // Arrange
+      const markers = [{ field: 'a' }, { field: 'b' }]
+
+      // Act
+      const result = filterEmptyTextNodes(markers)
+
+      // Assert
+      expect(result).toEqual([{ field: 'a' }, { field: 'b' }])
+    })
+  })
+
+  describe('buildKeyedMap', () => {
+    it('Given array of objects, When building map, Then keys by extractor', () => {
+      // Arrange
+      const arr = [
+        { name: [{ [TEXT_TAG]: 'a' }], value: 'x' },
+        { name: [{ [TEXT_TAG]: 'b' }], value: 'y' },
+      ]
+      const keyField = (item: Record<string, unknown>) =>
+        String((item['name'] as Array<Record<string, unknown>>)[0][TEXT_TAG])
+
+      // Act
+      const result = buildKeyedMap(arr, keyField)
+
+      // Assert
+      expect(result.size).toBe(2)
+      expect(result.get('a')).toBe(arr[0])
+      expect(result.get('b')).toBe(arr[1])
+    })
+
+    it('Given empty array, When building map, Then returns empty map', () => {
+      // Arrange & Act
+      const result = buildKeyedMap([], () => '')
+
+      // Assert
+      expect(result.size).toBe(0)
     })
   })
 })

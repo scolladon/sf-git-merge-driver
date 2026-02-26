@@ -1,5 +1,6 @@
 import {
   combineResults,
+  isNonEmpty,
   noConflict,
   withConflict,
 } from '../../../src/types/mergeResult.js'
@@ -124,6 +125,32 @@ describe('mergeResult', () => {
 
       // Assert
       expect(combined.output).toEqual([{ a: 1 }, { b: 2 }, { c: 3 }])
+    })
+  })
+
+  describe('isNonEmpty', () => {
+    it('Given result with output, When checking, Then returns true', () => {
+      // Arrange
+      const result = noConflict([{ a: 1 }])
+
+      // Act & Assert
+      expect(isNonEmpty(result)).toBe(true)
+    })
+
+    it('Given result with conflict and no output, When checking, Then returns true', () => {
+      // Arrange
+      const result = withConflict([])
+
+      // Act & Assert
+      expect(isNonEmpty(result)).toBe(true)
+    })
+
+    it('Given empty result without conflict, When checking, Then returns false', () => {
+      // Arrange
+      const result = noConflict([])
+
+      // Act & Assert
+      expect(isNonEmpty(result)).toBe(false)
     })
   })
 })

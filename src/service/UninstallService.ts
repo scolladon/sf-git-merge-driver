@@ -13,7 +13,7 @@ const MERGE_DRIVER_CONFIG = new RegExp(
 
 export class UninstallService {
   @log
-  public async uninstallMergeDriver() {
+  public async uninstallMergeDriver(): Promise<void> {
     const git = simpleGit()
     try {
       // Throws when the merge driver is not installed
