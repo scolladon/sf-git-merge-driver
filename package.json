@@ -76,6 +76,7 @@
     "compile": "wireit",
     "dependencies:upgrade": "npx npm-check-updates -u ; npm update ; npm audit fix",
     "devops:cleanup:dev-tag": "./tooling/devops-cleanup.sh",
+    "devops:cleanup:dev-tag:all": "./tooling/devops-cleanup-all.sh",
     "devops:move-tag": "./tooling/devops-movetag.sh",
     "lint": "wireit",
     "lint:dependencies": "wireit",
