@@ -85,7 +85,8 @@ const METADATA_KEY_EXTRACTORS = {
   profileActionOverrides: (el: JsonValue) => getPropertyValue(el, 'actionName'), // Profile
   recordTypeVisibilities: (el: JsonValue) => getPropertyValue(el, 'recordType'), // Profile // PermissionSet
   servicePresenceStatusAccesses: (el: JsonValue) =>
-    getPropertyValue(el, 'servicePresenceStatus'), // Profile
+    getPropertyValue(el, 'servicePresenceStatus'), // Profile // PermissionSet
+  tabSettings: (el: JsonValue) => getPropertyValue(el, 'tab'), // PermissionSet
   tabVisibilities: (el: JsonValue) => getPropertyValue(el, 'tab'), // Profile // PermissionSet
   userPermissions: (el: JsonValue) => getPropertyValue(el, 'name'), // Profile // PermissionSet
   dataspaceScopes: (el: JsonValue) => getPropertyValue(el, 'dataspaceScope'), // PermissionSet
