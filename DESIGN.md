@@ -331,10 +331,9 @@ Key methods in `OrderedKeyedArrayMergeStrategy` ([OrderedKeyedArrayMergeStrategy
 
 | Method | Purpose |
 |--------|---------|
-| `buildMergeContext()` | Extracts keys and builds position/object maps for O(1) lookups |
-| `analyzeOrderings(ctx)` | Returns `{canMerge, localMoved, otherMoved}` |
+| `buildArrayMergeState()` | Extracts keys and builds position/object maps for O(1) lookups |
+| `analyzeOrderings(ctx)` | Returns `{canMerge, localMoved, otherMoved}` — detects C4 (overlapping moves) and C6 (positional conflicts) |
 | `getMovedElements(ctx, modifiedPos)` | Finds elements that changed relative order |
-| `hasAddedElementPositionalConflict(ctx)` | Detects C6 scenario (same element added at different positions) |
 | `computeMergedKeyOrder(ctx, analysis)` | Builds merged key order; returns null for C7 conflict |
 | `processDivergedOrderings(config, ctx, analysis)` | Handles disjoint reorderings |
 | `processWithSpine(config, ctx)` | Uses LCS for spine-based merge |
