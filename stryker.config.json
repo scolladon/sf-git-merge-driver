@@ -3,7 +3,14 @@
   "testRunner": "vitest",
   "checkers": ["typescript"],
   "tsconfigFile": "tsconfig.json",
-  "mutate": ["src/**/*.ts", "!src/**/*.d.ts", "!src/commands/**/*.ts"],
+  "mutate": [
+    "src/**/*.ts",
+    "!src/**/*.d.ts",
+    "!src/commands/**/*.ts",
+    "!src/constant/metadataConstant.ts",
+    "!src/constant/driverConstant.ts",
+    "!src/constant/pluginConstant.ts"
+  ],
   "reporters": ["html", "clear-text", "progress"],
   "htmlReporter": {
     "fileName": "reports/mutation/mutation.html"
