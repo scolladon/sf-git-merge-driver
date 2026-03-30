@@ -44,6 +44,33 @@ describe('arrayUtils', () => {
     it('Given empty arrays, When computing LCS, Then returns empty', () => {
       expect(lcs([], [])).toEqual([])
     })
+
+    it('given first array empty when computing LCS then returns empty', () => {
+      expect(lcs([], ['a', 'b'])).toEqual([])
+    })
+
+    it('given second array empty when computing LCS then returns empty', () => {
+      expect(lcs(['a', 'b'], [])).toEqual([])
+    })
+
+    it('given single common element when computing LCS then returns it', () => {
+      expect(lcs(['a'], ['a'])).toEqual(['a'])
+    })
+
+    it('given interleaved elements when computing LCS then returns correct subsequence', () => {
+      // Forces the dp[i-1][j] > dp[i][j-1] branch
+      expect(lcs(['a', 'x', 'b'], ['a', 'b'])).toEqual(['a', 'b'])
+    })
+
+    it('given reversed elements when computing LCS then prefers left branch', () => {
+      // Forces the dp[i-1][j] <= dp[i][j-1] branch (j-- path)
+      expect(lcs(['a', 'b'], ['b', 'x', 'a'])).toEqual(['b'])
+    })
+
+    it('given equal dp values when backtracking then follows j-- path', () => {
+      // Tie-breaking: when dp[i-1][j] === dp[i][j-1], should follow j--
+      expect(lcs(['x', 'a'], ['y', 'a'])).toEqual(['a'])
+    })
   })
 
   describe('pushAll', () => {

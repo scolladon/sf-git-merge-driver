@@ -36,11 +36,21 @@ describe('mergeUtils', () => {
       ]
 
       it.each(cases)('$name', ({ input, expected }) => {
-        // Arrange
-        // Act
         const eol = detectEol(input as never)
-        // Assert
         expect(eol).toBe(expected)
+      })
+
+      it('given LF at first char when detectEol then returns LF', () => {
+        // i===0 so the i > 0 check matters
+        expect(detectEol('\na')).toBe('\n')
+      })
+
+      it('given single LF when detectEol then returns LF', () => {
+        expect(detectEol('\n')).toBe('\n')
+      })
+
+      it('given LF at last position when detectEol then returns LF', () => {
+        expect(detectEol('abc\n')).toBe('\n')
       })
     })
 
