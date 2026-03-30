@@ -38,6 +38,7 @@ describe('LoggingDecorator', () => {
 
         // Assert
         expect(result).toBe('result')
+        expect(result).not.toBeInstanceOf(Promise)
         expect(mockedTrace).toHaveBeenCalledTimes(2)
         const entryMsg = (mockedTrace.mock.calls[0][0] as () => string)()
         const exitMsg = (mockedTrace.mock.calls[1][0] as () => string)()

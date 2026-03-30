@@ -101,6 +101,22 @@ describe('TextMergeNode', () => {
       expect(result.output.length).toBeGreaterThan(0)
     })
 
+    it('given all present and local differs from other when merging then does not use early exit', () => {
+      // Arrange — local !== other, so the early exit must NOT fire
+      const node = new TextMergeNode(
+        'ancestor',
+        'localVal',
+        'otherVal',
+        'field'
+      )
+
+      // Act
+      const result = node.merge(defaultConfig)
+
+      // Assert — must detect conflict, not short-circuit to noConflict
+      expect(result.hasConflict).toBe(true)
+    })
+
     it('should return conflict when local and other differ (no ancestor)', () => {
       // Arrange
       const node = new TextMergeNode(null, 'local', 'other', 'field')
