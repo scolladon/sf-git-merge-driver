@@ -263,7 +263,164 @@ describe('OrderedKeyedArrayMergeStrategy', () => {
       ['A', 'B:B_OTHER'],
       ['A', L, 'B_LOCAL', A, S, 'B_OTHER', O],
     ],
+    [
+      'C10: Divergent deletions in same gap (local deletes B, other deletes C)',
+      ['A', 'B', 'C', 'D'],
+      ['A', 'C', 'D'],
+      ['A', 'B', 'D'],
+      ['A', L, 'C', A, 'B', 'C', S, 'B', O, 'D'],
+    ],
   ]
+
+  // Additional scenarios to exercise gap analysis and spine processing branches
+  const additionalGracefulScenarios: GracefulMergeScenario[] = [
+    [
+      'M13: Other-only move (local unchanged)',
+      ['A', 'B', 'C'],
+      ['A', 'B', 'C'],
+      ['C', 'A', 'B'],
+      ['C', 'A', 'B'],
+    ],
+    [
+      'M14: Deletion from ancestor with modification of remaining',
+      ['A', 'B', 'C'],
+      ['A:A_MOD', 'C'],
+      ['A', 'B', 'C'],
+      ['A_MOD', 'C'],
+    ],
+    [
+      'M15: Both delete same element (identical deletion in gap)',
+      ['A', 'B', 'C'],
+      ['A', 'C'],
+      ['A', 'C'],
+      ['A', 'C'],
+    ],
+    [
+      'M16: Multiple unchanged spine elements (adjacent anchors, empty gaps)',
+      ['A', 'B', 'C', 'D'],
+      ['A', 'B', 'C', 'D'],
+      ['A', 'B', 'C', 'D'],
+      ['A', 'B', 'C', 'D'],
+    ],
+    [
+      'M17: Addition between spine elements (non-empty gap)',
+      ['A', 'C'],
+      ['A', 'B', 'C'],
+      ['A', 'C'],
+      ['A', 'B', 'C'],
+    ],
+    [
+      'M18: One-sided move with same-side addition',
+      ['A', 'B', 'C'],
+      ['C', 'A', 'B', 'D'],
+      ['A', 'B', 'C'],
+      ['C', 'A', 'B', 'D'],
+    ],
+    [
+      'M19: Delete and add in same gap',
+      ['A', 'B', 'C'],
+      ['A', 'D', 'C'],
+      ['A', 'B', 'C'],
+      ['A', 'D', 'C'],
+    ],
+    [
+      'M20: Other-only addition with other-only move',
+      ['A', 'B'],
+      ['A', 'B'],
+      ['B', 'A', 'X'],
+      ['B', 'A', 'X'],
+    ],
+    [
+      'M21: Local-only move with other-only addition',
+      ['A', 'B'],
+      ['B', 'A'],
+      ['A', 'B', 'X'],
+      ['B', 'A', 'X'],
+    ],
+    [
+      'M22: Gap with local deletion and other unchanged',
+      ['A', 'B', 'C', 'D'],
+      ['A', 'D'],
+      ['A', 'B', 'C', 'D'],
+      ['A', 'D'],
+    ],
+    [
+      'M23: Gap with other addition and local unchanged',
+      ['A', 'D'],
+      ['A', 'D'],
+      ['A', 'B', 'D'],
+      ['A', 'B', 'D'],
+    ],
+    [
+      'M24: Element unchanged in all three inside spine',
+      ['A', 'B', 'C'],
+      ['A', 'B:B_MOD', 'C'],
+      ['A', 'B', 'C'],
+      ['A', 'B_MOD', 'C'],
+    ],
+    [
+      'M25: Multiple gaps between spine anchors',
+      ['A', 'B', 'C', 'D', 'E'],
+      ['A', 'X', 'C', 'D', 'E'],
+      ['A', 'B', 'C', 'Y', 'E'],
+      ['A', 'X', 'C', 'Y', 'E'],
+    ],
+    [
+      'M26: Local-only move reordering 3 elements',
+      ['A', 'B', 'C', 'D'],
+      ['C', 'B', 'A', 'D'],
+      ['A', 'B', 'C', 'D'],
+      ['C', 'B', 'A', 'D'],
+    ],
+    [
+      'M27: Gap with local add and ancestor delete (other unchanged)',
+      ['A', 'B', 'C'],
+      ['A', 'D', 'C'],
+      ['A', 'B', 'C'],
+      ['A', 'D', 'C'],
+    ],
+    [
+      'M28: Move last element to first (boundary of getMovedElements loop)',
+      ['A', 'B', 'C'],
+      ['C', 'A', 'B'],
+      ['A', 'B', 'C'],
+      ['C', 'A', 'B'],
+    ],
+    [
+      'M29: Local-only move with local-only addition (no other additions)',
+      ['A', 'B'],
+      ['B', 'A', 'X'],
+      ['A', 'B'],
+      ['B', 'A', 'X'],
+    ],
+    [
+      'M30: Other adds element already in local (dedup branch)',
+      ['A'],
+      ['A', 'B'],
+      ['A', 'B'],
+      ['A', 'B'],
+    ],
+  ]
+
+  describe('Additional Graceful Merges', () => {
+    it.each(
+      additionalGracefulScenarios
+    )('%s', (_name, ancestor, local, other, expectedOutput) => {
+      // Arrange
+      const strategy = createStrategy(
+        toElements(ancestor),
+        toElements(local),
+        toElements(other)
+      )
+
+      // Act
+      const result = strategy.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      expect(extractLabels(result.output)).toEqual(expectedOutput)
+    })
+  })
 
   describe('Conflicts', () => {
     it.each(
