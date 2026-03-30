@@ -1,19 +1,7 @@
-import {
-  DEFAULT_ANCESTOR_CONFLICT_TAG,
-  DEFAULT_CONFLICT_MARKER_SIZE,
-  DEFAULT_LOCAL_CONFLICT_TAG,
-  DEFAULT_OTHER_CONFLICT_TAG,
-} from '../../../../src/constant/conflictConstant.js'
+import { describe, expect, it } from 'vitest'
 import { TEXT_TAG } from '../../../../src/constant/parserConstant.js'
 import { PropertyMergeNode } from '../../../../src/merger/nodes/PropertyMergeNode.js'
-import type { MergeConfig } from '../../../../src/types/conflictTypes.js'
-
-const defaultConfig: MergeConfig = {
-  conflictMarkerSize: DEFAULT_CONFLICT_MARKER_SIZE,
-  ancestorConflictTag: DEFAULT_ANCESTOR_CONFLICT_TAG,
-  localConflictTag: DEFAULT_LOCAL_CONFLICT_TAG,
-  otherConflictTag: DEFAULT_OTHER_CONFLICT_TAG,
-}
+import { defaultConfig } from '../../../utils/testConfig.js'
 
 describe('PropertyMergeNode', () => {
   it('should merge objects and wrap results with attribute key', () => {

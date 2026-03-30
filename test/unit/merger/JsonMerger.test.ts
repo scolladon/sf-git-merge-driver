@@ -1,20 +1,8 @@
-import {
-  DEFAULT_ANCESTOR_CONFLICT_TAG,
-  DEFAULT_CONFLICT_MARKER_SIZE,
-  DEFAULT_LOCAL_CONFLICT_TAG,
-  DEFAULT_OTHER_CONFLICT_TAG,
-} from '../../../src/constant/conflictConstant.js'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { SALESFORCE_EOL } from '../../../src/constant/metadataConstant.js'
 import { JsonMerger } from '../../../src/merger/JsonMerger.js'
-import type { MergeConfig } from '../../../src/types/conflictTypes.js'
 import { JsonValue } from '../../../src/types/jsonTypes.js'
-
-const defaultConfig: MergeConfig = {
-  conflictMarkerSize: DEFAULT_CONFLICT_MARKER_SIZE,
-  ancestorConflictTag: DEFAULT_ANCESTOR_CONFLICT_TAG,
-  localConflictTag: DEFAULT_LOCAL_CONFLICT_TAG,
-  otherConflictTag: DEFAULT_OTHER_CONFLICT_TAG,
-}
+import { defaultConfig } from '../../utils/testConfig.js'
 
 describe('JsonMerger', () => {
   let sut: JsonMerger

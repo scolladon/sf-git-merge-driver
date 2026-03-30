@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest'
 import {
   ANCESTOR_CONFLICT_MARKER,
   DEFAULT_ANCESTOR_CONFLICT_TAG,
@@ -10,15 +11,8 @@ import {
 } from '../../../../src/constant/conflictConstant.js'
 import { TEXT_TAG } from '../../../../src/constant/parserConstant.js'
 import { OrderedKeyedArrayMergeStrategy } from '../../../../src/merger/nodes/OrderedKeyedArrayMergeStrategy.js'
-import type { MergeConfig } from '../../../../src/types/conflictTypes.js'
 import type { JsonArray, JsonObject } from '../../../../src/types/jsonTypes.js'
-
-const defaultConfig: MergeConfig = {
-  conflictMarkerSize: DEFAULT_CONFLICT_MARKER_SIZE,
-  ancestorConflictTag: DEFAULT_ANCESTOR_CONFLICT_TAG,
-  localConflictTag: DEFAULT_LOCAL_CONFLICT_TAG,
-  otherConflictTag: DEFAULT_OTHER_CONFLICT_TAG,
-}
+import { defaultConfig } from '../../../utils/testConfig.js'
 
 const CONFLICT_MARKERS = [
   `${LOCAL_CONFLICT_MARKER.repeat(DEFAULT_CONFLICT_MARKER_SIZE)} ${DEFAULT_LOCAL_CONFLICT_TAG}`,
