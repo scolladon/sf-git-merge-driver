@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest'
 import { MetadataService } from '../../../src/service/MetadataService.js'
 import { JsonValue } from '../../../src/types/jsonTypes.js'
 

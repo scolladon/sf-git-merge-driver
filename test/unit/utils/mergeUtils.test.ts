@@ -1,4 +1,5 @@
 import { EOL } from 'os'
+import { describe, expect, it } from 'vitest'
 import { detectEol, normalizeEol } from '../../../src/utils/mergeUtils.js'
 
 describe('mergeUtils', () => {

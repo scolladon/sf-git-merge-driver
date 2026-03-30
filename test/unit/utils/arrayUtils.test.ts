@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest'
 import { hasSameOrder, lcs, pushAll } from '../../../src/utils/arrayUtils.js'
 
 describe('arrayUtils', () => {

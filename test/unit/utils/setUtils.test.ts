@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest'
 import { setsEqual, setsIntersect } from '../../../src/utils/setUtils.js'
 
 describe('setUtils', () => {

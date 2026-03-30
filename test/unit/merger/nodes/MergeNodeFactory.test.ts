@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest'
 import { KeyedArrayMergeNode } from '../../../../src/merger/nodes/KeyedArrayMergeNode.js'
 import { defaultNodeFactory } from '../../../../src/merger/nodes/MergeNodeFactory.js'
 import { PropertyMergeNode } from '../../../../src/merger/nodes/PropertyMergeNode.js'
