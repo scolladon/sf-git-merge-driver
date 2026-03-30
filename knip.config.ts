@@ -10,6 +10,6 @@ export default {
     'src/commands/git/merge/driver/uninstall.ts',
   ],
   project: ['**/*.{ts,js,json,yml}'],
-  ignoreDependencies: ['@commitlint/config-conventional', 'lodash'],
+  ignoreDependencies: ['@commitlint/config-conventional'],
   ignoreBinaries: ['commitlint', 'jscpd', 'npm-check-updates'],
 }
