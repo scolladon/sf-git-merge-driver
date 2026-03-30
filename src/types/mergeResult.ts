@@ -13,9 +13,6 @@ const EMPTY_NO_CONFLICT: MergeResult = {
 }
 
 export const combineResults = (results: MergeResult[]): MergeResult => {
-  if (isEmpty(results)) {
-    return EMPTY_NO_CONFLICT
-  }
   if (results.length === 1) {
     return results[0]
   }
