@@ -103,6 +103,51 @@ jobs:
     uses: ./.github/workflows/reusable-build.yml
     secrets: inherit
 
+  mutation-testing:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    if: contains(github.event.pull_request.labels.*.name, 'mutation-testing')
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+
+      - uses: google/wireit@setup-github-actions-caching/v2
+
+      - name: Setup dependencies, cache and install
+        uses: ./.github/actions/install
+
+      - name: Restore incremental report
+        uses: actions/cache/restore@v5
+        with:
+          path: reports/mutation/stryker-incremental.json
+          key: stryker-incremental-${{ github.base_ref }}
+          restore-keys: |
+            stryker-incremental-
+
+      - name: Run incremental mutation testing
+        run: npm run test:mutation:incremental
+
+      - name: Save incremental report
+        uses: actions/cache/save@v5
+        if: always()
+        with:
+          path: reports/mutation/stryker-incremental.json
+          key: stryker-incremental-${{ github.base_ref }}-${{ github.sha }}
+
+      - name: Upload mutation report
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: mutation-report
+          path: reports/mutation
+
   perf:
     needs: [build]
     uses: ./.github/workflows/reusable-perf.yml
