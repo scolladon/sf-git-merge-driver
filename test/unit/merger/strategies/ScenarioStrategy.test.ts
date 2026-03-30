@@ -545,7 +545,7 @@ describe('ScenarioStrategy', () => {
     })
 
     describe('with attribute', () => {
-      it('should return conflict with attribute wrapping', () => {
+      it('should return conflict wrapping output with attribute key', () => {
         // Arrange
         const context = createContext({
           ancestor: { key: 'ancestorValue' },
@@ -558,6 +558,24 @@ describe('ScenarioStrategy', () => {
 
         // Assert
         expect(result.hasConflict).toBe(true)
+        const outputStr = JSON.stringify(result.output)
+        expect(outputStr).toContain('testAttr')
+      })
+
+      it('given no attribute when target differs from ancestor then produces conflict without attribute wrapping', () => {
+        // Arrange
+        const context = createContext({
+          ancestor: { key: 'ancestorValue' },
+          local: { key: 'localValue' },
+        })
+
+        // Act
+        const result = strategy.execute(context)
+
+        // Assert
+        expect(result.hasConflict).toBe(true)
+        const outputStr = JSON.stringify(result.output)
+        expect(outputStr).not.toContain('testAttr')
       })
     })
 
@@ -691,7 +709,7 @@ describe('ScenarioStrategy', () => {
     })
 
     describe('with attribute', () => {
-      it('should return conflict with attribute wrapping', () => {
+      it('should return conflict wrapping output with attribute key', () => {
         // Arrange
         const context = createContext({
           ancestor: { key: 'ancestorValue' },
@@ -704,6 +722,8 @@ describe('ScenarioStrategy', () => {
 
         // Assert
         expect(result.hasConflict).toBe(true)
+        const outputStr = JSON.stringify(result.output)
+        expect(outputStr).toContain('testAttr')
       })
     })
 

@@ -73,6 +73,28 @@ describe('ConflictMarkerFormatter', () => {
         expect(result).toBe('<<<<<<<')
       })
 
+      it('should remove indentation before multiple markers in one string', () => {
+        // Arrange — tests the 'g' flag on indentRegex
+        const input = '    <<<<<<< local\ncontent\n    ||||||| ancestor'
+
+        // Act
+        const result = formatter.correctConflictIndent(input)
+
+        // Assert
+        expect(result).toBe('<<<<<<< local\ncontent\n||||||| ancestor')
+      })
+
+      it('should remove lines with only whitespace and CR', () => {
+        // Arrange — exercises the [\n\r] character class in blank line regex
+        const input = '  \r\nsome content'
+
+        // Act
+        const result = formatter.correctConflictIndent(input)
+
+        // Assert
+        expect(result).toBe('some content')
+      })
+
       it('should not modify content without conflict markers', () => {
         // Arrange
         const input = '    <someTag>value</someTag>'

@@ -47,6 +47,38 @@ describe('XmlMerger integration', () => {
       expect(result.output).toContain('&amp;foo')
     })
 
+    it('given XML with boolean-like tag values when merging then preserves as strings', () => {
+      // Arrange — parseTagValue:false prevents "false" → boolean false
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<Root><Required>false</Required><Active>true</Active></Root>`
+
+      // Act
+      const result = sut.mergeThreeWay(xml, xml, xml)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      // Values must remain as string "false"/"true", not boolean
+      expect(result.output).toContain('false')
+      expect(result.output).toContain('true')
+      // If parsed as boolean, the builder would output empty tags
+      expect(result.output).not.toContain('<Required/>')
+      expect(result.output).not.toContain('<Active/>')
+    })
+
+    it('given XML with declaration when merging then output has exactly one declaration', () => {
+      // Arrange — ignoreDeclaration:true prevents double declaration
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<Root><Field>value</Field></Root>`
+
+      // Act
+      const result = sut.mergeThreeWay(xml, xml, xml)
+
+      // Assert
+      const declCount = (result.output.match(/<\?xml version="1.0"/g) ?? [])
+        .length
+      expect(declCount).toBe(1)
+    })
+
     it('given XML with CDATA when merging then preserves CDATA sections', () => {
       // Arrange
       const xml = `<?xml version="1.0" encoding="UTF-8"?>
