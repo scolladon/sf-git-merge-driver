@@ -1,5 +1,6 @@
 import { appendFile } from 'node:fs/promises'
 import simpleGit from 'simple-git'
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest'
 import {
   DRIVER_NAME,
   RUN_PLUGIN_COMMAND,
@@ -11,18 +12,18 @@ import {
 import { InstallService } from '../../../src/service/InstallService.js'
 import { getGitAttributesPath } from '../../../src/utils/gitUtils.js'
 
-jest.mock('node:fs/promises')
-jest.mock('simple-git')
-jest.mock('../../../src/utils/gitUtils.js')
+vi.mock('node:fs/promises')
+vi.mock('simple-git')
+vi.mock('../../../src/utils/gitUtils.js')
 
-const mockedAddConfig = jest.fn()
-const simpleGitMock = simpleGit as jest.Mock
+const mockedAddConfig = vi.fn()
+const simpleGitMock = simpleGit as Mock
 simpleGitMock.mockReturnValue({
   addConfig: mockedAddConfig,
 })
 
-const getGitAttributesPathMocked = getGitAttributesPath as jest.Mock
-const appendFileMocked = jest.mocked(appendFile)
+const getGitAttributesPathMocked = getGitAttributesPath as Mock
+const appendFileMocked = vi.mocked(appendFile)
 
 describe('InstallService', () => {
   let sut: InstallService // System Under Test

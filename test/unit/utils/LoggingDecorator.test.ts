@@ -1,18 +1,24 @@
 'use strict'
 
-const mockedTrace = jest.fn()
-jest.mock('../../../src/utils/LoggingService', () => ({
-  ...jest.requireActual('../../../src/utils/LoggingService'),
-  Logger: {
-    trace: mockedTrace,
-    debug: jest.fn(),
-    warn: jest.fn(),
-    info: jest.fn(),
-    error: jest.fn(),
-  },
-}))
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { log } from '../../../src/utils/LoggingDecorator.js'
+const mockedTrace = vi.fn()
+vi.mock('../../../src/utils/LoggingService', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('../../../src/utils/LoggingService')>()
+  return {
+    ...actual,
+    Logger: {
+      trace: mockedTrace,
+      debug: vi.fn(),
+      warn: vi.fn(),
+      info: vi.fn(),
+      error: vi.fn(),
+    },
+  }
+})
+
+const { log } = await import('../../../src/utils/LoggingDecorator.js')
 
 describe('LoggingDecorator', () => {
   describe('log', () => {
@@ -98,8 +104,8 @@ describe('LoggingDecorator', () => {
       })
     })
 
-    afterEach(() => {
-      jest.clearAllMocks()
+    beforeEach(() => {
+      vi.clearAllMocks()
     })
   })
 })

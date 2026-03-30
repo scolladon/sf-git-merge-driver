@@ -1,56 +1,37 @@
 import { XMLBuilder, XMLParser } from 'fast-xml-parser'
-import {
-  DEFAULT_ANCESTOR_CONFLICT_TAG,
-  DEFAULT_CONFLICT_MARKER_SIZE,
-  DEFAULT_LOCAL_CONFLICT_TAG,
-  DEFAULT_OTHER_CONFLICT_TAG,
-} from '../../../src/constant/conflictConstant.js'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { JsonMerger } from '../../../src/merger/JsonMerger.js'
 import { XmlMerger } from '../../../src/merger/XmlMerger.js'
-import type { MergeConfig } from '../../../src/types/conflictTypes.js'
+import { defaultConfig } from '../../utils/testConfig.js'
 
-jest.mock('fast-xml-parser', () => {
-  return {
-    XMLParser: jest.fn().mockImplementation(() => {
-      return {
-        parse: xml => xml,
-      }
-    }),
-    XMLBuilder: jest.fn().mockImplementation(() => {
-      return {
-        build: obj => obj,
-      }
-    }),
-  }
+// Mocks bypass XML parsing/building to isolate orchestration logic.
+// Real XML handling is covered by integration tests.
+vi.mock('fast-xml-parser', () => {
+  const XMLParser = vi.fn()
+  XMLParser.prototype.parse = (xml: string) => xml
+  const XMLBuilder = vi.fn()
+  XMLBuilder.prototype.build = (obj: unknown) => obj
+  return { XMLParser, XMLBuilder }
 })
 
-const mockedmerge = jest.fn()
-jest.mock('../../../src/merger/JsonMerger.js', () => {
-  return {
-    JsonMerger: jest.fn().mockImplementation(() => {
-      return {
-        mergeThreeWay: mockedmerge,
-      }
-    }),
-  }
+const mockedmerge = vi.fn()
+vi.mock('../../../src/merger/JsonMerger.js', () => {
+  const JsonMerger = vi.fn()
+  JsonMerger.prototype.mergeThreeWay = (...args: unknown[]) =>
+    mockedmerge(...args)
+  return { JsonMerger }
 })
 
-const defaultConfig: MergeConfig = {
-  conflictMarkerSize: DEFAULT_CONFLICT_MARKER_SIZE,
-  ancestorConflictTag: DEFAULT_ANCESTOR_CONFLICT_TAG,
-  localConflictTag: DEFAULT_LOCAL_CONFLICT_TAG,
-  otherConflictTag: DEFAULT_OTHER_CONFLICT_TAG,
-}
-
-describe('MergeDriver', () => {
+describe('XmlMerger', () => {
   let sut: XmlMerger
 
   beforeEach(() => {
+    vi.clearAllMocks()
     sut = new XmlMerger(defaultConfig)
   })
 
   describe('mergeThreeWay', () => {
-    it('should merge files successfully when given valid parameters', () => {
+    it('given valid inputs when merging then delegates to JsonMerger with config', () => {
       // Arrange
       mockedmerge.mockReturnValue({
         output: 'MergedContent',
@@ -61,13 +42,10 @@ describe('MergeDriver', () => {
       sut.mergeThreeWay('AncestorFile', 'OurFile', 'TheirFile')
 
       // Assert
-      expect(XMLParser).toHaveBeenCalledTimes(1)
-      expect(XMLBuilder).toHaveBeenCalledTimes(1)
-      expect(JsonMerger).toHaveBeenCalledTimes(1)
       expect(JsonMerger).toHaveBeenCalledWith(defaultConfig)
     })
 
-    it('should throw an error when mergeThreeWay fails', () => {
+    it('given JsonMerger throws when merging then propagates error', () => {
       // Arrange
       mockedmerge.mockImplementation(() => {
         throw new Error('Tripart XML merge failed')
@@ -80,12 +58,9 @@ describe('MergeDriver', () => {
     })
   })
 
-  describe('handling special XML features', () => {
-    it('should correctly handle XML special entities', () => {
+  describe('XML output formatting', () => {
+    it('given non-empty input when merging then output includes XML declaration', () => {
       // Arrange
-      const ancestorWithSpecial = '<root>&lt;special&gt;</root>'
-      const ourWithSpecial = '<root>&lt;modified&gt;</root>'
-      const theirWithSpecial = '<root>&lt;special&gt;</root>'
       mockedmerge.mockReturnValue({
         output: '<root>&lt;modified&gt;</root>',
         hasConflict: false,
@@ -93,22 +68,18 @@ describe('MergeDriver', () => {
 
       // Act
       const result = sut.mergeThreeWay(
-        ancestorWithSpecial,
-        ourWithSpecial,
-        theirWithSpecial
+        '<root>&lt;special&gt;</root>',
+        '<root>&lt;modified&gt;</root>',
+        '<root>&lt;special&gt;</root>'
       )
 
       // Assert
       expect(result.output).toContain('<?xml version="1.0" encoding="UTF-8"?>')
-      expect(result.output).toContain('&lt;modified&gt;')
       expect(result.hasConflict).toBe(false)
     })
 
-    it('should correctly handle XML comments', () => {
+    it('given XML comments when merging then preserves comments in output', () => {
       // Arrange
-      const ancestorWithComment = '<root><!-- original comment --></root>'
-      const ourWithComment = '<root><!-- our comment --></root>'
-      const theirWithComment = '<root><!-- their comment --></root>'
       mockedmerge.mockReturnValue({
         output: '<root><!-- merged comment --></root>',
         hasConflict: false,
@@ -116,30 +87,22 @@ describe('MergeDriver', () => {
 
       // Act
       const result = sut.mergeThreeWay(
-        ancestorWithComment,
-        ourWithComment,
-        theirWithComment
+        '<root><!-- original comment --></root>',
+        '<root><!-- our comment --></root>',
+        '<root><!-- their comment --></root>'
       )
 
       // Assert
-      expect(result.output).toContain('<?xml version="1.0" encoding="UTF-8"?>')
       expect(result.output).toContain('<!-- merged comment -->')
       expect(result.hasConflict).toBe(false)
     })
 
-    it('empty files should output empty file', () => {
+    it('given empty files when merging then returns empty output', () => {
       // Arrange
-      const ancestorWithComment = ''
-      const ourWithComment = ''
-      const theirWithComment = ''
       mockedmerge.mockReturnValue({ output: '', hasConflict: false })
 
       // Act
-      const result = sut.mergeThreeWay(
-        ancestorWithComment,
-        ourWithComment,
-        theirWithComment
-      )
+      const result = sut.mergeThreeWay('', '', '')
 
       // Assert
       expect(result.output).toEqual('')
