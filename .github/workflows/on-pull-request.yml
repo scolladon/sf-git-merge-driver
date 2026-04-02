@@ -120,11 +120,17 @@ jobs:
       - name: Setup dependencies, cache and install
         uses: ./.github/actions/install
 
+      - name: Checkout gh-pages baseline data
+        uses: actions/checkout@v6
+        with:
+          ref: gh-pages
+          path: gh-pages-data
+
       - name: Run benchmarks
         run: npm run test:perf
 
-      - name: Generate preview
-        run: node test/perf/preview.mjs
+      - name: Generate preview with trends
+        run: node test/perf/preview.mjs gh-pages-data
 
       - name: Compare runtime against baseline
         uses: benchmark-action/github-action-benchmark@v1

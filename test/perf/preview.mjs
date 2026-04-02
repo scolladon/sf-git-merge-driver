@@ -1,13 +1,126 @@
-import { readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+
+const ghPagesDir = process.argv[2] || ''
 
 const runtime = JSON.parse(readFileSync('perf-runtime.json', 'utf-8'))
 const memory = JSON.parse(readFileSync('perf-memory.json', 'utf-8'))
 
 const mergeRuntime = runtime.filter(b => b.name.startsWith('merge-'))
 const phaseRuntime = runtime.filter(b => !b.name.startsWith('merge-'))
-
 const mergeMemory = memory.filter(b => b.name.startsWith('merge-'))
 const phaseMemory = memory.filter(b => !b.name.startsWith('merge-'))
+
+const loadHistory = subdir => {
+  const dataPath = join(ghPagesDir, subdir, 'data.js')
+  if (!ghPagesDir || !existsSync(dataPath)) {
+    return []
+  }
+  const raw = readFileSync(dataPath, 'utf-8')
+  const jsonStr = raw.replace(/^window\.BENCHMARK_DATA\s*=\s*/, '')
+  const data = JSON.parse(jsonStr)
+  const suiteName = Object.keys(data.entries || {})[0]
+  return suiteName ? data.entries[suiteName] : []
+}
+
+const runtimeHistory = loadHistory('dev/bench/runtime')
+const memoryHistory = loadHistory('dev/bench/memory')
+const hasTrends = runtimeHistory.length > 0
+
+const buildTrendData = (history, currentBenches) => {
+  const benchNames = currentBenches.map(b => b.name)
+  const series = {}
+  for (const name of benchNames) {
+    series[name] = { labels: [], values: [] }
+  }
+
+  for (const entry of history) {
+    const label = entry.commit?.id?.slice(0, 7) || '?'
+    for (const b of entry.benches || []) {
+      if (series[b.name]) {
+        series[b.name].labels.push(label)
+        series[b.name].values.push(b.value)
+      }
+    }
+  }
+
+  for (const b of currentBenches) {
+    if (series[b.name]) {
+      series[b.name].labels.push('this PR')
+      series[b.name].values.push(b.value)
+    }
+  }
+
+  return series
+}
+
+const runtimeTrends = hasTrends ? buildTrendData(runtimeHistory, runtime) : {}
+const memoryTrends = hasTrends ? buildTrendData(memoryHistory, memory) : {}
+
+const trendChartsHtml = hasTrends
+  ? `
+  <h2>Trends — Runtime (ops/sec over time)</h2>
+  <div class="trend-grid">
+    ${runtime.map((b, i) => `<div class="chart-box trend-box"><h3>${b.name}</h3><canvas id="trend-rt-${i}"></canvas></div>`).join('\n    ')}
+  </div>
+
+  <h2>Trends — Mean Time (ms over time)</h2>
+  <div class="trend-grid">
+    ${memory.map((b, i) => `<div class="chart-box trend-box"><h3>${b.name}</h3><canvas id="trend-mem-${i}"></canvas></div>`).join('\n    ')}
+  </div>`
+  : ''
+
+const trendChartsJs = hasTrends
+  ? `
+    const runtimeTrends = ${JSON.stringify(runtimeTrends)};
+    const memoryTrends = ${JSON.stringify(memoryTrends)};
+    const runtimeNames = ${JSON.stringify(runtime.map(b => b.name))};
+    const memoryNames = ${JSON.stringify(memory.map(b => b.name))};
+
+    const trendOpts = (higherIsBetter) => ({
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: '#21262d' }, ticks: { color: '#8b949e', font: { size: 10 }, maxRotation: 45 } },
+        y: { grid: { color: '#21262d' }, ticks: { color: '#8b949e' } }
+      },
+      elements: {
+        point: { radius: 3, hoverRadius: 6 }
+      }
+    });
+
+    const trendLine = (id, labels, values, higherIsBetter) => {
+      const lastIdx = values.length - 1;
+      const pointBg = values.map((_, i) => i === lastIdx ? '#f85149' : '#58a6ff');
+      const pointRadius = values.map((_, i) => i === lastIdx ? 6 : 3);
+      new Chart(document.getElementById(id), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            data: values,
+            borderColor: '#58a6ff',
+            backgroundColor: 'rgba(88,166,255,0.1)',
+            fill: true,
+            tension: 0.2,
+            pointBackgroundColor: pointBg,
+            pointRadius: pointRadius,
+            pointBorderColor: pointBg,
+          }]
+        },
+        options: trendOpts(higherIsBetter)
+      });
+    };
+
+    runtimeNames.forEach((name, i) => {
+      const t = runtimeTrends[name];
+      if (t) trendLine('trend-rt-' + i, t.labels, t.values, true);
+    });
+    memoryNames.forEach((name, i) => {
+      const t = memoryTrends[name];
+      if (t) trendLine('trend-mem-' + i, t.labels, t.values, false);
+    });`
+  : ''
 
 const html = `<!DOCTYPE html>
 <html lang="en">
@@ -20,8 +133,13 @@ const html = `<!DOCTYPE html>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0d1117; color: #c9d1d9; padding: 24px; }
     h1 { font-size: 1.6rem; margin-bottom: 8px; color: #58a6ff; }
     h2 { font-size: 1.2rem; margin: 32px 0 12px; color: #8b949e; border-bottom: 1px solid #21262d; padding-bottom: 8px; }
+    h3 { font-size: 0.9rem; color: #c9d1d9; margin-bottom: 8px; }
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
+    .trend-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 16px; margin-bottom: 24px; }
     .chart-box { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; }
+    .trend-box { min-height: 200px; }
+    .pr-dot { display: inline-block; width: 10px; height: 10px; background: #f85149; border-radius: 50%; margin-right: 6px; }
+    .legend-note { color: #8b949e; font-size: 0.85rem; margin-bottom: 16px; }
     canvas { width: 100% !important; }
     table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 0.85rem; }
     th, td { padding: 6px 10px; text-align: left; border-bottom: 1px solid #21262d; }
@@ -32,8 +150,12 @@ const html = `<!DOCTYPE html>
 </head>
 <body>
   <h1>sf-git-merge-driver — Performance Benchmarks</h1>
-  <p class="subtitle">Local run — ${new Date().toISOString().slice(0, 19)}</p>
+  <p class="subtitle">${hasTrends ? 'PR preview with historical trends' : 'Local run'} — ${new Date().toISOString().slice(0, 19)}</p>
+  ${hasTrends ? '<p class="legend-note"><span class="pr-dot"></span>Red dot = this PR</p>' : ''}
 
+  ${trendChartsHtml}
+
+  <h2>Current Run — Snapshot</h2>
   <div class="grid">
     <div class="chart-box">
       <h2>E2E Merge — Runtime (ops/sec, higher is better)</h2>
@@ -102,6 +224,8 @@ const html = `<!DOCTYPE html>
     bar('mergeMemory',  ${JSON.stringify(mergeMemory.map(b => b.name))},  ${JSON.stringify(mergeMemory.map(b => b.value))}, 'log');
     bar('phaseRuntime', ${JSON.stringify(phaseRuntime.map(b => b.name))}, ${JSON.stringify(phaseRuntime.map(b => b.value))}, 'log');
     bar('phaseMemory',  ${JSON.stringify(phaseMemory.map(b => b.name))},  ${JSON.stringify(phaseMemory.map(b => b.value))}, 'log');
+
+    ${trendChartsJs}
   </script>
 </body>
 </html>`
@@ -110,3 +234,9 @@ const outPath = 'perf-preview.html'
 writeFileSync(outPath, html)
 // biome-ignore lint/suspicious/noConsole: preview output
 console.info(`Preview written to ${outPath}`)
+if (hasTrends) {
+  // biome-ignore lint/suspicious/noConsole: preview output
+  console.info(
+    `Loaded ${runtimeHistory.length} historical data points from gh-pages`
+  )
+}
