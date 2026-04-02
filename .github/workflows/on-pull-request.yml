@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: 'read'
+  pull-requests: write
 
 # Manage concurrency to stop running jobs and start new ones in case of new commit pushed
 concurrency:
@@ -124,6 +125,36 @@ jobs:
 
       - name: Generate preview
         run: node test/perf/preview.mjs
+
+      - name: Compare runtime against baseline
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: Runtime Benchmark
+          tool: customBiggerIsBetter
+          output-file-path: ./perf-runtime.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: false
+          save-data-file: false
+          alert-threshold: '130%'
+          comment-on-alert: true
+          fail-on-alert: true
+          alert-comment-cc-users: '@scolladon'
+          benchmark-data-dir-path: dev/bench/runtime
+
+      - name: Compare memory against baseline
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: Memory Benchmark
+          tool: customSmallerIsBetter
+          output-file-path: ./perf-memory.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: false
+          save-data-file: false
+          alert-threshold: '150%'
+          comment-on-alert: true
+          fail-on-alert: true
+          alert-comment-cc-users: '@scolladon'
+          benchmark-data-dir-path: dev/bench/memory
 
       - name: Upload benchmark report
         uses: actions/upload-artifact@v6
