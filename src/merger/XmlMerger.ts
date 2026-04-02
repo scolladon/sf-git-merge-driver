@@ -10,7 +10,7 @@ import { log } from '../utils/LoggingDecorator.js'
 import { ConflictMarkerFormatter } from './ConflictMarkerFormatter.js'
 import { JsonMerger } from './JsonMerger.js'
 
-export const baseOptions = {
+const baseOptions = {
   cdataPropName: CDATA_PROP_NAME,
   commentPropName: XML_COMMENT_PROP_NAME,
   ignoreAttributes: false,
