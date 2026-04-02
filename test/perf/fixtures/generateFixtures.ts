@@ -163,6 +163,58 @@ const customValue = (index: number, isActive: boolean): string =>
         <label>Value ${index}</label>
     </customValue>`
 
+const picklistValue = (index: number, isActive: boolean): string =>
+  `
+            <value>
+                <fullName>PickValue_${String(index).padStart(3, '0')}</fullName>
+                <default>false</default>
+                <isActive>${isActive}</isActive>
+                <label>Pick Value ${index}</label>
+            </value>`
+
+const buildPicklistField = (values: readonly string[]): string =>
+  `<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Status__c</fullName>
+    <description>Status picklist</description>
+    <label>Status</label>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>false</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>${values.join('')}
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>`
+
+export const generatePicklistFixtures = (): OrderedFixtures => {
+  const valueCount = 30
+
+  const ancestorValues = Array.from({ length: valueCount }, (_, i) =>
+    picklistValue(i, true)
+  )
+  const ancestor = buildPicklistField(ancestorValues)
+
+  const localValues = [
+    ...ancestorValues.slice(0, 8),
+    ...ancestorValues.slice(15, 22),
+    ...ancestorValues.slice(8, 15),
+    ...ancestorValues.slice(22),
+    picklistValue(valueCount, true),
+    picklistValue(valueCount + 1, true),
+  ]
+  const local = buildPicklistField(localValues)
+
+  const otherValues = ancestorValues
+    .filter((_, i) => i !== 5 && i !== 20)
+    .map((v, i) => (i < 3 ? picklistValue(i, false) : v))
+  const other = buildPicklistField(otherValues)
+
+  return { ancestor, local, other }
+}
+
 export const generateOrderedFixtures = (): OrderedFixtures => {
   const valueCount = 40
 

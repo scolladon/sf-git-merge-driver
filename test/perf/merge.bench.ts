@@ -8,6 +8,7 @@ import {
 import type { MergeConfig } from '../../src/types/conflictTypes.js'
 import {
   generateOrderedFixtures,
+  generatePicklistFixtures,
   generateProfileFixtures,
 } from './fixtures/generateFixtures.js'
 import { instrumentedMerge } from './instrumentation/instrumentedMerge.js'
@@ -59,6 +60,21 @@ describe('merge-ordered', () => {
       ordered.ancestor,
       ordered.local,
       ordered.other,
+      config,
+      timer
+    )
+  })
+})
+
+describe('merge-picklist', () => {
+  const picklist = generatePicklistFixtures()
+
+  bench('merge-picklist-customfield', () => {
+    const timer = new PhaseTimer()
+    instrumentedMerge(
+      picklist.ancestor,
+      picklist.local,
+      picklist.other,
       config,
       timer
     )
