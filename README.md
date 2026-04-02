@@ -2,6 +2,7 @@
 
 [![License](https://img.shields.io/badge/License-MIT-blue)]()
 [![Compatibility](https://img.shields.io/badge/Windows%20%7C%20Mac%20%7C%20Linux-Supported-success)]()
+[![Performance](https://img.shields.io/badge/Performance-Dashboard-58a6ff)](https://scolladon.github.io/sf-git-merge-driver/dev/bench/runtime/)
 
 An intelligent Git merge driver specifically designed for Salesforce metadata files. **Eliminates hours** of manual merge conflicts resolution.
 
