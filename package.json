@@ -38,6 +38,7 @@
     "ts-node": "^10.9.2",
     "tslib": "^2.8.1",
     "typescript": "^5.9.3",
+    "vitest": "^3.2.1",
     "wireit": "^0.14.12"
   },
   "engines": {
@@ -89,6 +90,7 @@
     "prepublishOnly": "npm shrinkwrap",
     "test:build": "wireit",
     "test:nut": "wireit",
+    "test:perf": "wireit",
     "test:unit": "wireit",
     "test": "wireit"
   },
@@ -103,7 +105,7 @@
       ]
     },
     "clean": {
-      "command": "shx rm -rf 'reports/*' .nyc_output oclif.manifest.json package.tgz 'sfdx-git-delta-*.tgz' 'stderr*.txt' 'stdout*.txt' '.stryker-tmp/*' perf-result.txt",
+      "command": "shx rm -rf 'reports/*' .nyc_output oclif.manifest.json package.tgz 'sfdx-git-delta-*.tgz' 'stderr*.txt' 'stdout*.txt' '.stryker-tmp/*' perf-result.txt perf-raw.json perf-runtime.json perf-memory.json",
       "files": [
         "lib",
         "reports/*",
@@ -114,7 +116,10 @@
         "stderr*.txt",
         "stdout*.txt",
         ".stryker-tmp/*",
-        "perf-result.txt"
+        "perf-result.txt",
+        "perf-raw.json",
+        "perf-runtime.json",
+        "perf-memory.json"
       ],
       "dependencies": [
         "clean:build"
@@ -263,6 +268,23 @@
       ],
       "dependencies": [
         "lint"
+      ]
+    },
+    "test:perf": {
+      "command": "node --expose-gc ./node_modules/.bin/vitest bench --config vitest.config.perf.ts && node test/perf/formatResults.mjs",
+      "files": [
+        "src/**/*.ts",
+        "test/perf/**",
+        "**/tsconfig.json",
+        "vitest.config.perf.ts"
+      ],
+      "output": [
+        "perf-raw.json",
+        "perf-runtime.json",
+        "perf-memory.json"
+      ],
+      "dependencies": [
+        "compile"
       ]
     }
   }

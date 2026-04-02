@@ -11,7 +11,10 @@
 e2e
 install-state.gz
 megalinter-reports/
+perf-raw.json
 perf-result.txt
+perf-runtime.json
+perf-memory.json
 stderr*.txt
 stdout*.txt
 tsconfig.tsbuildinfo
