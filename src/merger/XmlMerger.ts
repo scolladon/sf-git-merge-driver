@@ -10,14 +10,14 @@ import { log } from '../utils/LoggingDecorator.js'
 import { ConflictMarkerFormatter } from './ConflictMarkerFormatter.js'
 import { JsonMerger } from './JsonMerger.js'
 
-const baseOptions = {
+export const baseOptions = {
   cdataPropName: CDATA_PROP_NAME,
   commentPropName: XML_COMMENT_PROP_NAME,
   ignoreAttributes: false,
   processEntities: false,
 }
 
-const parserOptions = {
+export const parserOptions = {
   ...baseOptions,
   ignoreDeclaration: true,
   numberParseOptions: { leadingZeros: false, hex: false },
@@ -25,7 +25,7 @@ const parserOptions = {
   parseTagValue: false,
 }
 
-const builderOptions = {
+export const builderOptions = {
   ...baseOptions,
   format: true,
   indentBy: XML_INDENT,
