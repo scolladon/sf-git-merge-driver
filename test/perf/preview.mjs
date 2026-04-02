@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 
 const runtime = JSON.parse(readFileSync('perf-runtime.json', 'utf-8'))
@@ -111,4 +110,3 @@ const outPath = 'perf-preview.html'
 writeFileSync(outPath, html)
 // biome-ignore lint/suspicious/noConsole: preview output
 console.info(`Preview written to ${outPath}`)
-execFileSync('open', [outPath])

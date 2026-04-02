@@ -101,3 +101,35 @@ jobs:
   build:
     uses: ./.github/workflows/reusable-build.yml
     secrets: inherit
+
+  perf:
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v6
+
+      - name: Setup node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+
+      - uses: google/wireit@setup-github-actions-caching/v2
+
+      - name: Setup dependencies, cache and install
+        uses: ./.github/actions/install
+
+      - name: Run benchmarks
+        run: npm run test:perf
+
+      - name: Generate preview
+        run: node test/perf/preview.mjs
+
+      - name: Upload benchmark report
+        uses: actions/upload-artifact@v6
+        with:
+          name: perf-report
+          path: |
+            perf-preview.html
+            perf-runtime.json
+            perf-memory.json
