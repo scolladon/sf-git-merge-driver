@@ -7,50 +7,10 @@ on:
       - published
 
 permissions: # required if repository sets restricted permissions for token, see https://docs.github.com/en/actions/security-for-github-actions/security-guides/automatic-token-authentication#permissions-for-the-github_token
-  contents: write # required for benchmark auto-push to gh-pages
   issues: write # required if active on issues
   pull-requests: write # required if active on pull requests
 
 jobs:
-  perf-on-release:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v4
-
-      - name: Setup node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - uses: google/wireit@setup-github-actions-caching/v2
-
-      - name: Setup dependencies, cache and install
-        uses: ./.github/actions/install
-
-      - name: Run benchmarks
-        run: npm run test:perf
-
-      - name: Store release runtime benchmark
-        uses: benchmark-action/github-action-benchmark@v1
-        with:
-          name: Release Runtime Benchmark
-          tool: customBiggerIsBetter
-          output-file-path: ./perf-runtime.json
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          auto-push: true
-          benchmark-data-dir-path: releases/bench/runtime
-
-      - name: Store release memory benchmark
-        uses: benchmark-action/github-action-benchmark@v1
-        with:
-          name: Release Memory Benchmark
-          tool: customSmallerIsBetter
-          output-file-path: ./perf-memory.json
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          auto-push: true
-          benchmark-data-dir-path: releases/bench/memory
-
   release:
     runs-on: ubuntu-latest
     steps:

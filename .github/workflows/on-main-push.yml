@@ -78,6 +78,7 @@ jobs:
           output-file-path: ./perf-memory.json
           github-token: ${{ secrets.GITHUB_TOKEN }}
           auto-push: true
+          skip-fetch-gh-pages: true
           alert-threshold: '150%'
           comment-on-alert: true
           fail-on-alert: true
