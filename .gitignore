@@ -11,6 +11,7 @@
 e2e
 install-state.gz
 megalinter-reports/
+perf-preview.html
 perf-raw.json
 perf-result.txt
 perf-runtime.json
