@@ -2,6 +2,7 @@ export default {
   entry: [
     '.github/**/*.yml',
     '**/*.{nut,test}.ts',
+    'test/perf/**/*.{ts,mjs}',
     'bin/dev.js',
     'bin/run.js',
     'src/commands/git/merge/driver/install.ts',
