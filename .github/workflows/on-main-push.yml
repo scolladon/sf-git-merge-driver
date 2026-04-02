@@ -21,7 +21,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
-      prs_created: ${{ steps.release.outputs.prs_created }}
     permissions:
       contents: write
       pull-requests: write
@@ -34,54 +33,8 @@ jobs:
 
   perf:
     needs: [prepare-release]
-    runs-on: ubuntu-latest
     if: ${{ needs.prepare-release.outputs.release_created != 'true' }}
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v4
-
-      - name: Setup node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - uses: google/wireit@setup-github-actions-caching/v2
-
-      - name: Setup dependencies, cache and install
-        uses: ./.github/actions/install
-
-      - name: Run benchmarks
-        run: npm run test:perf
-
-      - name: Track runtime
-        uses: benchmark-action/github-action-benchmark@v1
-        with:
-          name: Runtime Benchmark
-          tool: customBiggerIsBetter
-          output-file-path: ./perf-runtime.json
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          auto-push: true
-          alert-threshold: '130%'
-          comment-on-alert: true
-          fail-on-alert: true
-          summary-always: true
-          alert-comment-cc-users: '@scolladon'
-          benchmark-data-dir-path: dev/bench/runtime
-
-      - name: Track memory
-        uses: benchmark-action/github-action-benchmark@v1
-        with:
-          name: Memory Benchmark
-          tool: customSmallerIsBetter
-          output-file-path: ./perf-memory.json
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          auto-push: true
-          skip-fetch-gh-pages: true
-          alert-threshold: '150%'
-          comment-on-alert: true
-          fail-on-alert: true
-          summary-always: true
-          alert-comment-cc-users: '@scolladon'
-          benchmark-data-dir-path: dev/bench/memory
+    uses: ./.github/workflows/reusable-perf.yml
+    secrets: inherit
+    with:
+      auto-push: true
