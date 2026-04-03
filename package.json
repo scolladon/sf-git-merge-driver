@@ -10,35 +10,36 @@
     "url": "git+https://github.com/scolladon/sf-git-merge-driver.git"
   },
   "dependencies": {
-    "@oclif/core": "^4.8.0",
-    "@salesforce/core": "^8.26.2",
+    "@oclif/core": "^4.10.4",
+    "@salesforce/core": "^8.28.1",
     "@salesforce/sf-plugins-core": "^12.2.6",
     "fast-equals": "^6.0.0",
-    "fast-xml-parser": "^5.3.7",
-    "lodash-es": "^4.17.23",
-    "simple-git": "^3.31.1"
+    "fast-xml-parser": "^5.5.10",
+    "lodash-es": "^4.18.1",
+    "simple-git": "^3.33.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.4.4",
-    "@commitlint/config-conventional": "^20.4.2",
-    "@oclif/plugin-help": "^6.2.37",
-    "@salesforce/cli-plugins-testkit": "^5.3.41",
-    "@salesforce/dev-config": "^4.3.2",
+    "@biomejs/biome": "2.4.10",
+    "@commitlint/config-conventional": "^20.5.0",
+    "@oclif/plugin-help": "^6.2.41",
+    "@salesforce/cli-plugins-testkit": "^5.3.50",
+    "@salesforce/dev-config": "^4.3.3",
+    "@stryker-mutator/core": "^9.6.0",
+    "@stryker-mutator/typescript-checker": "^9.6.0",
+    "@stryker-mutator/vitest-runner": "^9.6.0",
     "@types/chai": "^5.2.3",
-    "@types/jest": "^30.0.0",
+    "@vitest/coverage-v8": "^4.1.2",
     "chai": "^6.2.2",
     "husky": "^9.1.7",
-    "jest": "^30.2.0",
-    "knip": "^5.84.1",
+    "knip": "^6.3.0",
     "mocha": "^11.7.5",
-    "nyc": "^17.1.0",
-    "oclif": "^4.22.79",
+    "nyc": "^18.0.0",
+    "oclif": "^4.22.96",
     "shx": "^0.4.0",
-    "ts-jest": "^29.4.6",
     "ts-node": "^10.9.2",
     "tslib": "^2.8.1",
-    "typescript": "^5.9.3",
-    "vitest": "^3.2.1",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.2",
     "wireit": "^0.14.12"
   },
   "engines": {
@@ -89,10 +90,18 @@
     "prepare": "husky",
     "prepublishOnly": "npm shrinkwrap",
     "test:build": "wireit",
+    "test:mutation": "wireit",
+    "test:mutation:incremental": "wireit",
     "test:nut": "wireit",
     "test:perf": "wireit",
     "test:unit": "wireit",
     "test": "wireit"
+  },
+  "overrides": {
+    "mocha": {
+      "diff": "8.0.4",
+      "serialize-javascript": "7.0.5"
+    }
   },
   "publishConfig": {
     "access": "public"
@@ -239,6 +248,38 @@
         "clean:package-manager"
       ]
     },
+    "test:mutation": {
+      "command": "stryker run",
+      "files": [
+        "src/**/*.ts",
+        "test/**/*.test.ts",
+        "stryker.config.json",
+        "vitest.config.ts",
+        "**/tsconfig.json"
+      ],
+      "output": [
+        "reports/mutation/**"
+      ],
+      "dependencies": [
+        "test:unit"
+      ]
+    },
+    "test:mutation:incremental": {
+      "command": "stryker run --incremental --incrementalFile reports/mutation/stryker-incremental.json",
+      "files": [
+        "src/**/*.ts",
+        "test/**/*.test.ts",
+        "stryker.config.json",
+        "vitest.config.ts",
+        "**/tsconfig.json"
+      ],
+      "output": [
+        "reports/mutation/**"
+      ],
+      "dependencies": [
+        "test:unit"
+      ]
+    },
     "test:nut": {
       "command": "nyc mocha -r ts-node/register **/*.nut.ts",
       "files": [
@@ -256,12 +297,13 @@
       ]
     },
     "test:unit": {
-      "command": "jest --coverage",
+      "command": "vitest run --coverage",
       "files": [
         "src/**/*.ts",
-        "__tests__/**/*.ts",
+        "test/**/*.test.ts",
         "messages/**",
-        "**/tsconfig.json"
+        "**/tsconfig.json",
+        "vitest.config.ts"
       ],
       "output": [
         "reports/coverage/**"

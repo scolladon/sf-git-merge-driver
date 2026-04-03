@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest'
 import { MetadataService } from '../../../src/service/MetadataService.js'
 import { JsonValue } from '../../../src/types/jsonTypes.js'
 
@@ -367,6 +368,15 @@ describe('MetadataService', () => {
           expected: 'TestField.TestOperation.TestValue.TestValueField',
         },
         {
+          name: 'handles criteriaItems with only field and operation (partial)',
+          metadataType: 'criteriaItems',
+          testObject: {
+            field: 'TestField',
+            operation: 'TestOperation',
+          },
+          expected: 'TestField.TestOperation',
+        },
+        {
           name: 'handles recipients with type',
           metadataType: 'recipients',
           testObject: { type: 'TestRecipient' },
@@ -493,6 +503,12 @@ describe('MetadataService', () => {
           expected: 'TestSectionName',
         },
         {
+          name: 'handles sections with only section (no name)',
+          metadataType: 'sections',
+          testObject: { section: 'TestSection' },
+          expected: 'TestSection',
+        },
+        {
           name: 'handles columns with name',
           metadataType: 'columns',
           testObject: { name: 'TestColumn' },
@@ -508,6 +524,15 @@ describe('MetadataService', () => {
             possessive: 'TestPossessive',
           },
           expected: 'TestArticle.TestCaseType.TestPlural.TestPossessive',
+        },
+        {
+          name: 'handles caseValues with only article and caseType (partial)',
+          metadataType: 'caseValues',
+          testObject: {
+            article: 'TestArticle',
+            caseType: 'TestCaseType',
+          },
+          expected: 'TestArticle.TestCaseType',
         },
         {
           name: 'handles fieldSets with name',

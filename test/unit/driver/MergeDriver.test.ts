@@ -1,60 +1,65 @@
-import {
-  DEFAULT_ANCESTOR_CONFLICT_TAG,
-  DEFAULT_CONFLICT_MARKER_SIZE,
-  DEFAULT_LOCAL_CONFLICT_TAG,
-  DEFAULT_OTHER_CONFLICT_TAG,
-} from '../../../src/constant/conflictConstant.js'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MergeDriver } from '../../../src/driver/MergeDriver.js'
-import type { MergeConfig } from '../../../src/types/conflictTypes.js'
+import { defaultConfig } from '../../utils/testConfig.js'
 
-const mockReadFile = jest.fn()
-const mockWriteFile = jest.fn()
-jest.mock('node:fs/promises', () => ({
-  readFile: (...args) => mockReadFile(...args),
-  writeFile: (...args) => mockWriteFile(...args),
+const mockReadFile = vi.fn()
+const mockWriteFile = vi.fn()
+vi.mock('node:fs/promises', () => ({
+  readFile: (...args: unknown[]) => mockReadFile(...args),
+  writeFile: (...args: unknown[]) => mockWriteFile(...args),
 }))
 
-const mockedmergeThreeWay = jest.fn()
-jest.mock('../../../src/merger/XmlMerger.js', () => ({
-  XmlMerger: jest.fn(() => ({
-    mergeThreeWay: mockedmergeThreeWay,
-  })),
-}))
+const mockedmergeThreeWay = vi.fn()
+vi.mock('../../../src/merger/XmlMerger.js', () => {
+  const XmlMerger = vi.fn()
+  XmlMerger.prototype.mergeThreeWay = (...args: unknown[]) =>
+    mockedmergeThreeWay(...args)
+  return { XmlMerger }
+})
 
-const defaultConfig: MergeConfig = {
-  conflictMarkerSize: DEFAULT_CONFLICT_MARKER_SIZE,
-  ancestorConflictTag: DEFAULT_ANCESTOR_CONFLICT_TAG,
-  localConflictTag: DEFAULT_LOCAL_CONFLICT_TAG,
-  otherConflictTag: DEFAULT_OTHER_CONFLICT_TAG,
-}
+const SIMPLE_XML = '<label>Test Object</label>'
+const ANCESTOR_XML = '<label>Ancestor Object</label>'
+const OUR_XML = '<label>Our Object</label>'
+const THEIR_XML = '<label>Their Object</label>'
+const CRLF_CONTENT = '<a>\r\n  1\r\n</a>'
+const LF_CONTENT = '<a>\n  1\n</a>'
+const ANCESTOR_CONTENT = '<a>1</a>'
+const THEIR_CONTENT = '<a>2</a>'
 
 describe('MergeDriver', () => {
   let sut: MergeDriver
 
   beforeEach(() => {
+    vi.clearAllMocks()
     sut = new MergeDriver(defaultConfig)
   })
 
   describe('mergeFiles', () => {
-    it('should merge files successfully when given valid parameters', async () => {
+    it('given valid files when merging without conflict then returns false', async () => {
       // Arrange
-      mockReadFile.mockResolvedValue('<label>Test Object</label>')
-      mockedmergeThreeWay.mockReturnValue('<label>Test Object</label>')
+      mockReadFile.mockResolvedValue(SIMPLE_XML)
+      mockedmergeThreeWay.mockReturnValue({
+        output: SIMPLE_XML,
+        hasConflict: false,
+      })
 
       // Act
-      await sut.mergeFiles('AncestorFile', 'OurFile', 'TheirFile')
+      const result = await sut.mergeFiles(
+        'AncestorFile',
+        'OurFile',
+        'TheirFile'
+      )
 
       // Assert
-      expect(mockReadFile).toHaveBeenCalledTimes(3)
-      expect(mockedmergeThreeWay).toHaveBeenCalledTimes(1)
-      expect(mockWriteFile).toHaveBeenCalledTimes(1)
+      expect(result).toBe(false)
+      expect(mockWriteFile).toHaveBeenCalledWith('OurFile', SIMPLE_XML)
     })
 
-    it('should return true and write ourfile with ourcontent when mergeThreeWay throws', async () => {
+    it('given mergeThreeWay throws when merging then returns true and writes our content', async () => {
       // Arrange
-      mockReadFile.mockResolvedValueOnce('<label>Ancestor Object</label>')
-      mockReadFile.mockResolvedValueOnce('<label>Our Object</label>')
-      mockReadFile.mockResolvedValueOnce('<label>Their Object</label>')
+      mockReadFile.mockResolvedValueOnce(ANCESTOR_XML)
+      mockReadFile.mockResolvedValueOnce(OUR_XML)
+      mockReadFile.mockResolvedValueOnce(THEIR_XML)
       mockedmergeThreeWay.mockImplementation(() => {
         throw new Error('Tripart XML merge failed')
       })
@@ -68,18 +73,14 @@ describe('MergeDriver', () => {
 
       // Assert
       expect(result).toBe(true)
-      expect(mockWriteFile).toHaveBeenCalledTimes(1)
-      expect(mockWriteFile).toHaveBeenCalledWith(
-        'OurFile',
-        '<label>Our Object</label>'
-      )
+      expect(mockWriteFile).toHaveBeenCalledWith('OurFile', OUR_XML)
     })
 
-    it('should return true when there is a conflict', async () => {
+    it('given conflict when merging then returns true', async () => {
       // Arrange
-      mockReadFile.mockResolvedValue('<label>Test Object</label>')
+      mockReadFile.mockResolvedValue(SIMPLE_XML)
       mockedmergeThreeWay.mockReturnValue({
-        output: '<label>Test Object</label>',
+        output: SIMPLE_XML,
         hasConflict: true,
       })
 
@@ -94,11 +95,11 @@ describe('MergeDriver', () => {
       expect(result).toBe(true)
     })
 
-    it('should return false when there is no conflict', async () => {
+    it('given no conflict when merging then returns false', async () => {
       // Arrange
-      mockReadFile.mockResolvedValue('<label>Test Object</label>')
+      mockReadFile.mockResolvedValue(SIMPLE_XML)
       mockedmergeThreeWay.mockReturnValue({
-        output: '<label>Test Object</label>',
+        output: SIMPLE_XML,
         hasConflict: false,
       })
 
@@ -113,16 +114,14 @@ describe('MergeDriver', () => {
       expect(result).toBe(false)
     })
 
-    it('given our file uses CRLF when merging then it writes output with CRLF', async () => {
+    it('given our file uses CRLF when merging then writes output with CRLF', async () => {
       // Arrange
-      mockReadFile.mockReset()
-      mockWriteFile.mockReset()
       mockReadFile
-        .mockResolvedValueOnce('<a>1</a>') // ancestor
-        .mockResolvedValueOnce('<a>\r\n  1\r\n</a>') // our with CRLF
-        .mockResolvedValueOnce('<a>2</a>') // their
+        .mockResolvedValueOnce(ANCESTOR_CONTENT)
+        .mockResolvedValueOnce(CRLF_CONTENT)
+        .mockResolvedValueOnce(THEIR_CONTENT)
       mockedmergeThreeWay.mockReturnValue({
-        output: '<a>\n  1\n</a>',
+        output: LF_CONTENT,
         hasConflict: false,
       })
 
@@ -130,22 +129,17 @@ describe('MergeDriver', () => {
       await sut.mergeFiles('AncestorFile', 'OurFile', 'TheirFile')
 
       // Assert
-      expect(mockWriteFile).toHaveBeenCalledTimes(1)
-      const [, written] = mockWriteFile.mock.calls[0]
-      expect(written).toBe('<a>\r\n  1\r\n</a>')
+      expect(mockWriteFile).toHaveBeenCalledWith('OurFile', CRLF_CONTENT)
     })
 
-    it('given our file uses LF when merging then it writes output unchanged (LF)', async () => {
+    it('given our file uses LF when merging then writes output unchanged', async () => {
       // Arrange
-      mockReadFile.mockReset()
-      mockWriteFile.mockReset()
       mockReadFile
-        .mockResolvedValueOnce('<a>1</a>') // ancestor
-        .mockResolvedValueOnce('<a>\n  1\n</a>') // our with LF
-        .mockResolvedValueOnce('<a>2</a>') // their
-      const merged = '<a>\n  1\n</a>'
+        .mockResolvedValueOnce(ANCESTOR_CONTENT)
+        .mockResolvedValueOnce(LF_CONTENT)
+        .mockResolvedValueOnce(THEIR_CONTENT)
       mockedmergeThreeWay.mockReturnValue({
-        output: merged,
+        output: LF_CONTENT,
         hasConflict: false,
       })
 
@@ -153,9 +147,7 @@ describe('MergeDriver', () => {
       await sut.mergeFiles('AncestorFile', 'OurFile', 'TheirFile')
 
       // Assert
-      expect(mockWriteFile).toHaveBeenCalledTimes(1)
-      const [, written] = mockWriteFile.mock.calls[0]
-      expect(written).toBe(merged)
+      expect(mockWriteFile).toHaveBeenCalledWith('OurFile', LF_CONTENT)
     })
   })
 })

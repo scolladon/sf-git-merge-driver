@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest'
 import {
   combineResults,
   isNonEmpty,
@@ -29,6 +30,15 @@ describe('mergeResult', () => {
       // Assert
       expect(result.output).toEqual([])
       expect(result.hasConflict).toBe(false)
+    })
+
+    it('given empty output when called twice then returns same reference', () => {
+      // Act
+      const result1 = noConflict([])
+      const result2 = noConflict([])
+
+      // Assert
+      expect(result1).toBe(result2)
     })
   })
 
@@ -114,6 +124,17 @@ describe('mergeResult', () => {
       // Assert
       expect(combined.output).toEqual([])
       expect(combined.hasConflict).toBe(false)
+    })
+
+    it('given single result when combining then returns same reference', () => {
+      // Arrange
+      const single = noConflict([{ a: 1 }])
+
+      // Act
+      const combined = combineResults([single])
+
+      // Assert
+      expect(combined).toBe(single)
     })
 
     it('should flatten nested arrays from outputs', () => {

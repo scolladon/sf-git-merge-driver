@@ -5,13 +5,8 @@ import { noConflict } from '../../types/mergeResult.js'
 import type { MergeNode } from './MergeNode.js'
 import { generateObj } from './nodeUtils.js'
 
-const compareItems = (a: JsonValue, b: JsonValue): number => {
-  const strA = String(a)
-  const strB = String(b)
-  if (strA < strB) return -1
-  if (strA > strB) return 1
-  return 0
-}
+const compareItems = (a: JsonValue, b: JsonValue): number =>
+  String(a).localeCompare(String(b))
 
 export class TextArrayMergeNode implements MergeNode {
   constructor(

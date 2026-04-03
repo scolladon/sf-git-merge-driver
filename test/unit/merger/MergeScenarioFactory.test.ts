@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest'
 import { getScenario } from '../../../src/merger/MergeScenarioFactory.js'
 import { MergeScenario } from '../../../src/types/mergeScenario.js'
 

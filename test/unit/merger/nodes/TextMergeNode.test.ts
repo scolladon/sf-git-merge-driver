@@ -1,19 +1,7 @@
-import {
-  DEFAULT_ANCESTOR_CONFLICT_TAG,
-  DEFAULT_CONFLICT_MARKER_SIZE,
-  DEFAULT_LOCAL_CONFLICT_TAG,
-  DEFAULT_OTHER_CONFLICT_TAG,
-} from '../../../../src/constant/conflictConstant.js'
+import { describe, expect, it } from 'vitest'
 import { TEXT_TAG } from '../../../../src/constant/parserConstant.js'
 import { TextMergeNode } from '../../../../src/merger/nodes/TextMergeNode.js'
-import type { MergeConfig } from '../../../../src/types/conflictTypes.js'
-
-const defaultConfig: MergeConfig = {
-  conflictMarkerSize: DEFAULT_CONFLICT_MARKER_SIZE,
-  ancestorConflictTag: DEFAULT_ANCESTOR_CONFLICT_TAG,
-  localConflictTag: DEFAULT_LOCAL_CONFLICT_TAG,
-  otherConflictTag: DEFAULT_OTHER_CONFLICT_TAG,
-}
+import { defaultConfig } from '../../../utils/testConfig.js'
 
 describe('TextMergeNode', () => {
   describe('merge', () => {
@@ -111,6 +99,22 @@ describe('TextMergeNode', () => {
       // Assert
       expect(result.hasConflict).toBe(true)
       expect(result.output.length).toBeGreaterThan(0)
+    })
+
+    it('given all present and local differs from other when merging then does not use early exit', () => {
+      // Arrange — local !== other, so the early exit must NOT fire
+      const node = new TextMergeNode(
+        'ancestor',
+        'localVal',
+        'otherVal',
+        'field'
+      )
+
+      // Act
+      const result = node.merge(defaultConfig)
+
+      // Assert — must detect conflict, not short-circuit to noConflict
+      expect(result.hasConflict).toBe(true)
     })
 
     it('should return conflict when local and other differ (no ancestor)', () => {

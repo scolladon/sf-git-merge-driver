@@ -1,56 +1,53 @@
 'use strict'
 
-// Mock modules before importing the actual module
-jest.mock('@salesforce/core', () => {
-  const mockCoreLogger = {
-    setLevel: jest.fn(),
-    shouldLog: jest.fn().mockReturnValue(true),
-    debug: jest.fn(),
-    error: jest.fn(),
-    info: jest.fn(),
-    trace: jest.fn(),
-    warn: jest.fn(),
-  }
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-  return {
-    Logger: {
-      childFromRoot: jest.fn().mockReturnValue(mockCoreLogger),
-    },
-    LoggerLevel: {
-      TRACE: 'trace',
-      DEBUG: 'debug',
-      INFO: 'info',
-      WARN: 'warn',
-      ERROR: 'error',
-    },
-  }
-})
+const mockCoreLogger = {
+  setLevel: vi.fn(),
+  shouldLog: vi.fn().mockReturnValue(true),
+  debug: vi.fn(),
+  error: vi.fn(),
+  info: vi.fn(),
+  trace: vi.fn(),
+  warn: vi.fn(),
+}
 
-jest.mock('../../../src/constant/pluginConstant', () => ({
+vi.mock('@salesforce/core', () => ({
+  Logger: {
+    childFromRoot: vi.fn().mockReturnValue(mockCoreLogger),
+  },
+  LoggerLevel: {
+    TRACE: 'trace',
+    DEBUG: 'debug',
+    INFO: 'info',
+    WARN: 'warn',
+    ERROR: 'error',
+  },
+}))
+
+vi.mock('../../../src/constant/pluginConstant', () => ({
   PLUGIN_NAME: 'mock-plugin-name',
 }))
 
 // Import after mocking
-import { Logger, lazy } from '../../../src/utils/LoggingService'
+const { Logger, lazy } = await import('../../../src/utils/LoggingService')
 
-// Get the mock CoreLogger instance
-const mockCoreLogger = jest
-  .requireMock('@salesforce/core')
-  .Logger.childFromRoot()
-const mockDebug = mockCoreLogger.debug
-const mockError = mockCoreLogger.error
-const mockInfo = mockCoreLogger.info
-const mockTrace = mockCoreLogger.trace
-const mockWarn = mockCoreLogger.warn
 const mockShouldLog = mockCoreLogger.shouldLog
+
+const LOG_METHODS = [
+  { level: 'debug', mock: mockCoreLogger.debug },
+  { level: 'error', mock: mockCoreLogger.error },
+  { level: 'info', mock: mockCoreLogger.info },
+  { level: 'trace', mock: mockCoreLogger.trace },
+  { level: 'warn', mock: mockCoreLogger.warn },
+] as const
 
 describe('LoggingService', () => {
   let sut: typeof Logger
 
   beforeEach(() => {
-    // Arrange
     sut = Logger
-    jest.clearAllMocks()
+    vi.clearAllMocks()
     mockShouldLog.mockReturnValue(true)
   })
 
@@ -120,7 +117,7 @@ describe('LoggingService', () => {
 
       // Assert
       expect(called).toBe(true)
-      expect(mockDebug).toHaveBeenCalledWith('evaluated', undefined)
+      expect(mockCoreLogger.debug).toHaveBeenCalledWith('evaluated', undefined)
     })
 
     it('given log level disabled when logging with function parameter then does not evaluate function', () => {
@@ -137,7 +134,7 @@ describe('LoggingService', () => {
 
       // Assert
       expect(called).toBe(false)
-      expect(mockDebug).not.toHaveBeenCalled()
+      expect(mockCoreLogger.debug).not.toHaveBeenCalled()
     })
   })
 
@@ -150,214 +147,69 @@ describe('LoggingService', () => {
       sut.debug('message', meta)
 
       // Assert
-      expect(mockDebug).toHaveBeenCalledWith('message', meta)
+      expect(mockCoreLogger.debug).toHaveBeenCalledWith('message', meta)
     })
 
     it('given no meta data when logging then passes undefined meta', () => {
-      // Arrange & Act
+      // Act
       sut.debug('message')
 
       // Assert
-      expect(mockDebug).toHaveBeenCalledWith('message', undefined)
+      expect(mockCoreLogger.debug).toHaveBeenCalledWith('message', undefined)
     })
   })
 
   describe('log level conditional execution', () => {
-    describe('debug method', () => {
-      it('given log level disabled when logging then does not call logger', () => {
-        // Arrange
-        mockShouldLog.mockReturnValueOnce(false)
+    it.each(
+      LOG_METHODS
+    )('given $level level disabled when logging then does not call logger', ({
+      level,
+      mock,
+    }) => {
+      // Arrange
+      mockShouldLog.mockReturnValueOnce(false)
 
-        // Act
-        sut.debug('message')
+      // Act
+      sut[level]('message')
 
-        // Assert
-        expect(mockDebug).not.toHaveBeenCalled()
-      })
-
-      it('given log level enabled when logging then calls logger', () => {
-        // Arrange
-        mockShouldLog.mockReturnValueOnce(true)
-
-        // Act
-        sut.debug('message')
-
-        // Assert
-        expect(mockDebug).toHaveBeenCalled()
-      })
+      // Assert
+      expect(mock).not.toHaveBeenCalled()
     })
 
-    describe('error method', () => {
-      it('given log level disabled when logging then does not call logger', () => {
-        // Arrange
-        mockShouldLog.mockReturnValueOnce(false)
+    it.each(
+      LOG_METHODS
+    )('given $level level enabled when logging then calls logger', ({
+      level,
+      mock,
+    }) => {
+      // Arrange
+      mockShouldLog.mockReturnValueOnce(true)
 
-        // Act
-        sut.error('message')
+      // Act
+      sut[level]('message')
 
-        // Assert
-        expect(mockError).not.toHaveBeenCalled()
-      })
-
-      it('given log level enabled when logging then calls logger', () => {
-        // Arrange
-        mockShouldLog.mockReturnValueOnce(true)
-
-        // Act
-        sut.error('message')
-
-        // Assert
-        expect(mockError).toHaveBeenCalled()
-      })
-    })
-
-    describe('info method', () => {
-      it('given log level disabled when logging then does not call logger', () => {
-        // Arrange
-        mockShouldLog.mockReturnValueOnce(false)
-
-        // Act
-        sut.info('message')
-
-        // Assert
-        expect(mockInfo).not.toHaveBeenCalled()
-      })
-
-      it('given log level enabled when logging then calls logger', () => {
-        // Arrange
-        mockShouldLog.mockReturnValueOnce(true)
-
-        // Act
-        sut.info('message')
-
-        // Assert
-        expect(mockInfo).toHaveBeenCalled()
-      })
-    })
-
-    describe('trace method', () => {
-      it('given log level disabled when logging then does not call logger', () => {
-        // Arrange
-        mockShouldLog.mockReturnValueOnce(false)
-
-        // Act
-        sut.trace('message')
-
-        // Assert
-        expect(mockTrace).not.toHaveBeenCalled()
-      })
-
-      it('given log level enabled when logging then calls logger', () => {
-        // Arrange
-        mockShouldLog.mockReturnValueOnce(true)
-
-        // Act
-        sut.trace('message')
-
-        // Assert
-        expect(mockTrace).toHaveBeenCalled()
-      })
-    })
-
-    describe('warn method', () => {
-      it('given log level disabled when logging then does not call logger', () => {
-        // Arrange
-        mockShouldLog.mockReturnValueOnce(false)
-
-        // Act
-        sut.warn('message')
-
-        // Assert
-        expect(mockWarn).not.toHaveBeenCalled()
-      })
-
-      it('given log level enabled when logging then calls logger', () => {
-        // Arrange
-        mockShouldLog.mockReturnValueOnce(true)
-
-        // Act
-        sut.warn('message')
-
-        // Assert
-        expect(mockWarn).toHaveBeenCalled()
-      })
+      // Assert
+      expect(mock).toHaveBeenCalled()
     })
   })
 
   describe('logger methods', () => {
-    describe('debug method', () => {
-      it('given message and meta when calling debug then calls debug with correct parameters', () => {
-        // Arrange
-        const message = 'test debug message'
-        const meta = { key: 'value' }
+    it.each(
+      LOG_METHODS
+    )('given message and meta when calling $level then calls logger with correct parameters', ({
+      level,
+      mock,
+    }) => {
+      // Arrange
+      const message = `test ${level} message`
+      const meta = { key: 'value' }
 
-        // Act
-        sut.debug(message, meta)
+      // Act
+      sut[level](message, meta)
 
-        // Assert
-        expect(mockShouldLog).toHaveBeenCalledWith('debug')
-        expect(mockDebug).toHaveBeenCalledWith(message, meta)
-      })
-    })
-
-    describe('info method', () => {
-      it('given message and meta when calling info then calls info with correct parameters', () => {
-        // Arrange
-        const message = 'test info message'
-        const meta = { key: 'value' }
-
-        // Act
-        sut.info(message, meta)
-
-        // Assert
-        expect(mockShouldLog).toHaveBeenCalledWith('info')
-        expect(mockInfo).toHaveBeenCalledWith(message, meta)
-      })
-    })
-
-    describe('error method', () => {
-      it('given message and meta when calling error then calls error with correct parameters', () => {
-        // Arrange
-        const message = 'test error message'
-        const meta = { key: 'value' }
-
-        // Act
-        sut.error(message, meta)
-
-        // Assert
-        expect(mockShouldLog).toHaveBeenCalledWith('error')
-        expect(mockError).toHaveBeenCalledWith(message, meta)
-      })
-    })
-
-    describe('warn method', () => {
-      it('given message and meta when calling warn then calls warn with correct parameters', () => {
-        // Arrange
-        const message = 'test warn message'
-        const meta = { key: 'value' }
-
-        // Act
-        sut.warn(message, meta)
-
-        // Assert
-        expect(mockShouldLog).toHaveBeenCalledWith('warn')
-        expect(mockWarn).toHaveBeenCalledWith(message, meta)
-      })
-    })
-
-    describe('trace method', () => {
-      it('given message and meta when calling trace then calls trace with correct parameters', () => {
-        // Arrange
-        const message = 'test trace message'
-        const meta = { key: 'value' }
-
-        // Act
-        sut.trace(message, meta)
-
-        // Assert
-        expect(mockShouldLog).toHaveBeenCalledWith('trace')
-        expect(mockTrace).toHaveBeenCalledWith(message, meta)
-      })
+      // Assert
+      expect(mockShouldLog).toHaveBeenCalledWith(level)
+      expect(mock).toHaveBeenCalledWith(message, meta)
     })
   })
 })

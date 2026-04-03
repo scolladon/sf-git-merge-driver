@@ -23,9 +23,9 @@ export class PropertyMergeNode implements MergeNode {
     const results: MergeResult[] = []
 
     for (const key of props) {
-      const ancestorOfKey = this.ancestor?.[key]
-      const localOfKey = this.local?.[key]
-      const otherOfKey = this.other?.[key]
+      const ancestorOfKey = this.ancestor[key]
+      const localOfKey = this.local[key]
+      const otherOfKey = this.other[key]
 
       const childNode = defaultNodeFactory.createNode(
         ancestorOfKey,

@@ -1,102 +1,99 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import simpleGit from 'simple-git'
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest'
 import { DRIVER_NAME } from '../../../src/constant/driverConstant.js'
 import { UninstallService } from '../../../src/service/UninstallService.js'
 import { getGitAttributesPath } from '../../../src/utils/gitUtils.js'
 
-jest.mock('node:fs/promises')
-jest.mock('simple-git')
-jest.mock('../../../src/utils/gitUtils.js')
-const mockedRaw = jest.fn()
-const simpleGitMock = simpleGit as jest.Mock
+vi.mock('node:fs/promises')
+vi.mock('simple-git')
+vi.mock('../../../src/utils/gitUtils.js')
+
+const GIT_ATTRIBUTES_PATH = '.git/info/attributes'
+const ATTRIBUTES_CONTENT = `*.xml merge=salesforce-source\nsome other content`
+const FILTERED_CONTENT = 'some other content'
+
+const mockedRaw = vi.fn()
+const simpleGitMock = simpleGit as Mock
 simpleGitMock.mockReturnValue({
   raw: mockedRaw,
 })
 
-const getGitAttributesPathMocked = jest.mocked(getGitAttributesPath)
-getGitAttributesPathMocked.mockResolvedValue('.git/info/attributes')
-
-const readFileMocked = jest.mocked(readFile)
-readFileMocked.mockResolvedValue(
-  '*.xml merge=salesforce-source\nsome other content'
-)
+const getGitAttributesPathMocked = vi.mocked(getGitAttributesPath)
+const readFileMocked = vi.mocked(readFile) as Mock
 
 describe('UninstallService', () => {
-  let sut: UninstallService // System Under Test
+  let sut: UninstallService
 
   beforeEach(() => {
-    // Arrange
+    vi.clearAllMocks()
     sut = new UninstallService()
+    getGitAttributesPathMocked.mockResolvedValue(GIT_ATTRIBUTES_PATH)
+    readFileMocked.mockResolvedValue(ATTRIBUTES_CONTENT)
   })
 
-  it('should uninstall successfully when given valid parameters', async () => {
-    // Act
-    await sut.uninstallMergeDriver()
+  describe('given valid parameters when uninstalling', () => {
+    it('then removes merge config section', async () => {
+      // Act
+      await sut.uninstallMergeDriver()
 
-    // Assert
-    expect(mockedRaw).toHaveBeenCalledWith([
-      'config',
-      '--remove-section',
-      `merge.${DRIVER_NAME}`,
-    ])
-    expect(readFile).toHaveBeenCalledTimes(1)
-    expect(readFile).toHaveBeenCalledWith(
-      '.git/info/attributes',
-      expect.anything()
-    )
-    expect(writeFile).toHaveBeenCalledTimes(1)
-    expect(writeFile).toHaveBeenCalledWith(
-      '.git/info/attributes',
-      'some other content'
-    )
-    expect(getGitAttributesPathMocked).toHaveBeenCalledTimes(1)
+      // Assert
+      expect(mockedRaw).toHaveBeenCalledWith([
+        'config',
+        '--remove-section',
+        `merge.${DRIVER_NAME}`,
+      ])
+    })
+
+    it('then reads git attributes file', async () => {
+      // Act
+      await sut.uninstallMergeDriver()
+
+      // Assert
+      expect(readFile).toHaveBeenCalledWith(
+        GIT_ATTRIBUTES_PATH,
+        expect.anything()
+      )
+    })
+
+    it('then writes filtered content back', async () => {
+      // Act
+      await sut.uninstallMergeDriver()
+
+      // Assert
+      expect(writeFile).toHaveBeenCalledWith(
+        GIT_ATTRIBUTES_PATH,
+        FILTERED_CONTENT
+      )
+    })
   })
 
-  it('should cleanup attributes even when config cleanup fails', async () => {
-    // Arrange
-    mockedRaw.mockRejectedValue(new Error('Failed to cleanup git config'))
+  describe('given config cleanup fails when uninstalling', () => {
+    it('then still cleans up attributes', async () => {
+      // Arrange
+      mockedRaw.mockRejectedValue(new Error('Failed to cleanup git config'))
 
-    // Act
-    await sut.uninstallMergeDriver()
+      // Act
+      await sut.uninstallMergeDriver()
 
-    // Assert
-    expect(mockedRaw).toHaveBeenCalledWith([
-      'config',
-      '--remove-section',
-      `merge.${DRIVER_NAME}`,
-    ])
-    expect(readFile).toHaveBeenCalledTimes(1)
-    expect(readFile).toHaveBeenCalledWith(
-      '.git/info/attributes',
-      expect.anything()
-    )
-    expect(writeFile).toHaveBeenCalledTimes(1)
-    expect(writeFile).toHaveBeenCalledWith(
-      '.git/info/attributes',
-      'some other content'
-    )
-    expect(getGitAttributesPathMocked).toHaveBeenCalledTimes(1)
+      // Assert
+      expect(writeFile).toHaveBeenCalledWith(
+        GIT_ATTRIBUTES_PATH,
+        FILTERED_CONTENT
+      )
+    })
   })
 
-  it('should fail silently', async () => {
-    // Arrange
-    mockedRaw.mockRejectedValue(new Error('Failed to cleanup git config'))
-    readFileMocked.mockRejectedValue(
-      new Error('Failed to cleanup git attributes')
-    )
+  describe('given both config and attributes cleanup fail when uninstalling', () => {
+    it('then fails silently', async () => {
+      // Arrange
+      mockedRaw.mockRejectedValue(new Error('Failed to cleanup git config'))
+      readFileMocked.mockRejectedValue(
+        new Error('Failed to cleanup git attributes')
+      )
 
-    // Act
-    await sut.uninstallMergeDriver()
-
-    // Assert
-    expect(mockedRaw).toHaveBeenCalledWith([
-      'config',
-      '--remove-section',
-      `merge.${DRIVER_NAME}`,
-    ])
-    expect(readFile).toHaveBeenCalledWith(
-      '.git/info/attributes',
-      expect.anything()
-    )
+      // Act & Assert
+      await expect(sut.uninstallMergeDriver()).resolves.not.toThrow()
+    })
   })
 })

@@ -1,38 +1,26 @@
-import {
-  DEFAULT_ANCESTOR_CONFLICT_TAG,
-  DEFAULT_CONFLICT_MARKER_SIZE,
-  DEFAULT_LOCAL_CONFLICT_TAG,
-  DEFAULT_OTHER_CONFLICT_TAG,
-} from '../../../src/constant/conflictConstant.js'
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest'
 import { MergeOrchestrator } from '../../../src/merger/MergeOrchestrator.js'
 import { getScenario } from '../../../src/merger/MergeScenarioFactory.js'
 import { defaultNodeFactory } from '../../../src/merger/nodes/MergeNodeFactory.js'
 import { getScenarioStrategy } from '../../../src/merger/strategies/ScenarioStrategy.js'
-import type { MergeConfig } from '../../../src/types/conflictTypes.js'
 import type { MergeResult } from '../../../src/types/mergeResult.js'
 import { MergeScenario } from '../../../src/types/mergeScenario.js'
+import { defaultConfig } from '../../utils/testConfig.js'
 
-jest.mock('../../../src/merger/MergeScenarioFactory.js')
-jest.mock('../../../src/merger/strategies/ScenarioStrategy.js')
+vi.mock('../../../src/merger/MergeScenarioFactory.js')
+vi.mock('../../../src/merger/strategies/ScenarioStrategy.js')
 
-const mockedGetScenario = getScenario as jest.Mock
-const mockedGetScenarioStrategy = getScenarioStrategy as jest.Mock
-
-const defaultConfig: MergeConfig = {
-  conflictMarkerSize: DEFAULT_CONFLICT_MARKER_SIZE,
-  ancestorConflictTag: DEFAULT_ANCESTOR_CONFLICT_TAG,
-  localConflictTag: DEFAULT_LOCAL_CONFLICT_TAG,
-  otherConflictTag: DEFAULT_OTHER_CONFLICT_TAG,
-}
+const mockedGetScenario = getScenario as Mock
+const mockedGetScenarioStrategy = getScenarioStrategy as Mock
 
 describe('MergeOrchestrator', () => {
   const mockStrategy = {
-    execute: jest.fn(),
+    execute: vi.fn(),
   }
   const mockResult: MergeResult = { hasConflict: false, output: [] }
 
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
     mockedGetScenarioStrategy.mockReturnValue(mockStrategy)
     mockStrategy.execute.mockReturnValue(mockResult)
   })
@@ -80,7 +68,7 @@ describe('MergeOrchestrator', () => {
 
     it('should use provided nodeFactory in context', () => {
       // Arrange
-      const customNodeFactory = { createNode: jest.fn() }
+      const customNodeFactory = { createNode: vi.fn() }
       const orchestrator = new MergeOrchestrator(
         defaultConfig,
         customNodeFactory

@@ -1,18 +1,6 @@
-import {
-  DEFAULT_ANCESTOR_CONFLICT_TAG,
-  DEFAULT_CONFLICT_MARKER_SIZE,
-  DEFAULT_LOCAL_CONFLICT_TAG,
-  DEFAULT_OTHER_CONFLICT_TAG,
-} from '../../../src/constant/conflictConstant.js'
+import { describe, expect, it } from 'vitest'
 import { ConflictMarkerFormatter } from '../../../src/merger/ConflictMarkerFormatter.js'
-import type { MergeConfig } from '../../../src/types/conflictTypes.js'
-
-const defaultConfig: MergeConfig = {
-  conflictMarkerSize: DEFAULT_CONFLICT_MARKER_SIZE,
-  ancestorConflictTag: DEFAULT_ANCESTOR_CONFLICT_TAG,
-  localConflictTag: DEFAULT_LOCAL_CONFLICT_TAG,
-  otherConflictTag: DEFAULT_OTHER_CONFLICT_TAG,
-}
+import { defaultConfig } from '../../utils/testConfig.js'
 
 describe('ConflictMarkerFormatter', () => {
   describe('with default config (size 7)', () => {
@@ -83,6 +71,28 @@ describe('ConflictMarkerFormatter', () => {
 
         // Assert
         expect(result).toBe('<<<<<<<')
+      })
+
+      it('should remove indentation before multiple markers in one string', () => {
+        // Arrange — tests the 'g' flag on indentRegex
+        const input = '    <<<<<<< local\ncontent\n    ||||||| ancestor'
+
+        // Act
+        const result = formatter.correctConflictIndent(input)
+
+        // Assert
+        expect(result).toBe('<<<<<<< local\ncontent\n||||||| ancestor')
+      })
+
+      it('should remove lines with only whitespace and CR', () => {
+        // Arrange — exercises the [\n\r] character class in blank line regex
+        const input = '  \r\nsome content'
+
+        // Act
+        const result = formatter.correctConflictIndent(input)
+
+        // Assert
+        expect(result).toBe('some content')
       })
 
       it('should not modify content without conflict markers', () => {

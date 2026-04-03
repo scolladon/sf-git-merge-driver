@@ -5,7 +5,6 @@ import type { JsonArray, JsonObject } from '../../types/jsonTypes.js'
 import type { MergeResult } from '../../types/mergeResult.js'
 import {
   combineResults,
-  isNonEmpty,
   noConflict,
   withConflict,
 } from '../../types/mergeResult.js'
@@ -236,28 +235,14 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   ): string[] | null {
     const { localMoved, otherMoved } = analysis
 
-    // Build ordered lists for moved elements in a single pass each
-    const localMovedOrdered: string[] = []
-    const otherMovedOrdered: string[] = []
-    const localAdditions: string[] = []
-    const otherAdditions: string[] = []
-
-    for (const key of ctx.localKeys) {
-      if (localMoved.has(key)) {
-        localMovedOrdered.push(key)
-      } else if (!ctx.ancestorSet.has(key)) {
-        localAdditions.push(key)
-      }
-    }
-
-    for (const key of ctx.otherKeys) {
-      if (otherMoved.has(key)) {
-        otherMovedOrdered.push(key)
-      } else if (!ctx.ancestorSet.has(key) && !ctx.localMap.has(key)) {
-        // Only add if not already added by local
-        otherAdditions.push(key)
-      }
-    }
+    const localMovedOrdered = ctx.localKeys.filter(k => localMoved.has(k))
+    const otherMovedOrdered = ctx.otherKeys.filter(k => otherMoved.has(k))
+    const localAdditions = ctx.localKeys.filter(
+      k => !localMoved.has(k) && !ctx.ancestorSet.has(k)
+    )
+    const otherAdditions = ctx.otherKeys.filter(
+      k => !otherMoved.has(k) && !ctx.ancestorSet.has(k) && !ctx.localMap.has(k)
+    )
 
     // Conflict: both sides added different elements - ambiguous ordering
     if (localAdditions.length > 0 && otherAdditions.length > 0) {
@@ -395,11 +380,7 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
       oIdx += gapO.length
 
       const gaps: GapKeys = { ancestor: gapA, local: gapL, other: gapO }
-      const gapResult = this.mergeGap(config, gaps, ctx)
-      if (isNonEmpty(gapResult)) {
-        results.push(gapResult)
-      }
-
+      results.push(this.mergeGap(config, gaps, ctx))
       results.push(this.mergeElement(config, anchor, ctx))
 
       aIdx++
@@ -412,10 +393,7 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
       local: ctx.localKeys.slice(lIdx),
       other: ctx.otherKeys.slice(oIdx),
     }
-    const finalResult = this.mergeGap(config, finalGaps, ctx)
-    if (isNonEmpty(finalResult)) {
-      results.push(finalResult)
-    }
+    results.push(this.mergeGap(config, finalGaps, ctx))
 
     return combineResults(results)
   }
@@ -439,14 +417,6 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     gaps: GapKeys,
     ctx: ArrayMergeState
   ): MergeResult {
-    if (
-      gaps.ancestor.length === 0 &&
-      gaps.local.length === 0 &&
-      gaps.other.length === 0
-    ) {
-      return noConflict([])
-    }
-
     const sets = computeGapSets(gaps.ancestor, gaps.local, gaps.other)
 
     const gapConflict = this.detectGapConflict(config, gaps, sets, ctx)
@@ -570,11 +540,6 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     const aVal = ctx.ancestorMap.get(key)
     const lVal = ctx.localMap.get(key)
     const oVal = ctx.otherMap.get(key)
-
-    // All equal
-    if (deepEqual(aVal, lVal) && deepEqual(lVal, oVal)) {
-      return noConflict([this.wrapElement(lVal!)])
-    }
 
     // Other unchanged → take local
     if (deepEqual(aVal, oVal) && lVal) {
