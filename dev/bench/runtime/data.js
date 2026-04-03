@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775130954729,
+  "lastUpdate": 1775221218554,
   "repoUrl": "https://github.com/scolladon/sf-git-merge-driver",
   "entries": {
     "Runtime Benchmark": [
@@ -143,6 +143,150 @@ window.BENCHMARK_DATA = {
             "name": "format-large",
             "value": 964,
             "range": "±1.05%",
+            "unit": "ops/sec"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "colladonsebastien@gmail.com",
+            "name": "Sebastien",
+            "username": "scolladon"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "09382b3642ad757c323e3079627ee4afec07f67b",
+          "message": "chore: migrate to Vitest, upgrade deps, add mutation testing (#177)",
+          "timestamp": "2026-04-03T14:57:50+02:00",
+          "tree_id": "e7f63dd1fd595cc9629fe536f9012d9478ff5b97",
+          "url": "https://github.com/scolladon/sf-git-merge-driver/commit/09382b3642ad757c323e3079627ee4afec07f67b"
+        },
+        "date": 1775221218250,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "merge-small-no-conflict",
+            "value": 236,
+            "range": "±3.73%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-small-with-conflict",
+            "value": 260,
+            "range": "±1.76%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-medium-no-conflict",
+            "value": 32,
+            "range": "±1.51%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-medium-with-conflict",
+            "value": 33,
+            "range": "±0.82%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-large-no-conflict",
+            "value": 8,
+            "range": "±0.88%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-large-with-conflict",
+            "value": 8,
+            "range": "±1.13%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-ordered-globalvalueset",
+            "value": 372,
+            "range": "±1.72%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-picklist-customfield",
+            "value": 424,
+            "range": "±2.62%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "parse-small",
+            "value": 404,
+            "range": "±0.82%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-small",
+            "value": 919,
+            "range": "±3.80%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "build-small",
+            "value": 6189,
+            "range": "±0.91%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "format-small",
+            "value": 28581,
+            "range": "±0.43%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "parse-medium",
+            "value": 46,
+            "range": "±3.42%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-medium",
+            "value": 96,
+            "range": "±6.88%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "build-medium",
+            "value": 796,
+            "range": "±0.88%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "format-medium",
+            "value": 3858,
+            "range": "±0.19%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "parse-large",
+            "value": 11,
+            "range": "±7.30%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-large",
+            "value": 27,
+            "range": "±4.55%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "build-large",
+            "value": 182,
+            "range": "±1.77%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "format-large",
+            "value": 980,
+            "range": "±0.84%",
             "unit": "ops/sec"
           }
         ]
