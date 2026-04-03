@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/scolladon/sf-git-merge-driver/compare/v1.5.4...v1.6.0) (2026-04-03)
+
+
+### Features
+
+* **perf:** add comprehensive performance testing infrastructure ([#179](https://github.com/scolladon/sf-git-merge-driver/issues/179)) ([ae2c3db](https://github.com/scolladon/sf-git-merge-driver/commit/ae2c3dbc5ad455b5118eb3740a80041a7c327d4d))
+
 ## [1.5.4](https://github.com/scolladon/sf-git-merge-driver/compare/v1.5.3...v1.5.4) (2026-02-26)
 
 
