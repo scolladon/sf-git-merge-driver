@@ -50,13 +50,13 @@ export const instrumentedMerge = (
   )
   timer.endPhase('json-merge')
 
-  timer.startPhase('xml-build')
+  timer.startPhase('xml-serialize')
   const serializer = new FxpXmlSerializer(config)
   let output = ''
   if (mergedResult.output.length) {
     output = serializer.serialize(mergedResult.output, namespaces)
   }
-  timer.endPhase('xml-build')
+  timer.endPhase('xml-serialize')
 
   return {
     output,

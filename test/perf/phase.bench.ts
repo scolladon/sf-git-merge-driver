@@ -64,8 +64,8 @@ for (const size of sizes) {
     })
   })
 
-  describe(`phase-build-${size}`, () => {
-    bench(`build-${size}`, () => {
+  describe(`phase-serialize-${size}`, () => {
+    bench(`serialize-${size}`, () => {
       const s = new FxpXmlSerializer(config)
       s.serialize(mergedResult.output, namespaces)
     })
