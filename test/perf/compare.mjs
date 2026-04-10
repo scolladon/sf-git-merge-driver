@@ -12,7 +12,6 @@ import { readFileSync } from 'node:fs'
 const [baselinePath, currentPath] = process.argv.slice(2)
 
 if (!baselinePath || !currentPath) {
-  console.error('Usage: node compare.mjs <baseline.json> <current.json>')
   process.exit(1)
 }
 
