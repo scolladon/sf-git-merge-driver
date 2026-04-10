@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { TEXT_TAG } from '../../../../src/constant/parserConstant.js'
 import { TextMergeNode } from '../../../../src/merger/nodes/TextMergeNode.js'
 import { defaultConfig } from '../../../utils/testConfig.js'
 
@@ -14,7 +13,7 @@ describe('TextMergeNode', () => {
 
       // Assert
       expect(result.hasConflict).toBe(false)
-      expect(result.output).toEqual([{ field: [{ [TEXT_TAG]: 'value' }] }])
+      expect(result.output).toEqual([{ field: 'value' }])
     })
 
     it('should return local value when local equals other (all present)', () => {
@@ -26,7 +25,7 @@ describe('TextMergeNode', () => {
 
       // Assert
       expect(result.hasConflict).toBe(false)
-      expect(result.output).toEqual([{ field: [{ [TEXT_TAG]: 'same' }] }])
+      expect(result.output).toEqual([{ field: 'same' }])
     })
 
     it('should return other when only other is present', () => {
@@ -38,7 +37,7 @@ describe('TextMergeNode', () => {
 
       // Assert
       expect(result.hasConflict).toBe(false)
-      expect(result.output).toEqual([{ field: [{ [TEXT_TAG]: 'other' }] }])
+      expect(result.output).toEqual([{ field: 'other' }])
     })
 
     it('should return local when only local is present', () => {
@@ -50,7 +49,7 @@ describe('TextMergeNode', () => {
 
       // Assert
       expect(result.hasConflict).toBe(false)
-      expect(result.output).toEqual([{ field: [{ [TEXT_TAG]: 'local' }] }])
+      expect(result.output).toEqual([{ field: 'local' }])
     })
 
     it('should return empty when only ancestor is present (deleted in both)', () => {
@@ -74,7 +73,7 @@ describe('TextMergeNode', () => {
 
       // Assert
       expect(result.hasConflict).toBe(false)
-      expect(result.output).toEqual([{ field: [{ [TEXT_TAG]: 'other' }] }])
+      expect(result.output).toEqual([{ field: 'other' }])
     })
 
     it('should return local when ancestor equals other (local changed)', () => {
@@ -86,7 +85,7 @@ describe('TextMergeNode', () => {
 
       // Assert
       expect(result.hasConflict).toBe(false)
-      expect(result.output).toEqual([{ field: [{ [TEXT_TAG]: 'local' }] }])
+      expect(result.output).toEqual([{ field: 'local' }])
     })
 
     it('should return conflict when all three differ', () => {
@@ -137,7 +136,7 @@ describe('TextMergeNode', () => {
 
       // Assert
       expect(result.hasConflict).toBe(false)
-      expect(result.output).toEqual([{ field: [{ [TEXT_TAG]: 2 }] }])
+      expect(result.output).toEqual([{ field: 2 }])
     })
 
     it('should handle boolean values', () => {
@@ -149,7 +148,7 @@ describe('TextMergeNode', () => {
 
       // Assert
       expect(result.hasConflict).toBe(false)
-      expect(result.output).toEqual([{ field: [{ [TEXT_TAG]: true }] }])
+      expect(result.output).toEqual([{ field: true }])
     })
   })
 })

@@ -4,12 +4,10 @@ import {
   flow,
   isEmpty,
   isNil,
-  isObject,
   reject,
   sortBy,
   uniq,
 } from 'lodash-es'
-import { TEXT_TAG } from '../../constant/parserConstant.js'
 import type { JsonArray, JsonObject, JsonValue } from '../../types/jsonTypes.js'
 import type { MergeResult } from '../../types/mergeResult.js'
 import { noConflict } from '../../types/mergeResult.js'
@@ -32,10 +30,7 @@ export const getUniqueSortedProps = (
 export const generateObj = (
   value: JsonValue | null,
   attrib: string
-): JsonObject => (isNil(value) ? {} : { [attrib]: [{ [TEXT_TAG]: value }] })
-
-export const extractContent = (arr: JsonArray): JsonObject | JsonArray =>
-  (arr.length === 1 ? arr[0] : arr) as JsonObject | JsonArray
+): JsonObject => (isNil(value) ? {} : { [attrib]: value })
 
 export const wrapWithRootKey = (
   result: MergeResult,
@@ -50,42 +45,16 @@ export const wrapWithRootKey = (
   return noConflict([{ [rootKeyName]: [] }])
 }
 
-export const toJsonArray = (inputObj: JsonObject | JsonArray): JsonArray =>
-  flatMap(getUniqueSortedProps(inputObj), attribute => {
-    const inputObjOfAttr = inputObj[attribute]
-
-    if (isObject(inputObjOfAttr)) {
-      const inputObjArr = ensureArray(inputObjOfAttr)
-      return flatMap(getUniqueSortedProps(inputObjArr), key => {
-        const value = inputObjArr[key]
-        return isObject(value)
-          ? { [attribute]: toJsonArray(value as JsonObject | JsonArray) }
-          : generateObj(value, attribute)
-      })
-    }
-
-    return generateObj(inputObjOfAttr, attribute)
-  })
-
 export const buildEarlyResult = (
   value: JsonValue,
   rootKey?: RootKeyInfo
 ): MergeResult => {
-  const content = toJsonArray(value as JsonObject | JsonArray)
+  const content = ensureArray(value)
   if (rootKey) {
     return noConflict([{ [rootKey.name]: content }])
   }
   return noConflict(content)
 }
-
-export const filterEmptyTextNodes = (markers: JsonArray): JsonArray =>
-  markers.filter(item => {
-    if (item && typeof item === 'object' && TEXT_TAG in item) {
-      const text = (item as JsonObject)[TEXT_TAG]
-      return !(typeof text === 'string' && text.trim() === '')
-    }
-    return true
-  }) as JsonArray
 
 export type KeyExtractor = (item: JsonObject) => string
 

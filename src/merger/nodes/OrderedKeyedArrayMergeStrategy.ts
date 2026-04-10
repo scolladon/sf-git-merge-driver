@@ -12,11 +12,7 @@ import { hasSameOrder, lcs, pushAll } from '../../utils/arrayUtils.js'
 import { setsEqual, setsIntersect } from '../../utils/setUtils.js'
 import { buildConflictMarkers } from '../ConflictMarkerBuilder.js'
 import type { KeyExtractor } from './nodeUtils.js'
-import {
-  buildKeyedMap,
-  filterEmptyTextNodes,
-  toJsonArray,
-} from './nodeUtils.js'
+import { buildKeyedMap } from './nodeUtils.js'
 
 // ============================================================================
 // Strategy Interface
@@ -340,22 +336,21 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
 
   private wrapKeys(keys: string[], map: Map<string, JsonObject>): JsonArray {
     return keys.map(k => ({
-      [this.attribute]: toJsonArray(map.get(k)!),
+      [this.attribute]: map.get(k)!,
     }))
   }
 
   private buildFullArrayConflict(
-    config: MergeConfig,
+    _config: MergeConfig,
     ctx: ArrayMergeState
   ): MergeResult {
-    return withConflict(
+    return withConflict([
       buildConflictMarkers(
-        config,
         this.wrapKeys(ctx.localKeys, ctx.localMap),
         this.wrapKeys(ctx.ancestorKeys, ctx.ancestorMap),
         this.wrapKeys(ctx.otherKeys, ctx.otherMap)
-      )
-    )
+      ),
+    ])
   }
 
   // Spine processing
@@ -454,20 +449,17 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   }
 
   private buildGapConflict(
-    config: MergeConfig,
+    _config: MergeConfig,
     gaps: GapKeys,
     ctx: ArrayMergeState
   ): MergeResult {
-    return withConflict(
-      filterEmptyTextNodes(
-        buildConflictMarkers(
-          config,
-          this.wrapKeys(gaps.local, ctx.localMap),
-          this.wrapKeys(gaps.ancestor, ctx.ancestorMap),
-          this.wrapKeys(gaps.other, ctx.otherMap)
-        )
-      )
-    )
+    return withConflict([
+      buildConflictMarkers(
+        this.wrapKeys(gaps.local, ctx.localMap),
+        this.wrapKeys(gaps.ancestor, ctx.ancestorMap),
+        this.wrapKeys(gaps.other, ctx.otherMap)
+      ),
+    ])
   }
 
   private mergeGapElements(
@@ -529,7 +521,7 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   // Element helpers
 
   private wrapElement(value: JsonObject): JsonObject {
-    return { [this.attribute]: toJsonArray(value) }
+    return { [this.attribute]: value }
   }
 
   private mergeElement(
@@ -560,7 +552,7 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   }
 
   private buildElementConflict(
-    config: MergeConfig,
+    _config: MergeConfig,
     lVal: JsonObject | null | undefined,
     aVal: JsonObject | null | undefined,
     oVal: JsonObject | null | undefined
@@ -568,10 +560,8 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     const wrap = (val: JsonObject | null | undefined) =>
       val ? this.wrapElement(val) : ({} as JsonObject)
 
-    return withConflict(
-      filterEmptyTextNodes(
-        buildConflictMarkers(config, wrap(lVal), wrap(aVal), wrap(oVal))
-      )
-    )
+    return withConflict([
+      buildConflictMarkers(wrap(lVal), wrap(aVal), wrap(oVal)),
+    ])
   }
 }

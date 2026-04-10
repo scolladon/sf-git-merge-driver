@@ -1,126 +1,81 @@
 import { describe, expect, it } from 'vitest'
-import { SALESFORCE_EOL } from '../../../src/constant/metadataConstant.js'
-import { TEXT_TAG } from '../../../src/constant/parserConstant.js'
 import { buildConflictMarkers } from '../../../src/merger/ConflictMarkerBuilder.js'
-import { defaultConfig } from '../../utils/testConfig.js'
+import type { ConflictBlock } from '../../../src/types/conflictBlock.js'
 
 describe('ConflictMarkerBuilder', () => {
   describe('buildConflictMarkers', () => {
-    it('should build conflict markers with all values present', () => {
+    it('should build conflict block with all values present', () => {
       // Arrange
-      const local = { field: [{ [TEXT_TAG]: 'localValue' }] }
-      const ancestor = { field: [{ [TEXT_TAG]: 'ancestorValue' }] }
-      const other = { field: [{ [TEXT_TAG]: 'otherValue' }] }
+      const local = { field: 'localValue' }
+      const ancestor = { field: 'ancestorValue' }
+      const other = { field: 'otherValue' }
 
       // Act
-      const result = buildConflictMarkers(defaultConfig, local, ancestor, other)
+      const sut: ConflictBlock = buildConflictMarkers(local, ancestor, other)
 
       // Assert
-      expect(result).toHaveLength(7)
-      expect(result[0]).toEqual({
-        [TEXT_TAG]: `${SALESFORCE_EOL}<<<<<<< ours`,
-      })
-      expect(result[1]).toEqual(local)
-      expect(result[2]).toEqual({ [TEXT_TAG]: '||||||| base' })
-      expect(result[3]).toEqual(ancestor)
-      expect(result[4]).toEqual({ [TEXT_TAG]: '=======' })
-      expect(result[5]).toEqual(other)
-      expect(result[6]).toEqual({ [TEXT_TAG]: '>>>>>>> theirs' })
+      expect(sut.__conflict).toBe(true)
+      expect(sut.local).toEqual([local])
+      expect(sut.ancestor).toEqual([ancestor])
+      expect(sut.other).toEqual([other])
     })
 
-    it('should use empty value placeholder when local is empty', () => {
+    it('should use empty object when local is empty', () => {
       // Arrange
       const local = {}
-      const ancestor = { field: [{ [TEXT_TAG]: 'ancestorValue' }] }
-      const other = { field: [{ [TEXT_TAG]: 'otherValue' }] }
+      const ancestor = { field: 'ancestorValue' }
+      const other = { field: 'otherValue' }
 
       // Act
-      const result = buildConflictMarkers(defaultConfig, local, ancestor, other)
+      const sut: ConflictBlock = buildConflictMarkers(local, ancestor, other)
 
       // Assert
-      expect(result[1]).toEqual({ [TEXT_TAG]: SALESFORCE_EOL })
+      expect(sut.__conflict).toBe(true)
+      expect(sut.local).toEqual([{}])
     })
 
-    it('should use empty value placeholder when ancestor is empty', () => {
+    it('should use empty object when ancestor is empty', () => {
       // Arrange
-      const local = { field: [{ [TEXT_TAG]: 'localValue' }] }
+      const local = { field: 'localValue' }
       const ancestor = {}
-      const other = { field: [{ [TEXT_TAG]: 'otherValue' }] }
+      const other = { field: 'otherValue' }
 
       // Act
-      const result = buildConflictMarkers(defaultConfig, local, ancestor, other)
+      const sut: ConflictBlock = buildConflictMarkers(local, ancestor, other)
 
       // Assert
-      expect(result[3]).toEqual({ [TEXT_TAG]: SALESFORCE_EOL })
+      expect(sut.__conflict).toBe(true)
+      expect(sut.ancestor).toEqual([{}])
     })
 
-    it('should use empty value placeholder when other is empty', () => {
+    it('should use empty object when other is empty', () => {
       // Arrange
-      const local = { field: [{ [TEXT_TAG]: 'localValue' }] }
-      const ancestor = { field: [{ [TEXT_TAG]: 'ancestorValue' }] }
+      const local = { field: 'localValue' }
+      const ancestor = { field: 'ancestorValue' }
       const other = {}
 
       // Act
-      const result = buildConflictMarkers(defaultConfig, local, ancestor, other)
+      const sut: ConflictBlock = buildConflictMarkers(local, ancestor, other)
 
       // Assert
-      expect(result[5]).toEqual({ [TEXT_TAG]: SALESFORCE_EOL })
-    })
-
-    it('should respect custom conflict marker size', () => {
-      // Arrange
-      const config: MergeConfig = {
-        ...defaultConfig,
-        conflictMarkerSize: 3,
-      }
-      const local = { field: [{ [TEXT_TAG]: 'localValue' }] }
-      const ancestor = { field: [{ [TEXT_TAG]: 'ancestorValue' }] }
-      const other = { field: [{ [TEXT_TAG]: 'otherValue' }] }
-
-      // Act
-      const result = buildConflictMarkers(config, local, ancestor, other)
-
-      // Assert
-      expect(result[0]).toEqual({ [TEXT_TAG]: `${SALESFORCE_EOL}<<< ours` })
-      expect(result[2]).toEqual({ [TEXT_TAG]: '||| base' })
-      expect(result[4]).toEqual({ [TEXT_TAG]: '===' })
-      expect(result[6]).toEqual({ [TEXT_TAG]: '>>> theirs' })
-    })
-
-    it('should respect custom conflict tags', () => {
-      // Arrange
-      const config: MergeConfig = {
-        ...defaultConfig,
-        localConflictTag: 'OURS',
-        ancestorConflictTag: 'ANCESTOR',
-        otherConflictTag: 'THEIRS',
-      }
-      const local = { field: [{ [TEXT_TAG]: 'localValue' }] }
-      const ancestor = { field: [{ [TEXT_TAG]: 'ancestorValue' }] }
-      const other = { field: [{ [TEXT_TAG]: 'otherValue' }] }
-
-      // Act
-      const result = buildConflictMarkers(config, local, ancestor, other)
-
-      // Assert
-      expect(result[0]).toEqual({ [TEXT_TAG]: `${SALESFORCE_EOL}<<<<<<< OURS` })
-      expect(result[2]).toEqual({ [TEXT_TAG]: '||||||| ANCESTOR' })
-      expect(result[6]).toEqual({ [TEXT_TAG]: '>>>>>>> THEIRS' })
+      expect(sut.__conflict).toBe(true)
+      expect(sut.other).toEqual([{}])
     })
 
     it('should handle arrays as values', () => {
       // Arrange
-      const local = [{ field: [{ [TEXT_TAG]: 'localValue' }] }]
-      const ancestor = [{ field: [{ [TEXT_TAG]: 'ancestorValue' }] }]
-      const other = [{ field: [{ [TEXT_TAG]: 'otherValue' }] }]
+      const local = [{ field: 'localValue' }]
+      const ancestor = [{ field: 'ancestorValue' }]
+      const other = [{ field: 'otherValue' }]
 
       // Act
-      const result = buildConflictMarkers(defaultConfig, local, ancestor, other)
+      const sut: ConflictBlock = buildConflictMarkers(local, ancestor, other)
 
       // Assert
-      expect(result[1]).toEqual(local)
-      expect(result[3]).toEqual(ancestor)
-      expect(result[5]).toEqual(other)
+      expect(sut.__conflict).toBe(true)
+      expect(sut.local).toEqual(local)
+      expect(sut.ancestor).toEqual(ancestor)
+      expect(sut.other).toEqual(other)
     })
   })
 })

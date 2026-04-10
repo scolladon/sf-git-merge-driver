@@ -5,7 +5,7 @@ export default defineConfig({
     globals: false,
     environment: 'node',
     include: ['**/test/**/*.test.ts'],
-    exclude: ['src', 'e2e', 'node_modules', 'test/utils', 'reports'],
+    exclude: ['src', 'e2e', 'node_modules', 'test/utils', 'reports', '.stryker-tmp'],
     clearMocks: true,
     coverage: {
       provider: 'v8',

@@ -137,7 +137,7 @@ describe('ScenarioStrategy', () => {
         const result = strategy.execute(context)
 
         // Assert
-        expect(result.output).toEqual([])
+        expect(result.output).toEqual([{}])
         expect(result.hasConflict).toBe(false)
       })
     })
@@ -177,7 +177,7 @@ describe('ScenarioStrategy', () => {
         const result = strategy.execute(context)
 
         // Assert
-        expect(result.output).toEqual([{ testKey: [] }])
+        expect(result.output).toEqual([{ testKey: [{}] }])
         expect(result.hasConflict).toBe(false)
       })
     })
@@ -223,7 +223,7 @@ describe('ScenarioStrategy', () => {
         const result = strategy.execute(context)
 
         // Assert
-        expect(result.output).toEqual([])
+        expect(result.output).toEqual([{}])
         expect(result.hasConflict).toBe(false)
       })
     })
@@ -263,7 +263,7 @@ describe('ScenarioStrategy', () => {
         const result = strategy.execute(context)
 
         // Assert
-        expect(result.output).toEqual([{ testKey: [] }])
+        expect(result.output).toEqual([{ testKey: [{}] }])
         expect(result.hasConflict).toBe(false)
       })
     })
@@ -323,7 +323,7 @@ describe('ScenarioStrategy', () => {
         const result = strategy.execute(context)
 
         // Assert
-        expect(result.output).toEqual([{ testKey: [] }])
+        expect(result.output).toEqual([{ testKey: [{}] }])
         expect(result.hasConflict).toBe(false)
       })
     })
@@ -927,7 +927,7 @@ describe('ScenarioStrategy', () => {
         const result = strategy.execute(context)
 
         // Assert
-        expect(result.output).toEqual([{ testKey: [] }])
+        expect(result.output).toEqual([{ testKey: [{}] }])
         expect(result.hasConflict).toBe(false)
       })
     })

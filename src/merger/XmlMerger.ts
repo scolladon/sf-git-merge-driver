@@ -1,45 +1,22 @@
-import { XMLBuilder, XMLParser } from 'fast-xml-parser'
-import {
-  CDATA_PROP_NAME,
-  XML_COMMENT_PROP_NAME,
-  XML_DECL,
-  XML_INDENT,
-} from '../constant/parserConstant.js'
+import { FlxXmlParser } from '../adapter/FlxXmlParser.js'
+import { FxpXmlSerializer } from '../adapter/FxpXmlSerializer.js'
+import type { XmlParser } from '../adapter/XmlParser.js'
+import type { XmlSerializer } from '../adapter/XmlSerializer.js'
 import type { MergeConfig } from '../types/conflictTypes.js'
+import type { JsonObject } from '../types/jsonTypes.js'
 import { log } from '../utils/LoggingDecorator.js'
-import { ConflictMarkerFormatter } from './ConflictMarkerFormatter.js'
 import { JsonMerger } from './JsonMerger.js'
 
-const baseOptions = {
-  cdataPropName: CDATA_PROP_NAME,
-  commentPropName: XML_COMMENT_PROP_NAME,
-  ignoreAttributes: false,
-  processEntities: false,
-}
-
-export const parserOptions = {
-  ...baseOptions,
-  ignoreDeclaration: true,
-  numberParseOptions: { leadingZeros: false, hex: false },
-  parseAttributeValue: false,
-  parseTagValue: false,
-}
-
-export const builderOptions = {
-  ...baseOptions,
-  format: true,
-  indentBy: XML_INDENT,
-  preserveOrder: true,
-}
-
-const correctComments = (xml: string): string =>
-  xml.includes('<!--') ? xml.replace(/\s+<!--(.*?)-->\s+/g, '<!--$1-->') : xml
+const mergeNamespaces = (...maps: JsonObject[]): JsonObject =>
+  Object.assign({}, ...maps)
 
 export class XmlMerger {
-  private readonly formatter: ConflictMarkerFormatter
+  private readonly parser: XmlParser
+  private readonly serializer: XmlSerializer
 
   constructor(private readonly config: MergeConfig) {
-    this.formatter = new ConflictMarkerFormatter(config)
+    this.parser = new FlxXmlParser()
+    this.serializer = new FxpXmlSerializer(config)
   }
 
   @log
@@ -48,28 +25,28 @@ export class XmlMerger {
     ourContent: string,
     theirContent: string
   ): { output: string; hasConflict: boolean } {
-    const parser = new XMLParser(parserOptions)
+    const ancestor = this.parser.parse(ancestorContent)
+    const local = this.parser.parse(ourContent)
+    const other = this.parser.parse(theirContent)
 
-    const ancestorObj = parser.parse(ancestorContent)
-    const ourObj = parser.parse(ourContent)
-    const theirObj = parser.parse(theirContent)
+    const namespaces = mergeNamespaces(
+      ancestor.namespaces,
+      local.namespaces,
+      other.namespaces
+    )
 
     const jsonMerger = new JsonMerger(this.config)
-    const mergedResult = jsonMerger.mergeThreeWay(ancestorObj, ourObj, theirObj)
+    const mergedResult = jsonMerger.mergeThreeWay(
+      ancestor.content,
+      local.content,
+      other.content
+    )
 
-    const builder = new XMLBuilder(builderOptions)
-    const mergedXml: string = builder.build(mergedResult.output)
     return {
-      output: mergedXml.length ? this.formatXmlOutput(mergedXml) : '',
+      output: mergedResult.output.length
+        ? this.serializer.serialize(mergedResult.output, namespaces)
+        : '',
       hasConflict: mergedResult.hasConflict,
     }
-  }
-
-  private formatXmlOutput(xml: string): string {
-    let result = XML_DECL.concat(xml)
-    result = this.formatter.handleSpecialEntities(result)
-    result = correctComments(result)
-    result = this.formatter.correctConflictIndent(result)
-    return result
   }
 }

@@ -3,10 +3,8 @@ import { TEXT_TAG } from '../../../../src/constant/parserConstant.js'
 import {
   buildKeyedMap,
   ensureArray,
-  filterEmptyTextNodes,
   generateObj,
   getUniqueSortedProps,
-  toJsonArray,
 } from '../../../../src/merger/nodes/nodeUtils.js'
 
 describe('nodeUtils', () => {
@@ -115,125 +113,13 @@ describe('nodeUtils', () => {
       expect(result).toEqual({})
     })
 
-    it('given value when generateObj then returns wrapped object', () => {
+    it('given value when generateObj then returns compact object', () => {
       // Arrange
       // Act
       const result = generateObj('value', 'attr')
 
       // Assert
-      expect(result).toEqual({ attr: [{ '#text': 'value' }] })
-    })
-  })
-
-  describe('toJsonArray', () => {
-    it('given simple object when toJsonArray then returns array with wrapped values', () => {
-      // Arrange
-      const obj = { attr: 'value' }
-
-      // Act
-      const result = toJsonArray(obj)
-
-      // Assert
-      expect(result).toEqual([{ attr: [{ '#text': 'value' }] }])
-    })
-
-    it('given empty object when toJsonArray then returns empty array', () => {
-      // Arrange
-      // Act
-      const result = toJsonArray({})
-
-      // Assert
-      expect(result).toEqual([])
-    })
-
-    it('given nested object when toJsonArray then returns flattened array', () => {
-      // Arrange
-      const obj = { outer: [{ inner: 'value' }] }
-
-      // Act
-      const result = toJsonArray(obj)
-
-      // Assert
-      expect(result.length).toBeGreaterThan(0)
-    })
-
-    it('given object with array containing primitive values when toJsonArray then generates objects for primitives', () => {
-      // Arrange - covers the else branch in line 41 where value is NOT an object
-      const obj = { items: ['a', 'b', 'c'] }
-
-      // Act
-      const result = toJsonArray(obj)
-
-      // Assert
-      expect(result).toEqual([
-        { items: [{ '#text': 'a' }] },
-        { items: [{ '#text': 'b' }] },
-        { items: [{ '#text': 'c' }] },
-      ])
-    })
-
-    it('given object with array containing mixed primitives and objects when toJsonArray then handles both', () => {
-      // Arrange - covers both branches in line 41
-      const obj = {
-        items: ['primitive', { nested: 'object' }],
-      }
-
-      // Act
-      const result = toJsonArray(obj)
-
-      // Assert
-      expect(result.length).toBe(2)
-      // First element is primitive wrapped
-      expect(result[0]).toEqual({ items: [{ '#text': 'primitive' }] })
-      // Second element is nested object processed recursively
-      expect(result[1]).toHaveProperty('items')
-    })
-
-    it('given object with null value in array when toJsonArray then generates empty object', () => {
-      // Arrange - covers the isNil branch in generateObj within toJsonArray
-      const obj = { items: [null, 'valid'] }
-
-      // Act
-      const result = toJsonArray(obj)
-
-      // Assert
-      // null generates empty object {}, 'valid' generates wrapped object
-      expect(result).toContainEqual({ items: [{ '#text': 'valid' }] })
-    })
-  })
-
-  describe('filterEmptyTextNodes', () => {
-    it('Given array with empty text node, When filtering, Then removes it', () => {
-      // Arrange
-      const markers = [{ [TEXT_TAG]: '  ' }, { field: 'value' }]
-
-      // Act
-      const result = filterEmptyTextNodes(markers)
-
-      // Assert
-      expect(result).toEqual([{ field: 'value' }])
-    })
-
-    it('Given array with non-empty text node, When filtering, Then keeps it', () => {
-      // Arrange
-      const markers = [{ [TEXT_TAG]: 'content' }, { field: 'value' }]
-
-      // Act
-      const result = filterEmptyTextNodes(markers)
-
-      // Assert
-      expect(result).toEqual([{ [TEXT_TAG]: 'content' }, { field: 'value' }])
-    })
-
-    it('Given array without text nodes, When filtering, Then returns unchanged', () => {
-      // Arrange
-      const markers = [{ field: 'a' }, { field: 'b' }]
-
-      // Act
-      const result = filterEmptyTextNodes(markers)
-
-      // Assert
-      expect(result).toEqual([{ field: 'a' }, { field: 'b' }])
+      expect(result).toEqual({ attr: 'value' })
     })
   })
 

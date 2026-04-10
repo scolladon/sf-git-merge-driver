@@ -128,7 +128,18 @@ Enum representing the 8 possible scenarios based on content presence:
 
 ### Conflict Handling
 
-When conflicts cannot be auto-resolved, the driver generates zdiff3-style conflict markers:
+When conflicts cannot be auto-resolved, the merger produces `ConflictBlock` domain objects:
+
+```typescript
+interface ConflictBlock {
+  readonly __conflict: true
+  readonly local: JsonArray    // local version content
+  readonly ancestor: JsonArray // ancestor version content
+  readonly other: JsonArray    // other version content
+}
+```
+
+The serializer adapter expands these into zdiff3-style conflict markers in the XML output:
 
 ```xml
 <<<<<<< ours
@@ -140,7 +151,40 @@ When conflicts cannot be auto-resolved, the driver generates zdiff3-style confli
 >>>>>>> theirs
 ```
 
-The `ConflictMarkerBuilder` constructs these markers, and `ConflictMarkerFormatter` handles post-processing (entity escaping, indentation correction).
+`ConflictMarkerFormatter` handles post-processing (entity escaping, indentation correction).
+
+### Ports & Adapters (Hexagonal Architecture)
+
+The XML parsing and serialization are isolated behind port interfaces, keeping the merge domain free from library-specific format details.
+
+```mermaid
+classDiagram
+    class XmlParser {
+        <<interface>>
+        +parse(xml) ParsedXml
+    }
+
+    class XmlSerializer {
+        <<interface>>
+        +serialize(output, namespaces) string
+    }
+
+    class FlxXmlParser {
+        +parse(xml) ParsedXml
+    }
+
+    class FxpXmlSerializer {
+        +serialize(output, namespaces) string
+    }
+
+    XmlParser <|.. FlxXmlParser
+    XmlSerializer <|.. FxpXmlSerializer
+```
+
+- **`XmlParser` port** — Parses XML, extracts namespace attributes, returns clean compact content
+- **`XmlSerializer` port** — Converts compact merge output + `ConflictBlock` objects to ordered XML builder format, inserts namespaces, formats output
+- **`FlxXmlParser`** — Adapter using `@nodable/flexible-xml-parser` (3-5x faster parsing)
+- **`FxpXmlSerializer`** — Adapter using `fast-xml-parser` `XMLBuilder`
 
 ## Data Flow
 
@@ -150,38 +194,50 @@ flowchart TD
         XML["XML Input (3 files)"]
     end
 
-    subgraph Parse
-        JSON["JSON Parse (fast-xml-parser)"]
+    subgraph "Parser Adapter"
+        Parse["FlxXmlParser.parse()"]
+        Extract["Extract namespaces (@_)"]
+        Clean["Clean parser bugs"]
     end
 
-    subgraph Merge
+    subgraph "Domain (format-agnostic)"
         Orchestrator["MergeOrchestrator"]
         Strategy["ScenarioStrategy"]
         Nodes["MergeNode (recursive)"]
-        Conflict["ConflictMarkerBuilder"]
+        Conflict["ConflictBlock"]
+    end
+
+    subgraph "Serializer Adapter"
+        Convert["Compact → Ordered"]
+        Expand["Expand ConflictBlocks"]
+        Build["XMLBuilder"]
+        Format["ConflictMarkerFormatter"]
     end
 
     subgraph Output
         Result["XML Output (merged file)"]
     end
 
-    XML --> JSON
-    JSON --> Orchestrator
+    XML --> Parse --> Extract --> Clean --> Orchestrator
     Orchestrator --> Strategy
     Strategy --> Nodes
     Strategy --> Conflict
-    Nodes --> Result
-    Conflict --> Result
+    Nodes --> Convert
+    Conflict --> Expand
+    Convert --> Build
+    Expand --> Build
+    Build --> Format --> Result
 ```
 
 ## Key Design Decisions
 
-### 1. JSON Intermediate Representation
+### 1. Compact JSON Intermediate Representation
 
-XML is converted to JSON for easier manipulation. The `fast-xml-parser` library preserves:
-- Element order
-- Attributes (prefixed with `@_`)
-- Text content (stored in `#text` property)
+XML is converted to a compact JSON format for easier manipulation. The domain operates on plain JSON objects without knowledge of any XML parser library's conventions:
+- Scalars are plain values: `{ field: "value" }`
+- Nested elements are child objects: `{ parent: { child: "value" } }`
+- Namespace attributes are extracted by the parser adapter
+- The serializer adapter handles conversion to the XML builder's ordered format (`{ tag: [{ "#text": value }] }`) and expansion of `ConflictBlock` objects into text markers
 
 ### 2. Key-Based Array Merging
 

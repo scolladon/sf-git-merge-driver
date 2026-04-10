@@ -12,9 +12,7 @@ import type { MergeContext } from '../MergeContext.js'
 import { MergeOrchestrator } from '../MergeOrchestrator.js'
 import {
   buildEarlyResult,
-  extractContent,
   getUniqueSortedProps,
-  toJsonArray,
   wrapWithRootKey,
 } from '../nodes/nodeUtils.js'
 
@@ -77,10 +75,10 @@ abstract class AbstractAncestorStrategy implements ScenarioStrategy {
 
       if (!existsInSecondary && !targetUnchanged) {
         const targetObj = {
-          [name]: toJsonArray(target as JsonObject | JsonArray),
+          [name]: target as JsonObject | JsonArray,
         }
         const ancestorObj = {
-          [name]: toJsonArray(context.ancestor as JsonObject | JsonArray),
+          [name]: context.ancestor as JsonObject | JsonArray,
         }
         return withConflict(this.buildConflict(context, targetObj, ancestorObj))
       }
@@ -99,8 +97,8 @@ abstract class AbstractAncestorStrategy implements ScenarioStrategy {
     return withConflict(
       this.buildConflict(
         context,
-        extractContent(toJsonArray(target as JsonObject | JsonArray)),
-        extractContent(toJsonArray(context.ancestor as JsonObject | JsonArray))
+        target as JsonObject | JsonArray,
+        context.ancestor as JsonObject | JsonArray
       )
     )
   }
@@ -184,11 +182,11 @@ class AncestorAndLocalStrategy extends AbstractAncestorStrategy {
   }
 
   protected buildConflict(
-    context: MergeContext,
+    _context: MergeContext,
     targetObj: JsonObject,
     ancestorObj: JsonObject
   ): JsonArray {
-    return buildConflictMarkers(context.config, targetObj, ancestorObj, {})
+    return [buildConflictMarkers(targetObj, ancestorObj, {})]
   }
 
   protected executeWithAttribute(context: MergeContext): MergeResult {
@@ -209,9 +207,7 @@ class AncestorAndLocalStrategy extends AbstractAncestorStrategy {
       [context.attribute!]: ancestorResult.output,
     }
 
-    return withConflict(
-      buildConflictMarkers(context.config, localProp, ancestorProp, {})
-    )
+    return withConflict([buildConflictMarkers(localProp, ancestorProp, {})])
   }
 }
 
@@ -225,11 +221,11 @@ class AncestorAndOtherStrategy extends AbstractAncestorStrategy {
   }
 
   protected buildConflict(
-    context: MergeContext,
+    _context: MergeContext,
     targetObj: JsonObject | JsonArray,
     ancestorObj: JsonObject | JsonArray
   ): JsonArray {
-    return buildConflictMarkers(context.config, {}, ancestorObj, targetObj)
+    return [buildConflictMarkers({}, ancestorObj, targetObj)]
   }
 
   protected executeWithAttribute(context: MergeContext): MergeResult {
@@ -250,9 +246,7 @@ class AncestorAndOtherStrategy extends AbstractAncestorStrategy {
     }
     const otherProp = { [context.attribute!]: otherResult.output }
 
-    return withConflict(
-      buildConflictMarkers(context.config, {}, ancestorProp, otherProp)
-    )
+    return withConflict([buildConflictMarkers({}, ancestorProp, otherProp)])
   }
 }
 

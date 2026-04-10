@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { TEXT_TAG } from '../../../../src/constant/parserConstant.js'
 import { TextArrayMergeNode } from '../../../../src/merger/nodes/TextArrayMergeNode.js'
 import { defaultConfig } from '../../../utils/testConfig.js'
 
@@ -18,9 +17,9 @@ describe('TextArrayMergeNode', () => {
       // Assert
       expect(result.hasConflict).toBe(false)
       expect(result.output).toEqual([
-        { items: [{ [TEXT_TAG]: 'a' }] },
-        { items: [{ [TEXT_TAG]: 'b' }] },
-        { items: [{ [TEXT_TAG]: 'c' }] },
+        { items: 'a' },
+        { items: 'b' },
+        { items: 'c' },
       ])
     })
 
@@ -127,9 +126,9 @@ describe('TextArrayMergeNode', () => {
       // Assert
       expect(result.hasConflict).toBe(false)
       expect(result.output).toEqual([
-        { items: [{ [TEXT_TAG]: 'a' }] },
-        { items: [{ [TEXT_TAG]: 'b' }] },
-        { items: [{ [TEXT_TAG]: 'c' }] },
+        { items: 'a' },
+        { items: 'b' },
+        { items: 'c' },
       ])
     })
 
@@ -192,7 +191,7 @@ describe('TextArrayMergeNode', () => {
       expect(result.hasConflict).toBe(false)
       // null value generates empty object {} which is included in output
       expect(result.output).toContainEqual({})
-      expect(result.output).toContainEqual({ items: [{ [TEXT_TAG]: 'a' }] })
+      expect(result.output).toContainEqual({ items: 'a' })
     })
 
     it('should handle arrays with undefined values added by both sides', () => {
@@ -282,8 +281,8 @@ describe('TextArrayMergeNode', () => {
       const result = node.merge(defaultConfig)
 
       // Assert
-      expect(result.output[0]).toEqual({ items: [{ [TEXT_TAG]: 'a' }] })
-      expect(result.output[1]).toEqual({ items: [{ [TEXT_TAG]: 'z' }] })
+      expect(result.output[0]).toEqual({ items: 'a' })
+      expect(result.output[1]).toEqual({ items: 'z' })
     })
 
     it('should correctly compare items where first is greater', () => {
@@ -298,8 +297,8 @@ describe('TextArrayMergeNode', () => {
 
       // Assert
       // After sort: a, b
-      expect(result.output[0]).toEqual({ items: [{ [TEXT_TAG]: 'a' }] })
-      expect(result.output[1]).toEqual({ items: [{ [TEXT_TAG]: 'b' }] })
+      expect(result.output[0]).toEqual({ items: 'a' })
+      expect(result.output[1]).toEqual({ items: 'b' })
     })
 
     it('should skip adding item from local when it exists in ancestor', () => {

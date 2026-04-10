@@ -9,7 +9,7 @@ import { MergeOrchestrator } from '../MergeOrchestrator.js'
 import type { MergeNode } from './MergeNode.js'
 import { defaultNodeFactory } from './MergeNodeFactory.js'
 import type { KeyExtractor } from './nodeUtils.js'
-import { buildKeyedMap, toJsonArray } from './nodeUtils.js'
+import { buildKeyedMap } from './nodeUtils.js'
 import type { KeyedArrayMergeStrategy } from './OrderedKeyedArrayMergeStrategy.js'
 import { OrderedKeyedArrayMergeStrategy } from './OrderedKeyedArrayMergeStrategy.js'
 
@@ -25,18 +25,14 @@ class UnkeyedConflictStrategy implements KeyedArrayMergeStrategy {
     private readonly attribute: string
   ) {}
 
-  merge(config: MergeConfig): MergeResult {
-    const unwrap = (arr: JsonArray) =>
-      (arr.length === 1 ? arr[0] : arr) as JsonObject | JsonArray
-
-    return withConflict(
+  merge(_config: MergeConfig): MergeResult {
+    return withConflict([
       buildConflictMarkers(
-        config,
-        unwrap(toJsonArray({ [this.attribute]: this.local })),
-        unwrap(toJsonArray({ [this.attribute]: this.ancestor })),
-        unwrap(toJsonArray({ [this.attribute]: this.other }))
-      )
-    )
+        { [this.attribute]: this.local },
+        { [this.attribute]: this.ancestor },
+        { [this.attribute]: this.other }
+      ),
+    ])
   }
 }
 

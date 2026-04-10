@@ -1,4 +1,3 @@
-import { NamespaceHandler } from '../service/NamespaceHandler.js'
 import type { MergeConfig } from '../types/conflictTypes.js'
 import type { JsonArray, JsonObject } from '../types/jsonTypes.js'
 import type { MergeResult } from '../types/mergeResult.js'
@@ -21,13 +20,6 @@ export class JsonMerger {
     local: JsonObject | JsonArray,
     other: JsonObject | JsonArray
   ): { output: JsonArray; hasConflict: boolean } {
-    const namespaceHandler = new NamespaceHandler()
-    const namespaces = namespaceHandler.processNamespaces(
-      ancestor,
-      local,
-      other
-    )
-
     const results: MergeResult[] = []
     const props = getUniqueSortedProps(ancestor, local, other)
 
@@ -47,8 +39,6 @@ export class JsonMerger {
     }
 
     const combined = combineResults(results)
-    namespaceHandler.addNamespacesToResult(combined.output, namespaces)
-
     return {
       output: combined.output,
       hasConflict: combined.hasConflict,

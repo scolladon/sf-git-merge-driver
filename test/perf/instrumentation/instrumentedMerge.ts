@@ -1,13 +1,9 @@
-import { XMLBuilder, XMLParser } from 'fast-xml-parser'
-import { XML_DECL } from '../../../src/constant/parserConstant.js'
-import { ConflictMarkerFormatter } from '../../../src/merger/ConflictMarkerFormatter.js'
+import { FlxXmlParser } from '../../../src/adapter/FlxXmlParser.js'
+import { FxpXmlSerializer } from '../../../src/adapter/FxpXmlSerializer.js'
 import { JsonMerger } from '../../../src/merger/JsonMerger.js'
-import { builderOptions, parserOptions } from '../../../src/merger/XmlMerger.js'
 import type { MergeConfig } from '../../../src/types/conflictTypes.js'
+import type { JsonObject } from '../../../src/types/jsonTypes.js'
 import type { PhaseTimer } from './PhaseTimer.js'
-
-const correctComments = (xml: string): string =>
-  xml.includes('<!--') ? xml.replace(/\s+<!--(.*?)-->\s+/g, '<!--$1-->') : xml
 
 export interface InstrumentedResult {
   readonly output: string
@@ -15,6 +11,9 @@ export interface InstrumentedResult {
   readonly inputSizeBytes: number
   readonly outputSizeBytes: number
 }
+
+const mergeNamespaces = (...maps: JsonObject[]): JsonObject =>
+  Object.assign({}, ...maps)
 
 export const instrumentedMerge = (
   ancestorContent: string,
@@ -28,35 +27,36 @@ export const instrumentedMerge = (
     Buffer.byteLength(localContent) +
     Buffer.byteLength(otherContent)
 
-  const parser = new XMLParser(parserOptions)
+  const parser = new FlxXmlParser()
 
   timer.startPhase('xml-parse')
-  const ancestorObj = parser.parse(ancestorContent)
-  const localObj = parser.parse(localContent)
-  const otherObj = parser.parse(otherContent)
+  const ancestor = parser.parse(ancestorContent)
+  const local = parser.parse(localContent)
+  const other = parser.parse(otherContent)
   timer.endPhase('xml-parse')
+
+  const namespaces = mergeNamespaces(
+    ancestor.namespaces,
+    local.namespaces,
+    other.namespaces
+  )
 
   timer.startPhase('json-merge')
   const jsonMerger = new JsonMerger(config)
-  const mergedResult = jsonMerger.mergeThreeWay(ancestorObj, localObj, otherObj)
+  const mergedResult = jsonMerger.mergeThreeWay(
+    ancestor.content,
+    local.content,
+    other.content
+  )
   timer.endPhase('json-merge')
 
   timer.startPhase('xml-build')
-  const builder = new XMLBuilder(builderOptions)
-  const mergedXml: string = builder.build(mergedResult.output)
-  timer.endPhase('xml-build')
-
-  timer.startPhase('conflict-format')
+  const serializer = new FxpXmlSerializer(config)
   let output = ''
-  if (mergedXml.length) {
-    const formatter = new ConflictMarkerFormatter(config)
-    let result = XML_DECL.concat(mergedXml)
-    result = formatter.handleSpecialEntities(result)
-    result = correctComments(result)
-    result = formatter.correctConflictIndent(result)
-    output = result
+  if (mergedResult.output.length) {
+    output = serializer.serialize(mergedResult.output, namespaces)
   }
-  timer.endPhase('conflict-format')
+  timer.endPhase('xml-build')
 
   return {
     output,
