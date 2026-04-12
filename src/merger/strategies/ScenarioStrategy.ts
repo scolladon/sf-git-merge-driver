@@ -264,14 +264,14 @@ class AllPresentStrategy extends AbstractMergeStrategy {
 // ============================================================================
 
 const strategies: Record<MergeScenario, ScenarioStrategy> = {
+  [MergeScenario.ALL]: new AllPresentStrategy(),
+  [MergeScenario.ANCESTOR_AND_LOCAL]: new AncestorAndLocalStrategy(),
+  [MergeScenario.ANCESTOR_AND_OTHER]: new AncestorAndOtherStrategy(),
+  [MergeScenario.ANCESTOR_ONLY]: new AncestorOnlyStrategy(),
+  [MergeScenario.LOCAL_AND_OTHER]: new LocalAndOtherStrategy(),
+  [MergeScenario.LOCAL_ONLY]: new LocalOnlyStrategy(),
   [MergeScenario.NONE]: new NoneStrategy(),
   [MergeScenario.OTHER_ONLY]: new OtherOnlyStrategy(),
-  [MergeScenario.LOCAL_ONLY]: new LocalOnlyStrategy(),
-  [MergeScenario.LOCAL_AND_OTHER]: new LocalAndOtherStrategy(),
-  [MergeScenario.ANCESTOR_ONLY]: new AncestorOnlyStrategy(),
-  [MergeScenario.ANCESTOR_AND_OTHER]: new AncestorAndOtherStrategy(),
-  [MergeScenario.ANCESTOR_AND_LOCAL]: new AncestorAndLocalStrategy(),
-  [MergeScenario.ALL]: new AllPresentStrategy(),
 }
 
 export const getScenarioStrategy = (
