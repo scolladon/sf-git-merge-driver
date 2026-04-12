@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { FxpXmlSerializer } from '../../../src/adapter/FxpXmlSerializer.js'
 import { buildConflictBlock } from '../../../src/types/conflictBlock.js'
+import type { JsonArray } from '../../../src/types/jsonTypes.js'
 import { defaultConfig } from '../../utils/testConfig.js'
 
 describe('FxpXmlSerializer', () => {
@@ -262,6 +263,73 @@ describe('FxpXmlSerializer', () => {
       expect(result).toContain('<<<<<<< ours')
       expect(result).toContain('>>>>>>> theirs')
       expect(result).toContain('localDeep')
+    })
+  })
+
+  describe('given output with null text value', () => {
+    it('when serializing then produces empty element', () => {
+      // Arrange - wrapText receives null value
+      const mergedOutput: JsonArray = [
+        {
+          Root: [{ tag: null as unknown as string }],
+        },
+      ]
+
+      // Act
+      const result = sut.serialize(mergedOutput, {})
+
+      // Assert
+      expect(result).toContain('<Root>')
+      expect(result).not.toContain('<tag>')
+    })
+  })
+
+  describe('given output with XML comments', () => {
+    it('when serializing then corrects comment whitespace', () => {
+      // Arrange - XML comments use the '!--' property
+      const mergedOutput: JsonArray = [
+        {
+          Root: [{ '!--': [{ '#text': 'test comment' }] }],
+        },
+      ]
+
+      // Act
+      const result = sut.serialize(mergedOutput, {})
+
+      // Assert
+      expect(result).toContain('<!--')
+      expect(result).toContain('-->')
+    })
+  })
+
+  describe('given empty output array', () => {
+    it('when serializing with namespaces then does not insert namespaces', () => {
+      // Arrange - empty output should skip namespace insertion
+      const mergedOutput: JsonArray = []
+      const namespaces = {
+        '@_xmlns': 'http://soap.sforce.com/2006/04/metadata',
+      }
+
+      // Act
+      const result = sut.serialize(mergedOutput, namespaces)
+
+      // Assert
+      expect(result).not.toContain('xmlns')
+    })
+  })
+
+  describe('given non-empty output with empty namespaces', () => {
+    it('when serializing then skips namespace insertion', () => {
+      // Arrange
+      const mergedOutput: JsonArray = [{ Root: [{ val: 'test' }] }]
+      const namespaces = {}
+
+      // Act
+      const result = sut.serialize(mergedOutput, namespaces)
+
+      // Assert
+      expect(result).not.toContain('xmlns')
+      expect(result).toContain('<val>test</val>')
     })
   })
 })

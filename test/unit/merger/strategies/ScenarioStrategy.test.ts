@@ -577,6 +577,33 @@ describe('ScenarioStrategy', () => {
         const outputStr = JSON.stringify(result.output)
         expect(outputStr).not.toContain('testAttr')
       })
+
+      it('given attribute when target differs from ancestor then wraps output as object with attribute key', () => {
+        // Arrange
+        const context = createContext({
+          ancestor: { key: 'ancestorValue' },
+          local: { key: 'localValue' },
+          attribute: 'myAttr',
+        })
+
+        // Act
+        const result = strategy.execute(context)
+
+        // Assert
+        expect(result.hasConflict).toBe(true)
+        // Verify the conflict block contains objects with the attribute key (not arrays)
+        const conflictBlock = result.output[0] as Record<string, unknown>
+        expect(conflictBlock).toHaveProperty('__conflict', true)
+        const localSide = conflictBlock['local'] as Record<string, unknown>[]
+        expect(localSide[0]).toHaveProperty('myAttr')
+        expect(Array.isArray(localSide[0])).toBe(false)
+        const ancestorSide = conflictBlock['ancestor'] as Record<
+          string,
+          unknown
+        >[]
+        expect(ancestorSide[0]).toHaveProperty('myAttr')
+        expect(Array.isArray(ancestorSide[0])).toBe(false)
+      })
     })
 
     describe('with rootKey', () => {
@@ -724,6 +751,34 @@ describe('ScenarioStrategy', () => {
         expect(result.hasConflict).toBe(true)
         const outputStr = JSON.stringify(result.output)
         expect(outputStr).toContain('testAttr')
+      })
+    })
+
+    describe('with attribute', () => {
+      it('given attribute when target differs from ancestor then wraps output as object with attribute key', () => {
+        // Arrange
+        const context = createContext({
+          ancestor: { key: 'ancestorValue' },
+          other: { key: 'otherValue' },
+          attribute: 'myAttr',
+        })
+
+        // Act
+        const result = strategy.execute(context)
+
+        // Assert
+        expect(result.hasConflict).toBe(true)
+        const conflictBlock = result.output[0] as Record<string, unknown>
+        expect(conflictBlock).toHaveProperty('__conflict', true)
+        const otherSide = conflictBlock['other'] as Record<string, unknown>[]
+        expect(otherSide[0]).toHaveProperty('myAttr')
+        expect(Array.isArray(otherSide[0])).toBe(false)
+        const ancestorSide = conflictBlock['ancestor'] as Record<
+          string,
+          unknown
+        >[]
+        expect(ancestorSide[0]).toHaveProperty('myAttr')
+        expect(Array.isArray(ancestorSide[0])).toBe(false)
       })
     })
 

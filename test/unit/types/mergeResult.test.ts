@@ -175,6 +175,18 @@ describe('mergeResult', () => {
       expect(result.output).toEqual([{ root: [] }])
       expect(result.hasConflict).toBe(false)
     })
+
+    it('given non-empty output without conflict when wrapping then preserves hasConflict false', () => {
+      // Arrange
+      const sut = noConflict([{ field: 'value' }])
+
+      // Act
+      const result = wrapWithRootKey(sut, 'root')
+
+      // Assert
+      expect(result.output).toEqual([{ root: [{ field: 'value' }] }])
+      expect(result.hasConflict).toBe(false)
+    })
   })
 
   describe('buildEarlyResult', () => {

@@ -77,5 +77,44 @@ describe('ConflictMarkerBuilder', () => {
       expect(sut.ancestor).toEqual(ancestor)
       expect(sut.other).toEqual(other)
     })
+
+    it('given empty array when building then replaces with empty object', () => {
+      // Arrange
+      const local: never[] = []
+      const ancestor = { field: 'ancestorValue' }
+      const other = { field: 'otherValue' }
+
+      // Act
+      const sut: ConflictBlock = buildConflictMarkers(local, ancestor, other)
+
+      // Assert
+      expect(sut.local).toEqual([{}])
+    })
+
+    it('given non-empty array when building then keeps array as-is', () => {
+      // Arrange
+      const local = [{ a: 1 }]
+      const ancestor = { field: 'ancestorValue' }
+      const other = { field: 'otherValue' }
+
+      // Act
+      const sut: ConflictBlock = buildConflictMarkers(local, ancestor, other)
+
+      // Assert
+      expect(sut.local).toEqual([{ a: 1 }])
+    })
+
+    it('given non-empty object when building then keeps object as-is', () => {
+      // Arrange
+      const local = { a: 1 }
+      const ancestor = { field: 'ancestorValue' }
+      const other = { field: 'otherValue' }
+
+      // Act
+      const sut: ConflictBlock = buildConflictMarkers(local, ancestor, other)
+
+      // Assert
+      expect(sut.local).toEqual([{ a: 1 }])
+    })
   })
 })

@@ -435,4 +435,42 @@ describe('OrderedKeyedArrayMergeStrategy', () => {
       expect(extractConflictStructure(result.output)).toEqual(expectedOutput)
     })
   })
+
+  describe('processKeyOrder with deleted elements', () => {
+    it('given diverged ordering with one side deleting an element then filters out empty results', () => {
+      // Arrange - local moves A,B and local deletes C (not in other),
+      // processKeyOrder iterates keys and some produce null/empty results
+      const strategy = createStrategy(
+        toElements(['A', 'B', 'C']),
+        toElements(['B', 'A']),
+        toElements(['A', 'B', 'C'])
+      )
+
+      // Act
+      const result = strategy.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      expect(extractLabels(result.output)).toEqual(['B', 'A'])
+    })
+  })
+
+  describe('computeGapSets filtering', () => {
+    it('given gap where ancestor has keys not in local or other then computes correct deleted sets', () => {
+      // Arrange - A,B,C in ancestor; local has only A; other has only A
+      // Both deleted B and C independently via gap processing
+      const strategy = createStrategy(
+        toElements(['X', 'A', 'B', 'C', 'Y']),
+        toElements(['X', 'A', 'Y']),
+        toElements(['X', 'A', 'Y'])
+      )
+
+      // Act
+      const result = strategy.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      expect(extractLabels(result.output)).toEqual(['X', 'A', 'Y'])
+    })
+  })
 })

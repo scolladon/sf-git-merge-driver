@@ -127,6 +127,33 @@ describe('MergeNodeFactory', () => {
         // Assert
         expect(node).toBeInstanceOf(KeyedArrayMergeNode)
       })
+
+      it('given object and array values when createNode then returns KeyedArrayMergeNode not PropertyMergeNode', () => {
+        // Arrange - one value is an array, which prevents isPureUnknown from returning true
+        const ancestor = { a: 1 }
+        const local = [{ b: 2 }]
+        const other = { c: 3 }
+
+        // Act
+        const node = factory.createNode(ancestor, local, other, 'attr')
+
+        // Assert
+        expect(node).toBeInstanceOf(KeyedArrayMergeNode)
+        expect(node).not.toBeInstanceOf(PropertyMergeNode)
+      })
+
+      it('given objects with known key extractor when createNode then returns KeyedArrayMergeNode', () => {
+        // Arrange - 'customValue' has a key extractor in MetadataService
+        const ancestor = { fullName: 'A' }
+        const local = { fullName: 'B' }
+        const other = { fullName: 'C' }
+
+        // Act
+        const node = factory.createNode(ancestor, local, other, 'customValue')
+
+        // Assert
+        expect(node).toBeInstanceOf(KeyedArrayMergeNode)
+      })
     })
   })
 
