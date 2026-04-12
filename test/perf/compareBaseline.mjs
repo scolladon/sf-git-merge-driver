@@ -106,12 +106,10 @@ if (token && repo && prNumber) {
 
   const commentsRes = await fetch(
     `${apiBase}/issues/${prNumber}/comments?per_page=100`,
-    { headers },
+    { headers }
   )
   const comments = await commentsRes.json()
-  const existing = comments.find?.(c =>
-    c.body?.includes(commentMarker),
-  )
+  const existing = comments.find?.(c => c.body?.includes(commentMarker))
 
   if (existing) {
     await fetch(`${apiBase}/issues/comments/${existing.id}`, {
@@ -131,7 +129,7 @@ if (token && repo && prNumber) {
 if (regressions.length > 0) {
   // biome-ignore lint/suspicious/noConsole: CI output
   console.error(
-    `\n::error::${regressions.length} performance regression(s) detected (runtime threshold: ${RUNTIME_THRESHOLD}x, latency threshold: ${MEMORY_THRESHOLD}x)`,
+    `\n::error::${regressions.length} performance regression(s) detected (runtime threshold: ${RUNTIME_THRESHOLD}x, latency threshold: ${MEMORY_THRESHOLD}x)`
   )
   process.exit(1)
 }
