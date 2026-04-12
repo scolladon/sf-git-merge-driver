@@ -13,10 +13,12 @@ const mergeNamespaces = (...maps: JsonObject[]): JsonObject =>
 export class XmlMerger {
   private readonly parser: XmlParser
   private readonly serializer: XmlSerializer
+  private readonly jsonMerger: JsonMerger
 
-  constructor(private readonly config: MergeConfig) {
+  constructor(config: MergeConfig) {
     this.parser = new FlxXmlParser()
     this.serializer = new FxpXmlSerializer(config)
+    this.jsonMerger = new JsonMerger(config)
   }
 
   @log
@@ -35,8 +37,7 @@ export class XmlMerger {
       other.namespaces
     )
 
-    const jsonMerger = new JsonMerger(this.config)
-    const mergedResult = jsonMerger.mergeThreeWay(
+    const mergedResult = this.jsonMerger.mergeThreeWay(
       ancestor.content,
       local.content,
       other.content

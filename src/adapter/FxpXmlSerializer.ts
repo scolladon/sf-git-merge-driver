@@ -1,5 +1,4 @@
 import { XMLBuilder } from 'fast-xml-parser'
-import { flatMap, isEmpty, isNil, isObject } from 'lodash-es'
 import {
   ANCESTOR_CONFLICT_MARKER,
   LOCAL_CONFLICT_MARKER,
@@ -35,15 +34,18 @@ const builderOptions = {
 // Compact → Ordered Format Converter (created per-serialization with config)
 // ============================================================================
 
+const isObj = (x: unknown): x is JsonObject =>
+  typeof x === 'object' && x !== null
+
 const createConverter = (config: MergeConfig) => {
   const wrapText = (value: JsonValue, attribute: string): JsonObject =>
-    isNil(value) ? {} : { [attribute]: [{ [TEXT_TAG]: value }] }
+    value == null ? {} : { [attribute]: [{ [TEXT_TAG]: value }] }
 
   const expandConflictContent = (content: JsonArray): JsonArray => {
-    if (isEmpty(content)) return [{ [TEXT_TAG]: SALESFORCE_EOL }]
-    return flatMap(content, (item: JsonValue) => {
+    if (content.length === 0) return [{ [TEXT_TAG]: SALESFORCE_EOL }]
+    return content.flatMap((item: JsonValue) => {
       if (isConflictBlock(item)) return expandConflict(item)
-      if (isObject(item)) return compactToOrdered(item as JsonObject)
+      if (isObj(item)) return compactToOrdered(item)
       return { [TEXT_TAG]: item }
     })
   }
@@ -67,23 +69,23 @@ const createConverter = (config: MergeConfig) => {
 
   const convertItem = (item: JsonValue): JsonArray => {
     if (isConflictBlock(item)) return expandConflict(item)
-    if (isObject(item)) return compactToOrdered(item as JsonObject)
+    if (isObj(item)) return compactToOrdered(item)
     return [{ [TEXT_TAG]: item }]
   }
 
   const compactToOrdered = (input: JsonObject | JsonArray): JsonArray => {
     const keys = Object.keys(input).sort()
-    return flatMap(keys, attribute => {
+    return keys.flatMap(attribute => {
       const value = input[attribute]
 
       if (Array.isArray(value)) {
-        const children = flatMap(value, convertItem)
+        const children = value.flatMap(convertItem)
         return { [attribute]: children }
       }
 
-      if (isObject(value)) {
+      if (isObj(value)) {
         if (isConflictBlock(value)) return expandConflict(value)
-        return { [attribute]: compactToOrdered(value as JsonObject) }
+        return { [attribute]: compactToOrdered(value) }
       }
 
       return wrapText(value, attribute)
@@ -98,7 +100,7 @@ const createConverter = (config: MergeConfig) => {
 // ============================================================================
 
 const insertNamespaces = (output: JsonArray, namespaces: JsonObject): void => {
-  if (isEmpty(namespaces) || isEmpty(output)) return
+  if (Object.keys(namespaces).length === 0 || output.length === 0) return
   const root = output[0] as JsonObject
   root[NAMESPACE_ROOT] = { ...namespaces }
 }
@@ -113,20 +115,21 @@ const correctComments = (xml: string): string =>
 export class FxpXmlSerializer implements XmlSerializer {
   private readonly formatter: ConflictMarkerFormatter
   private readonly convert: (input: JsonObject | JsonArray) => JsonArray
+  private readonly builder: XMLBuilder
 
   constructor(config: MergeConfig) {
     this.formatter = new ConflictMarkerFormatter(config)
     this.convert = createConverter(config)
+    this.builder = new XMLBuilder(builderOptions)
   }
 
   serialize(mergedOutput: JsonArray, namespaces: JsonObject): string {
-    const ordered = flatMap(mergedOutput, (item: JsonValue) =>
-      isObject(item) ? this.convert(item as JsonObject) : [{ [TEXT_TAG]: item }]
+    const ordered = mergedOutput.flatMap((item: JsonValue) =>
+      isObj(item) ? this.convert(item) : [{ [TEXT_TAG]: item }]
     )
     insertNamespaces(ordered, namespaces)
 
-    const builder = new XMLBuilder(builderOptions)
-    const xml: string = builder.build(ordered)
+    const xml: string = this.builder.build(ordered)
 
     let result = XML_DECL.concat(xml)
     result = this.formatter.handleSpecialEntities(result)

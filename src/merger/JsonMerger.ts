@@ -4,8 +4,8 @@ import type { MergeResult } from '../types/mergeResult.js'
 import { combineResults } from '../types/mergeResult.js'
 import { log } from '../utils/LoggingDecorator.js'
 import { MergeOrchestrator } from './MergeOrchestrator.js'
+import { getUniqueSortedProps } from './mergePropertyKeys.js'
 import { defaultNodeFactory } from './nodes/MergeNodeFactory.js'
-import { getUniqueSortedProps } from './nodes/nodeUtils.js'
 
 export class JsonMerger {
   private readonly orchestrator: MergeOrchestrator

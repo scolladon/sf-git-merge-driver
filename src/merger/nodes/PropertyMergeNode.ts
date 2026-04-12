@@ -1,10 +1,14 @@
 import type { MergeConfig } from '../../types/conflictTypes.js'
 import type { JsonArray, JsonObject } from '../../types/jsonTypes.js'
 import type { MergeResult } from '../../types/mergeResult.js'
-import { combineResults, noConflict } from '../../types/mergeResult.js'
+import {
+  combineResults,
+  noConflict,
+  wrapWithRootKey,
+} from '../../types/mergeResult.js'
+import { getUniqueSortedProps } from '../mergePropertyKeys.js'
 import type { MergeNode } from './MergeNode.js'
 import { defaultNodeFactory } from './MergeNodeFactory.js'
-import { getUniqueSortedProps, wrapWithRootKey } from './nodeUtils.js'
 
 // Merges pure objects property-by-property through child nodes.
 // Used by MergeNodeFactory for objects without a key extractor (e.g. valueSet, valueSetDefinition).

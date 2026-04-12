@@ -1,5 +1,4 @@
 import { deepEqual } from 'fast-equals'
-import { isEmpty } from 'lodash-es'
 import type { MergeConfig } from '../../types/conflictTypes.js'
 import type { JsonArray, JsonObject } from '../../types/jsonTypes.js'
 import type { MergeResult } from '../../types/mergeResult.js'
@@ -11,16 +10,9 @@ import {
 import { hasSameOrder, lcs, pushAll } from '../../utils/arrayUtils.js'
 import { setsEqual, setsIntersect } from '../../utils/setUtils.js'
 import { buildConflictMarkers } from '../ConflictMarkerBuilder.js'
-import type { KeyExtractor } from './nodeUtils.js'
-import { buildKeyedMap } from './nodeUtils.js'
-
-// ============================================================================
-// Strategy Interface
-// ============================================================================
-
-export interface KeyedArrayMergeStrategy {
-  merge(config: MergeConfig): MergeResult
-}
+import type { KeyExtractor } from './KeyedArrayIndex.js'
+import { buildKeyedMap } from './KeyedArrayIndex.js'
+import type { KeyedArrayMergeStrategy } from './KeyedArrayMergeStrategy.js'
 
 // ============================================================================
 // Ordered Strategy
@@ -304,7 +296,7 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
 
     for (const key of keys) {
       const result = this.mergeElementWithPresenceCheck(config, key, ctx)
-      if (result && !isEmpty(result.output)) {
+      if (result && result.output.length > 0) {
         results.push(result)
       }
     }
@@ -366,21 +358,21 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     let oIdx = 0
 
     for (const anchor of spine) {
-      const gapA = this.collectUntil(ctx.ancestorKeys, aIdx, anchor)
-      const gapL = this.collectUntil(ctx.localKeys, lIdx, anchor)
-      const gapO = this.collectUntil(ctx.otherKeys, oIdx, anchor)
+      const aEnd = ctx.ancestorPos.get(anchor)!
+      const lEnd = ctx.localPos.get(anchor)!
+      const oEnd = ctx.otherPos.get(anchor)!
 
-      aIdx += gapA.length
-      lIdx += gapL.length
-      oIdx += gapO.length
-
-      const gaps: GapKeys = { ancestor: gapA, local: gapL, other: gapO }
+      const gaps: GapKeys = {
+        ancestor: ctx.ancestorKeys.slice(aIdx, aEnd),
+        local: ctx.localKeys.slice(lIdx, lEnd),
+        other: ctx.otherKeys.slice(oIdx, oEnd),
+      }
       results.push(this.mergeGap(config, gaps, ctx))
       results.push(this.mergeElement(config, anchor, ctx))
 
-      aIdx++
-      lIdx++
-      oIdx++
+      aIdx = aEnd + 1
+      lIdx = lEnd + 1
+      oIdx = oEnd + 1
     }
 
     const finalGaps: GapKeys = {
@@ -391,18 +383,6 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     results.push(this.mergeGap(config, finalGaps, ctx))
 
     return combineResults(results)
-  }
-
-  private collectUntil(
-    keys: string[],
-    startIdx: number,
-    anchor: string
-  ): string[] {
-    const result: string[] = []
-    for (let i = startIdx; i < keys.length && keys[i] !== anchor; i++) {
-      result.push(keys[i])
-    }
-    return result
   }
 
   // Gap merging

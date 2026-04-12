@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildEarlyResult,
   combineResults,
   isNonEmpty,
   noConflict,
   withConflict,
+  wrapWithRootKey,
 } from '../../../src/types/mergeResult.js'
 
 describe('mergeResult', () => {
@@ -146,6 +148,76 @@ describe('mergeResult', () => {
 
       // Assert
       expect(combined.output).toEqual([{ a: 1 }, { b: 2 }, { c: 3 }])
+    })
+  })
+
+  describe('wrapWithRootKey', () => {
+    it('given non-empty output when wrapping then wraps under key preserving conflict', () => {
+      // Arrange
+      const sut = withConflict([{ field: 'value' }])
+
+      // Act
+      const result = wrapWithRootKey(sut, 'root')
+
+      // Assert
+      expect(result.output).toEqual([{ root: [{ field: 'value' }] }])
+      expect(result.hasConflict).toBe(true)
+    })
+
+    it('given empty output when wrapping then returns noConflict with empty array under key', () => {
+      // Arrange
+      const sut = noConflict([])
+
+      // Act
+      const result = wrapWithRootKey(sut, 'root')
+
+      // Assert
+      expect(result.output).toEqual([{ root: [] }])
+      expect(result.hasConflict).toBe(false)
+    })
+  })
+
+  describe('buildEarlyResult', () => {
+    it('given value without rootKeyName when building then returns content as-is', () => {
+      // Arrange
+      const sut = [{ a: 1 }]
+
+      // Act
+      const result = buildEarlyResult(sut)
+
+      // Assert
+      expect(result.output).toEqual([{ a: 1 }])
+      expect(result.hasConflict).toBe(false)
+    })
+
+    it('given value with rootKeyName when building then wraps under key', () => {
+      // Arrange
+      const sut = [{ a: 1 }]
+
+      // Act
+      const result = buildEarlyResult(sut, 'root')
+
+      // Assert
+      expect(result.output).toEqual([{ root: [{ a: 1 }] }])
+      expect(result.hasConflict).toBe(false)
+    })
+
+    it('given null value when building then returns empty array', () => {
+      // Arrange & Act
+      const result = buildEarlyResult(null as unknown as never)
+
+      // Assert
+      expect(result.output).toEqual([])
+      expect(result.hasConflict).toBe(false)
+    })
+
+    it('given null value with rootKeyName when building then wraps empty under key', () => {
+      // Arrange & Act
+      const result = buildEarlyResult(null as unknown as never, 'root')
+
+      // Assert
+      expect(result.output).toEqual([{ root: [] }])
+      expect(result.hasConflict).toBe(false)
     })
   })
 

@@ -19,6 +19,15 @@ describe('arrayUtils', () => {
       expect(hasSameOrder(['a', 'b'], ['c', 'd'])).toBe(true)
     })
 
+    it('Given different common element counts, When comparing, Then returns false', () => {
+      expect(hasSameOrder(['a', 'b', 'c'], ['a', 'c'])).toBe(true)
+      expect(hasSameOrder(['a', 'c'], ['c', 'a', 'b'])).toBe(false)
+    })
+
+    it('Given duplicates causing length mismatch, When comparing, Then returns false', () => {
+      expect(hasSameOrder(['a', 'a', 'b'], ['a', 'b'])).toBe(false)
+    })
+
     it('Given empty arrays, When comparing, Then returns true', () => {
       expect(hasSameOrder([], [])).toBe(true)
     })

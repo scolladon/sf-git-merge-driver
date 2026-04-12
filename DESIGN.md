@@ -115,16 +115,16 @@ interface MergeContext {
 
 Enum representing the 8 possible scenarios based on content presence:
 
-| Scenario | Ancestor | Local | Other | Value |
-|----------|----------|-------|-------|-------|
-| NONE | - | - | - | 0 |
-| OTHER_ONLY | - | - | ✓ | 1 |
-| LOCAL_ONLY | - | ✓ | - | 10 |
-| LOCAL_AND_OTHER | - | ✓ | ✓ | 11 |
-| ANCESTOR_ONLY | ✓ | - | - | 100 |
-| ANCESTOR_AND_OTHER | ✓ | - | ✓ | 101 |
-| ANCESTOR_AND_LOCAL | ✓ | ✓ | - | 110 |
-| ALL | ✓ | ✓ | ✓ | 111 |
+| Scenario | Ancestor | Local | Other | Value (bitmask) |
+|----------|----------|-------|-------|-----------------|
+| NONE | - | - | - | 0 (000) |
+| OTHER_ONLY | - | - | ✓ | 1 (001) |
+| LOCAL_ONLY | - | ✓ | - | 2 (010) |
+| LOCAL_AND_OTHER | - | ✓ | ✓ | 3 (011) |
+| ANCESTOR_ONLY | ✓ | - | - | 4 (100) |
+| ANCESTOR_AND_OTHER | ✓ | - | ✓ | 5 (101) |
+| ANCESTOR_AND_LOCAL | ✓ | ✓ | - | 6 (110) |
+| ALL | ✓ | ✓ | ✓ | 7 (111) |
 
 ### Conflict Handling
 

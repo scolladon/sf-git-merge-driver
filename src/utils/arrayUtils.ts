@@ -1,5 +1,3 @@
-import { deepEqual } from 'fast-equals'
-
 /**
  * Appends all elements from source arrays to target array.
  * Stack-safe alternative to target.push(...source) which can overflow on large arrays.
@@ -17,38 +15,60 @@ export const hasSameOrder = (a: string[], b: string[]): boolean => {
   const aFiltered = a.filter(k => bSet.has(k))
   const aSet = new Set(a)
   const bFiltered = b.filter(k => aSet.has(k))
-  return deepEqual(aFiltered, bFiltered)
+  if (aFiltered.length !== bFiltered.length) return false
+  for (let i = 0; i < aFiltered.length; i++) {
+    if (aFiltered[i] !== bFiltered[i]) return false
+  }
+  return true
 }
+
+const DIR_TOP = 0
+const DIR_LEFT = 1
+const DIR_DIAG = 2
 
 export const lcs = (a: string[], b: string[]): string[] => {
   const m = a.length
   const n = b.length
-  const dp: number[][] = Array.from({ length: m + 1 }, () =>
-    Array(n + 1).fill(0)
+  if (m === 0 || n === 0) return []
+
+  let prev = new Array<number>(n + 1).fill(0)
+  let curr = new Array<number>(n + 1).fill(0)
+  const dir: Uint8Array[] = Array.from(
+    { length: m + 1 },
+    () => new Uint8Array(n + 1)
   )
 
   for (let i = 1; i <= m; i++) {
+    curr[0] = 0
     for (let j = 1; j <= n; j++) {
-      dp[i][j] =
-        a[i - 1] === b[j - 1]
-          ? dp[i - 1][j - 1] + 1
-          : Math.max(dp[i - 1][j], dp[i][j - 1])
+      if (a[i - 1] === b[j - 1]) {
+        curr[j] = prev[j - 1] + 1
+        dir[i][j] = DIR_DIAG
+      } else if (prev[j] > curr[j - 1]) {
+        curr[j] = prev[j]
+        dir[i][j] = DIR_TOP
+      } else {
+        curr[j] = curr[j - 1]
+        dir[i][j] = DIR_LEFT
+      }
     }
+    ;[prev, curr] = [curr, prev]
   }
 
   const result: string[] = []
   let i = m
   let j = n
   while (i > 0 && j > 0) {
-    if (a[i - 1] === b[j - 1]) {
-      result.unshift(a[i - 1])
+    if (dir[i][j] === DIR_DIAG) {
+      result.push(a[i - 1])
       i--
       j--
-    } else if (dp[i - 1][j] > dp[i][j - 1]) {
+    } else if (dir[i][j] === DIR_TOP) {
       i--
     } else {
       j--
     }
   }
+  result.reverse()
   return result
 }
