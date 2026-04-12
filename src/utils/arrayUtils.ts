@@ -22,48 +22,33 @@ export const hasSameOrder = (a: string[], b: string[]): boolean => {
   return true
 }
 
-const DIR_TOP = 0
-const DIR_LEFT = 1
-const DIR_DIAG = 2
-
 export const lcs = (a: string[], b: string[]): string[] => {
   const m = a.length
   const n = b.length
   if (m === 0 || n === 0) return []
 
-  let prev = new Array<number>(n + 1).fill(0)
-  let curr = new Array<number>(n + 1).fill(0)
-  const dir: Uint8Array[] = Array.from(
-    { length: m + 1 },
-    () => new Uint8Array(n + 1)
+  const dp: number[][] = Array.from({ length: m + 1 }, () =>
+    new Array(n + 1).fill(0)
   )
 
   for (let i = 1; i <= m; i++) {
-    curr[0] = 0
     for (let j = 1; j <= n; j++) {
-      if (a[i - 1] === b[j - 1]) {
-        curr[j] = prev[j - 1] + 1
-        dir[i][j] = DIR_DIAG
-      } else if (prev[j] > curr[j - 1]) {
-        curr[j] = prev[j]
-        dir[i][j] = DIR_TOP
-      } else {
-        curr[j] = curr[j - 1]
-        dir[i][j] = DIR_LEFT
-      }
+      dp[i][j] =
+        a[i - 1] === b[j - 1]
+          ? dp[i - 1][j - 1] + 1
+          : Math.max(dp[i - 1][j], dp[i][j - 1])
     }
-    ;[prev, curr] = [curr, prev]
   }
 
   const result: string[] = []
   let i = m
   let j = n
   while (i > 0 && j > 0) {
-    if (dir[i][j] === DIR_DIAG) {
+    if (a[i - 1] === b[j - 1]) {
       result.push(a[i - 1])
       i--
       j--
-    } else if (dir[i][j] === DIR_TOP) {
+    } else if (dp[i - 1][j] > dp[i][j - 1]) {
       i--
     } else {
       j--
