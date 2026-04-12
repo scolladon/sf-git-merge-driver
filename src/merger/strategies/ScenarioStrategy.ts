@@ -64,26 +64,40 @@ abstract class AbstractAncestorStrategy implements ScenarioStrategy {
     const targetUnchanged = deepEqual(context.ancestor, target)
 
     if (context.rootKey) {
-      const { name } = context.rootKey
-      const existsInSecondary = this.getExistsInSecondary(context)
-
-      if (!existsInSecondary && targetUnchanged) {
-        return noConflict([])
-      }
-
-      if (!existsInSecondary && !targetUnchanged) {
-        const targetObj = {
-          [name]: target as JsonObject | JsonArray,
-        }
-        const ancestorObj = {
-          [name]: context.ancestor as JsonObject | JsonArray,
-        }
-        return withConflict(this.buildConflict(context, targetObj, ancestorObj))
-      }
-
-      return wrapWithRootKey(this.executeNested(context), name)
+      return this.executeWithRootKey(context, target, targetUnchanged)
     }
 
+    return this.executeWithoutRootKey(context, target, targetUnchanged)
+  }
+
+  private executeWithRootKey(
+    context: MergeContext,
+    target: unknown,
+    targetUnchanged: boolean
+  ): MergeResult {
+    const { name } = context.rootKey!
+    const existsInSecondary = this.getExistsInSecondary(context)
+
+    if (!existsInSecondary && targetUnchanged) {
+      return noConflict([])
+    }
+
+    if (!existsInSecondary) {
+      const targetObj = { [name]: target as JsonObject | JsonArray }
+      const ancestorObj = {
+        [name]: context.ancestor as JsonObject | JsonArray,
+      }
+      return withConflict(this.buildConflict(context, targetObj, ancestorObj))
+    }
+
+    return wrapWithRootKey(this.executeNested(context), name)
+  }
+
+  private executeWithoutRootKey(
+    context: MergeContext,
+    target: unknown,
+    targetUnchanged: boolean
+  ): MergeResult {
     if (targetUnchanged) {
       return noConflict([])
     }
