@@ -67,6 +67,9 @@ jobs:
       # ── Compare on same runner (PR only) ───────────────────────────
       - name: Compare baseline vs PR
         if: github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: node test/perf/compare.mjs perf-runtime-baseline.json perf-runtime.json
 
       - name: Checkout gh-pages baseline data
@@ -88,8 +91,8 @@ jobs:
           auto-push: ${{ inputs.auto-push }}
           save-data-file: ${{ inputs.auto-push }}
           alert-threshold: '130%'
-          comment-on-alert: true
-          fail-on-alert: ${{ github.event_name == 'pull_request' }}
+          comment-on-alert: ${{ inputs.auto-push }}
+          fail-on-alert: false
           summary-always: ${{ inputs.auto-push }}
           alert-comment-cc-users: '@scolladon'
           benchmark-data-dir-path: dev/bench/runtime
@@ -105,8 +108,8 @@ jobs:
           save-data-file: ${{ inputs.auto-push }}
           skip-fetch-gh-pages: true
           alert-threshold: '150%'
-          comment-on-alert: true
-          fail-on-alert: ${{ github.event_name == 'pull_request' }}
+          comment-on-alert: ${{ inputs.auto-push }}
+          fail-on-alert: false
           summary-always: ${{ inputs.auto-push }}
           alert-comment-cc-users: '@scolladon'
           benchmark-data-dir-path: dev/bench/memory
