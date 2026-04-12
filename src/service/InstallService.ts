@@ -11,7 +11,7 @@ import { log } from '../utils/LoggingDecorator.js'
 export class InstallService {
   @log
   public async installMergeDriver(): Promise<void> {
-    const git = simpleGit()
+    const git = simpleGit({ unsafe: { allowUnsafeMergeDriver: true } })
     await git.addConfig(
       `merge.${DRIVER_NAME}.name`,
       'Salesforce source merge driver'

@@ -42,6 +42,9 @@ describe('InstallService', () => {
 
     // Assert
     expect(getGitAttributesPathMocked).toHaveBeenCalledTimes(1)
+    expect(simpleGitMock).toHaveBeenCalledWith({
+      unsafe: { allowUnsafeMergeDriver: true },
+    })
     expect(mockedAddConfig).toHaveBeenCalledTimes(2)
     expect(mockedAddConfig).toHaveBeenCalledWith(
       `merge.${DRIVER_NAME}.name`,
