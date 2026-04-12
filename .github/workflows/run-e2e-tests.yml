@@ -31,8 +31,6 @@ jobs:
         run: |
           echo "SF_DISABLE_AUTOUPDATE=true" >> "$GITHUB_ENV"
           echo "SF_DISABLE_TELEMETRY=true" >> "$GITHUB_ENV"
-          git config --global merge.allowUnsafeMergeDriver true
-          git config --local merge.allowUnsafeMergeDriver true
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
 
