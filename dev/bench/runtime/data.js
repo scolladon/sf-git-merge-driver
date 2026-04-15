@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775221218554,
+  "lastUpdate": 1776277715938,
   "repoUrl": "https://github.com/scolladon/sf-git-merge-driver",
   "entries": {
     "Runtime Benchmark": [
@@ -287,6 +287,132 @@ window.BENCHMARK_DATA = {
             "name": "format-large",
             "value": 980,
             "range": "±0.84%",
+            "unit": "ops/sec"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "colladonsebastien@gmail.com",
+            "name": "Sebastien",
+            "username": "scolladon"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3dd3e6815e4dfc96035f70de5038ae9f774a7371",
+          "message": "fix(perf): switch to flexible-xml-parser, introduce ports & adapters architecture (#181)",
+          "timestamp": "2026-04-15T20:25:58+02:00",
+          "tree_id": "59e5f0f340fd851824ab5145cdd936f6aeaab60e",
+          "url": "https://github.com/scolladon/sf-git-merge-driver/commit/3dd3e6815e4dfc96035f70de5038ae9f774a7371"
+        },
+        "date": 1776277715486,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "merge-small-no-conflict",
+            "value": 450,
+            "range": "±3.26%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-small-with-conflict",
+            "value": 468,
+            "range": "±2.00%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-medium-no-conflict",
+            "value": 64,
+            "range": "±1.96%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-medium-with-conflict",
+            "value": 64,
+            "range": "±3.37%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-large-no-conflict",
+            "value": 16,
+            "range": "±1.84%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-large-with-conflict",
+            "value": 16,
+            "range": "±1.89%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-ordered-globalvalueset",
+            "value": 542,
+            "range": "±1.89%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-picklist-customfield",
+            "value": 796,
+            "range": "±1.90%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "parse-small",
+            "value": 833,
+            "range": "±2.31%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-small",
+            "value": 5398,
+            "range": "±3.74%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "serialize-small",
+            "value": 2026,
+            "range": "±2.80%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "parse-medium",
+            "value": 108,
+            "range": "±1.42%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-medium",
+            "value": 608,
+            "range": "±5.16%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "serialize-medium",
+            "value": 238,
+            "range": "±2.82%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "parse-large",
+            "value": 29,
+            "range": "±0.55%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-large",
+            "value": 152,
+            "range": "±2.80%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "serialize-large",
+            "value": 62,
+            "range": "±2.31%",
             "unit": "ops/sec"
           }
         ]
