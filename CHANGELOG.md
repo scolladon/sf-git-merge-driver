@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.1](https://github.com/scolladon/sf-git-merge-driver/compare/v1.6.0...v1.6.1) (2026-04-15)
+
+
+### Bug Fixes
+
+* **perf:** switch to flexible-xml-parser, introduce ports & adapters architecture ([#181](https://github.com/scolladon/sf-git-merge-driver/issues/181)) ([3dd3e68](https://github.com/scolladon/sf-git-merge-driver/commit/3dd3e6815e4dfc96035f70de5038ae9f774a7371))
+
 ## [1.6.0](https://github.com/scolladon/sf-git-merge-driver/compare/v1.5.4...v1.6.0) (2026-04-03)
 
 
