@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775130955477,
+  "lastUpdate": 1776277716874,
   "repoUrl": "https://github.com/scolladon/sf-git-merge-driver",
   "entries": {
     "Memory Benchmark": [
@@ -143,6 +143,134 @@ window.BENCHMARK_DATA = {
             "name": "format-large",
             "value": 1.0369,
             "range": "±1.05%",
+            "unit": "ms"
+          }
+        ]
+      }
+    ],
+    "Latency Benchmark": [
+      {
+        "commit": {
+          "author": {
+            "email": "colladonsebastien@gmail.com",
+            "name": "Sebastien",
+            "username": "scolladon"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3dd3e6815e4dfc96035f70de5038ae9f774a7371",
+          "message": "fix(perf): switch to flexible-xml-parser, introduce ports & adapters architecture (#181)",
+          "timestamp": "2026-04-15T20:25:58+02:00",
+          "tree_id": "59e5f0f340fd851824ab5145cdd936f6aeaab60e",
+          "url": "https://github.com/scolladon/sf-git-merge-driver/commit/3dd3e6815e4dfc96035f70de5038ae9f774a7371"
+        },
+        "date": 1776277716840,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "merge-small-no-conflict",
+            "value": 2.2231,
+            "range": "±3.26%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-small-with-conflict",
+            "value": 2.135,
+            "range": "±2.00%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-medium-no-conflict",
+            "value": 15.5424,
+            "range": "±1.96%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-medium-with-conflict",
+            "value": 15.5996,
+            "range": "±3.37%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-large-no-conflict",
+            "value": 61.5876,
+            "range": "±1.84%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-large-with-conflict",
+            "value": 62.1388,
+            "range": "±1.89%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-ordered-globalvalueset",
+            "value": 1.8445,
+            "range": "±1.89%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-picklist-customfield",
+            "value": 1.2566,
+            "range": "±1.90%",
+            "unit": "ms"
+          },
+          {
+            "name": "parse-small",
+            "value": 1.2006,
+            "range": "±2.31%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-small",
+            "value": 0.1853,
+            "range": "±3.74%",
+            "unit": "ms"
+          },
+          {
+            "name": "serialize-small",
+            "value": 0.4935,
+            "range": "±2.80%",
+            "unit": "ms"
+          },
+          {
+            "name": "parse-medium",
+            "value": 9.2192,
+            "range": "±1.42%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-medium",
+            "value": 1.6448,
+            "range": "±5.16%",
+            "unit": "ms"
+          },
+          {
+            "name": "serialize-medium",
+            "value": 4.1987,
+            "range": "±2.82%",
+            "unit": "ms"
+          },
+          {
+            "name": "parse-large",
+            "value": 34.8108,
+            "range": "±0.55%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-large",
+            "value": 6.5705,
+            "range": "±2.80%",
+            "unit": "ms"
+          },
+          {
+            "name": "serialize-large",
+            "value": 16.1532,
+            "range": "±2.31%",
             "unit": "ms"
           }
         ]
