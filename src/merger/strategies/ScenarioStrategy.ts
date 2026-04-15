@@ -2,21 +2,17 @@ import { deepEqual } from 'fast-equals'
 import type { JsonArray, JsonObject } from '../../types/jsonTypes.js'
 import type { MergeResult } from '../../types/mergeResult.js'
 import {
+  buildEarlyResult,
   combineResults,
   noConflict,
   withConflict,
+  wrapWithRootKey,
 } from '../../types/mergeResult.js'
 import { MergeScenario } from '../../types/mergeScenario.js'
 import { buildConflictMarkers } from '../ConflictMarkerBuilder.js'
 import type { MergeContext } from '../MergeContext.js'
 import { MergeOrchestrator } from '../MergeOrchestrator.js'
-import {
-  buildEarlyResult,
-  extractContent,
-  getUniqueSortedProps,
-  toJsonArray,
-  wrapWithRootKey,
-} from '../nodes/nodeUtils.js'
+import { getUniqueSortedProps } from '../mergePropertyKeys.js'
 
 // ============================================================================
 // Strategy Interface
@@ -68,26 +64,40 @@ abstract class AbstractAncestorStrategy implements ScenarioStrategy {
     const targetUnchanged = deepEqual(context.ancestor, target)
 
     if (context.rootKey) {
-      const { name } = context.rootKey
-      const existsInSecondary = this.getExistsInSecondary(context)
-
-      if (!existsInSecondary && targetUnchanged) {
-        return noConflict([])
-      }
-
-      if (!existsInSecondary && !targetUnchanged) {
-        const targetObj = {
-          [name]: toJsonArray(target as JsonObject | JsonArray),
-        }
-        const ancestorObj = {
-          [name]: toJsonArray(context.ancestor as JsonObject | JsonArray),
-        }
-        return withConflict(this.buildConflict(context, targetObj, ancestorObj))
-      }
-
-      return wrapWithRootKey(this.executeNested(context), name)
+      return this.executeWithRootKey(context, target, targetUnchanged)
     }
 
+    return this.executeWithoutRootKey(context, target, targetUnchanged)
+  }
+
+  private executeWithRootKey(
+    context: MergeContext,
+    target: unknown,
+    targetUnchanged: boolean
+  ): MergeResult {
+    const { name } = context.rootKey!
+    const existsInSecondary = this.getExistsInSecondary(context)
+
+    if (!existsInSecondary && targetUnchanged) {
+      return noConflict([])
+    }
+
+    if (!existsInSecondary) {
+      const targetObj = { [name]: target as JsonObject | JsonArray }
+      const ancestorObj = {
+        [name]: context.ancestor as JsonObject | JsonArray,
+      }
+      return withConflict(this.buildConflict(context, targetObj, ancestorObj))
+    }
+
+    return wrapWithRootKey(this.executeNested(context), name)
+  }
+
+  private executeWithoutRootKey(
+    context: MergeContext,
+    target: unknown,
+    targetUnchanged: boolean
+  ): MergeResult {
     if (targetUnchanged) {
       return noConflict([])
     }
@@ -99,8 +109,8 @@ abstract class AbstractAncestorStrategy implements ScenarioStrategy {
     return withConflict(
       this.buildConflict(
         context,
-        extractContent(toJsonArray(target as JsonObject | JsonArray)),
-        extractContent(toJsonArray(context.ancestor as JsonObject | JsonArray))
+        target as JsonObject | JsonArray,
+        context.ancestor as JsonObject | JsonArray
       )
     )
   }
@@ -123,7 +133,30 @@ abstract class AbstractAncestorStrategy implements ScenarioStrategy {
     return orchestrator.merge(context.ancestor, context.local, context.other)
   }
 
-  protected abstract executeWithAttribute(context: MergeContext): MergeResult
+  private executeWithAttribute(context: MergeContext): MergeResult {
+    const orchestrator = new MergeOrchestrator(
+      context.config,
+      context.nodeFactory
+    )
+    const targetResult = this.mergeTarget(orchestrator, context)
+    const ancestorResult = orchestrator.merge(
+      {},
+      context.ancestor,
+      {},
+      undefined
+    )
+
+    const attr = context.attribute!
+    const targetProp = { [attr]: targetResult.output }
+    const ancestorProp = { [attr]: ancestorResult.output }
+
+    return withConflict(this.buildConflict(context, targetProp, ancestorProp))
+  }
+
+  protected abstract mergeTarget(
+    orchestrator: MergeOrchestrator,
+    context: MergeContext
+  ): MergeResult
 }
 
 // ============================================================================
@@ -138,13 +171,13 @@ class NoneStrategy implements ScenarioStrategy {
 
 class OtherOnlyStrategy implements ScenarioStrategy {
   execute(context: MergeContext): MergeResult {
-    return buildEarlyResult(context.other, context.rootKey)
+    return buildEarlyResult(context.other, context.rootKey?.name)
   }
 }
 
 class LocalOnlyStrategy implements ScenarioStrategy {
   execute(context: MergeContext): MergeResult {
-    return buildEarlyResult(context.local, context.rootKey)
+    return buildEarlyResult(context.local, context.rootKey?.name)
   }
 }
 
@@ -154,7 +187,7 @@ class LocalAndOtherStrategy extends AbstractMergeStrategy {
     const other = context.other as JsonObject | JsonArray
 
     if (deepEqual(local, other)) {
-      return buildEarlyResult(local, context.rootKey)
+      return buildEarlyResult(local, context.rootKey?.name)
     }
 
     return this.mergeChildren(context, undefined)
@@ -184,34 +217,18 @@ class AncestorAndLocalStrategy extends AbstractAncestorStrategy {
   }
 
   protected buildConflict(
-    context: MergeContext,
+    _context: MergeContext,
     targetObj: JsonObject,
     ancestorObj: JsonObject
   ): JsonArray {
-    return buildConflictMarkers(context.config, targetObj, ancestorObj, {})
+    return [buildConflictMarkers(targetObj, ancestorObj, {})]
   }
 
-  protected executeWithAttribute(context: MergeContext): MergeResult {
-    const orchestrator = new MergeOrchestrator(
-      context.config,
-      context.nodeFactory
-    )
-    const localResult = orchestrator.merge({}, context.local, {}, undefined)
-    const ancestorResult = orchestrator.merge(
-      {},
-      context.ancestor,
-      {},
-      undefined
-    )
-
-    const localProp = { [context.attribute!]: localResult.output }
-    const ancestorProp = {
-      [context.attribute!]: ancestorResult.output,
-    }
-
-    return withConflict(
-      buildConflictMarkers(context.config, localProp, ancestorProp, {})
-    )
+  protected mergeTarget(
+    orchestrator: MergeOrchestrator,
+    context: MergeContext
+  ): MergeResult {
+    return orchestrator.merge({}, context.local, {}, undefined)
   }
 }
 
@@ -225,34 +242,18 @@ class AncestorAndOtherStrategy extends AbstractAncestorStrategy {
   }
 
   protected buildConflict(
-    context: MergeContext,
+    _context: MergeContext,
     targetObj: JsonObject | JsonArray,
     ancestorObj: JsonObject | JsonArray
   ): JsonArray {
-    return buildConflictMarkers(context.config, {}, ancestorObj, targetObj)
+    return [buildConflictMarkers({}, ancestorObj, targetObj)]
   }
 
-  protected executeWithAttribute(context: MergeContext): MergeResult {
-    const orchestrator = new MergeOrchestrator(
-      context.config,
-      context.nodeFactory
-    )
-    const ancestorResult = orchestrator.merge(
-      {},
-      context.ancestor,
-      {},
-      undefined
-    )
-    const otherResult = orchestrator.merge({}, {}, context.other, undefined)
-
-    const ancestorProp = {
-      [context.attribute!]: ancestorResult.output,
-    }
-    const otherProp = { [context.attribute!]: otherResult.output }
-
-    return withConflict(
-      buildConflictMarkers(context.config, {}, ancestorProp, otherProp)
-    )
+  protected mergeTarget(
+    orchestrator: MergeOrchestrator,
+    context: MergeContext
+  ): MergeResult {
+    return orchestrator.merge({}, {}, context.other, undefined)
   }
 }
 
@@ -262,7 +263,7 @@ class AllPresentStrategy extends AbstractMergeStrategy {
       deepEqual(context.ancestor, context.local) &&
       deepEqual(context.local, context.other)
     ) {
-      return buildEarlyResult(context.local, context.rootKey)
+      return buildEarlyResult(context.local, context.rootKey?.name)
     }
 
     return this.mergeChildren(
@@ -276,26 +277,17 @@ class AllPresentStrategy extends AbstractMergeStrategy {
 // Strategy Factory
 // ============================================================================
 
-let strategies: Record<MergeScenario, ScenarioStrategy> | null = null
-
-const getStrategies = (): Record<MergeScenario, ScenarioStrategy> => {
-  if (!strategies) {
-    strategies = {
-      [MergeScenario.NONE]: new NoneStrategy(),
-      [MergeScenario.OTHER_ONLY]: new OtherOnlyStrategy(),
-      [MergeScenario.LOCAL_ONLY]: new LocalOnlyStrategy(),
-      [MergeScenario.LOCAL_AND_OTHER]: new LocalAndOtherStrategy(),
-      [MergeScenario.ANCESTOR_ONLY]: new AncestorOnlyStrategy(),
-      [MergeScenario.ANCESTOR_AND_OTHER]: new AncestorAndOtherStrategy(),
-      [MergeScenario.ANCESTOR_AND_LOCAL]: new AncestorAndLocalStrategy(),
-      [MergeScenario.ALL]: new AllPresentStrategy(),
-    }
-  }
-  return strategies
+const strategies: Record<MergeScenario, ScenarioStrategy> = {
+  [MergeScenario.ALL]: new AllPresentStrategy(),
+  [MergeScenario.ANCESTOR_AND_LOCAL]: new AncestorAndLocalStrategy(),
+  [MergeScenario.ANCESTOR_AND_OTHER]: new AncestorAndOtherStrategy(),
+  [MergeScenario.ANCESTOR_ONLY]: new AncestorOnlyStrategy(),
+  [MergeScenario.LOCAL_AND_OTHER]: new LocalAndOtherStrategy(),
+  [MergeScenario.LOCAL_ONLY]: new LocalOnlyStrategy(),
+  [MergeScenario.NONE]: new NoneStrategy(),
+  [MergeScenario.OTHER_ONLY]: new OtherOnlyStrategy(),
 }
 
 export const getScenarioStrategy = (
   scenario: MergeScenario
-): ScenarioStrategy => {
-  return getStrategies()[scenario]
-}
+): ScenarioStrategy => strategies[scenario]

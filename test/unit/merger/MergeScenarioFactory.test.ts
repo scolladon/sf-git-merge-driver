@@ -9,6 +9,21 @@ describe('MergeScenarioFactory', () => {
       expect(getScenario({}, {}, {})).toBe(MergeScenario.NONE)
       expect(getScenario(null, null, null)).toBe(MergeScenario.NONE)
       expect(getScenario([], [], [])).toBe(MergeScenario.NONE)
+      expect(getScenario('', '', '')).toBe(MergeScenario.NONE)
+    })
+
+    it('given string values when present then treats as content', () => {
+      // Assert
+      expect(getScenario('text', {}, {})).toBe(MergeScenario.ANCESTOR_ONLY)
+      expect(getScenario({}, 'text', {})).toBe(MergeScenario.LOCAL_ONLY)
+      expect(getScenario({}, {}, 'text')).toBe(MergeScenario.OTHER_ONLY)
+    })
+
+    it('given numeric values when present then treats as content', () => {
+      // Assert
+      expect(getScenario(42 as unknown as JsonValue, {}, {})).toBe(
+        MergeScenario.ANCESTOR_ONLY
+      )
     })
 
     it('should return OTHER_ONLY when only other has content', () => {

@@ -1,5 +1,4 @@
 import { deepEqual } from 'fast-equals'
-import { isEmpty } from 'lodash-es'
 import type { MergeConfig } from '../../types/conflictTypes.js'
 import type { JsonArray, JsonObject } from '../../types/jsonTypes.js'
 import type { MergeResult } from '../../types/mergeResult.js'
@@ -11,20 +10,9 @@ import {
 import { hasSameOrder, lcs, pushAll } from '../../utils/arrayUtils.js'
 import { setsEqual, setsIntersect } from '../../utils/setUtils.js'
 import { buildConflictMarkers } from '../ConflictMarkerBuilder.js'
-import type { KeyExtractor } from './nodeUtils.js'
-import {
-  buildKeyedMap,
-  filterEmptyTextNodes,
-  toJsonArray,
-} from './nodeUtils.js'
-
-// ============================================================================
-// Strategy Interface
-// ============================================================================
-
-export interface KeyedArrayMergeStrategy {
-  merge(config: MergeConfig): MergeResult
-}
+import type { KeyExtractor } from './KeyedArrayIndex.js'
+import { buildKeyedMap } from './KeyedArrayIndex.js'
+import type { KeyedArrayMergeStrategy } from './KeyedArrayMergeStrategy.js'
 
 // ============================================================================
 // Ordered Strategy
@@ -308,7 +296,7 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
 
     for (const key of keys) {
       const result = this.mergeElementWithPresenceCheck(config, key, ctx)
-      if (result && !isEmpty(result.output)) {
+      if (result && result.output.length > 0) {
         results.push(result)
       }
     }
@@ -340,22 +328,21 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
 
   private wrapKeys(keys: string[], map: Map<string, JsonObject>): JsonArray {
     return keys.map(k => ({
-      [this.attribute]: toJsonArray(map.get(k)!),
+      [this.attribute]: map.get(k)!,
     }))
   }
 
   private buildFullArrayConflict(
-    config: MergeConfig,
+    _config: MergeConfig,
     ctx: ArrayMergeState
   ): MergeResult {
-    return withConflict(
+    return withConflict([
       buildConflictMarkers(
-        config,
         this.wrapKeys(ctx.localKeys, ctx.localMap),
         this.wrapKeys(ctx.ancestorKeys, ctx.ancestorMap),
         this.wrapKeys(ctx.otherKeys, ctx.otherMap)
-      )
-    )
+      ),
+    ])
   }
 
   // Spine processing
@@ -371,21 +358,21 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     let oIdx = 0
 
     for (const anchor of spine) {
-      const gapA = this.collectUntil(ctx.ancestorKeys, aIdx, anchor)
-      const gapL = this.collectUntil(ctx.localKeys, lIdx, anchor)
-      const gapO = this.collectUntil(ctx.otherKeys, oIdx, anchor)
+      const aEnd = ctx.ancestorPos.get(anchor)!
+      const lEnd = ctx.localPos.get(anchor)!
+      const oEnd = ctx.otherPos.get(anchor)!
 
-      aIdx += gapA.length
-      lIdx += gapL.length
-      oIdx += gapO.length
-
-      const gaps: GapKeys = { ancestor: gapA, local: gapL, other: gapO }
+      const gaps: GapKeys = {
+        ancestor: ctx.ancestorKeys.slice(aIdx, aEnd),
+        local: ctx.localKeys.slice(lIdx, lEnd),
+        other: ctx.otherKeys.slice(oIdx, oEnd),
+      }
       results.push(this.mergeGap(config, gaps, ctx))
       results.push(this.mergeElement(config, anchor, ctx))
 
-      aIdx++
-      lIdx++
-      oIdx++
+      aIdx = aEnd + 1
+      lIdx = lEnd + 1
+      oIdx = oEnd + 1
     }
 
     const finalGaps: GapKeys = {
@@ -396,18 +383,6 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     results.push(this.mergeGap(config, finalGaps, ctx))
 
     return combineResults(results)
-  }
-
-  private collectUntil(
-    keys: string[],
-    startIdx: number,
-    anchor: string
-  ): string[] {
-    const result: string[] = []
-    for (let i = startIdx; i < keys.length && keys[i] !== anchor; i++) {
-      result.push(keys[i])
-    }
-    return result
   }
 
   // Gap merging
@@ -454,20 +429,17 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   }
 
   private buildGapConflict(
-    config: MergeConfig,
+    _config: MergeConfig,
     gaps: GapKeys,
     ctx: ArrayMergeState
   ): MergeResult {
-    return withConflict(
-      filterEmptyTextNodes(
-        buildConflictMarkers(
-          config,
-          this.wrapKeys(gaps.local, ctx.localMap),
-          this.wrapKeys(gaps.ancestor, ctx.ancestorMap),
-          this.wrapKeys(gaps.other, ctx.otherMap)
-        )
-      )
-    )
+    return withConflict([
+      buildConflictMarkers(
+        this.wrapKeys(gaps.local, ctx.localMap),
+        this.wrapKeys(gaps.ancestor, ctx.ancestorMap),
+        this.wrapKeys(gaps.other, ctx.otherMap)
+      ),
+    ])
   }
 
   private mergeGapElements(
@@ -529,7 +501,7 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   // Element helpers
 
   private wrapElement(value: JsonObject): JsonObject {
-    return { [this.attribute]: toJsonArray(value) }
+    return { [this.attribute]: value }
   }
 
   private mergeElement(
@@ -560,7 +532,7 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   }
 
   private buildElementConflict(
-    config: MergeConfig,
+    _config: MergeConfig,
     lVal: JsonObject | null | undefined,
     aVal: JsonObject | null | undefined,
     oVal: JsonObject | null | undefined
@@ -568,10 +540,8 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     const wrap = (val: JsonObject | null | undefined) =>
       val ? this.wrapElement(val) : ({} as JsonObject)
 
-    return withConflict(
-      filterEmptyTextNodes(
-        buildConflictMarkers(config, wrap(lVal), wrap(aVal), wrap(oVal))
-      )
-    )
+    return withConflict([
+      buildConflictMarkers(wrap(lVal), wrap(aVal), wrap(oVal)),
+    ])
   }
 }

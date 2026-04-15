@@ -19,8 +19,25 @@ describe('arrayUtils', () => {
       expect(hasSameOrder(['a', 'b'], ['c', 'd'])).toBe(true)
     })
 
+    it('Given different common element counts, When comparing, Then returns false', () => {
+      expect(hasSameOrder(['a', 'b', 'c'], ['a', 'c'])).toBe(true)
+      expect(hasSameOrder(['a', 'c'], ['c', 'a', 'b'])).toBe(false)
+    })
+
+    it('Given duplicates causing length mismatch, When comparing, Then returns false', () => {
+      expect(hasSameOrder(['a', 'a', 'b'], ['a', 'b'])).toBe(false)
+    })
+
     it('Given empty arrays, When comparing, Then returns true', () => {
       expect(hasSameOrder([], [])).toBe(true)
+    })
+
+    it('Given different filtered lengths, When comparing, Then returns false', () => {
+      expect(hasSameOrder(['a', 'b'], ['b', 'a', 'c'])).toBe(false)
+    })
+
+    it('Given same filtered length but different order, When comparing, Then returns false', () => {
+      expect(hasSameOrder(['a', 'b', 'c'], ['a', 'c', 'b'])).toBe(false)
     })
   })
 
@@ -70,6 +87,21 @@ describe('arrayUtils', () => {
     it('given equal dp values when backtracking then follows j-- path', () => {
       // Tie-breaking: when dp[i-1][j] === dp[i][j-1], should follow j--
       expect(lcs(['x', 'a'], ['y', 'a'])).toEqual(['a'])
+    })
+
+    it('given interleaved common elements when computing LCS then exercises all backtracking paths', () => {
+      // Exercises diagonal (a,c match), top (skip x in a), left (skip y in b)
+      const sut = lcs(['a', 'b', 'c'], ['x', 'a', 'y', 'c'])
+
+      expect(sut).toEqual(['a', 'c'])
+    })
+
+    it('given swapped pair when computing LCS then forces left path during backtrack', () => {
+      // With a=['a','b'] b=['b','a'], LCS is length 1
+      // The backtracking must take the left (j--) path at some point
+      const sut = lcs(['a', 'b'], ['b', 'a'])
+
+      expect(sut).toHaveLength(1)
     })
   })
 

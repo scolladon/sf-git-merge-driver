@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { KeyedArrayMergeNode } from '../../../../src/merger/nodes/KeyedArrayMergeNode.js'
+import { MetadataService } from '../../../../src/service/MetadataService.js'
 import type { JsonArray } from '../../../../src/types/jsonTypes.js'
 import { defaultConfig } from '../../../utils/testConfig.js'
+
+const fieldPermissionsKey =
+  MetadataService.getKeyFieldExtractor('fieldPermissions')
 
 describe('KeyedArrayMergeNode', () => {
   describe('merge with key field (fieldPermissions)', () => {
@@ -14,7 +18,9 @@ describe('KeyedArrayMergeNode', () => {
         ancestor,
         local,
         other,
-        'fieldPermissions'
+        'fieldPermissions',
+        fieldPermissionsKey,
+        false
       )
 
       // Act
@@ -36,7 +42,9 @@ describe('KeyedArrayMergeNode', () => {
         ancestor,
         local,
         other,
-        'fieldPermissions'
+        'fieldPermissions',
+        fieldPermissionsKey,
+        false
       )
 
       // Act
@@ -59,7 +67,9 @@ describe('KeyedArrayMergeNode', () => {
         ancestor,
         local,
         other,
-        'fieldPermissions'
+        'fieldPermissions',
+        fieldPermissionsKey,
+        false
       )
 
       // Act
@@ -85,7 +95,9 @@ describe('KeyedArrayMergeNode', () => {
         ancestor,
         local,
         other,
-        'fieldPermissions'
+        'fieldPermissions',
+        fieldPermissionsKey,
+        false
       )
 
       // Act
@@ -112,7 +124,9 @@ describe('KeyedArrayMergeNode', () => {
         ancestor,
         local,
         other,
-        'fieldPermissions'
+        'fieldPermissions',
+        fieldPermissionsKey,
+        false
       )
 
       // Act
@@ -133,7 +147,9 @@ describe('KeyedArrayMergeNode', () => {
         ancestor,
         local,
         other,
-        'fieldPermissions'
+        'fieldPermissions',
+        fieldPermissionsKey,
+        false
       )
 
       // Act
@@ -153,7 +169,9 @@ describe('KeyedArrayMergeNode', () => {
         ancestor,
         local,
         other,
-        'fieldPermissions'
+        'fieldPermissions',
+        fieldPermissionsKey,
+        false
       )
 
       // Act
@@ -173,7 +191,9 @@ describe('KeyedArrayMergeNode', () => {
         ancestor,
         local,
         other,
-        'fieldPermissions'
+        'fieldPermissions',
+        fieldPermissionsKey,
+        false
       )
 
       // Act
@@ -192,7 +212,9 @@ describe('KeyedArrayMergeNode', () => {
         ancestor,
         local,
         other,
-        'fieldPermissions'
+        'fieldPermissions',
+        fieldPermissionsKey,
+        false
       )
 
       // Act
@@ -213,7 +235,9 @@ describe('KeyedArrayMergeNode', () => {
         ancestor,
         local,
         other,
-        'unknownAttribute'
+        'unknownAttribute',
+        undefined,
+        false
       )
 
       // Act
@@ -232,7 +256,9 @@ describe('KeyedArrayMergeNode', () => {
         ancestor,
         local,
         other,
-        'unknownAttribute'
+        'unknownAttribute',
+        undefined,
+        false
       )
 
       // Act
@@ -253,7 +279,9 @@ describe('KeyedArrayMergeNode', () => {
         ancestor,
         local,
         other,
-        'fieldPermissions'
+        'fieldPermissions',
+        fieldPermissionsKey,
+        false
       )
 
       // Act
@@ -272,7 +300,9 @@ describe('KeyedArrayMergeNode', () => {
         ancestor,
         local,
         other,
-        'fieldPermissions'
+        'fieldPermissions',
+        fieldPermissionsKey,
+        false
       )
 
       // Act
@@ -300,7 +330,9 @@ describe('KeyedArrayMergeNode', () => {
         ancestor,
         local,
         other,
-        'fieldPermissions'
+        'fieldPermissions',
+        fieldPermissionsKey,
+        false
       )
 
       // Act

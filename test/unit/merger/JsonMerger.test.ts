@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { SALESFORCE_EOL } from '../../../src/constant/metadataConstant.js'
 import { JsonMerger } from '../../../src/merger/JsonMerger.js'
 import { JsonValue } from '../../../src/types/jsonTypes.js'
 import { defaultConfig } from '../../utils/testConfig.js'
@@ -77,37 +76,41 @@ describe('JsonMerger', () => {
           Profile: [
             {
               fieldPermissions: [
-                { editable: [{ '#text': 'true' }] },
-                { field: [{ '#text': 'Account.AllAndAncestorAndOther' }] },
-                { readable: [{ '#text': 'true' }] },
+                { editable: 'true' },
+                { field: 'Account.AllAndAncestorAndOther' },
+                { readable: 'true' },
               ],
             },
             {
               fieldPermissions: [
-                { editable: [{ '#text': 'false' }] },
-                { field: [{ '#text': 'Account.Industry' }] },
-                { readable: [{ '#text': 'true' }] },
+                {
+                  editable: 'false',
+                  field: 'Account.Industry',
+                  readable: 'true',
+                },
               ],
             },
             {
               fieldPermissions: [
-                { editable: [{ '#text': 'false' }] },
-                { field: [{ '#text': 'Account.LocalAndOther' }] },
-                { readable: [{ '#text': 'true' }] },
+                {
+                  editable: 'false',
+                  field: 'Account.LocalAndOther',
+                  readable: 'true',
+                },
               ],
             },
             {
               fieldPermissions: [
-                { editable: [{ '#text': 'true' }] },
-                { field: [{ '#text': 'Account.Name' }] },
-                { readable: [{ '#text': 'true' }] },
+                { editable: 'true' },
+                { field: 'Account.Name' },
+                { readable: 'true' },
               ],
             },
             {
               fieldPermissions: [
-                { editable: [{ '#text': 'false' }] },
-                { field: [{ '#text': 'Account.Type' }] },
-                { readable: [{ '#text': 'false' }] },
+                { editable: 'false' },
+                { field: 'Account.Type' },
+                { readable: 'false' },
               ],
             },
           ],
@@ -151,9 +154,9 @@ describe('JsonMerger', () => {
           Profile: [
             {
               fieldPermissions: [
-                { editable: [{ '#text': 'true' }] },
-                { field: [{ '#text': 'Account.Name' }] },
-                { readable: [{ '#text': 'false' }] },
+                { editable: 'true' },
+                { field: 'Account.Name' },
+                { readable: 'false' },
               ],
             },
           ],
@@ -198,16 +201,18 @@ describe('JsonMerger', () => {
           Profile: [
             {
               fieldPermissions: [
-                { editable: [{ '#text': 'true' }] },
-                { field: [{ '#text': 'Account.Name' }] },
-                { readable: [{ '#text': 'true' }] },
+                { editable: 'true' },
+                { field: 'Account.Name' },
+                { readable: 'true' },
               ],
             },
             {
               fieldPermissions: [
-                { editable: [{ '#text': 'false' }] },
-                { field: [{ '#text': 'Account.Type' }] },
-                { readable: [{ '#text': 'true' }] },
+                {
+                  editable: 'false',
+                  field: 'Account.Type',
+                  readable: 'true',
+                },
               ],
             },
           ],
@@ -257,23 +262,25 @@ describe('JsonMerger', () => {
         {
           Profile: [
             {
-              description: [{ '#text': 'Our updated description' }],
+              description: 'Our updated description',
             },
             {
               fieldPermissions: [
-                { editable: [{ '#text': 'true' }] },
-                { field: [{ '#text': 'Account.Name' }] },
-                { readable: [{ '#text': 'false' }] },
+                { editable: 'true' },
+                { field: 'Account.Name' },
+                { readable: 'false' },
               ],
             },
             {
               fieldPermissions: [
-                { editable: [{ '#text': 'false' }] },
-                { field: [{ '#text': 'Account.Type' }] },
-                { readable: [{ '#text': 'true' }] },
+                {
+                  editable: 'false',
+                  field: 'Account.Type',
+                  readable: 'true',
+                },
               ],
             },
-            { label: [{ '#text': 'Their Label' }] },
+            { label: 'Their Label' },
           ],
         },
       ])
@@ -281,9 +288,11 @@ describe('JsonMerger', () => {
     })
   })
 
-  describe('Handling XML namespaces in metadata merges', () => {
-    it('should correctly position namespace attributes at the appropriate level in the output structure', () => {
+  describe('given inputs without namespace attributes (extracted by parser adapter)', () => {
+    it('given clean content when merging then produces output without namespace container', () => {
       // Arrange
+      // Namespace attributes (@_xmlns) are now extracted by the parser adapter
+      // before reaching JsonMerger. JsonMerger only sees clean content.
       const ancestor: JsonValue = {
         CustomLabels: {
           labels: {
@@ -293,7 +302,6 @@ describe('JsonMerger', () => {
             protected: 'false',
             shortDescription: 'this is ancestor label',
           },
-          '@_xmlns': 'http://soap.sforce.com/2006/04/metadata',
         },
       }
 
@@ -306,7 +314,6 @@ describe('JsonMerger', () => {
             protected: 'false',
             shortDescription: 'this is ancestor label',
           },
-          '@_xmlns': 'http://soap.sforce.com/2006/04/metadata',
         },
       }
 
@@ -319,7 +326,6 @@ describe('JsonMerger', () => {
             protected: 'false',
             shortDescription: 'this is ancestor label',
           },
-          '@_xmlns': 'http://soap.sforce.com/2006/04/metadata',
         },
       }
 
@@ -331,20 +337,15 @@ describe('JsonMerger', () => {
         {
           CustomLabels: [
             {
-              labels: [
-                { fullName: [{ '#text': 'tested_label' }] },
-                { language: [{ '#text': 'fr' }] },
-                { protected: [{ '#text': 'false' }] },
-                {
-                  shortDescription: [{ '#text': 'this is ancestor label' }],
-                },
-                { value: [{ '#text': 'this is ancestor label' }] },
-              ],
+              labels: {
+                fullName: 'tested_label',
+                value: 'this is ancestor label',
+                language: 'fr',
+                protected: 'false',
+                shortDescription: 'this is ancestor label',
+              },
             },
           ],
-          ':@': {
-            '@_xmlns': 'http://soap.sforce.com/2006/04/metadata',
-          },
         },
       ])
       expect(result.hasConflict).toBe(false)
@@ -382,38 +383,40 @@ describe('JsonMerger', () => {
       expect(result.output).toEqual([
         {
           Profile: [
-            { description: [{ '#text': 'Their description' }] },
+            { description: 'Their description' },
             {
               fieldPermissions: [
-                { editable: [{ '#text': 'false' }] },
-                { field: [{ '#text': 'Account.Industry' }] },
-                { readable: [{ '#text': 'true' }] },
+                {
+                  editable: 'false',
+                  field: 'Account.Industry',
+                  readable: 'true',
+                },
               ],
             },
             {
               fieldPermissions: [
-                { '#text': SALESFORCE_EOL + '<<<<<<< ours' },
-                { editable: [{ '#text': 'true' }] },
-                { '#text': '||||||| base' },
-                { '#text': SALESFORCE_EOL },
-                { '#text': '=======' },
-                { editable: [{ '#text': 'false' }] },
-                { '#text': '>>>>>>> theirs' },
-                { field: [{ '#text': 'Account.Name' }] },
-                { '#text': SALESFORCE_EOL + '<<<<<<< ours' },
-                { readable: [{ '#text': 'true' }] },
-                { '#text': '||||||| base' },
-                { '#text': SALESFORCE_EOL },
-                { '#text': '=======' },
-                { readable: [{ '#text': 'false' }] },
-                { '#text': '>>>>>>> theirs' },
+                {
+                  __conflict: true,
+                  ancestor: [{}],
+                  local: [{ editable: 'true' }],
+                  other: [{ editable: 'false' }],
+                },
+                { field: 'Account.Name' },
+                {
+                  __conflict: true,
+                  ancestor: [{}],
+                  local: [{ readable: 'true' }],
+                  other: [{ readable: 'false' }],
+                },
               ],
             },
             {
               fieldPermissions: [
-                { editable: [{ '#text': 'false' }] },
-                { field: [{ '#text': 'Account.Type' }] },
-                { readable: [{ '#text': 'true' }] },
+                {
+                  editable: 'false',
+                  field: 'Account.Type',
+                  readable: 'true',
+                },
               ],
             },
           ],
@@ -453,15 +456,14 @@ describe('JsonMerger', () => {
           Profile: [
             {
               fieldPermissions: [
-                { '#text': SALESFORCE_EOL + '<<<<<<< ours' },
-                { editable: [{ '#text': 'true' }] },
-                { '#text': '||||||| base' },
-                { '#text': SALESFORCE_EOL },
-                { '#text': '=======' },
-                { editable: [{ '#text': 'false' }] },
-                { '#text': '>>>>>>> theirs' },
-                { field: [{ '#text': 'Account.Name' }] },
-                { readable: [{ '#text': 'true' }] },
+                {
+                  __conflict: true,
+                  ancestor: [{}],
+                  local: [{ editable: 'true' }],
+                  other: [{ editable: 'false' }],
+                },
+                { field: 'Account.Name' },
+                { readable: 'true' },
               ],
             },
           ],
@@ -499,25 +501,36 @@ describe('JsonMerger', () => {
       expect(result.output).toEqual([
         {
           Profile: [
-            { '#text': SALESFORCE_EOL + '<<<<<<< ours' },
             {
-              unknown: [
-                { editable: [{ '#text': 'true' }] },
-                { field: [{ '#text': 'Account.Name' }] },
-                { readable: [{ '#text': 'true' }] },
+              __conflict: true,
+              ancestor: [
+                {
+                  unknown: [],
+                },
+              ],
+              local: [
+                {
+                  unknown: [
+                    {
+                      editable: 'true',
+                      field: 'Account.Name',
+                      readable: 'true',
+                    },
+                  ],
+                },
+              ],
+              other: [
+                {
+                  unknown: [
+                    {
+                      editable: 'false',
+                      field: 'Account.Name',
+                      readable: 'true',
+                    },
+                  ],
+                },
               ],
             },
-            { '#text': '||||||| base' },
-            { '#text': SALESFORCE_EOL },
-            { '#text': '=======' },
-            {
-              unknown: [
-                { editable: [{ '#text': 'false' }] },
-                { field: [{ '#text': 'Account.Name' }] },
-                { readable: [{ '#text': 'true' }] },
-              ],
-            },
-            { '#text': '>>>>>>> theirs' },
           ],
         },
       ])
@@ -555,25 +568,32 @@ describe('JsonMerger', () => {
       expect(result.output).toEqual([
         {
           Profile: [
-            { '#text': SALESFORCE_EOL + '<<<<<<< ours' },
             {
-              fieldPermissions: [
-                { editable: [{ '#text': 'false' }] },
-                { field: [{ '#text': 'Account.Name' }] },
-                { readable: [{ '#text': 'true' }] },
+              __conflict: true,
+              ancestor: [
+                {
+                  fieldPermissions: [
+                    {
+                      editable: 'true',
+                      field: 'Account.Name',
+                      readable: 'true',
+                    },
+                  ],
+                },
               ],
-            },
-            { '#text': '||||||| base' },
-            {
-              fieldPermissions: [
-                { editable: [{ '#text': 'true' }] },
-                { field: [{ '#text': 'Account.Name' }] },
-                { readable: [{ '#text': 'true' }] },
+              local: [
+                {
+                  fieldPermissions: [
+                    {
+                      editable: 'false',
+                      field: 'Account.Name',
+                      readable: 'true',
+                    },
+                  ],
+                },
               ],
+              other: [{}],
             },
-            { '#text': '=======' },
-            { '#text': SALESFORCE_EOL },
-            { '#text': '>>>>>>> theirs' },
           ],
         },
       ])
@@ -608,48 +628,47 @@ describe('JsonMerger', () => {
 
       // Assert
       expect(result.output).toEqual([
-        { '#text': SALESFORCE_EOL + '<<<<<<< ours' },
         {
-          Profile: [
+          __conflict: true,
+          ancestor: [
             {
-              fieldPermissions: [
-                { editable: [{ '#text': 'true' }] },
-                { field: [{ '#text': 'Account.Name' }] },
-                { readable: [{ '#text': 'true' }] },
-              ],
-            },
-            {
-              fieldPermissions: [
-                { editable: [{ '#text': 'false' }] },
-                { field: [{ '#text': 'Account.Type' }] },
-                { readable: [{ '#text': 'true' }] },
-              ],
+              Profile: {
+                description: 'Their description',
+                fieldPermissions: [
+                  {
+                    editable: 'false',
+                    field: 'Account.Name',
+                    readable: 'false',
+                  },
+                  {
+                    editable: 'false',
+                    field: 'Account.Industry',
+                    readable: 'true',
+                  },
+                ],
+              },
             },
           ],
-        },
-        { '#text': '||||||| base' },
-        {
-          Profile: [
-            { description: [{ '#text': 'Their description' }] },
+          local: [
             {
-              fieldPermissions: [
-                { editable: [{ '#text': 'false' }] },
-                { field: [{ '#text': 'Account.Name' }] },
-                { readable: [{ '#text': 'false' }] },
-              ],
-            },
-            {
-              fieldPermissions: [
-                { editable: [{ '#text': 'false' }] },
-                { field: [{ '#text': 'Account.Industry' }] },
-                { readable: [{ '#text': 'true' }] },
-              ],
+              Profile: {
+                fieldPermissions: [
+                  {
+                    editable: 'true',
+                    field: 'Account.Name',
+                    readable: 'true',
+                  },
+                  {
+                    editable: 'false',
+                    field: 'Account.Type',
+                    readable: 'true',
+                  },
+                ],
+              },
             },
           ],
+          other: [{}],
         },
-        { '#text': '=======' },
-        { '#text': SALESFORCE_EOL },
-        { '#text': '>>>>>>> theirs' },
       ])
       expect(result.hasConflict).toBe(true)
     })
@@ -685,25 +704,32 @@ describe('JsonMerger', () => {
       expect(result.output).toEqual([
         {
           Profile: [
-            { '#text': SALESFORCE_EOL + '<<<<<<< ours' },
-            { '#text': SALESFORCE_EOL },
-            { '#text': '||||||| base' },
             {
-              fieldPermissions: [
-                { editable: [{ '#text': 'true' }] },
-                { field: [{ '#text': 'Account.Name' }] },
-                { readable: [{ '#text': 'true' }] },
+              __conflict: true,
+              ancestor: [
+                {
+                  fieldPermissions: [
+                    {
+                      editable: 'true',
+                      field: 'Account.Name',
+                      readable: 'true',
+                    },
+                  ],
+                },
+              ],
+              local: [{}],
+              other: [
+                {
+                  fieldPermissions: [
+                    {
+                      editable: 'false',
+                      field: 'Account.Name',
+                      readable: 'true',
+                    },
+                  ],
+                },
               ],
             },
-            { '#text': '=======' },
-            {
-              fieldPermissions: [
-                { editable: [{ '#text': 'false' }] },
-                { field: [{ '#text': 'Account.Name' }] },
-                { readable: [{ '#text': 'true' }] },
-              ],
-            },
-            { '#text': '>>>>>>> theirs' },
           ],
         },
       ])
@@ -738,48 +764,47 @@ describe('JsonMerger', () => {
 
       // Assert
       expect(result.output).toEqual([
-        { '#text': SALESFORCE_EOL + '<<<<<<< ours' },
-        { '#text': SALESFORCE_EOL },
-        { '#text': '||||||| base' },
         {
-          Profile: [
-            { description: [{ '#text': 'Their description' }] },
+          __conflict: true,
+          ancestor: [
             {
-              fieldPermissions: [
-                { editable: [{ '#text': 'false' }] },
-                { field: [{ '#text': 'Account.Name' }] },
-                { readable: [{ '#text': 'false' }] },
-              ],
+              Profile: {
+                description: 'Their description',
+                fieldPermissions: [
+                  {
+                    editable: 'false',
+                    field: 'Account.Name',
+                    readable: 'false',
+                  },
+                  {
+                    editable: 'false',
+                    field: 'Account.Industry',
+                    readable: 'true',
+                  },
+                ],
+              },
             },
+          ],
+          local: [{}],
+          other: [
             {
-              fieldPermissions: [
-                { editable: [{ '#text': 'false' }] },
-                { field: [{ '#text': 'Account.Industry' }] },
-                { readable: [{ '#text': 'true' }] },
-              ],
+              Profile: {
+                fieldPermissions: [
+                  {
+                    editable: 'true',
+                    field: 'Account.Name',
+                    readable: 'true',
+                  },
+                  {
+                    editable: 'false',
+                    field: 'Account.Type',
+                    readable: 'true',
+                  },
+                ],
+              },
             },
           ],
         },
-        { '#text': '=======' },
-        {
-          Profile: [
-            {
-              fieldPermissions: [
-                { editable: [{ '#text': 'true' }] },
-                { field: [{ '#text': 'Account.Name' }] },
-                { readable: [{ '#text': 'true' }] },
-              ],
-            },
-            {
-              fieldPermissions: [
-                { editable: [{ '#text': 'false' }] },
-                { field: [{ '#text': 'Account.Type' }] },
-                { readable: [{ '#text': 'true' }] },
-              ],
-            },
-          ],
-        },
-        { '#text': '>>>>>>> theirs' },
       ])
       expect(result.hasConflict).toBe(true)
     })
@@ -867,7 +892,7 @@ describe('JsonMerger', () => {
         {
           Profile: [
             {
-              description: [{ '#text': 'Original description' }],
+              description: 'Original description',
             },
           ],
         },
@@ -901,7 +926,7 @@ describe('JsonMerger', () => {
         {
           Profile: [
             {
-              description: [{ '#text': 'Our description' }],
+              description: 'Our description',
             },
           ],
         },
@@ -1021,7 +1046,7 @@ describe('JsonMerger', () => {
         {
           Profile: [
             {
-              description: [{ '#text': 'Our description' }],
+              description: 'Our description',
             },
           ],
         },
@@ -1054,17 +1079,12 @@ describe('JsonMerger', () => {
       expect(result.output).toEqual([
         {
           Profile: [
-            { '#text': SALESFORCE_EOL + '<<<<<<< ours' },
             {
-              description: [{ '#text': 'Our description' }],
+              __conflict: true,
+              ancestor: [{}],
+              local: [{ description: 'Our description' }],
+              other: [{ description: 'Their description' }],
             },
-            { '#text': '||||||| base' },
-            { '#text': SALESFORCE_EOL },
-            { '#text': '=======' },
-            {
-              description: [{ '#text': 'Their description' }],
-            },
-            { '#text': '>>>>>>> theirs' },
           ],
         },
       ])
@@ -1096,17 +1116,12 @@ describe('JsonMerger', () => {
       expect(result.output).toEqual([
         {
           Profile: [
-            { '#text': SALESFORCE_EOL + '<<<<<<< ours' },
-            { '#text': SALESFORCE_EOL },
-            { '#text': '||||||| base' },
             {
-              description: [{ '#text': 'Original description' }],
+              __conflict: true,
+              ancestor: [{ description: 'Original description' }],
+              local: [{}],
+              other: [{ description: 'Their description' }],
             },
-            { '#text': '=======' },
-            {
-              description: [{ '#text': 'Their description' }],
-            },
-            { '#text': '>>>>>>> theirs' },
           ],
         },
       ])
@@ -1138,17 +1153,12 @@ describe('JsonMerger', () => {
       expect(result.output).toEqual([
         {
           Profile: [
-            { '#text': SALESFORCE_EOL + '<<<<<<< ours' },
             {
-              description: [{ '#text': 'Our description' }],
+              __conflict: true,
+              ancestor: [{ description: 'Original description' }],
+              local: [{ description: 'Our description' }],
+              other: [{}],
             },
-            { '#text': '||||||| base' },
-            {
-              description: [{ '#text': 'Original description' }],
-            },
-            { '#text': '=======' },
-            { '#text': SALESFORCE_EOL },
-            { '#text': '>>>>>>> theirs' },
           ],
         },
       ])
@@ -1182,19 +1192,12 @@ describe('JsonMerger', () => {
       expect(result.output).toEqual([
         {
           Profile: [
-            { '#text': SALESFORCE_EOL + '<<<<<<< ours' },
             {
-              description: [{ '#text': 'Our description' }],
+              __conflict: true,
+              ancestor: [{ description: 'Original description' }],
+              local: [{ description: 'Our description' }],
+              other: [{ description: 'Their description' }],
             },
-            { '#text': '||||||| base' },
-            {
-              description: [{ '#text': 'Original description' }],
-            },
-            { '#text': '=======' },
-            {
-              description: [{ '#text': 'Their description' }],
-            },
-            { '#text': '>>>>>>> theirs' },
           ],
         },
       ])
@@ -1249,34 +1252,19 @@ describe('JsonMerger', () => {
         {
           Profile: [
             {
-              loginHours: [
-                { fridayEnd: [{ '#text': 400 }] },
-                { fridayStart: [{ '#text': 300 }] },
-              ],
+              loginHours: [{ fridayEnd: 400, fridayStart: 300 }],
             },
             {
-              loginHours: [
-                { mondayEnd: [{ '#text': 400 }] },
-                { mondayStart: [{ '#text': 200 }] },
-              ],
+              loginHours: [{ mondayEnd: 400 }, { mondayStart: 200 }],
             },
             {
-              loginHours: [
-                { thursdayEnd: [{ '#text': 400 }] },
-                { thursdayStart: [{ '#text': 300 }] },
-              ],
+              loginHours: [{ thursdayEnd: 400, thursdayStart: 300 }],
             },
             {
-              loginHours: [
-                { tuesdayEnd: [{ '#text': 400 }] },
-                { tuesdayStart: [{ '#text': 300 }] },
-              ],
+              loginHours: [{ tuesdayEnd: 400, tuesdayStart: 300 }],
             },
             {
-              loginHours: [
-                { wednesdayEnd: [{ '#text': 500 }] },
-                { wednesdayStart: [{ '#text': 300 }] },
-              ],
+              loginHours: [{ wednesdayEnd: 500 }, { wednesdayStart: 300 }],
             },
           ],
         },
@@ -1331,9 +1319,11 @@ describe('JsonMerger', () => {
           Profile: [
             {
               loginIpRanges: [
-                { description: [{ '#text': 'description' }] },
-                { endAddress: [{ '#text': '10.0.0.2' }] },
-                { startAddress: [{ '#text': '192.168.1.1' }] },
+                {
+                  description: 'description',
+                  endAddress: '10.0.0.2',
+                  startAddress: '192.168.1.1',
+                },
               ],
             },
           ],
@@ -1384,34 +1374,19 @@ describe('JsonMerger', () => {
         {
           Profile: [
             {
-              loginHours: [
-                { fridayEnd: [{ '#text': 400 }] },
-                { fridayStart: [{ '#text': 300 }] },
-              ],
+              loginHours: [{ fridayEnd: 400, fridayStart: 300 }],
             },
             {
-              loginHours: [
-                { mondayEnd: [{ '#text': 400 }] },
-                { mondayStart: [{ '#text': 300 }] },
-              ],
+              loginHours: [{ mondayEnd: 400, mondayStart: 300 }],
             },
             {
-              loginHours: [
-                { thursdayEnd: [{ '#text': 400 }] },
-                { thursdayStart: [{ '#text': 300 }] },
-              ],
+              loginHours: [{ thursdayEnd: 400, thursdayStart: 300 }],
             },
             {
-              loginHours: [
-                { tuesdayEnd: [{ '#text': 400 }] },
-                { tuesdayStart: [{ '#text': 300 }] },
-              ],
+              loginHours: [{ tuesdayEnd: 400, tuesdayStart: 300 }],
             },
             {
-              loginHours: [
-                { wednesdayEnd: [{ '#text': 400 }] },
-                { wednesdayStart: [{ '#text': 300 }] },
-              ],
+              loginHours: [{ wednesdayEnd: 400, wednesdayStart: 300 }],
             },
           ],
         },
@@ -1459,34 +1434,19 @@ describe('JsonMerger', () => {
         {
           Profile: [
             {
-              loginHours: [
-                { fridayEnd: [{ '#text': 400 }] },
-                { fridayStart: [{ '#text': 300 }] },
-              ],
+              loginHours: [{ fridayEnd: 400, fridayStart: 300 }],
             },
             {
-              loginHours: [
-                { mondayEnd: [{ '#text': 500 }] },
-                { mondayStart: [{ '#text': 300 }] },
-              ],
+              loginHours: [{ mondayEnd: 500 }, { mondayStart: 300 }],
             },
             {
-              loginHours: [
-                { thursdayEnd: [{ '#text': 400 }] },
-                { thursdayStart: [{ '#text': 300 }] },
-              ],
+              loginHours: [{ thursdayEnd: 400, thursdayStart: 300 }],
             },
             {
-              loginHours: [
-                { tuesdayEnd: [{ '#text': 400 }] },
-                { tuesdayStart: [{ '#text': 300 }] },
-              ],
+              loginHours: [{ tuesdayEnd: 400, tuesdayStart: 300 }],
             },
             {
-              loginHours: [
-                { wednesdayEnd: [{ '#text': 400 }] },
-                { wednesdayStart: [{ '#text': 300 }] },
-              ],
+              loginHours: [{ wednesdayEnd: 400, wednesdayStart: 300 }],
             },
           ],
         },
@@ -1523,19 +1483,12 @@ describe('JsonMerger', () => {
       expect(result.output).toEqual([
         {
           Package: [
-            { '#text': SALESFORCE_EOL + '<<<<<<< ours' },
             {
-              version: [{ '#text': '60.0' }],
+              __conflict: true,
+              ancestor: [{ version: '59.0' }],
+              local: [{ version: '60.0' }],
+              other: [{ version: '61.0' }],
             },
-            { '#text': '||||||| base' },
-            {
-              version: [{ '#text': '59.0' }],
-            },
-            { '#text': '=======' },
-            {
-              version: [{ '#text': '61.0' }],
-            },
-            { '#text': '>>>>>>> theirs' },
           ],
         },
       ])
@@ -1570,7 +1523,7 @@ describe('JsonMerger', () => {
         {
           Package: [
             {
-              version: [{ '#text': '60.0' }],
+              version: '60.0',
             },
           ],
         },
@@ -1606,7 +1559,7 @@ describe('JsonMerger', () => {
         {
           Package: [
             {
-              version: [{ '#text': '60.0' }],
+              version: '60.0',
             },
           ],
         },
@@ -1720,10 +1673,10 @@ describe('JsonMerger', () => {
           Package: [
             {
               types: [
-                { members: [{ '#text': 'SelectorClass' }] },
-                { members: [{ '#text': 'ServiceClass' }] },
-                { members: [{ '#text': 'ServiceClass2' }] },
-                { name: [{ '#text': 'ApexTrigger' }] },
+                { members: 'SelectorClass' },
+                { members: 'ServiceClass' },
+                { members: 'ServiceClass2' },
+                { name: 'ApexTrigger' },
               ],
             },
           ],
@@ -1771,9 +1724,9 @@ describe('JsonMerger', () => {
           Package: [
             {
               types: [
-                { members: [{ '#text': 'NewLocalClass' }] },
-                { members: [{ '#text': 'ServiceClass' }] },
-                { name: [{ '#text': 'ApexTrigger' }] },
+                { members: 'NewLocalClass' },
+                { members: 'ServiceClass' },
+                { name: 'ApexTrigger' },
               ],
             },
           ],
@@ -1817,10 +1770,10 @@ describe('JsonMerger', () => {
           Package: [
             {
               types: [
-                { members: [{ '#text': 'LocalMember' }] },
-                { members: [{ '#text': 'OnlyMember' }] },
-                { members: [{ '#text': 'RemoteMember' }] },
-                { name: [{ '#text': 'ApexClass' }] },
+                { members: 'LocalMember' },
+                { members: 'OnlyMember' },
+                { members: 'RemoteMember' },
+                { name: 'ApexClass' },
               ],
             },
           ],

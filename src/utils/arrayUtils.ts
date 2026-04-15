@@ -1,5 +1,3 @@
-import { deepEqual } from 'fast-equals'
-
 /**
  * Appends all elements from source arrays to target array.
  * Stack-safe alternative to target.push(...source) which can overflow on large arrays.
@@ -17,14 +15,20 @@ export const hasSameOrder = (a: string[], b: string[]): boolean => {
   const aFiltered = a.filter(k => bSet.has(k))
   const aSet = new Set(a)
   const bFiltered = b.filter(k => aSet.has(k))
-  return deepEqual(aFiltered, bFiltered)
+  if (aFiltered.length !== bFiltered.length) return false
+  for (let i = 0; i < aFiltered.length; i++) {
+    if (aFiltered[i] !== bFiltered[i]) return false
+  }
+  return true
 }
 
 export const lcs = (a: string[], b: string[]): string[] => {
   const m = a.length
   const n = b.length
+  if (m === 0 || n === 0) return []
+
   const dp: number[][] = Array.from({ length: m + 1 }, () =>
-    Array(n + 1).fill(0)
+    new Array(n + 1).fill(0)
   )
 
   for (let i = 1; i <= m; i++) {
@@ -41,7 +45,7 @@ export const lcs = (a: string[], b: string[]): string[] => {
   let j = n
   while (i > 0 && j > 0) {
     if (a[i - 1] === b[j - 1]) {
-      result.unshift(a[i - 1])
+      result.push(a[i - 1])
       i--
       j--
     } else if (dp[i - 1][j] > dp[i][j - 1]) {
@@ -50,5 +54,6 @@ export const lcs = (a: string[], b: string[]): string[] => {
       j--
     }
   }
+  result.reverse()
   return result
 }

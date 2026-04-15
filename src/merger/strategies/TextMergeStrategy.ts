@@ -32,32 +32,23 @@ class LocalOnlyStrategy implements TextMergeStrategy {
 }
 
 class LocalAndOtherStrategy implements TextMergeStrategy {
-  handle({
-    config,
-    objLocal,
-    objOther,
-    local,
-    other,
-  }: TextMergeParams): MergeResult {
+  handle({ objLocal, objOther, local, other }: TextMergeParams): MergeResult {
     if (local === other) {
       return noConflict([objLocal])
     }
-    return withConflict(buildConflictMarkers(config, objLocal, {}, objOther))
+    return withConflict([buildConflictMarkers(objLocal, {}, objOther)])
   }
 }
 
 class AncestorAndOtherStrategy implements TextMergeStrategy {
   handle({
-    config,
     objAncestor,
     objOther,
     ancestor,
     other,
   }: TextMergeParams): MergeResult {
     if (ancestor !== other) {
-      return withConflict(
-        buildConflictMarkers(config, {}, objAncestor, objOther)
-      )
+      return withConflict([buildConflictMarkers({}, objAncestor, objOther)])
     }
     return noConflict([])
   }
@@ -65,16 +56,13 @@ class AncestorAndOtherStrategy implements TextMergeStrategy {
 
 class AncestorAndLocalStrategy implements TextMergeStrategy {
   handle({
-    config,
     objAncestor,
     objLocal,
     ancestor,
     local,
   }: TextMergeParams): MergeResult {
     if (ancestor !== local) {
-      return withConflict(
-        buildConflictMarkers(config, objLocal, objAncestor, {})
-      )
+      return withConflict([buildConflictMarkers(objLocal, objAncestor, {})])
     }
     return noConflict([])
   }
@@ -82,7 +70,6 @@ class AncestorAndLocalStrategy implements TextMergeStrategy {
 
 class AllPresentStrategy implements TextMergeStrategy {
   handle({
-    config,
     objAncestor,
     objLocal,
     objOther,
@@ -99,9 +86,7 @@ class AllPresentStrategy implements TextMergeStrategy {
     if (local === other) {
       return noConflict([objLocal])
     }
-    return withConflict(
-      buildConflictMarkers(config, objLocal, objAncestor, objOther)
-    )
+    return withConflict([buildConflictMarkers(objLocal, objAncestor, objOther)])
   }
 }
 

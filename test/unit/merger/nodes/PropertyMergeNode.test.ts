@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { TEXT_TAG } from '../../../../src/constant/parserConstant.js'
 import { PropertyMergeNode } from '../../../../src/merger/nodes/PropertyMergeNode.js'
 import { defaultConfig } from '../../../utils/testConfig.js'
 
@@ -32,9 +31,7 @@ describe('PropertyMergeNode', () => {
 
     // Assert
     expect(result.hasConflict).toBe(false)
-    expect(result.output).toEqual([
-      { wrapper: [{ field: [{ [TEXT_TAG]: 'localValue' }] }] },
-    ])
+    expect(result.output).toEqual([{ wrapper: [{ field: 'localValue' }] }])
   })
 
   it('should handle string arrays', () => {
@@ -77,10 +74,7 @@ describe('PropertyMergeNode', () => {
     expect(result.hasConflict).toBe(false)
     expect(result.output).toEqual([
       {
-        wrapper: [
-          { a: [{ [TEXT_TAG]: 'localA' }] },
-          { b: [{ [TEXT_TAG]: 'localB' }] },
-        ],
+        wrapper: [{ a: 'localA' }, { b: 'localB' }],
       },
     ])
   })
@@ -97,9 +91,7 @@ describe('PropertyMergeNode', () => {
 
     // Assert
     expect(result.hasConflict).toBe(false)
-    expect(result.output).toEqual([
-      { wrapper: [{ added: [{ [TEXT_TAG]: 'newValue' }] }] },
-    ])
+    expect(result.output).toEqual([{ wrapper: [{ added: 'newValue' }] }])
   })
 
   it('should include property only in other', () => {
@@ -114,9 +106,7 @@ describe('PropertyMergeNode', () => {
 
     // Assert
     expect(result.hasConflict).toBe(false)
-    expect(result.output).toEqual([
-      { wrapper: [{ added: [{ [TEXT_TAG]: 'otherValue' }] }] },
-    ])
+    expect(result.output).toEqual([{ wrapper: [{ added: 'otherValue' }] }])
   })
 
   it('should return empty when property deleted in both', () => {
@@ -164,7 +154,7 @@ describe('PropertyMergeNode', () => {
     expect(result.hasConflict).toBe(false)
     expect(result.output).toEqual([
       {
-        wrapper: [{ nested: [{ inner: [{ [TEXT_TAG]: 'changed' }] }] }],
+        wrapper: [{ nested: [{ inner: 'changed' }] }],
       },
     ])
   })

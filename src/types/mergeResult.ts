@@ -1,5 +1,5 @@
-import { isEmpty } from 'lodash-es'
-import type { JsonArray } from './jsonTypes.js'
+import { pushAll } from '../utils/arrayUtils.js'
+import type { JsonArray, JsonValue } from './jsonTypes.js'
 
 export interface MergeResult {
   output: JsonArray
@@ -13,17 +13,18 @@ const EMPTY_NO_CONFLICT: MergeResult = {
 }
 
 export const combineResults = (results: MergeResult[]): MergeResult => {
-  if (results.length === 1) {
-    return results[0]
+  if (results.length === 1) return results[0]
+  const output: JsonArray = []
+  let hasConflict = false
+  for (const r of results) {
+    pushAll(output, r.output)
+    hasConflict = hasConflict || r.hasConflict
   }
-  return {
-    output: results.flatMap(r => r.output),
-    hasConflict: results.some(r => r.hasConflict),
-  }
+  return { output, hasConflict }
 }
 
 export const noConflict = (output: JsonArray): MergeResult => {
-  if (isEmpty(output)) {
+  if (output.length === 0) {
     return EMPTY_NO_CONFLICT
   }
   return { output, hasConflict: false }
@@ -36,3 +37,32 @@ export const withConflict = (output: JsonArray): MergeResult => ({
 
 export const isNonEmpty = (result: MergeResult): boolean =>
   result.output.length > 0 || result.hasConflict
+
+export const wrapWithRootKey = (
+  result: MergeResult,
+  rootKeyName: string
+): MergeResult => {
+  if (result.output.length > 0) {
+    return {
+      output: [{ [rootKeyName]: result.output }],
+      hasConflict: result.hasConflict,
+    }
+  }
+  return noConflict([{ [rootKeyName]: [] }])
+}
+
+export const buildEarlyResult = (
+  value: JsonValue,
+  rootKeyName?: string
+): MergeResult => {
+  const content: JsonArray =
+    value == null
+      ? []
+      : Array.isArray(value)
+        ? (value as JsonArray)
+        : ([value] as JsonArray)
+  if (rootKeyName) {
+    return noConflict([{ [rootKeyName]: content }])
+  }
+  return noConflict(content)
+}

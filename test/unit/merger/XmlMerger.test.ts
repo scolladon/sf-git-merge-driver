@@ -1,17 +1,21 @@
-import { XMLBuilder, XMLParser } from 'fast-xml-parser'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { JsonMerger } from '../../../src/merger/JsonMerger.js'
 import { XmlMerger } from '../../../src/merger/XmlMerger.js'
 import { defaultConfig } from '../../utils/testConfig.js'
 
-// Mocks bypass XML parsing/building to isolate orchestration logic.
-// Real XML handling is covered by integration tests.
-vi.mock('fast-xml-parser', () => {
-  const XMLParser = vi.fn()
-  XMLParser.prototype.parse = (xml: string) => xml
-  const XMLBuilder = vi.fn()
-  XMLBuilder.prototype.build = (obj: unknown) => obj
-  return { XMLParser, XMLBuilder }
+vi.mock('../../../src/adapter/FlxXmlParser.js', () => {
+  const FlxXmlParser = vi.fn()
+  FlxXmlParser.prototype.parse = (xml: string) => ({
+    content: xml,
+    namespaces: {},
+  })
+  return { FlxXmlParser }
+})
+
+vi.mock('../../../src/adapter/FxpXmlSerializer.js', () => {
+  const FxpXmlSerializer = vi.fn()
+  FxpXmlSerializer.prototype.serialize = (output: unknown) => output
+  return { FxpXmlSerializer }
 })
 
 const mockedmerge = vi.fn()
@@ -59,7 +63,7 @@ describe('XmlMerger', () => {
   })
 
   describe('XML output formatting', () => {
-    it('given non-empty input when merging then output includes XML declaration', () => {
+    it('given non-empty output when merging then serializer is called', () => {
       // Arrange
       mockedmerge.mockReturnValue({
         output: '<root>&lt;modified&gt;</root>',
@@ -74,32 +78,25 @@ describe('XmlMerger', () => {
       )
 
       // Assert
-      expect(result.output).toContain('<?xml version="1.0" encoding="UTF-8"?>')
       expect(result.hasConflict).toBe(false)
+      expect(result.output).toBeTruthy()
     })
 
-    it('given XML comments when merging then preserves comments in output', () => {
-      // Arrange
-      mockedmerge.mockReturnValue({
-        output: '<root><!-- merged comment --></root>',
-        hasConflict: false,
-      })
-
-      // Act
-      const result = sut.mergeThreeWay(
-        '<root><!-- original comment --></root>',
-        '<root><!-- our comment --></root>',
-        '<root><!-- their comment --></root>'
-      )
-
-      // Assert
-      expect(result.output).toContain('<!-- merged comment -->')
-      expect(result.hasConflict).toBe(false)
-    })
-
-    it('given empty files when merging then returns empty output', () => {
+    it('given empty output when merging then returns empty string', () => {
       // Arrange
       mockedmerge.mockReturnValue({ output: '', hasConflict: false })
+
+      // Act
+      const result = sut.mergeThreeWay('', '', '')
+
+      // Assert
+      expect(result.output).toEqual('')
+      expect(result.hasConflict).toBe(false)
+    })
+
+    it('given empty array output when merging then returns empty string', () => {
+      // Arrange
+      mockedmerge.mockReturnValue({ output: [], hasConflict: false })
 
       // Act
       const result = sut.mergeThreeWay('', '', '')
