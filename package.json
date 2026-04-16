@@ -325,7 +325,8 @@
       ],
       "dependencies": [
         "lint",
-        "build"
+        "build",
+        "build:bin"
       ]
     },
     "test:unit": {
