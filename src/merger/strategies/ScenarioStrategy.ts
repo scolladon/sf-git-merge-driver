@@ -1,4 +1,3 @@
-import { deepEqual } from 'fast-equals'
 import type { JsonArray, JsonObject } from '../../types/jsonTypes.js'
 import type { MergeResult } from '../../types/mergeResult.js'
 import {
@@ -9,6 +8,7 @@ import {
   wrapWithRootKey,
 } from '../../types/mergeResult.js'
 import { MergeScenario } from '../../types/mergeScenario.js'
+import { jsonEqual } from '../../utils/jsonEqual.js'
 import { buildConflictMarkers } from '../ConflictMarkerBuilder.js'
 import type { MergeContext } from '../MergeContext.js'
 import { MergeOrchestrator } from '../MergeOrchestrator.js'
@@ -61,7 +61,7 @@ abstract class AbstractMergeStrategy implements ScenarioStrategy {
 abstract class AbstractAncestorStrategy implements ScenarioStrategy {
   execute(context: MergeContext): MergeResult {
     const target = this.getTarget(context)
-    const targetUnchanged = deepEqual(context.ancestor, target)
+    const targetUnchanged = jsonEqual(context.ancestor, target)
 
     if (context.rootKey) {
       return this.executeWithRootKey(context, target, targetUnchanged)
@@ -186,7 +186,7 @@ class LocalAndOtherStrategy extends AbstractMergeStrategy {
     const local = context.local as JsonObject | JsonArray
     const other = context.other as JsonObject | JsonArray
 
-    if (deepEqual(local, other)) {
+    if (jsonEqual(local, other)) {
       return buildEarlyResult(local, context.rootKey?.name)
     }
 
@@ -260,8 +260,8 @@ class AncestorAndOtherStrategy extends AbstractAncestorStrategy {
 class AllPresentStrategy extends AbstractMergeStrategy {
   execute(context: MergeContext): MergeResult {
     if (
-      deepEqual(context.ancestor, context.local) &&
-      deepEqual(context.local, context.other)
+      jsonEqual(context.ancestor, context.local) &&
+      jsonEqual(context.local, context.other)
     ) {
       return buildEarlyResult(context.local, context.rootKey?.name)
     }

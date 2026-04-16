@@ -14,8 +14,7 @@
     "@oclif/core": "^4.10.5",
     "@salesforce/core": "^8.28.3",
     "@salesforce/sf-plugins-core": "^12.2.6",
-    "fast-equals": "^6.0.0",
-    "fast-xml-parser": "^5.6.0",
+    "fast-xml-builder": "^1.1.4",
     "simple-git": "^3.36.0"
   },
   "devDependencies": {
@@ -30,6 +29,7 @@
     "@types/chai": "^5.2.3",
     "@vitest/coverage-v8": "^4.1.4",
     "chai": "^6.2.2",
+    "fast-xml-parser": "^5.6.0",
     "husky": "^9.1.7",
     "knip": "^6.4.1",
     "mocha": "^11.7.5",

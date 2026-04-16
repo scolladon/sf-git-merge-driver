@@ -1,4 +1,3 @@
-import { deepEqual } from 'fast-equals'
 import type { MergeConfig } from '../../types/conflictTypes.js'
 import type { JsonArray, JsonObject } from '../../types/jsonTypes.js'
 import type { MergeResult } from '../../types/mergeResult.js'
@@ -8,6 +7,7 @@ import {
   withConflict,
 } from '../../types/mergeResult.js'
 import { hasSameOrder, lcs, pushAll } from '../../utils/arrayUtils.js'
+import { jsonEqual } from '../../utils/jsonEqual.js'
 import { setsEqual, setsIntersect } from '../../utils/setUtils.js'
 import { buildConflictMarkers } from '../ConflictMarkerBuilder.js'
 import type { KeyExtractor } from './KeyedArrayIndex.js'
@@ -477,19 +477,19 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
           return null
         }
         // Local deleted - conflict if other modified
-        return deepEqual(aVal, oVal)
+        return jsonEqual(aVal, oVal)
           ? null
           : this.buildElementConflict(config, null, aVal, oVal)
       }
       // Other deleted - conflict if local modified
-      return deepEqual(aVal, lVal)
+      return jsonEqual(aVal, lVal)
         ? null
         : this.buildElementConflict(config, lVal, aVal, null)
     }
 
     // Both added - accept if identical, conflict otherwise
     if (lVal !== undefined && oVal !== undefined) {
-      return deepEqual(lVal, oVal)
+      return jsonEqual(lVal, oVal)
         ? noConflict([this.wrapElement(lVal)])
         : this.buildElementConflict(config, lVal, null, oVal)
     }
@@ -514,17 +514,17 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     const oVal = ctx.otherMap.get(key)
 
     // Other unchanged → take local
-    if (deepEqual(aVal, oVal) && lVal) {
+    if (jsonEqual(aVal, oVal) && lVal) {
       return noConflict([this.wrapElement(lVal)])
     }
 
     // Local unchanged → take other
-    if (deepEqual(aVal, lVal) && oVal) {
+    if (jsonEqual(aVal, lVal) && oVal) {
       return noConflict([this.wrapElement(oVal)])
     }
 
     // Both changed to same
-    if (deepEqual(lVal, oVal)) {
+    if (jsonEqual(lVal, oVal)) {
       return noConflict([this.wrapElement(lVal!)])
     }
 

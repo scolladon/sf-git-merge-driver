@@ -1,4 +1,4 @@
-import { XMLBuilder } from 'fast-xml-parser'
+import Builder, { type XMLBuilder } from 'fast-xml-builder'
 import {
   ANCESTOR_CONFLICT_MARKER,
   LOCAL_CONFLICT_MARKER,
@@ -120,7 +120,7 @@ export class FxpXmlSerializer implements XmlSerializer {
   constructor(config: MergeConfig) {
     this.formatter = new ConflictMarkerFormatter(config)
     this.convert = createConverter(config)
-    this.builder = new XMLBuilder(builderOptions)
+    this.builder = new Builder(builderOptions)
   }
 
   serialize(mergedOutput: JsonArray, namespaces: JsonObject): string {
