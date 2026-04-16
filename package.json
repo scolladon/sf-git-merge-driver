@@ -29,6 +29,7 @@
     "@types/chai": "^5.2.3",
     "@vitest/coverage-v8": "^4.1.4",
     "chai": "^6.2.2",
+    "esbuild": "^0.28.0",
     "fast-xml-parser": "^5.6.0",
     "husky": "^9.1.7",
     "knip": "^6.4.1",
@@ -73,6 +74,8 @@
   },
   "scripts": {
     "build": "wireit",
+    "build:bin": "wireit",
+    "build:bin:debug": "wireit",
     "clean:package-manager": "wireit",
     "clean": "wireit",
     "compile": "wireit",
@@ -113,8 +116,36 @@
         "lint"
       ]
     },
+    "build:bin": {
+      "command": "node tooling/build-bin.mjs",
+      "files": [
+        "lib/**/*.js",
+        "tooling/build-bin.mjs",
+        "package.json"
+      ],
+      "output": [
+        "bin/merge-driver.cjs"
+      ],
+      "dependencies": [
+        "compile"
+      ]
+    },
+    "build:bin:debug": {
+      "command": "node tooling/build-bin-debug.mjs",
+      "files": [
+        "lib/**/*.js",
+        "tooling/build-bin-debug.mjs",
+        "package.json"
+      ],
+      "output": [
+        "bin/merge-driver.cjs"
+      ],
+      "dependencies": [
+        "compile"
+      ]
+    },
     "clean": {
-      "command": "shx rm -rf 'reports/*' .nyc_output oclif.manifest.json package.tgz 'sfdx-git-delta-*.tgz' 'stderr*.txt' 'stdout*.txt' '.stryker-tmp/*' perf-result.txt perf-raw.json perf-runtime.json perf-memory.json",
+      "command": "shx rm -rf 'reports/*' .nyc_output oclif.manifest.json package.tgz 'sfdx-git-delta-*.tgz' 'stderr*.txt' 'stdout*.txt' '.stryker-tmp/*' perf-result.txt perf-raw.json perf-runtime.json perf-memory.json bin/merge-driver.cjs",
       "files": [
         "lib",
         "reports/*",
@@ -226,7 +257,8 @@
         "README.md"
       ],
       "dependencies": [
-        "build"
+        "build",
+        "build:bin"
       ],
       "output": [
         "README.md"

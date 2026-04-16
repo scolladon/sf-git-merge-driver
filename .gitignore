@@ -19,3 +19,4 @@ perf-memory.json
 stderr*.txt
 stdout*.txt
 tsconfig.tsbuildinfo
+bin/merge-driver.cjs

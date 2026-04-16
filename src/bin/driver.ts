@@ -1,5 +1,4 @@
 import { existsSync } from 'node:fs'
-import { pathToFileURL } from 'node:url'
 import {
   DEFAULT_ANCESTOR_CONFLICT_TAG,
   DEFAULT_CONFLICT_MARKER_SIZE,
@@ -11,6 +10,9 @@ import type { MergeConfig } from '../types/conflictTypes.js'
 
 // Injected by esbuild --define at build time; in dev/test falls back.
 declare const __VERSION__: string
+// Injected by esbuild --define at build time; `typeof` guard keeps tests
+// from triggering the main() invocation on module import.
+declare const __BUNDLED__: boolean
 
 const USAGE = `Usage: sf-git-merge-driver -O <ancestor> -A <local> -B <other> -P <output> [-L n] [-S tag] [-X tag] [-Y tag]
 
@@ -146,16 +148,13 @@ export async function main(argv: readonly string[]): Promise<number> {
   return hasConflict ? CONFLICT_EXIT_CODE : SUCCESS_EXIT_CODE
 }
 
-// Module top-level: only run as a script when invoked directly. Tests
-// importing specific exports do NOT trigger this block because
-// `process.argv[1]` is the test runner, not this file. End-to-end coverage
-// for the invocation path is provided by NUTs (Phase 6).
+// Module top-level: run main() only when executed as a bundled script.
+// esbuild sets __BUNDLED__ = true via --define. In tests and ts-node/vitest
+// contexts __BUNDLED__ is undefined, so the typeof guard prevents side
+// effects on module import. End-to-end coverage for the invocation path is
+// provided by NUTs (Phase 6).
 /* v8 ignore start -- covered by NUT tests */
-const argv1 = process.argv[1]
-const isMain =
-  argv1 !== undefined && import.meta.url === pathToFileURL(argv1).href
-
-if (isMain) {
+if (typeof __BUNDLED__ !== 'undefined' && __BUNDLED__) {
   assertNodeVersion(process.versions.node)
   main(process.argv.slice(2)).then(code => {
     process.exit(code)
