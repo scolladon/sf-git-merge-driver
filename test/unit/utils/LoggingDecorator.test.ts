@@ -21,92 +21,110 @@ vi.mock('../../../src/utils/LoggingService', async importOriginal => {
 const { log } = await import('../../../src/utils/LoggingDecorator.js')
 
 describe('LoggingDecorator', () => {
-  describe('log', () => {
-    describe('given a sync method', () => {
-      it('when called, then traces entry and exit', () => {
-        // Arrange
-        class TestClass {
-          @log
-          syncMethod() {
-            return 'result'
-          }
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  describe('given a sync method', () => {
+    it('When called, Then traces entry and exit with the passed class name', () => {
+      // Arrange
+      class SyncTestClass {
+        @log('SyncTestClass')
+        syncMethod() {
+          return 'result'
         }
-        const sut = new TestClass()
+      }
+      const sut = new SyncTestClass()
 
-        // Act
-        const result = sut.syncMethod()
+      // Act
+      const result = sut.syncMethod()
 
-        // Assert
-        expect(result).toBe('result')
-        expect(result).not.toBeInstanceOf(Promise)
-        expect(mockedTrace).toHaveBeenCalledTimes(2)
-        const entryMsg = (mockedTrace.mock.calls[0][0] as () => string)()
-        const exitMsg = (mockedTrace.mock.calls[1][0] as () => string)()
-        expect(entryMsg).toContain('syncMethod: entry')
-        expect(exitMsg).toContain('syncMethod: exit')
-      })
-
-      it('when called with arguments, then passes arguments through', () => {
-        // Arrange
-        class TestClass {
-          @log
-          syncMethod(a: string, b: number) {
-            return `${a}-${b}`
-          }
-        }
-        const sut = new TestClass()
-
-        // Act
-        const result = sut.syncMethod('hello', 42)
-
-        // Assert
-        expect(result).toBe('hello-42')
-      })
+      // Assert
+      expect(result).toBe('result')
+      expect(result).not.toBeInstanceOf(Promise)
+      expect(mockedTrace).toHaveBeenCalledTimes(2)
+      const entryMsg = (mockedTrace.mock.calls[0][0] as () => string)()
+      const exitMsg = (mockedTrace.mock.calls[1][0] as () => string)()
+      expect(entryMsg).toBe('SyncTestClass.syncMethod: entry')
+      expect(exitMsg).toBe('SyncTestClass.syncMethod: exit')
     })
 
-    describe('given an async method', () => {
-      it('when called, then traces entry and exit', async () => {
-        // Arrange
-        class TestClass {
-          @log
-          async asyncMethod() {
-            return 'async-result'
-          }
+    it('When called with arguments, Then passes arguments through', () => {
+      // Arrange
+      class SyncArgsClass {
+        @log('SyncArgsClass')
+        syncMethod(a: string, b: number) {
+          return `${a}-${b}`
         }
-        const sut = new TestClass()
+      }
+      const sut = new SyncArgsClass()
 
-        // Act
-        const result = await sut.asyncMethod()
+      // Act
+      const result = sut.syncMethod('hello', 42)
 
-        // Assert
-        expect(result).toBe('async-result')
-        expect(mockedTrace).toHaveBeenCalledTimes(2)
-        const entryMsg = (mockedTrace.mock.calls[0][0] as () => string)()
-        const exitMsg = (mockedTrace.mock.calls[1][0] as () => string)()
-        expect(entryMsg).toContain('asyncMethod: entry')
-        expect(exitMsg).toContain('asyncMethod: exit')
-      })
+      // Assert
+      expect(result).toBe('hello-42')
+    })
+  })
 
-      it('when called with arguments, then passes arguments through', async () => {
-        // Arrange
-        class TestClass {
-          @log
-          async asyncMethod(a: string, b: number) {
-            return `${a}-${b}`
-          }
+  describe('given an async method', () => {
+    it('When called, Then traces entry and exit with the passed class name', async () => {
+      // Arrange
+      class AsyncTestClass {
+        @log('AsyncTestClass')
+        async asyncMethod() {
+          return 'async-result'
         }
-        const sut = new TestClass()
+      }
+      const sut = new AsyncTestClass()
 
-        // Act
-        const result = await sut.asyncMethod('hello', 42)
+      // Act
+      const result = await sut.asyncMethod()
 
-        // Assert
-        expect(result).toBe('hello-42')
-      })
+      // Assert
+      expect(result).toBe('async-result')
+      expect(mockedTrace).toHaveBeenCalledTimes(2)
+      const entryMsg = (mockedTrace.mock.calls[0][0] as () => string)()
+      const exitMsg = (mockedTrace.mock.calls[1][0] as () => string)()
+      expect(entryMsg).toBe('AsyncTestClass.asyncMethod: entry')
+      expect(exitMsg).toBe('AsyncTestClass.asyncMethod: exit')
     })
 
-    beforeEach(() => {
-      vi.clearAllMocks()
+    it('When called with arguments, Then passes arguments through', async () => {
+      // Arrange
+      class AsyncArgsClass {
+        @log('AsyncArgsClass')
+        async asyncMethod(a: string, b: number) {
+          return `${a}-${b}`
+        }
+      }
+      const sut = new AsyncArgsClass()
+
+      // Act
+      const result = await sut.asyncMethod('hello', 42)
+
+      // Assert
+      expect(result).toBe('hello-42')
+    })
+  })
+
+  describe('decorator class-name stability (guards against rename drift)', () => {
+    it('Given an explicit class name, When minified or renamed, Then logs still use the passed string', () => {
+      // Arrange: deliberately mismatch class name and decorator string to prove the decorator uses the argument
+      class RenamedAfter {
+        @log('OriginalName')
+        method() {
+          return 1
+        }
+      }
+      const sut = new RenamedAfter()
+
+      // Act
+      sut.method()
+
+      // Assert
+      const entryMsg = (mockedTrace.mock.calls[0][0] as () => string)()
+      expect(entryMsg).toBe('OriginalName.method: entry')
     })
   })
 })

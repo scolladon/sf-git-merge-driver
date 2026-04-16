@@ -9,7 +9,7 @@ import { detectEol, normalizeEol } from '../utils/mergeUtils.js'
 export class MergeDriver {
   constructor(private readonly config: MergeConfig) {}
 
-  @log
+  @log('MergeDriver')
   async mergeFiles(
     ancestorFile: string,
     ourFile: string,

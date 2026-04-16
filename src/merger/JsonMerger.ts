@@ -14,7 +14,7 @@ export class JsonMerger {
     this.orchestrator = new MergeOrchestrator(config, defaultNodeFactory)
   }
 
-  @log
+  @log('JsonMerger')
   public mergeThreeWay(
     ancestor: JsonObject | JsonArray,
     local: JsonObject | JsonArray,

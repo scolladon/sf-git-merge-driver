@@ -72,7 +72,7 @@ export default class Run extends SfCommand<void> {
     }),
   }
 
-  @log
+  @log('Run')
   public async run(): Promise<void> {
     Logger.info('Merge starting')
     const { flags } = await this.parse(Run)

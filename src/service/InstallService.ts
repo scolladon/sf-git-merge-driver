@@ -9,7 +9,7 @@ import { getGitAttributesPath } from '../utils/gitUtils.js'
 import { log } from '../utils/LoggingDecorator.js'
 
 export class InstallService {
-  @log
+  @log('InstallService')
   public async installMergeDriver(): Promise<void> {
     const git = simpleGit({ unsafe: { allowUnsafeMergeDriver: true } })
     await git.addConfig(

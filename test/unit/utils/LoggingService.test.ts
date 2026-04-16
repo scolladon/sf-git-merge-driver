@@ -1,215 +1,221 @@
 'use strict'
 
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mockCoreLogger = {
-  setLevel: vi.fn(),
-  shouldLog: vi.fn().mockReturnValue(true),
-  debug: vi.fn(),
-  error: vi.fn(),
-  info: vi.fn(),
-  trace: vi.fn(),
-  warn: vi.fn(),
-}
-
-vi.mock('@salesforce/core', () => ({
-  Logger: {
-    childFromRoot: vi.fn().mockReturnValue(mockCoreLogger),
-  },
-  LoggerLevel: {
-    TRACE: 'trace',
-    DEBUG: 'debug',
-    INFO: 'info',
-    WARN: 'warn',
-    ERROR: 'error',
-  },
+const mockAppendFileSync = vi.fn()
+const mockMkdirSync = vi.fn()
+vi.mock('node:fs', () => ({
+  appendFileSync: mockAppendFileSync,
+  mkdirSync: mockMkdirSync,
 }))
 
-vi.mock('../../../src/constant/pluginConstant', () => ({
-  PLUGIN_NAME: 'mock-plugin-name',
-}))
+const mockStderrWrite = vi.fn()
 
-// Import after mocking
-const { Logger, lazy } = await import('../../../src/utils/LoggingService')
+beforeEach(() => {
+  vi.resetModules()
+  vi.unstubAllEnvs()
+  mockAppendFileSync.mockReset()
+  mockMkdirSync.mockReset()
+  mockStderrWrite.mockReset()
+  vi.spyOn(process.stderr, 'write').mockImplementation(
+    mockStderrWrite as unknown as typeof process.stderr.write
+  )
+})
 
-const mockShouldLog = mockCoreLogger.shouldLog
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
-const LOG_METHODS = [
-  { level: 'debug', mock: mockCoreLogger.debug },
-  { level: 'error', mock: mockCoreLogger.error },
-  { level: 'info', mock: mockCoreLogger.info },
-  { level: 'trace', mock: mockCoreLogger.trace },
-  { level: 'warn', mock: mockCoreLogger.warn },
-] as const
+const freshLogger = async () =>
+  (await import('../../../src/utils/LoggingService.js')).Logger
+
+const freshLazy = async () =>
+  (await import('../../../src/utils/LoggingService.js')).lazy
 
 describe('LoggingService', () => {
-  let sut: typeof Logger
-
-  beforeEach(() => {
-    sut = Logger
-    vi.clearAllMocks()
-    mockShouldLog.mockReturnValue(true)
-  })
-
-  describe('lazy template strings', () => {
-    it('given dynamic value when evaluating lazy template then returns updated value', () => {
-      // Arrange
-      let value = 'dynamic'
-      const lazyMessage = lazy`dynamic ${() => value} mic`
-
-      // Act
-      value = 'changed'
-      const result = lazyMessage()
-
-      // Assert
-      expect(result).toBe('dynamic changed mic')
+  describe('lazy template tag', () => {
+    it('Given a static expression, When evaluating, Then returns the interpolated string', async () => {
+      const lazy = await freshLazy()
+      const value = 'world'
+      expect(lazy`hello ${value}`()).toBe('hello world')
     })
 
-    it('given static value when evaluating lazy template then returns static value', () => {
-      // Arrange
-      const value = 'value'
-      const staticMessage = lazy`static ${value} mic`
-
-      // Act
-      const result = staticMessage()
-
-      // Assert
-      expect(result).toBe('static value mic')
+    it('Given a deferred function expression, When evaluating, Then calls the function at evaluation time', async () => {
+      const lazy = await freshLazy()
+      let counter = 0
+      const getter = () => ++counter
+      const template = lazy`count=${getter}`
+      expect(template()).toBe('count=1')
+      expect(template()).toBe('count=2')
     })
 
-    it('given empty template when evaluating lazy template then returns empty string', () => {
-      // Arrange
-      const emptyMessage = lazy``
-
-      // Act
-      const result = emptyMessage()
-
-      // Assert
-      expect(result).toBe('')
-    })
-
-    it('given multiple expressions when evaluating lazy template then returns combined result', () => {
-      // Arrange
-      const first = 'first'
-      const second = () => 'second'
-      const third = 'third'
-      const message = lazy`${first}-${second}-${third}`
-
-      // Act
-      const result = message()
-
-      // Assert
-      expect(result).toBe('first-second-third')
+    it('Given an empty template, When evaluating, Then returns empty string', async () => {
+      const lazy = await freshLazy()
+      expect(lazy``()).toBe('')
     })
   })
 
-  describe('function parameter evaluation', () => {
-    it('given log level enabled when logging with function parameter then evaluates function', () => {
-      // Arrange
+  describe('level gating (default = warn)', () => {
+    it('Given no env var, When calling trace/debug/info, Then nothing is written', async () => {
+      const Logger = await freshLogger()
+      Logger.trace('t')
+      Logger.debug('d')
+      Logger.info('i')
+      expect(mockAppendFileSync).not.toHaveBeenCalled()
+    })
+
+    it('Given no env var, When calling warn/error, Then a line is written', async () => {
+      const Logger = await freshLogger()
+      Logger.warn('w')
+      Logger.error('e')
+      expect(mockAppendFileSync).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  describe('SF_LOG_LEVEL env var', () => {
+    it('Given SF_LOG_LEVEL=trace, When calling trace, Then a line is written', async () => {
+      vi.stubEnv('SF_LOG_LEVEL', 'trace')
+      const Logger = await freshLogger()
+      Logger.trace('msg')
+      expect(mockAppendFileSync).toHaveBeenCalledTimes(1)
+    })
+
+    it('Given SF_LOG_LEVEL=40 (integer), When calling info (30), Then nothing is written', async () => {
+      vi.stubEnv('SF_LOG_LEVEL', '40')
+      const Logger = await freshLogger()
+      Logger.info('msg')
+      expect(mockAppendFileSync).not.toHaveBeenCalled()
+    })
+
+    it('Given SF_LOG_LEVEL=40 (integer), When calling warn, Then a line is written', async () => {
+      vi.stubEnv('SF_LOG_LEVEL', '40')
+      const Logger = await freshLogger()
+      Logger.warn('msg')
+      expect(mockAppendFileSync).toHaveBeenCalledTimes(1)
+    })
+
+    it('Given SF_LOG_LEVEL invalid, When calling any level, Then default (warn) applies', async () => {
+      vi.stubEnv('SF_LOG_LEVEL', 'not-a-level')
+      const Logger = await freshLogger()
+      Logger.info('i')
+      Logger.warn('w')
+      expect(mockAppendFileSync).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('SFDX_LOG_LEVEL fallback', () => {
+    it('Given SFDX_LOG_LEVEL=trace and SF_LOG_LEVEL unset, When calling trace, Then a line is written', async () => {
+      vi.stubEnv('SFDX_LOG_LEVEL', 'trace')
+      const Logger = await freshLogger()
+      Logger.trace('msg')
+      expect(mockAppendFileSync).toHaveBeenCalledTimes(1)
+    })
+
+    it('Given SF_LOG_LEVEL set, When both env vars present, Then SF_LOG_LEVEL wins', async () => {
+      vi.stubEnv('SF_LOG_LEVEL', 'error')
+      vi.stubEnv('SFDX_LOG_LEVEL', 'trace')
+      const Logger = await freshLogger()
+      Logger.trace('msg')
+      Logger.error('msg')
+      expect(mockAppendFileSync).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('NDJSON format', () => {
+    it('Given a warn call, When written, Then line is valid JSON with required fields', async () => {
+      const Logger = await freshLogger()
+      Logger.warn('hello')
+      const written = mockAppendFileSync.mock.calls[0][1] as string
+      expect(written.endsWith('\n')).toBe(true)
+      const entry = JSON.parse(written.trim())
+      expect(entry.level).toBe(40)
+      expect(entry.msg).toBe('hello')
+      expect(entry.name).toBeDefined()
+      expect(entry.pid).toBe(process.pid)
+      expect(typeof entry.time).toBe('number')
+      expect(typeof entry.hostname).toBe('string')
+    })
+
+    it('Given meta data, When written, Then entry includes meta field', async () => {
+      const Logger = await freshLogger()
+      Logger.warn('m', { k: 'v' })
+      const written = mockAppendFileSync.mock.calls[0][1] as string
+      const entry = JSON.parse(written.trim())
+      expect(entry.meta).toEqual({ k: 'v' })
+    })
+
+    it('Given no meta, When written, Then entry omits meta field', async () => {
+      const Logger = await freshLogger()
+      Logger.warn('m')
+      const written = mockAppendFileSync.mock.calls[0][1] as string
+      const entry = JSON.parse(written.trim())
+      expect('meta' in entry).toBe(false)
+    })
+  })
+
+  describe('lazy message evaluation', () => {
+    it('Given a function message with trace level, When SF_LOG_LEVEL=trace, Then the function is evaluated', async () => {
+      vi.stubEnv('SF_LOG_LEVEL', 'trace')
+      const Logger = await freshLogger()
       let called = false
-      const messageFn = () => {
+      Logger.trace(() => {
         called = true
-        return 'evaluated'
-      }
-
-      // Act
-      sut.debug(messageFn)
-
-      // Assert
+        return 'computed'
+      })
       expect(called).toBe(true)
-      expect(mockCoreLogger.debug).toHaveBeenCalledWith('evaluated', undefined)
     })
 
-    it('given log level disabled when logging with function parameter then does not evaluate function', () => {
-      // Arrange
-      mockShouldLog.mockReturnValueOnce(false)
+    it('Given a function message below threshold, When logging, Then the function is NOT evaluated', async () => {
+      const Logger = await freshLogger()
       let called = false
-      const messageFn = () => {
+      Logger.trace(() => {
         called = true
-        return 'evaluated'
-      }
-
-      // Act
-      sut.debug(messageFn)
-
-      // Assert
+        return 'computed'
+      })
       expect(called).toBe(false)
-      expect(mockCoreLogger.debug).not.toHaveBeenCalled()
     })
   })
 
-  describe('meta parameters', () => {
-    it('given meta data when logging then passes meta to logger', () => {
-      // Arrange
-      const meta = { key: 'value' }
-
-      // Act
-      sut.debug('message', meta)
-
-      // Assert
-      expect(mockCoreLogger.debug).toHaveBeenCalledWith('message', meta)
+  describe('stderr mirror', () => {
+    it('Given SF_LOG_STDERR=true and a warn call, When written, Then stderr receives the line', async () => {
+      vi.stubEnv('SF_LOG_STDERR', 'true')
+      const Logger = await freshLogger()
+      Logger.warn('mirror me')
+      expect(mockStderrWrite).toHaveBeenCalledTimes(1)
+      const line = mockStderrWrite.mock.calls[0][0] as string
+      expect(line).toContain('mirror me')
     })
 
-    it('given no meta data when logging then passes undefined meta', () => {
-      // Act
-      sut.debug('message')
-
-      // Assert
-      expect(mockCoreLogger.debug).toHaveBeenCalledWith('message', undefined)
+    it('Given SF_LOG_STDERR unset, When warn is called, Then stderr is NOT written', async () => {
+      const Logger = await freshLogger()
+      Logger.warn('no mirror')
+      expect(mockStderrWrite).not.toHaveBeenCalled()
     })
   })
 
-  describe('log level conditional execution', () => {
-    it.each(
-      LOG_METHODS
-    )('given $level level disabled when logging then does not call logger', ({
-      level,
-      mock,
-    }) => {
-      // Arrange
-      mockShouldLog.mockReturnValueOnce(false)
-
-      // Act
-      sut[level]('message')
-
-      // Assert
-      expect(mock).not.toHaveBeenCalled()
+  describe('best-effort write', () => {
+    it('Given appendFileSync throws, When logging, Then the error is swallowed and the caller does not throw', async () => {
+      mockAppendFileSync.mockImplementation(() => {
+        throw new Error('disk full')
+      })
+      const Logger = await freshLogger()
+      expect(() => Logger.warn('will fail')).not.toThrow()
     })
 
-    it.each(
-      LOG_METHODS
-    )('given $level level enabled when logging then calls logger', ({
-      level,
-      mock,
-    }) => {
-      // Arrange
-      mockShouldLog.mockReturnValueOnce(true)
-
-      // Act
-      sut[level]('message')
-
-      // Assert
-      expect(mock).toHaveBeenCalled()
+    it('Given mkdirSync throws, When first log, Then the error is swallowed', async () => {
+      mockMkdirSync.mockImplementation(() => {
+        throw new Error('read-only FS')
+      })
+      const Logger = await freshLogger()
+      expect(() => Logger.warn('first')).not.toThrow()
     })
-  })
 
-  describe('logger methods', () => {
-    it.each(
-      LOG_METHODS
-    )('given message and meta when calling $level then calls logger with correct parameters', ({
-      level,
-      mock,
-    }) => {
-      // Arrange
-      const message = `test ${level} message`
-      const meta = { key: 'value' }
-
-      // Act
-      sut[level](message, meta)
-
-      // Assert
-      expect(mockShouldLog).toHaveBeenCalledWith(level)
-      expect(mock).toHaveBeenCalledWith(message, meta)
+    it('Given multiple calls, When logging, Then mkdirSync is called only once (lazy)', async () => {
+      const Logger = await freshLogger()
+      Logger.warn('1')
+      Logger.warn('2')
+      Logger.warn('3')
+      expect(mockMkdirSync).toHaveBeenCalledTimes(1)
     })
   })
 })

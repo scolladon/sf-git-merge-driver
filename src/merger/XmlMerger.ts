@@ -21,7 +21,7 @@ export class XmlMerger {
     this.jsonMerger = new JsonMerger(config)
   }
 
-  @log
+  @log('XmlMerger')
   mergeThreeWay(
     ancestorContent: string,
     ourContent: string,
