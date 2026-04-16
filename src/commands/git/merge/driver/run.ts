@@ -74,6 +74,10 @@ export default class Run extends SfCommand<void> {
 
   @log('Run')
   public async run(): Promise<void> {
+    process.stderr.write(
+      '[sf-git-merge-driver] This command path is deprecated and will be removed in the next major release.\n' +
+        'Run `sf git merge driver install` in this repository to upgrade to the faster binary driver.\n'
+    )
     Logger.info('Merge starting')
     const { flags } = await this.parse(Run)
 

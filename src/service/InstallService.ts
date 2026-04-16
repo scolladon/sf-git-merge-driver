@@ -1,12 +1,30 @@
 import { appendFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { simpleGit } from 'simple-git'
-import { DRIVER_NAME, RUN_PLUGIN_COMMAND } from '../constant/driverConstant.js'
+import { DRIVER_NAME } from '../constant/driverConstant.js'
 import {
   MANIFEST_PATTERNS,
   METADATA_TYPES_PATTERNS,
 } from '../constant/metadataConstant.js'
 import { getGitAttributesPath } from '../utils/gitUtils.js'
 import { log } from '../utils/LoggingDecorator.js'
+
+// Resolved from this compiled module's location:
+//   <plugin-root>/lib/service/InstallService.js → ../../bin/merge-driver.cjs
+const BINARY_RELATIVE = ['..', '..', 'bin', 'merge-driver.cjs'] as const
+const BINARY_PATH = join(
+  dirname(fileURLToPath(import.meta.url)),
+  ...BINARY_RELATIVE
+)
+
+// git's merge-driver placeholder convention: %O ancestor, %A local, %B other,
+// %P output, %L conflict-marker-size, %S ancestor-label, %X local-label,
+// %Y other-label. All 8 are passed — this wires %S (new) through to the
+// binary's -S flag; previous install omitted %S, forcing the static default.
+const DRIVER_COMMAND =
+  `sh -c 'node "${BINARY_PATH}" -O "$1" -A "$2" -B "$3" -P "$4" -L "$5" -S "$6" -X "$7" -Y "$8"'` +
+  ' -- %O %A %B %P %L %S %X %Y'
 
 export class InstallService {
   @log('InstallService')
@@ -16,10 +34,7 @@ export class InstallService {
       `merge.${DRIVER_NAME}.name`,
       'Salesforce source merge driver'
     )
-    await git.addConfig(
-      `merge.${DRIVER_NAME}.driver`,
-      `sh -c '${RUN_PLUGIN_COMMAND} -O "$1" -A "$2" -B "$3" -P "$4" -L "$5" -X "$6" -Y "$7"' -- %O %A %B %P %L %X %Y`
-    )
+    await git.addConfig(`merge.${DRIVER_NAME}.driver`, DRIVER_COMMAND)
 
     // Configure merge driver for each metadata type pattern
     const metadataPatterns = METADATA_TYPES_PATTERNS.map(
