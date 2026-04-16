@@ -363,6 +363,9 @@ GLOBAL FLAGS
 DESCRIPTION
   Runs the merge driver for the specified files.
 
+  DEPRECATED — will be removed in the next major release. Run `sf git merge driver install` in the repository to upgrade
+  to the faster standalone binary driver.
+
   Runs the merge driver for the specified files, handling the merge conflict resolution using Salesforce-specific merge
   strategies. This command is typically called automatically by Git when a merge conflict is detected.
 
