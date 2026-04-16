@@ -4,6 +4,9 @@
   "version": "1.6.1",
   "exports": "./lib/driver/MergeDriver.js",
   "type": "module",
+  "bin": {
+    "sf-git-merge-driver": "./bin/merge-driver.cjs"
+  },
   "author": "Sébastien Colladon (colladonsebastien@gmail.com)",
   "repository": {
     "type": "git",
