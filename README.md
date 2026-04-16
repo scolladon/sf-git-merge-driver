@@ -94,6 +94,10 @@ cd my/sf/project
 sf git merge driver install
 ```
 
+> **Upgrading from a previous version:** re-run `sf git merge driver install` in each repository after upgrading. Recent releases route conflicts through a bundled standalone binary (~80 ms per file instead of ~600 ms via the oclif command) — a 200-file rebase drops from ~120 s to ~16 s of merge-driver overhead. Previously-installed `.git/config` entries keep working via the retained oclif command, but do not receive the speedup until reinstall.
+>
+> Re-installing also wires git's `%S` placeholder into conflict markers: the ancestor-marker label now reflects git's own label (typically a short SHA) instead of the static `base` string. See the CHANGELOG for the exact before/after.
+
 ### Integration in VsCode SFDX-Hardis
 
 [SFDX-Hardis VS Code extension](https://marketplace.visualstudio.com/items?itemName=NicolasVuillamy.vscode-sfdx-hardis) has integrated the sf-git-merge-driver in its default dependencies, and offers a one click activation of the merge driver from the status bar, as shown below:
