@@ -359,7 +359,8 @@
         "perf-memory.json"
       ],
       "dependencies": [
-        "compile"
+        "compile",
+        "build:bin"
       ]
     }
   }

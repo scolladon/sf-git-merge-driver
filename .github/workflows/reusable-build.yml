@@ -2,10 +2,19 @@
 name: Build Checks
 on:
   workflow_call:
+    inputs:
+      os:
+        description: Runner OS (e.g. ubuntu-latest, macos-latest, windows-latest)
+        type: string
+        default: ubuntu-latest
+      node-version:
+        description: Node.js major version to install
+        type: string
+        default: "20"
 
 jobs:
   source:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.os }}
     steps:
       - name: Checkout sources
         uses: actions/checkout@v6
@@ -13,7 +22,7 @@ jobs:
       - name: Setup node
         uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: ${{ inputs.node-version }}
 
       - uses: google/wireit@setup-github-actions-caching/v2
 
@@ -36,6 +45,7 @@ jobs:
         run: npm run test:nut
 
       - uses: actions/upload-artifact@v6
+        if: inputs.os == 'ubuntu-latest' && inputs.node-version == '20'
         with:
           name: coverage-test-report
           path: reports/coverage
