@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import { chmodSync, readFileSync, statSync } from 'node:fs'
 import { build } from 'esbuild'
 
+const debug = process.argv.includes('--debug')
+
 const pkg = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf-8')
 )
@@ -21,9 +23,10 @@ await build({
   platform: 'node',
   target: 'node20',
   format: 'cjs',
-  minify: true,
-  keepNames: false,
+  minify: !debug,
+  keepNames: debug,
   treeShaking: true,
+  ...(debug ? { sourcemap: 'inline' } : {}),
   outfile: OUTFILE,
   banner: { js: `${SHEBANG}\n${COMPILE_CACHE_BANNER}` },
   define: {
@@ -35,8 +38,15 @@ await build({
 chmodSync(OUTFILE, 0o755)
 
 const size = statSync(OUTFILE).size
-assert.ok(
-  size < SIZE_LIMIT_BYTES,
-  `Bundle size ${size} exceeds ${SIZE_LIMIT_BYTES} byte gate — something heavy leaked in`
+const label = debug ? '(debug)' : ''
+
+if (!debug) {
+  assert.ok(
+    size < SIZE_LIMIT_BYTES,
+    `Bundle size ${size} exceeds ${SIZE_LIMIT_BYTES} byte gate — something heavy leaked in`
+  )
+}
+
+process.stdout.write(
+  `${OUTFILE} ${label}: ${(size / 1024).toFixed(1)} KB, mode 0755${debug ? ', inline sourcemap' : ''}\n`
 )
-process.stdout.write(`${OUTFILE}: ${(size / 1024).toFixed(1)} KB, mode 0755\n`)

@@ -13,11 +13,11 @@
     "url": "git+https://github.com/scolladon/sf-git-merge-driver.git"
   },
   "dependencies": {
-    "@nodable/flexible-xml-parser": "^1.1.0",
+    "@nodable/flexible-xml-parser": "^1.1.1",
     "@oclif/core": "^4.10.5",
     "@salesforce/core": "^8.28.3",
     "@salesforce/sf-plugins-core": "^12.2.6",
-    "fast-xml-builder": "^1.1.4",
+    "fast-xml-builder": "^1.1.5",
     "simple-git": "^3.36.0"
   },
   "devDependencies": {
@@ -42,7 +42,7 @@
     "shx": "^0.4.0",
     "ts-node": "^10.9.2",
     "tslib": "^2.8.1",
-    "typescript": "^6.0.2",
+    "typescript": "^6.0.3",
     "vitest": "^4.1.4",
     "wireit": "^0.14.12"
   },
@@ -134,10 +134,10 @@
       ]
     },
     "build:bin:debug": {
-      "command": "node tooling/build-bin-debug.mjs",
+      "command": "node tooling/build-bin.mjs --debug",
       "files": [
         "lib/**/*.js",
-        "tooling/build-bin-debug.mjs",
+        "tooling/build-bin.mjs",
         "package.json"
       ],
       "output": [

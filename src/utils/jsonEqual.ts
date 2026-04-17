@@ -1,7 +1,7 @@
 import type { JsonObject } from '../types/jsonTypes.js'
 
 /**
- * Deep equality for JSON-shaped values.
+ * Deep equality for JSON-shaped values (iterative, stack-safe).
  * Accepts `unknown` to match the signature of `fast-equals.deepEqual` it replaces;
  * non-JSON values (functions, symbols, class instances) fall through the primitive/
  * object checks and return false unless strictly `===`.
@@ -10,20 +10,34 @@ import type { JsonObject } from '../types/jsonTypes.js'
  * (per JSON semantics).
  */
 export function jsonEqual(a: unknown, b: unknown): boolean {
-  if (a === b) return true
-  if (a === null || b === null) return false
-  if (typeof a !== 'object' || typeof b !== 'object') return false
+  const stack: [unknown, unknown][] = [[a, b]]
 
-  if (Array.isArray(a)) {
-    if (!Array.isArray(b)) return false
-    if (a.length !== b.length) return false
-    return a.every((element, index) => jsonEqual(element, b[index]))
+  while (stack.length > 0) {
+    const [left, right] = stack.pop() as [unknown, unknown]
+
+    if (left === right) continue
+    if (left === null || right === null) return false
+    if (typeof left !== 'object' || typeof right !== 'object') return false
+
+    if (Array.isArray(left)) {
+      if (!Array.isArray(right)) return false
+      if (left.length !== right.length) return false
+      for (let i = left.length - 1; i >= 0; i--) {
+        stack.push([left[i], right[i]])
+      }
+      continue
+    }
+    if (Array.isArray(right)) return false
+
+    const lObj = left as JsonObject
+    const rObj = right as JsonObject
+    const lKeys = Object.keys(lObj)
+    if (lKeys.length !== Object.keys(rObj).length) return false
+    for (const key of lKeys) {
+      if (!(key in rObj)) return false
+      stack.push([lObj[key], rObj[key]])
+    }
   }
-  if (Array.isArray(b)) return false
 
-  const aObj = a as JsonObject
-  const bObj = b as JsonObject
-  const aKeys = Object.keys(aObj)
-  if (aKeys.length !== Object.keys(bObj).length) return false
-  return aKeys.every(key => key in bObj && jsonEqual(aObj[key], bObj[key]))
+  return true
 }
