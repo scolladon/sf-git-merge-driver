@@ -42,14 +42,12 @@ jobs:
         env:
           BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD~1' }}
         run: |
-          git stash --include-untracked
           git checkout --detach "$BASE_REF"
           npm install
           npm run test:perf || true
           cp perf-runtime.json perf-runtime-base.json 2>/dev/null || true
           cp perf-memory.json perf-memory-base.json 2>/dev/null || true
-          git checkout -
-          git stash pop || true
+          git checkout --force -
           npm install
 
       - name: Run benchmarks
