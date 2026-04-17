@@ -122,8 +122,12 @@ describe('MergeDriver (integration — real filesystem, no mocks)', () => {
     // Act
     const hasConflict = await sut.mergeFiles(ancestor, local, other)
 
-    // Assert
+    // Assert — no conflict and local is byte-identical to the input
+    // (idempotent no-op merge; guards against accidental re-serialisation
+    // drift like attribute-order changes or whitespace normalisation).
     expect(hasConflict).toBe(false)
+    const merged = readFileSync(local, 'utf8')
+    expect(merged).toBe(PROFILE_BASE)
   })
 
   it('Given malformed XML on the local side, When running mergeFiles, Then restores original ourContent and returns hasConflict=true', async () => {

@@ -264,18 +264,21 @@ describe('OrderedKeyedArrayMergeStrategy', () => {
       ['A', 'B', 'D'],
       ['A', conflict(['C'], ['B', 'C'], ['B']), 'D'],
     ],
-    // Discriminating C7 — disjoint additions on both sides while the shared
-    // spine ordering is unchanged. This distinguishes C7 (ordering divergence
-    // across additions) from C4 (pure divergent moves with no additions).
-    // Per MEMORY.md: C7 triggers when both sides have disjoint additions
-    // AND orderings diverge. Here the ancestor shared spine [A,B,C] is
-    // preserved on both sides but each adds different new elements.
+    // Pure C7 — disjoint additions on both sides with the shared spine
+    // fully preserved in the same order everywhere. No moves on either
+    // side; only the positions of the new keys differ (X vs Y don't
+    // overlap, and each side chooses a different insertion position
+    // relative to the shared spine). This rules out C4 (requires
+    // divergent moves) and C6 (requires the same key added at different
+    // positions).
     [
-      'C7 (discriminator): disjoint additions + divergent local ordering (no shared moves)',
-      ['A', 'B', 'C'],
-      ['B', 'A', 'C', 'X'],
-      ['A', 'B', 'C', 'Y'],
-      [conflict(['B', 'A', 'C', 'X'], ['A', 'B', 'C'], ['A', 'B', 'C', 'Y'])],
+      'C7 (discriminator): pure disjoint additions, no moves (rules out C4/C6)',
+      ['A', 'B'],
+      ['A', 'B', 'X'],
+      ['A', 'B', 'Y'],
+      // Spine [A, B] is preserved; the conflict is scoped to the gap
+      // after B where each side added a different disjoint key.
+      ['A', 'B', conflict(['X'], [], ['Y'])],
     ],
   ]
 

@@ -103,9 +103,11 @@ Immutable context object passed to strategies:
 ```typescript
 interface MergeContext {
   readonly config: MergeConfig
-  readonly ancestor: JsonValue
-  readonly local: JsonValue
-  readonly other: JsonValue
+  // `| undefined` preserves the "key not present on this side" distinction
+  // from JsonValue null so strategies can branch on existence separately.
+  readonly ancestor: JsonValue | undefined
+  readonly local: JsonValue | undefined
+  readonly other: JsonValue | undefined
   readonly attribute: string | undefined
   readonly nodeFactory: MergeNodeFactory
   readonly rootKey: RootKeyInfo | undefined

@@ -35,8 +35,12 @@ const builderOptions = {
 // Compact → Ordered Format Converter (created per-serialization with config)
 // ============================================================================
 
+// Strict narrowing: arrays are structurally objects but carry numeric indexes,
+// so accepting them as `JsonObject` would let them flow into compactToOrdered
+// (which was narrowed to JsonObject-only for correctness and performance).
+// Excluding arrays here guarantees that narrowing is sound at every callsite.
 const isObj = (x: unknown): x is JsonObject =>
-  typeof x === 'object' && x !== null
+  typeof x === 'object' && x !== null && !Array.isArray(x)
 
 const createConverter = (config: MergeConfig) => {
   const wrapText = (value: JsonValue, attribute: string): JsonObject =>

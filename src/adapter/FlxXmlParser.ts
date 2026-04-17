@@ -16,33 +16,26 @@ const flxOptions = {
   doctypeOptions: { enabled: false, maxEntityCount: 100, maxEntitySize: 10000 },
 } as X2jOptions
 
-// Parser guarantees every root child is an object (see parse-output tests),
-// so we don't need to defensively handle primitives/arrays at this level.
-const stripDeclarationArtifacts = (root: JsonObject): JsonObject => {
-  const cleaned: JsonObject = {}
-  for (const key of Object.keys(root)) {
-    const child = root[key] as JsonObject
-    const childCleaned: JsonObject = {}
-    for (const childKey of Object.keys(child)) {
-      if (childKey === '@_version' || childKey === '@_encoding') continue
-      childCleaned[childKey] = child[childKey]
-    }
-    cleaned[key] = childCleaned
-  }
-  return cleaned
-}
-
 const hasEmptyCdataText = (node: JsonObject): boolean =>
   CDATA_PROP_NAME in node && '#text' in node && node['#text'] === ''
 
-const pruneEmptyCdataText = (value: unknown): unknown => {
+// Single recursive pass that:
+//   - strips `@_version`/`@_encoding` (XML-declaration attributes that some
+//     parser builds leak onto element nodes) at every depth — defensive
+//     coverage that matches the original in-place `cleanParserBugs` walk;
+//   - drops empty `#text` siblings of a CDATA block (parser quirk).
+// Computing both conditions in one walk halves the parse-time tree-rebuild
+// cost vs. doing them in two separate passes.
+const normalizeParsed = (value: unknown): unknown => {
   if (value === null || typeof value !== 'object') return value
-  if (Array.isArray(value)) return value.map(pruneEmptyCdataText)
+  if (Array.isArray(value)) return value.map(normalizeParsed)
   const obj = value as JsonObject
+  const dropEmptyText = hasEmptyCdataText(obj)
   const out: JsonObject = {}
   for (const key of Object.keys(obj)) {
-    if (hasEmptyCdataText(obj) && key === '#text') continue
-    out[key] = pruneEmptyCdataText(obj[key]) as JsonObject[string]
+    if (key === '@_version' || key === '@_encoding') continue
+    if (dropEmptyText && key === '#text') continue
+    out[key] = normalizeParsed(obj[key]) as JsonObject[string]
   }
   return out
 }
@@ -72,8 +65,7 @@ export class FlxXmlParser implements XmlParser {
 
   parse(xml: string): ParsedXml {
     const raw = this.parser.parse(xml) as JsonObject
-    const afterDeclaration = stripDeclarationArtifacts(raw)
-    const afterCdataPrune = pruneEmptyCdataText(afterDeclaration) as JsonObject
-    return extractNamespaces(afterCdataPrune)
+    const normalized = normalizeParsed(raw) as JsonObject
+    return extractNamespaces(normalized)
   }
 }

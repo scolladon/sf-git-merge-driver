@@ -1,8 +1,8 @@
 import type { MergeConfig } from '../../types/conflictTypes.js'
 import {
-  getJsonProp,
   type JsonArray,
   type JsonObject,
+  toJsonObjectOrEmpty,
 } from '../../types/jsonTypes.js'
 import type { MergeResult } from '../../types/mergeResult.js'
 import {
@@ -27,14 +27,18 @@ export class PropertyMergeNode implements MergeNode {
   ) {}
 
   merge(config: MergeConfig): MergeResult {
+    // One-shot narrowing keeps the per-key loop allocation-free.
+    const ancestorObj = toJsonObjectOrEmpty(this.ancestor)
+    const localObj = toJsonObjectOrEmpty(this.local)
+    const otherObj = toJsonObjectOrEmpty(this.other)
     const props = getUniqueSortedProps(this.ancestor, this.local, this.other)
     const results: MergeResult[] = []
 
     for (const key of props) {
       const childNode = defaultNodeFactory.createNode(
-        getJsonProp(this.ancestor, key),
-        getJsonProp(this.local, key),
-        getJsonProp(this.other, key),
+        ancestorObj[key],
+        localObj[key],
+        otherObj[key],
         key
       )
       const childResult = childNode.merge(config)

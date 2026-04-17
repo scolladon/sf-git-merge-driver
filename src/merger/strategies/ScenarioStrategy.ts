@@ -1,7 +1,7 @@
 import {
-  getJsonProp,
   type JsonArray,
   type JsonObject,
+  toJsonObjectOrEmpty,
 } from '../../types/jsonTypes.js'
 import type { MergeResult } from '../../types/mergeResult.js'
 import {
@@ -40,14 +40,21 @@ abstract class AbstractMergeStrategy implements ScenarioStrategy {
     const local = context.local as JsonObject | JsonArray
     const other = context.other as JsonObject | JsonArray
 
+    // Narrow once up front; direct indexing in the loop avoids a per-key
+    // Array.isArray on the hot path.
+    const localObj = toJsonObjectOrEmpty(local)
+    const otherObj = toJsonObjectOrEmpty(other)
+    const ancestorObj =
+      ancestor === undefined ? undefined : toJsonObjectOrEmpty(ancestor)
+
     const props = getUniqueSortedProps(ancestor ?? {}, local, other)
     const results: MergeResult[] = []
 
     for (const key of props) {
       const childNode = context.nodeFactory.createNode(
-        ancestor === undefined ? undefined : getJsonProp(ancestor, key),
-        getJsonProp(local, key),
-        getJsonProp(other, key),
+        ancestorObj === undefined ? undefined : ancestorObj[key],
+        localObj[key],
+        otherObj[key],
         key
       )
       const childResult = childNode.merge(context.config)

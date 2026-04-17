@@ -3,6 +3,7 @@ import {
   getJsonProp,
   type JsonArray,
   type JsonObject,
+  toJsonObjectOrEmpty,
 } from '../../../src/types/jsonTypes.js'
 
 describe('jsonTypes.getJsonProp', () => {
@@ -31,5 +32,17 @@ describe('jsonTypes.getJsonProp', () => {
     expect(getJsonProp(sut, '0')).toBeUndefined()
     expect(getJsonProp(sut, 'length')).toBeUndefined()
     expect(getJsonProp(sut, 'anything')).toBeUndefined()
+  })
+})
+
+describe('jsonTypes.toJsonObjectOrEmpty', () => {
+  it('Given a JsonObject, When narrowing, Then returns the same reference', () => {
+    const sut: JsonObject = { a: 1 }
+    expect(toJsonObjectOrEmpty(sut)).toBe(sut)
+  })
+
+  it('Given a JsonArray, When narrowing, Then returns a fresh empty object (arrays have no string-keyed content to iterate)', () => {
+    const sut: JsonArray = ['x', 'y']
+    expect(toJsonObjectOrEmpty(sut)).toEqual({})
   })
 })
