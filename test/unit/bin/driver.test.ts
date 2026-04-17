@@ -342,6 +342,42 @@ describe('bin/driver', () => {
       process.argv = origArgv
     })
 
+    it('Given __BUNDLED__=true with merge flags in argv, When module loads, Then slice(2) strips node+script and merge succeeds', async () => {
+      vi.resetModules()
+      vi.stubGlobal('__BUNDLED__', true)
+
+      // Merge flags at argv[2..] — slice(2) yields valid flags.
+      // Without slice(2), 'node' is the first token → unknown flag → exit(2).
+      const origArgv = process.argv
+      process.argv = [
+        'node',
+        'driver.cjs',
+        '-O',
+        'a',
+        '-A',
+        'b',
+        '-B',
+        'c',
+        '-P',
+        'd',
+      ]
+
+      const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {
+        // intentionally empty — prevent real process.exit
+      }) as never)
+
+      await import('../../../src/bin/driver.js')
+      await Promise.resolve()
+      await Promise.resolve()
+      await Promise.resolve()
+
+      // slice(2) → ['-O','a',...] → merge succeeds → exit(0)
+      // without slice → ['node','driver.cjs','-O',...] → 'node' unknown → exit(2)
+      expect(exitSpy).toHaveBeenCalledWith(0)
+
+      process.argv = origArgv
+    })
+
     it('Given __BUNDLED__=true and main rejects, When module loads, Then rejection handler exits 1 with clean message', async () => {
       vi.resetModules()
       vi.stubGlobal('__BUNDLED__', true)
