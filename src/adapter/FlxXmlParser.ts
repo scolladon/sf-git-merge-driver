@@ -16,15 +16,12 @@ const flxOptions = {
   doctypeOptions: { enabled: false, maxEntityCount: 100, maxEntitySize: 10000 },
 } as X2jOptions
 
+// Parser guarantees every root child is an object (see parse-output tests),
+// so we don't need to defensively handle primitives/arrays at this level.
 const stripDeclarationArtifacts = (root: JsonObject): JsonObject => {
   const cleaned: JsonObject = {}
   for (const key of Object.keys(root)) {
-    const val = root[key]
-    if (val === null || typeof val !== 'object' || Array.isArray(val)) {
-      cleaned[key] = val
-      continue
-    }
-    const child = val as JsonObject
+    const child = root[key] as JsonObject
     const childCleaned: JsonObject = {}
     for (const childKey of Object.keys(child)) {
       if (childKey === '@_version' || childKey === '@_encoding') continue

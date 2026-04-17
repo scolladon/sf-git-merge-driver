@@ -288,4 +288,23 @@ describe('UninstallService', () => {
       ])
     })
   })
+
+  describe('given a CRLF-terminated .gitattributes file (Windows)', () => {
+    it('When uninstalling, Then preserves CRLF line endings and filters driver lines', async () => {
+      // Arrange — CRLF content with the driver line in the middle
+      readFileMocked.mockResolvedValue(
+        `# header\r\n*.xml merge=salesforce-source\r\ntrailing line\r\n`
+      )
+
+      // Act
+      await sut.uninstallMergeDriver()
+
+      // Assert — output re-joined with CRLF (no mixed endings), driver
+      // line removed, other lines preserved.
+      expect(writeFile).toHaveBeenCalledWith(
+        GIT_ATTRIBUTES_PATH,
+        '# header\r\ntrailing line\r\n'
+      )
+    })
+  })
 })

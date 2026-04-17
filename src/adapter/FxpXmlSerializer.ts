@@ -80,14 +80,10 @@ const createConverter = (config: MergeConfig) => {
   // which adds up to thousands of extra allocations on large profiles.
   // Using pushAll + a single output array per call halves the garbage the
   // serializer generates at the expense of a little extra indentation.
-  const compactToOrdered = (input: JsonObject | JsonArray): JsonArray => {
-    if (Array.isArray(input)) {
-      const out: JsonArray = []
-      for (const item of input) {
-        pushAll(out, convertItem(item))
-      }
-      return out
-    }
+  //
+  // All call sites (convertItem, serialize) narrow via isObj before calling
+  // in, so input is always a JsonObject — no JsonArray branch needed.
+  const compactToOrdered = (input: JsonObject): JsonArray => {
     const keys = Object.keys(input).sort()
     const out: JsonArray = []
     for (const attribute of keys) {
@@ -151,7 +147,7 @@ const correctComments = (xml: string): string =>
 
 export class FxpXmlSerializer implements XmlSerializer {
   private readonly formatter: ConflictMarkerFormatter
-  private readonly convert: (input: JsonObject | JsonArray) => JsonArray
+  private readonly convert: (input: JsonObject) => JsonArray
   private readonly builder: XMLBuilder
 
   constructor(config: MergeConfig) {
