@@ -64,6 +64,9 @@ jobs:
       - name: Generate preview with trends
         run: node test/perf/preview.mjs gh-pages-data
 
+      - name: Clean working tree for benchmark action
+        run: git checkout -- .
+
       - name: Runtime benchmark
         uses: benchmark-action/github-action-benchmark@v1
         with:
