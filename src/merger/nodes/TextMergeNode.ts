@@ -5,14 +5,16 @@ import { getScenario } from '../MergeScenarioFactory.js'
 import { getTextMergeStrategy } from '../strategies/TextMergeStrategy.js'
 import type { MergeNode } from './MergeNode.js'
 
-const toObj = (value: JsonValue | null, attrib: string): JsonObject =>
-  value == null ? {} : { [attrib]: value }
+const toObj = (
+  value: JsonValue | null | undefined,
+  attrib: string
+): JsonObject => (value == null ? {} : { [attrib]: value })
 
 export class TextMergeNode implements MergeNode {
   constructor(
-    private readonly ancestor: JsonValue | null,
-    private readonly local: JsonValue | null,
-    private readonly other: JsonValue | null,
+    private readonly ancestor: JsonValue | null | undefined,
+    private readonly local: JsonValue | null | undefined,
+    private readonly other: JsonValue | null | undefined,
     private readonly attribute: string
   ) {}
 

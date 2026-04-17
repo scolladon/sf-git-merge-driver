@@ -10,9 +10,12 @@ export interface RootKeyInfo {
 
 export interface MergeContext {
   readonly config: MergeConfig
-  readonly ancestor: JsonValue
-  readonly local: JsonValue
-  readonly other: JsonValue
+  // Undefined distinguishes "key not present on this side" from JsonValue null.
+  // Downstream `isPresent()` treats both as absent, but the type preserves the
+  // distinction for strategies that inspect existence separately.
+  readonly ancestor: JsonValue | undefined
+  readonly local: JsonValue | undefined
+  readonly other: JsonValue | undefined
   readonly attribute: string | undefined
   readonly nodeFactory: MergeNodeFactory
   readonly rootKey: RootKeyInfo | undefined

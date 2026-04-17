@@ -1,7 +1,7 @@
 import type { JsonValue } from '../types/jsonTypes.js'
 import { MergeScenario } from '../types/mergeScenario.js'
 
-const isPresent = (value: JsonValue): boolean => {
+const isPresent = (value: JsonValue | undefined): boolean => {
   if (value == null) return false
   if (typeof value === 'string') return value.length > 0
   if (Array.isArray(value)) return value.length > 0
@@ -10,9 +10,9 @@ const isPresent = (value: JsonValue): boolean => {
 }
 
 export const getScenario = (
-  ancestor: JsonValue,
-  local: JsonValue,
-  other: JsonValue
+  ancestor: JsonValue | undefined,
+  local: JsonValue | undefined,
+  other: JsonValue | undefined
 ): MergeScenario => {
   let scenario = MergeScenario.NONE as number
   if (isPresent(ancestor)) {

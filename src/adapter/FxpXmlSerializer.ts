@@ -74,6 +74,12 @@ const createConverter = (config: MergeConfig) => {
   }
 
   const compactToOrdered = (input: JsonObject | JsonArray): JsonArray => {
+    // Arrays are numerically indexed and shouldn't appear here — the caller
+    // distinguishes them via `Array.isArray` before recursing. Narrow to
+    // JsonObject so string indexing is type-safe.
+    if (Array.isArray(input)) {
+      return input.flatMap(convertItem)
+    }
     const keys = Object.keys(input).sort()
     return keys.flatMap(attribute => {
       const value = input[attribute]

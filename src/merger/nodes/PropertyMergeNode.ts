@@ -1,5 +1,9 @@
 import type { MergeConfig } from '../../types/conflictTypes.js'
-import type { JsonArray, JsonObject } from '../../types/jsonTypes.js'
+import {
+  getJsonProp,
+  type JsonArray,
+  type JsonObject,
+} from '../../types/jsonTypes.js'
 import type { MergeResult } from '../../types/mergeResult.js'
 import {
   combineResults,
@@ -27,14 +31,10 @@ export class PropertyMergeNode implements MergeNode {
     const results: MergeResult[] = []
 
     for (const key of props) {
-      const ancestorOfKey = this.ancestor[key]
-      const localOfKey = this.local[key]
-      const otherOfKey = this.other[key]
-
       const childNode = defaultNodeFactory.createNode(
-        ancestorOfKey,
-        localOfKey,
-        otherOfKey,
+        getJsonProp(this.ancestor, key),
+        getJsonProp(this.local, key),
+        getJsonProp(this.other, key),
         key
       )
       const childResult = childNode.merge(config)

@@ -1,4 +1,8 @@
-import type { JsonArray, JsonObject } from '../../types/jsonTypes.js'
+import {
+  getJsonProp,
+  type JsonArray,
+  type JsonObject,
+} from '../../types/jsonTypes.js'
 import type { MergeResult } from '../../types/mergeResult.js'
 import {
   buildEarlyResult,
@@ -10,7 +14,7 @@ import {
 import { MergeScenario } from '../../types/mergeScenario.js'
 import { jsonEqual } from '../../utils/jsonEqual.js'
 import { buildConflictMarkers } from '../ConflictMarkerBuilder.js'
-import type { MergeContext } from '../MergeContext.js'
+import type { MergeContext, RootKeyInfo } from '../MergeContext.js'
 import { MergeOrchestrator } from '../MergeOrchestrator.js'
 import { getUniqueSortedProps } from '../mergePropertyKeys.js'
 
@@ -41,9 +45,9 @@ abstract class AbstractMergeStrategy implements ScenarioStrategy {
 
     for (const key of props) {
       const childNode = context.nodeFactory.createNode(
-        (ancestor as JsonObject | JsonArray)?.[key],
-        local[key],
-        other[key],
+        ancestor === undefined ? undefined : getJsonProp(ancestor, key),
+        getJsonProp(local, key),
+        getJsonProp(other, key),
         key
       )
       const childResult = childNode.merge(context.config)
@@ -64,7 +68,12 @@ abstract class AbstractAncestorStrategy implements ScenarioStrategy {
     const targetUnchanged = jsonEqual(context.ancestor, target)
 
     if (context.rootKey) {
-      return this.executeWithRootKey(context, target, targetUnchanged)
+      return this.executeWithRootKey(
+        context,
+        context.rootKey,
+        target,
+        targetUnchanged
+      )
     }
 
     return this.executeWithoutRootKey(context, target, targetUnchanged)
@@ -72,11 +81,12 @@ abstract class AbstractAncestorStrategy implements ScenarioStrategy {
 
   private executeWithRootKey(
     context: MergeContext,
+    rootKey: RootKeyInfo,
     target: unknown,
     targetUnchanged: boolean
   ): MergeResult {
-    const { name } = context.rootKey!
-    const existsInSecondary = this.getExistsInSecondary(context)
+    const { name } = rootKey
+    const existsInSecondary = this.getExistsInSecondary(rootKey)
 
     if (!existsInSecondary && targetUnchanged) {
       return noConflict([])
@@ -103,7 +113,7 @@ abstract class AbstractAncestorStrategy implements ScenarioStrategy {
     }
 
     if (context.attribute) {
-      return this.executeWithAttribute(context)
+      return this.executeWithAttribute(context, context.attribute)
     }
 
     return withConflict(
@@ -117,7 +127,7 @@ abstract class AbstractAncestorStrategy implements ScenarioStrategy {
 
   protected abstract getTarget(context: MergeContext): unknown
 
-  protected abstract getExistsInSecondary(context: MergeContext): boolean
+  protected abstract getExistsInSecondary(rootKey: RootKeyInfo): boolean
 
   protected abstract buildConflict(
     context: MergeContext,
@@ -133,7 +143,10 @@ abstract class AbstractAncestorStrategy implements ScenarioStrategy {
     return orchestrator.merge(context.ancestor, context.local, context.other)
   }
 
-  private executeWithAttribute(context: MergeContext): MergeResult {
+  private executeWithAttribute(
+    context: MergeContext,
+    attribute: string
+  ): MergeResult {
     const orchestrator = new MergeOrchestrator(
       context.config,
       context.nodeFactory
@@ -146,9 +159,8 @@ abstract class AbstractAncestorStrategy implements ScenarioStrategy {
       undefined
     )
 
-    const attr = context.attribute!
-    const targetProp = { [attr]: targetResult.output }
-    const ancestorProp = { [attr]: ancestorResult.output }
+    const targetProp = { [attribute]: targetResult.output }
+    const ancestorProp = { [attribute]: ancestorResult.output }
 
     return withConflict(this.buildConflict(context, targetProp, ancestorProp))
   }
@@ -212,8 +224,8 @@ class AncestorAndLocalStrategy extends AbstractAncestorStrategy {
     return context.local
   }
 
-  protected getExistsInSecondary(context: MergeContext): boolean {
-    return context.rootKey!.existsInOther
+  protected getExistsInSecondary(rootKey: RootKeyInfo): boolean {
+    return rootKey.existsInOther
   }
 
   protected buildConflict(
@@ -237,8 +249,8 @@ class AncestorAndOtherStrategy extends AbstractAncestorStrategy {
     return context.other
   }
 
-  protected getExistsInSecondary(context: MergeContext): boolean {
-    return context.rootKey!.existsInLocal
+  protected getExistsInSecondary(rootKey: RootKeyInfo): boolean {
+    return rootKey.existsInLocal
   }
 
   protected buildConflict(

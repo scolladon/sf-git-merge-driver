@@ -6,7 +6,7 @@ import { PropertyMergeNode } from './PropertyMergeNode.js'
 import { TextArrayMergeNode } from './TextArrayMergeNode.js'
 import { TextMergeNode } from './TextMergeNode.js'
 
-const toArray = (v: JsonValue): JsonArray =>
+const toArray = (v: JsonValue | undefined): JsonArray =>
   v == null ? [] : Array.isArray(v) ? (v as JsonArray) : ([v] as JsonArray)
 
 const isObject = (val: unknown): boolean =>
@@ -37,18 +37,18 @@ const isPureUnknown = (
 
 export interface MergeNodeFactory {
   createNode(
-    ancestor: JsonValue,
-    local: JsonValue,
-    other: JsonValue,
+    ancestor: JsonValue | undefined,
+    local: JsonValue | undefined,
+    other: JsonValue | undefined,
     attribute: string
   ): MergeNode
 }
 
 class DefaultMergeNodeFactory implements MergeNodeFactory {
   createNode(
-    ancestor: JsonValue,
-    local: JsonValue,
-    other: JsonValue,
+    ancestor: JsonValue | undefined,
+    local: JsonValue | undefined,
+    other: JsonValue | undefined,
     attribute: string
   ): MergeNode {
     if (isStringArray(ancestor, local, other)) {

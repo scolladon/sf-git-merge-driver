@@ -52,7 +52,7 @@ export const wrapWithRootKey = (
 }
 
 export const buildEarlyResult = (
-  value: JsonValue,
+  value: JsonValue | undefined,
   rootKeyName?: string
 ): MergeResult => {
   const content: JsonArray =

@@ -1,11 +1,18 @@
 import type { MergeConfig } from '../types/conflictTypes.js'
-import type { JsonArray, JsonObject } from '../types/jsonTypes.js'
+import {
+  getJsonProp,
+  type JsonArray,
+  type JsonObject,
+} from '../types/jsonTypes.js'
 import type { MergeResult } from '../types/mergeResult.js'
 import { combineResults } from '../types/mergeResult.js'
 import { log } from '../utils/LoggingDecorator.js'
 import { MergeOrchestrator } from './MergeOrchestrator.js'
 import { getUniqueSortedProps } from './mergePropertyKeys.js'
 import { defaultNodeFactory } from './nodes/MergeNodeFactory.js'
+
+const existsAt = (value: JsonObject | JsonArray, key: string): boolean =>
+  !Array.isArray(value) && key in value
 
 export class JsonMerger {
   private readonly orchestrator: MergeOrchestrator
@@ -25,14 +32,14 @@ export class JsonMerger {
 
     for (const key of props) {
       const result = this.orchestrator.merge(
-        ancestor[key],
-        local[key],
-        other[key],
+        getJsonProp(ancestor, key),
+        getJsonProp(local, key),
+        getJsonProp(other, key),
         undefined,
         {
           name: key,
-          existsInLocal: key in local,
-          existsInOther: key in other,
+          existsInLocal: existsAt(local, key),
+          existsInOther: existsAt(other, key),
         }
       )
       results.push(result)
