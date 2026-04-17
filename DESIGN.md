@@ -184,7 +184,65 @@ classDiagram
 - **`XmlParser` port** — Parses XML, extracts namespace attributes, returns clean compact content
 - **`XmlSerializer` port** — Converts compact merge output + `ConflictBlock` objects to ordered XML builder format, inserts namespaces, formats output
 - **`FlxXmlParser`** — Adapter using `@nodable/flexible-xml-parser` (3-5x faster parsing)
-- **`FxpXmlSerializer`** — Adapter using `fast-xml-parser` `XMLBuilder`
+- **`FxpXmlSerializer`** — Adapter using `fast-xml-builder` `XMLBuilder`
+
+## Binary Entry Point
+
+Git invokes the merge driver for every metadata file conflict. To avoid loading the full oclif + `@salesforce/core` stack (~600 ms) on each invocation, a standalone binary is shipped alongside the oclif commands.
+
+### Runtime Topology
+
+```mermaid
+flowchart TD
+    subgraph Git["Git merge / rebase"]
+        GitCfg[".git/config<br/>merge.salesforce-source.driver"]
+    end
+
+    subgraph Install["Install-time (one-off, via sf CLI)"]
+        SfInstall["sf git merge driver install"]
+        InstallSvc["InstallService<br/>resolves abs path via import.meta.url"]
+    end
+
+    subgraph Runtime["Runtime (per file, thousands per rebase)"]
+        Binary["bin/merge-driver.cjs<br/>(esbuild-bundled, ~101 KB)"]
+        ArgvParser["argv parser<br/>(no oclif, no SF core)"]
+        MD["MergeDriver.mergeFiles"]
+    end
+
+    SfInstall --> InstallSvc -->|writes| GitCfg
+    GitCfg -->|invokes per file| Binary
+    Binary --> ArgvParser --> MD
+```
+
+### Build Pipeline
+
+The binary is produced by esbuild from the compiled TypeScript:
+
+```
+src/**/*.ts → tsc → lib/**/*.js → esbuild (minify, treeshake, cjs) → bin/merge-driver.cjs (~101 KB, mode 755)
+```
+
+Key build choices:
+- `keepNames: false` — saves ~22 KB; `@log('ClassName')` decorator passes names as string literals instead
+- Shebang + compile-cache banner — `module.enableCompileCache()` gated on Node ≥ 22.8 (stable API)
+- `__VERSION__` + `__BUNDLED__` injected via esbuild `--define` from `package.json`
+
+Implementation: [tooling/build-bin.mjs](tooling/build-bin.mjs)
+
+### Logging
+
+The binary uses a pure-Node NDJSON logger ([LoggingService.ts](src/utils/LoggingService.ts)) that replaces `@salesforce/core` Logger across all command paths:
+
+- Reads `SF_LOG_LEVEL` (fallback `SFDX_LOG_LEVEL`); default `warn` — zero I/O on the hot path
+- Writes to `~/.sf/sf-YYYY-MM-DD.log` via `appendFileSync` (best-effort, failures swallowed)
+- `SF_LOG_STDERR=true` mirrors to stderr
+- Format: `{"level":N,"time":ms,"pid":N,"hostname":"...","name":"sf-git-merge-driver","msg":"..."}`
+
+The `@log('ClassName')` decorator ([LoggingDecorator.ts](src/utils/LoggingDecorator.ts)) emits trace-level entry/exit logs for instrumented methods, including on async rejection and sync throw.
+
+### Deep Equality
+
+Element comparison uses a custom iterative `jsonEqual` ([jsonEqual.ts](src/utils/jsonEqual.ts)) instead of `fast-equals`. Stack-safe via explicit work stack; key-order-independent for objects, order-significant for arrays.
 
 ## Data Flow
 
