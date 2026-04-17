@@ -238,6 +238,12 @@ describe('MetadataService', () => {
           expected: 'Available',
         },
         {
+          name: 'handles tabSettings with tab',
+          metadataType: 'tabSettings',
+          testObject: { tab: 'TestTab' },
+          expected: 'TestTab',
+        },
+        {
           name: 'handles tabVisibilities with tab',
           metadataType: 'tabVisibilities',
           testObject: { tab: 'TestTab' },
