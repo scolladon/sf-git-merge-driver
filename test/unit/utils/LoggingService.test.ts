@@ -94,6 +94,13 @@ describe('LoggingService', () => {
       expect(mockAppendFileSync).toHaveBeenCalledTimes(1)
     })
 
+    it('Given SF_LOG_LEVEL=10 (integer, trace), When calling trace, Then a line is written', async () => {
+      vi.stubEnv('SF_LOG_LEVEL', '10')
+      const Logger = await freshLogger()
+      Logger.trace('msg')
+      expect(mockAppendFileSync).toHaveBeenCalledTimes(1)
+    })
+
     it('Given SF_LOG_LEVEL=40 (integer), When calling info (30), Then nothing is written', async () => {
       vi.stubEnv('SF_LOG_LEVEL', '40')
       const Logger = await freshLogger()
@@ -166,11 +173,15 @@ describe('LoggingService', () => {
       expect(typeof entry.hostname).toBe('string')
     })
 
-    it('Given a warn call, When written, Then file path matches dated NDJSON pattern in .sf dir', async () => {
+    it('Given a warn call, When written, Then file path uses todays date in .sf dir', async () => {
       const Logger = await freshLogger()
       Logger.warn('path-check')
       const filePath = mockAppendFileSync.mock.calls[0][0] as string
-      expect(filePath).toMatch(/\.sf[/\\]sf-\d{4}-\d{2}-\d{2}\.log$/)
+      const now = new Date()
+      const yyyy = now.getFullYear()
+      const mm = String(now.getMonth() + 1).padStart(2, '0')
+      const dd = String(now.getDate()).padStart(2, '0')
+      expect(filePath).toContain(`.sf/sf-${yyyy}-${mm}-${dd}.log`)
     })
 
     it('Given meta data, When written, Then entry includes meta field', async () => {

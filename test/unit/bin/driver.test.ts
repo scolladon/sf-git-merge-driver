@@ -223,7 +223,7 @@ describe('bin/driver', () => {
       expect(code).toBe(0)
       expect(stdout).toHaveBeenCalled()
       const out = stdout.mock.calls[0][0] as string
-      expect(out.length).toBeGreaterThan(0)
+      expect(out).toBe('dev\n')
       stdout.mockRestore()
     })
 
@@ -317,23 +317,26 @@ describe('bin/driver', () => {
       vi.restoreAllMocks()
     })
 
-    it('Given __BUNDLED__=true, When module loads, Then calls process.exit (success path)', async () => {
+    it('Given __BUNDLED__=true with --version in argv, When module loads, Then calls process.exit(0)', async () => {
       vi.resetModules()
       vi.stubGlobal('__BUNDLED__', true)
+
+      // Control process.argv so main gets exactly ['--version'] from slice(2)
+      const origArgv = process.argv
+      process.argv = ['node', 'driver.cjs', '--version']
 
       const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {
         // intentionally empty — prevent real process.exit
       }) as never)
       vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 
-      // process.argv will cause parseArgs to fail (vitest's argv), which is
-      // fine — main() catches the error and returns 2, then exit(2) is called.
       await import('../../../src/bin/driver.js')
-
-      // Give the async main().then() a tick to settle
       await new Promise(r => setTimeout(r, 50))
 
-      expect(exitSpy).toHaveBeenCalled()
+      // slice(2) gives ['--version'] → main returns 0 → exit(0)
+      expect(exitSpy).toHaveBeenCalledWith(0)
+
+      process.argv = origArgv
     })
 
     it('Given __BUNDLED__=true and main rejects, When module loads, Then rejection handler exits 1 with clean message', async () => {
