@@ -84,10 +84,11 @@ Implementation: [MergeNodeFactory.ts](src/merger/nodes/MergeNodeFactory.ts)
 ### MergeOrchestrator
 
 The central coordinator that:
-1. Determines the merge scenario using `MergeScenarioFactory`
-2. Applies early termination optimization when all inputs are equal
-3. Selects the appropriate strategy via `getScenarioStrategy()`
-4. Builds the `MergeContext` and executes the strategy
+1. Determines the merge scenario using the `getScenario()` function (in `MergeScenarioFactory.ts`)
+2. Selects the appropriate strategy via `getScenarioStrategy()`
+3. Builds the `MergeContext` and executes the strategy
+
+Early termination when all inputs are equal lives in `AllPresentStrategy.execute()` (and `LocalAndOtherStrategy.execute()`) via `jsonEqual` fast-paths — see section "Early Termination Optimization" below.
 
 ```typescript
 class MergeOrchestrator {

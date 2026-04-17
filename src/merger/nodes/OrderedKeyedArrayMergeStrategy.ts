@@ -19,17 +19,17 @@ import type { KeyedArrayMergeStrategy } from './KeyedArrayMergeStrategy.js'
 // ============================================================================
 
 interface ArrayMergeState {
-  ancestorKeys: string[]
-  localKeys: string[]
-  otherKeys: string[]
-  ancestorMap: Map<string, JsonObject>
-  localMap: Map<string, JsonObject>
-  otherMap: Map<string, JsonObject>
+  readonly ancestorKeys: readonly string[]
+  readonly localKeys: readonly string[]
+  readonly otherKeys: readonly string[]
+  readonly ancestorMap: ReadonlyMap<string, JsonObject>
+  readonly localMap: ReadonlyMap<string, JsonObject>
+  readonly otherMap: ReadonlyMap<string, JsonObject>
   // Position maps for O(1) lookups - computed once, reused everywhere
-  ancestorPos: Map<string, number>
-  localPos: Map<string, number>
-  otherPos: Map<string, number>
-  ancestorSet: Set<string>
+  readonly ancestorPos: ReadonlyMap<string, number>
+  readonly localPos: ReadonlyMap<string, number>
+  readonly otherPos: ReadonlyMap<string, number>
+  readonly ancestorSet: ReadonlySet<string>
 }
 
 interface GapKeys {
@@ -39,11 +39,11 @@ interface GapKeys {
 }
 
 interface GapSets {
-  localDeleted: Set<string>
-  otherDeleted: Set<string>
-  localAdded: Set<string>
-  otherAdded: Set<string>
-  allKeys: Set<string>
+  readonly localDeleted: ReadonlySet<string>
+  readonly otherDeleted: ReadonlySet<string>
+  readonly localAdded: ReadonlySet<string>
+  readonly otherAdded: ReadonlySet<string>
+  readonly allKeys: ReadonlySet<string>
 }
 
 const computeGapSets = (
@@ -167,7 +167,7 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
    */
   private getMovedElements(
     ctx: ArrayMergeState,
-    modifiedPos: Map<string, number>
+    modifiedPos: ReadonlyMap<string, number>
   ): Set<string> {
     const moved = new Set<string>()
 
@@ -326,7 +326,10 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     return this.mergeGapElement(config, key, ctx)
   }
 
-  private wrapKeys(keys: string[], map: Map<string, JsonObject>): JsonArray {
+  private wrapKeys(
+    keys: readonly string[],
+    map: ReadonlyMap<string, JsonObject>
+  ): JsonArray {
     return keys.map(k => ({
       [this.attribute]: map.get(k)!,
     }))
@@ -415,11 +418,12 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
       otherDeleted.size > 0 &&
       !setsEqual(localDeleted, otherDeleted)
 
+    // When both sides added disjoint non-empty sets, equality is impossible,
+    // so `!setsIntersect` is sufficient — no need for a redundant `!setsEqual`.
     const hasAdditionConflict =
       localAdded.size > 0 &&
       otherAdded.size > 0 &&
-      !setsIntersect(localAdded, otherAdded) &&
-      !setsEqual(localAdded, otherAdded)
+      !setsIntersect(localAdded, otherAdded)
 
     if (hasDeletionConflict || hasAdditionConflict) {
       return this.buildGapConflict(config, gaps, ctx)

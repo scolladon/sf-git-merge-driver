@@ -111,11 +111,15 @@ const insertNamespaces = (
   ]
 }
 
-// XMLBuilder's format:true inserts \n + indentation around comments.
+// XMLBuilder's format:true inserts `\n + indentation` before comments.
 // Salesforce metadata uses inline comments — strip only builder-added
-// newlines+indentation, not horizontal whitespace within a line.
+// newlines+indentation before each comment, not horizontal whitespace within
+// a line. Previously the trailing `\n?\s*` group consumed the leading
+// whitespace of the next element which caused consecutive comments to be
+// silently concatenated; by only consuming the leading whitespace we keep
+// the regex pure and the `g` flag handles back-to-back comments correctly.
 const correctComments = (xml: string): string =>
-  xml.includes('<!--') ? xml.replace(/\n\s*(<!--.*?-->)\n?\s*/g, '$1') : xml
+  xml.includes('<!--') ? xml.replace(/\n\s*(<!--.*?-->)/g, '$1') : xml
 
 // ============================================================================
 // Serializer

@@ -8,6 +8,10 @@ vi.mock('../../../src/utils/LoggingService.js', async importOriginal => {
     await importOriginal<typeof import('../../../src/utils/LoggingService')>()
   return {
     ...actual,
+    // Force decorator to install wrapper even when the runtime threshold
+    // (default `warn`) would disable tracing — otherwise the no-op fast path
+    // hides the behaviour these tests assert on.
+    isLevelEnabled: () => true,
     Logger: {
       trace: mockedTrace,
       debug: vi.fn(),
@@ -139,6 +143,53 @@ describe('LoggingDecorator', () => {
       expect(mockedTrace).toHaveBeenCalledTimes(2)
       const exitMsg = (mockedTrace.mock.calls[1][0] as () => string)()
       expect(exitMsg).toContain('exit (error)')
+    })
+  })
+
+  describe('short-circuit when trace not enabled', () => {
+    it('Given trace not enabled at module init, When decorating a method, Then calls fall through with no Logger.trace invocations', async () => {
+      // Arrange — fresh module load with isLevelEnabled forced to false
+      vi.resetModules()
+      vi.doMock(
+        '../../../src/utils/LoggingService.js',
+        async importOriginal => {
+          const actual =
+            await importOriginal<
+              typeof import('../../../src/utils/LoggingService')
+            >()
+          return {
+            ...actual,
+            isLevelEnabled: () => false,
+            Logger: {
+              trace: mockedTrace,
+              debug: vi.fn(),
+              warn: vi.fn(),
+              info: vi.fn(),
+              error: vi.fn(),
+            },
+          }
+        }
+      )
+      const { log: logNoOp } = await import(
+        '../../../src/utils/LoggingDecorator.js'
+      )
+
+      class Plain {
+        @logNoOp('Plain')
+        method() {
+          return 'unchanged'
+        }
+      }
+      const sut = new Plain()
+
+      // Act
+      const result = sut.method()
+
+      // Assert — original method still runs and returns, but no trace calls
+      expect(result).toBe('unchanged')
+      expect(mockedTrace).not.toHaveBeenCalled()
+
+      vi.doUnmock('../../../src/utils/LoggingService.js')
     })
   })
 
