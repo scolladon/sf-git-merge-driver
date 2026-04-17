@@ -43,10 +43,14 @@ export function assertNodeVersion(versionString: string): void {
   }
 }
 
+const toMessage = (err: unknown): string =>
+  err instanceof Error ? err.message : String(err)
+
 export type ParsedArgs = {
   ancestorFile: string
   localFile: string
   otherFile: string
+  /** Accepted for git-merge-driver contract compliance; MergeDriver writes to localFile (%A). */
   outputFile: string
   config: MergeConfig
 }
@@ -119,7 +123,7 @@ export async function main(argv: readonly string[]): Promise<number> {
   try {
     parsed = parseArgs(argv)
   } catch (err) {
-    process.stderr.write(`sf-git-merge-driver: ${(err as Error).message}\n`)
+    process.stderr.write(`sf-git-merge-driver: ${toMessage(err)}\n`)
     return USAGE_EXIT_CODE
   }
 
@@ -145,7 +149,7 @@ export async function main(argv: readonly string[]): Promise<number> {
     )
     return hasConflict ? CONFLICT_EXIT_CODE : SUCCESS_EXIT_CODE
   } catch (err) {
-    process.stderr.write(`sf-git-merge-driver: ${(err as Error).message}\n`)
+    process.stderr.write(`sf-git-merge-driver: ${toMessage(err)}\n`)
     return CONFLICT_EXIT_CODE
   }
 }
@@ -158,7 +162,7 @@ if (typeof __BUNDLED__ !== 'undefined' && __BUNDLED__) {
   main(process.argv.slice(2)).then(
     code => process.exit(code),
     err => {
-      process.stderr.write(`sf-git-merge-driver: ${(err as Error).message}\n`)
+      process.stderr.write(`sf-git-merge-driver: ${toMessage(err)}\n`)
       process.exit(CONFLICT_EXIT_CODE)
     }
   )

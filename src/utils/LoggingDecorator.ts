@@ -27,9 +27,14 @@ export function log(className: string) {
         )
       }
 
-      const result = call()
-      Logger.trace(lazy`${className}.${propertyKey}: exit`)
-      return result
+      try {
+        const result = call()
+        Logger.trace(lazy`${className}.${propertyKey}: exit`)
+        return result
+      } catch (err) {
+        Logger.trace(lazy`${className}.${propertyKey}: exit (error)`)
+        throw err
+      }
     }
   }
 }

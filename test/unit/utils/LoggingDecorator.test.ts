@@ -65,6 +65,23 @@ describe('LoggingDecorator', () => {
       // Assert
       expect(result).toBe('hello-42')
     })
+
+    it('When method throws, Then traces entry and exit with (error), and re-throws', () => {
+      // Arrange
+      class SyncErrorClass {
+        @log('SyncErrorClass')
+        failingMethod() {
+          throw new Error('sync boom')
+        }
+      }
+      const sut = new SyncErrorClass()
+
+      // Act & Assert
+      expect(() => sut.failingMethod()).toThrow('sync boom')
+      expect(mockedTrace).toHaveBeenCalledTimes(2)
+      const exitMsg = (mockedTrace.mock.calls[1][0] as () => string)()
+      expect(exitMsg).toContain('SyncErrorClass.failingMethod: exit (error)')
+    })
   })
 
   describe('given an async method', () => {

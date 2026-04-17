@@ -269,7 +269,7 @@ describe('bin/driver', () => {
       expect(code).toBe(1)
     })
 
-    it('Given mergeFiles throws, When running, Then exits 1 with clean error message', async () => {
+    it('Given mergeFiles throws Error, When running, Then exits 1 with clean error message', async () => {
       mockMergeFiles.mockRejectedValue(new Error('read failed'))
       const stderr = vi
         .spyOn(process.stderr, 'write')
@@ -280,6 +280,20 @@ describe('bin/driver', () => {
       expect(code).toBe(1)
       const msg = stderr.mock.calls[0][0] as string
       expect(msg).toContain('sf-git-merge-driver: read failed')
+      stderr.mockRestore()
+    })
+
+    it('Given mergeFiles throws a non-Error value, When running, Then exits 1 with stringified message', async () => {
+      mockMergeFiles.mockRejectedValue('raw string rejection')
+      const stderr = vi
+        .spyOn(process.stderr, 'write')
+        .mockImplementation(() => true)
+
+      const code = await main(['-O', 'a', '-A', 'b', '-B', 'c', '-P', 'd'])
+
+      expect(code).toBe(1)
+      const msg = stderr.mock.calls[0][0] as string
+      expect(msg).toContain('sf-git-merge-driver: raw string rejection')
       stderr.mockRestore()
     })
 
