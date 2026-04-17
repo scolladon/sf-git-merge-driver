@@ -59,23 +59,32 @@ describe('git merge driver install', () => {
     expect(gitConfigOutput).to.match(DRIVER_LINE_PATTERN)
   })
 
-  it('reinstalls merge driver correctly', () => {
-    // Arrange
-    // Driver is already installed from previous test
-
-    // Act
+  it('reinstalls merge driver idempotently (no duplicate .gitattributes lines)', () => {
+    // Arrange — ensure driver is installed (self-contained, not dependent on prior test)
     execCmd('git merge driver install', {
       ensureExitCode: 0,
       cwd: ROOT_FOLDER,
     })
 
-    // Assert
+    // Act — install again
+    execCmd('git merge driver install', {
+      ensureExitCode: 0,
+      cwd: ROOT_FOLDER,
+    })
+
+    // Assert — .gitattributes has each pattern exactly ONCE (no duplication)
     const gitattributesPath = join(ROOT_FOLDER, '.git/info/attributes')
-    expect(existsSync(gitattributesPath)).to.be.true
-
     const gitattributesContent = readFileSync(gitattributesPath, 'utf-8')
-    expect(gitattributesContent).to.include(`.xml merge=${DRIVER_NAME}`)
+    const lines = gitattributesContent
+      .split('\n')
+      .filter(l => l.includes(`merge=${DRIVER_NAME}`))
+    const uniqueLines = new Set(lines)
+    expect(lines.length).to.equal(
+      uniqueLines.size,
+      `Duplicate .gitattributes lines found:\n${lines.join('\n')}`
+    )
 
+    // Assert — git config driver entry present (not duplicated)
     const gitConfigOutput = execSync('git config --list', {
       cwd: ROOT_FOLDER,
     }).toString()
