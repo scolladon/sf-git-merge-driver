@@ -7,6 +7,9 @@ import { defaultConfig } from '../../../utils/testConfig.js'
 const fieldPermissionsKey =
   MetadataService.getKeyFieldExtractor('fieldPermissions')
 const picklistValueKey = MetadataService.getKeyFieldExtractor('value')
+const servicePresenceStatusAccessesKey = MetadataService.getKeyFieldExtractor(
+  'servicePresenceStatusAccesses'
+)
 
 describe('KeyedArrayMergeNode', () => {
   describe('merge with key field (fieldPermissions)', () => {
@@ -580,7 +583,9 @@ describe('KeyedArrayMergeNode', () => {
         ancestor,
         local,
         other,
-        'servicePresenceStatusAccesses'
+        'servicePresenceStatusAccesses',
+        servicePresenceStatusAccessesKey,
+        false
       )
 
       // Act
@@ -605,7 +610,9 @@ describe('KeyedArrayMergeNode', () => {
         ancestor,
         local,
         other,
-        'servicePresenceStatusAccesses'
+        'servicePresenceStatusAccesses',
+        servicePresenceStatusAccessesKey,
+        false
       )
 
       // Act
@@ -627,7 +634,9 @@ describe('KeyedArrayMergeNode', () => {
         ancestor,
         local,
         other,
-        'servicePresenceStatusAccesses'
+        'servicePresenceStatusAccesses',
+        servicePresenceStatusAccessesKey,
+        false
       )
 
       // Act
