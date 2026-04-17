@@ -35,7 +35,7 @@ const ATTRIBUTES_CONTENT = `*.xml merge=salesforce-source\nsome other content`
 const FILTERED_CONTENT = 'some other content'
 
 const mockedRaw = vi.fn()
-const simpleGitMock = simpleGit as Mock
+const simpleGitMock = simpleGit as unknown as Mock
 simpleGitMock.mockReturnValue({
   raw: mockedRaw,
 })

@@ -51,13 +51,12 @@ describe('FlxXmlParser', () => {
       const result = sut.parse(xml)
 
       // Assert
-      const script = (result.content as Record<string, unknown>).Root as Record<
-        string,
-        unknown
-      >
+      const script = (result.content as Record<string, unknown>)[
+        'Root'
+      ] as Record<string, unknown>
       expect(script).toHaveProperty('script')
-      const scriptNode = script.script as Record<string, unknown>
-      expect(scriptNode.__cdata).toBe('if (a < b) {}')
+      const scriptNode = script['script'] as Record<string, unknown>
+      expect(scriptNode['__cdata']).toBe('if (a < b) {}')
       expect(scriptNode).not.toHaveProperty('#text')
     })
   })
@@ -72,7 +71,7 @@ describe('FlxXmlParser', () => {
       const result = sut.parse(xml)
 
       // Assert
-      expect((result.content as Record<string, unknown>).Root).toEqual({
+      expect((result.content as Record<string, unknown>)['Root']).toEqual({
         code: '007',
         hex: '0x1F',
       })
@@ -89,7 +88,7 @@ describe('FlxXmlParser', () => {
       const result = sut.parse(xml)
 
       // Assert
-      expect((result.content as Record<string, unknown>).Root).toEqual({
+      expect((result.content as Record<string, unknown>)['Root']).toEqual({
         text: '&amp;foo &lt;bar&gt;',
       })
     })
@@ -105,9 +104,9 @@ describe('FlxXmlParser', () => {
       const result = sut.parse(xml)
 
       // Assert
-      expect((result.content as Record<string, unknown>).Root).toHaveProperty(
-        '#xml__comment'
-      )
+      expect(
+        (result.content as Record<string, unknown>)['Root']
+      ).toHaveProperty('#xml__comment')
     })
   })
 

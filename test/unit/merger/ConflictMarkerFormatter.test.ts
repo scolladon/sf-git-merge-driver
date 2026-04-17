@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ConflictMarkerFormatter } from '../../../src/merger/ConflictMarkerFormatter.js'
+import type { MergeConfig } from '../../../src/types/conflictTypes.js'
 import { defaultConfig } from '../../utils/testConfig.js'
 
 describe('ConflictMarkerFormatter', () => {

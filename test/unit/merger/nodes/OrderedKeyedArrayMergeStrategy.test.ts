@@ -264,6 +264,19 @@ describe('OrderedKeyedArrayMergeStrategy', () => {
       ['A', 'B', 'D'],
       ['A', conflict(['C'], ['B', 'C'], ['B']), 'D'],
     ],
+    // Discriminating C7 — disjoint additions on both sides while the shared
+    // spine ordering is unchanged. This distinguishes C7 (ordering divergence
+    // across additions) from C4 (pure divergent moves with no additions).
+    // Per MEMORY.md: C7 triggers when both sides have disjoint additions
+    // AND orderings diverge. Here the ancestor shared spine [A,B,C] is
+    // preserved on both sides but each adds different new elements.
+    [
+      'C7 (discriminator): disjoint additions + divergent local ordering (no shared moves)',
+      ['A', 'B', 'C'],
+      ['B', 'A', 'C', 'X'],
+      ['A', 'B', 'C', 'Y'],
+      [conflict(['B', 'A', 'C', 'X'], ['A', 'B', 'C'], ['A', 'B', 'C', 'Y'])],
+    ],
   ]
 
   // Additional scenarios to exercise gap analysis and spine processing branches

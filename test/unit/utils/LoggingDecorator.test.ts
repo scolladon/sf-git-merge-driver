@@ -5,7 +5,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mockedTrace = vi.fn()
 vi.mock('../../../src/utils/LoggingService.js', async importOriginal => {
   const actual =
-    await importOriginal<typeof import('../../../src/utils/LoggingService')>()
+    await importOriginal<
+      typeof import('../../../src/utils/LoggingService.js')
+    >()
   return {
     ...actual,
     // Force decorator to install wrapper even when the runtime threshold
@@ -155,7 +157,7 @@ describe('LoggingDecorator', () => {
         async importOriginal => {
           const actual =
             await importOriginal<
-              typeof import('../../../src/utils/LoggingService')
+              typeof import('../../../src/utils/LoggingService.js')
             >()
           return {
             ...actual,

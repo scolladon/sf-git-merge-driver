@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "types": ["node", "vitest/globals"]
+  },
+  "include": [
+    "./src/**/*",
+    "./test/unit/**/*",
+    "./test/integration/*.test.ts",
+    "./test/utils/**/*",
+    "./test/perf/**/*"
+  ],
+  "exclude": [
+    "./test/integration/*.nut.ts"
+  ]
+}

@@ -137,9 +137,9 @@ describe('FxpXmlSerializer', () => {
         {
           Root: [
             buildConflictBlock(
-              ['scalar-local'] as unknown as Record<string, unknown>,
-              ['scalar-base'] as unknown as Record<string, unknown>,
-              ['scalar-other'] as unknown as Record<string, unknown>
+              ['scalar-local'] as unknown as JsonArray,
+              ['scalar-base'] as unknown as JsonArray,
+              ['scalar-other'] as unknown as JsonArray
             ),
           ],
         },
@@ -248,7 +248,7 @@ describe('FxpXmlSerializer', () => {
         {
           Root: [
             buildConflictBlock(
-              [innerConflict] as unknown as Record<string, unknown>,
+              [innerConflict] as unknown as JsonArray,
               { shallow: 'base' },
               { shallow: 'other' }
             ),

@@ -96,6 +96,7 @@
     "prepare": "husky",
     "prepublishOnly": "npm shrinkwrap",
     "test:build": "wireit",
+    "test:typecheck": "wireit",
     "test:mutation": "wireit",
     "test:mutation:incremental": "wireit",
     "test:nut": "wireit",
@@ -345,8 +346,19 @@
         "reports/coverage/**"
       ],
       "dependencies": [
-        "lint"
+        "lint",
+        "test:typecheck"
       ]
+    },
+    "test:typecheck": {
+      "command": "tsc -p tsconfig.test.json --pretty",
+      "files": [
+        "src/**/*.ts",
+        "test/**/*.ts",
+        "tsconfig.json",
+        "tsconfig.test.json"
+      ],
+      "output": []
     },
     "test:perf": {
       "command": "node --expose-gc ./node_modules/.bin/vitest bench --config vitest.config.perf.ts && node test/perf/formatResults.mjs",
