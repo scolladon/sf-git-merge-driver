@@ -115,12 +115,12 @@ describe('LoggingService', () => {
       expect(mockAppendFileSync).toHaveBeenCalledTimes(1)
     })
 
-    it('Given SF_LOG_LEVEL=0, When calling any level, Then default (warn) applies', async () => {
+    it('Given SF_LOG_LEVEL=0, When calling trace, Then everything logs (threshold 0 = no filtering, pino-compatible)', async () => {
       vi.stubEnv('SF_LOG_LEVEL', '0')
       const Logger = await freshLogger()
       Logger.trace('t')
       Logger.warn('w')
-      expect(mockAppendFileSync).toHaveBeenCalledTimes(1)
+      expect(mockAppendFileSync).toHaveBeenCalledTimes(2)
     })
 
     it('Given SF_LOG_LEVEL=-5, When calling any level, Then default (warn) applies', async () => {

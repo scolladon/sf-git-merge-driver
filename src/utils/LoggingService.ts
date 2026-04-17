@@ -41,7 +41,7 @@ const DEFAULT_LEVEL = LEVELS.warn
 function parseLevel(raw: string | undefined): number {
   if (!raw) return DEFAULT_LEVEL
   const asNumber = Number(raw)
-  if (Number.isInteger(asNumber) && asNumber > 0) return asNumber
+  if (Number.isInteger(asNumber) && asNumber >= 0) return asNumber
   const key = raw.toLowerCase()
   if (key in LEVELS) return LEVELS[key as keyof typeof LEVELS]
   return DEFAULT_LEVEL
