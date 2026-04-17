@@ -13,10 +13,14 @@ import { log } from '../utils/LoggingDecorator.js'
 // Resolved from this compiled module's location:
 //   <plugin-root>/lib/service/InstallService.js → ../../bin/merge-driver.cjs
 const BINARY_RELATIVE = ['..', '..', 'bin', 'merge-driver.cjs'] as const
-const BINARY_PATH = join(
+const BINARY_PATH_RAW = join(
   dirname(fileURLToPath(import.meta.url)),
   ...BINARY_RELATIVE
 )
+
+// Ensure POSIX separators (Windows join() uses backslash) and escape single
+// quotes so the path embeds safely inside the sh -c '...' wrapper.
+const BINARY_PATH = BINARY_PATH_RAW.replace(/\\/g, '/').replace(/'/g, "'\\''")
 
 // git's merge-driver placeholder convention: %O ancestor, %A local, %B other,
 // %P output, %L conflict-marker-size, %S ancestor-label, %X local-label,

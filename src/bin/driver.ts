@@ -33,9 +33,6 @@ const USAGE_EXIT_CODE = 2
 const CONFLICT_EXIT_CODE = 1
 const SUCCESS_EXIT_CODE = 0
 
-// Version check extracted into a pure function so unit tests can call it
-// directly. `process.versions.node` is non-writable so vi.stubGlobal can't
-// mutate it; tests mock `process.exit` to throw instead.
 export function assertNodeVersion(versionString: string): void {
   const major = Number(versionString.split('.')[0])
   if (major < 20) {
@@ -65,7 +62,7 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
       throw new Error(`unknown argument: ${flag}`)
     }
     const value = argv[i + 1]
-    if (value === undefined) {
+    if (value === undefined || FLAG_NAMES.has(value)) {
       throw new Error(`missing value for ${flag}`)
     }
     raw[flag] = value
@@ -139,25 +136,30 @@ export async function main(argv: readonly string[]): Promise<number> {
     }
   }
 
-  const driver = new MergeDriver(parsed.config)
-  const hasConflict = await driver.mergeFiles(
-    parsed.ancestorFile,
-    parsed.localFile,
-    parsed.otherFile
-  )
-  return hasConflict ? CONFLICT_EXIT_CODE : SUCCESS_EXIT_CODE
+  try {
+    const driver = new MergeDriver(parsed.config)
+    const hasConflict = await driver.mergeFiles(
+      parsed.ancestorFile,
+      parsed.localFile,
+      parsed.otherFile
+    )
+    return hasConflict ? CONFLICT_EXIT_CODE : SUCCESS_EXIT_CODE
+  } catch (err) {
+    process.stderr.write(`sf-git-merge-driver: ${(err as Error).message}\n`)
+    return CONFLICT_EXIT_CODE
+  }
 }
 
 // Module top-level: run main() only when executed as a bundled script.
-// esbuild sets __BUNDLED__ = true via --define. In tests and ts-node/vitest
-// contexts __BUNDLED__ is undefined, so the typeof guard prevents side
-// effects on module import. End-to-end coverage for the invocation path is
-// provided by NUTs (Phase 6).
-/* v8 ignore start -- covered by NUT tests */
+// esbuild sets __BUNDLED__ = true via --define. In tests, vi.stubGlobal +
+// vi.resetModules + dynamic import exercises this block for full coverage.
 if (typeof __BUNDLED__ !== 'undefined' && __BUNDLED__) {
   assertNodeVersion(process.versions.node)
-  main(process.argv.slice(2)).then(code => {
-    process.exit(code)
-  })
+  main(process.argv.slice(2)).then(
+    code => process.exit(code),
+    err => {
+      process.stderr.write(`sf-git-merge-driver: ${(err as Error).message}\n`)
+      process.exit(CONFLICT_EXIT_CODE)
+    }
+  )
 }
-/* v8 ignore stop */

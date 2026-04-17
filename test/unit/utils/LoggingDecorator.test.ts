@@ -3,7 +3,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mockedTrace = vi.fn()
-vi.mock('../../../src/utils/LoggingService', async importOriginal => {
+vi.mock('../../../src/utils/LoggingService.js', async importOriginal => {
   const actual =
     await importOriginal<typeof import('../../../src/utils/LoggingService')>()
   return {
@@ -105,6 +105,23 @@ describe('LoggingDecorator', () => {
 
       // Assert
       expect(result).toBe('hello-42')
+    })
+
+    it('When method rejects, Then traces entry and exit with (error), and re-throws', async () => {
+      // Arrange
+      class AsyncErrorClass {
+        @log('AsyncErrorClass')
+        async failingMethod() {
+          throw new Error('boom')
+        }
+      }
+      const sut = new AsyncErrorClass()
+
+      // Act & Assert
+      await expect(sut.failingMethod()).rejects.toThrow('boom')
+      expect(mockedTrace).toHaveBeenCalledTimes(2)
+      const exitMsg = (mockedTrace.mock.calls[1][0] as () => string)()
+      expect(exitMsg).toContain('exit (error)')
     })
   })
 

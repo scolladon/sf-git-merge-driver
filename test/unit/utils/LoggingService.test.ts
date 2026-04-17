@@ -11,28 +11,28 @@ vi.mock('node:fs', () => ({
 
 const mockStderrWrite = vi.fn()
 
-beforeEach(() => {
-  vi.resetModules()
-  vi.unstubAllEnvs()
-  mockAppendFileSync.mockReset()
-  mockMkdirSync.mockReset()
-  mockStderrWrite.mockReset()
-  vi.spyOn(process.stderr, 'write').mockImplementation(
-    mockStderrWrite as unknown as typeof process.stderr.write
-  )
-})
-
-afterEach(() => {
-  vi.restoreAllMocks()
-})
-
-const freshLogger = async () =>
-  (await import('../../../src/utils/LoggingService.js')).Logger
-
-const freshLazy = async () =>
-  (await import('../../../src/utils/LoggingService.js')).lazy
-
 describe('LoggingService', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.unstubAllEnvs()
+    mockAppendFileSync.mockReset()
+    mockMkdirSync.mockReset()
+    mockStderrWrite.mockReset()
+    vi.spyOn(process.stderr, 'write').mockImplementation(
+      mockStderrWrite as unknown as typeof process.stderr.write
+    )
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  const freshLogger = async () =>
+    (await import('../../../src/utils/LoggingService.js')).Logger
+
+  const freshLazy = async () =>
+    (await import('../../../src/utils/LoggingService.js')).lazy
+
   describe('lazy template tag', () => {
     it('Given a static expression, When evaluating, Then returns the interpolated string', async () => {
       const lazy = await freshLazy()
@@ -80,6 +80,20 @@ describe('LoggingService', () => {
       expect(mockAppendFileSync).toHaveBeenCalledTimes(1)
     })
 
+    it('Given SF_LOG_LEVEL=debug, When calling debug, Then a line is written', async () => {
+      vi.stubEnv('SF_LOG_LEVEL', 'debug')
+      const Logger = await freshLogger()
+      Logger.debug('msg')
+      expect(mockAppendFileSync).toHaveBeenCalledTimes(1)
+    })
+
+    it('Given SF_LOG_LEVEL=info, When calling info, Then a line is written', async () => {
+      vi.stubEnv('SF_LOG_LEVEL', 'info')
+      const Logger = await freshLogger()
+      Logger.info('msg')
+      expect(mockAppendFileSync).toHaveBeenCalledTimes(1)
+    })
+
     it('Given SF_LOG_LEVEL=40 (integer), When calling info (30), Then nothing is written', async () => {
       vi.stubEnv('SF_LOG_LEVEL', '40')
       const Logger = await freshLogger()
@@ -91,6 +105,22 @@ describe('LoggingService', () => {
       vi.stubEnv('SF_LOG_LEVEL', '40')
       const Logger = await freshLogger()
       Logger.warn('msg')
+      expect(mockAppendFileSync).toHaveBeenCalledTimes(1)
+    })
+
+    it('Given SF_LOG_LEVEL=0, When calling any level, Then default (warn) applies', async () => {
+      vi.stubEnv('SF_LOG_LEVEL', '0')
+      const Logger = await freshLogger()
+      Logger.trace('t')
+      Logger.warn('w')
+      expect(mockAppendFileSync).toHaveBeenCalledTimes(1)
+    })
+
+    it('Given SF_LOG_LEVEL=-5, When calling any level, Then default (warn) applies', async () => {
+      vi.stubEnv('SF_LOG_LEVEL', '-5')
+      const Logger = await freshLogger()
+      Logger.trace('t')
+      Logger.warn('w')
       expect(mockAppendFileSync).toHaveBeenCalledTimes(1)
     })
 
@@ -130,10 +160,17 @@ describe('LoggingService', () => {
       const entry = JSON.parse(written.trim())
       expect(entry.level).toBe(40)
       expect(entry.msg).toBe('hello')
-      expect(entry.name).toBeDefined()
+      expect(entry.name).toBe('sf-git-merge-driver')
       expect(entry.pid).toBe(process.pid)
       expect(typeof entry.time).toBe('number')
       expect(typeof entry.hostname).toBe('string')
+    })
+
+    it('Given a warn call, When written, Then file path matches dated NDJSON pattern in .sf dir', async () => {
+      const Logger = await freshLogger()
+      Logger.warn('path-check')
+      const filePath = mockAppendFileSync.mock.calls[0][0] as string
+      expect(filePath).toMatch(/\.sf[/\\]sf-\d{4}-\d{2}-\d{2}\.log$/)
     })
 
     it('Given meta data, When written, Then entry includes meta field', async () => {
@@ -216,6 +253,15 @@ describe('LoggingService', () => {
       Logger.warn('2')
       Logger.warn('3')
       expect(mockMkdirSync).toHaveBeenCalledTimes(1)
+    })
+
+    it('Given first call, When mkdirSync is invoked, Then it uses recursive: true', async () => {
+      const Logger = await freshLogger()
+      Logger.warn('check')
+      expect(mockMkdirSync).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ recursive: true })
+      )
     })
   })
 })

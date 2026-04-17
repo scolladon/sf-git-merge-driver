@@ -75,6 +75,14 @@ describe('jsonEqual', () => {
     it('Given array vs object, When comparing, Then returns false', () => {
       expect(jsonEqual([], {})).toBe(false)
     })
+
+    it('Given undefined vs object, When comparing, Then returns false (kills || vs && mutant)', () => {
+      expect(jsonEqual(undefined as unknown, {})).toBe(false)
+    })
+
+    it('Given object vs undefined, When comparing, Then returns false', () => {
+      expect(jsonEqual({}, undefined as unknown)).toBe(false)
+    })
   })
 
   describe('arrays', () => {

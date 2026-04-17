@@ -9,8 +9,11 @@ function resolveLoggerMessage<T>(message: LoggerMessage<T>): T {
   return typeof message === 'function' ? (message as () => T)() : message
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: Any is expected here
-export function lazy(strings: TemplateStringsArray, ...exprs: any[]) {
+export function lazy(
+  strings: TemplateStringsArray,
+  // biome-ignore lint/suspicious/noExplicitAny: tagged template exprs are inherently untyped
+  ...exprs: any[]
+): () => string {
   const getters = exprs.map(expr => {
     if (typeof expr === 'function') return expr
     return () => expr

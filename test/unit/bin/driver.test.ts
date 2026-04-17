@@ -1,6 +1,6 @@
 'use strict'
 
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mockExistsSync = vi.fn()
 vi.mock('node:fs', () => ({
@@ -107,6 +107,22 @@ describe('bin/driver', () => {
       expect(parsed.config.otherConflictTag).toBe('YOURS')
     })
 
+    it('Given -L 1 (boundary), When parsing, Then succeeds with conflictMarkerSize 1', () => {
+      const parsed = parseArgs([
+        '-O',
+        'a',
+        '-A',
+        'b',
+        '-B',
+        'c',
+        '-P',
+        'd',
+        '-L',
+        '1',
+      ])
+      expect(parsed.config.conflictMarkerSize).toBe(1)
+    })
+
     it('Given empty-string values for tag flags, When parsing, Then falls back to defaults (treats empty as unset)', () => {
       const parsed = parseArgs([
         '-O',
@@ -169,6 +185,12 @@ describe('bin/driver', () => {
       expect(() => parseArgs(['-O', 'a', '-A', 'b', '-B', 'c', '-P'])).toThrow(
         /missing value for -P/
       )
+    })
+
+    it('Given value that looks like a flag, When parsing, Then throws "missing value" for the preceding flag', () => {
+      expect(() =>
+        parseArgs(['-O', '-A', '-A', 'b', '-B', 'c', '-P', 'd'])
+      ).toThrow(/missing value for -O/)
     })
 
     it('Given non-integer -L, When parsing, Then throws', () => {
@@ -247,6 +269,20 @@ describe('bin/driver', () => {
       expect(code).toBe(1)
     })
 
+    it('Given mergeFiles throws, When running, Then exits 1 with clean error message', async () => {
+      mockMergeFiles.mockRejectedValue(new Error('read failed'))
+      const stderr = vi
+        .spyOn(process.stderr, 'write')
+        .mockImplementation(() => true)
+
+      const code = await main(['-O', 'a', '-A', 'b', '-B', 'c', '-P', 'd'])
+
+      expect(code).toBe(1)
+      const msg = stderr.mock.calls[0][0] as string
+      expect(msg).toContain('sf-git-merge-driver: read failed')
+      stderr.mockRestore()
+    })
+
     it('Given missing required flag, When running, Then exits 2 with sf-git-merge-driver prefix on stderr', async () => {
       const stderr = vi
         .spyOn(process.stderr, 'write')
@@ -272,6 +308,60 @@ describe('bin/driver', () => {
       const msg = stderr.mock.calls[0][0] as string
       expect(msg).toContain('sf-git-merge-driver: file not found: a')
       stderr.mockRestore()
+    })
+  })
+
+  describe('__BUNDLED__ guard (module bootstrap)', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals()
+      vi.restoreAllMocks()
+    })
+
+    it('Given __BUNDLED__=true, When module loads, Then calls process.exit (success path)', async () => {
+      vi.resetModules()
+      vi.stubGlobal('__BUNDLED__', true)
+
+      const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {
+        // intentionally empty — prevent real process.exit
+      }) as never)
+      vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+      // process.argv will cause parseArgs to fail (vitest's argv), which is
+      // fine — main() catches the error and returns 2, then exit(2) is called.
+      await import('../../../src/bin/driver.js')
+
+      // Give the async main().then() a tick to settle
+      await new Promise(r => setTimeout(r, 50))
+
+      expect(exitSpy).toHaveBeenCalled()
+    })
+
+    it('Given __BUNDLED__=true and main rejects, When module loads, Then rejection handler exits 1 with clean message', async () => {
+      vi.resetModules()
+      vi.stubGlobal('__BUNDLED__', true)
+
+      // Force main to reject by making stdout.write throw during --version
+      const origArgv = process.argv
+      process.argv = ['node', 'driver.cjs', '--version']
+
+      vi.spyOn(process.stdout, 'write').mockImplementation(() => {
+        throw new Error('stdout broken')
+      })
+      const stderrSpy = vi
+        .spyOn(process.stderr, 'write')
+        .mockImplementation(() => true)
+      const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {
+        // intentionally empty — prevent real process.exit
+      }) as never)
+
+      await import('../../../src/bin/driver.js')
+      await new Promise(r => setTimeout(r, 50))
+
+      expect(exitSpy).toHaveBeenCalledWith(1)
+      const msgs = stderrSpy.mock.calls.map(c => c[0] as string)
+      expect(msgs.some(m => m.includes('stdout broken'))).toBe(true)
+
+      process.argv = origArgv
     })
   })
 })
