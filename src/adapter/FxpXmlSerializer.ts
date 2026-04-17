@@ -99,10 +99,16 @@ const createConverter = (config: MergeConfig) => {
 // Namespace + Post-processing
 // ============================================================================
 
-const insertNamespaces = (output: JsonArray, namespaces: JsonObject): void => {
-  if (Object.keys(namespaces).length === 0 || output.length === 0) return
-  const root = output[0] as JsonObject
-  root[NAMESPACE_ROOT] = { ...namespaces }
+const insertNamespaces = (
+  output: JsonArray,
+  namespaces: JsonObject
+): JsonArray => {
+  if (Object.keys(namespaces).length === 0 || output.length === 0) return output
+  const [first, ...rest] = output
+  return [
+    { ...(first as JsonObject), [NAMESPACE_ROOT]: { ...namespaces } },
+    ...rest,
+  ]
 }
 
 const correctComments = (xml: string): string =>
@@ -127,9 +133,9 @@ export class FxpXmlSerializer implements XmlSerializer {
     const ordered = mergedOutput.flatMap((item: JsonValue) =>
       isObj(item) ? this.convert(item) : [{ [TEXT_TAG]: item }]
     )
-    insertNamespaces(ordered, namespaces)
+    const withNamespaces = insertNamespaces(ordered, namespaces)
 
-    const xml: string = this.builder.build(ordered)
+    const xml: string = this.builder.build(withNamespaces)
 
     let result = XML_DECL.concat(xml)
     result = this.formatter.handleSpecialEntities(result)
