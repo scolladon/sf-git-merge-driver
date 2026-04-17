@@ -111,8 +111,11 @@ const insertNamespaces = (
   ]
 }
 
+// XMLBuilder's format:true inserts \n + indentation around comments.
+// Salesforce metadata uses inline comments — strip only builder-added
+// newlines+indentation, not horizontal whitespace within a line.
 const correctComments = (xml: string): string =>
-  xml.includes('<!--') ? xml.replace(/\s+<!--(.*?)-->\s+/g, '<!--$1-->') : xml
+  xml.includes('<!--') ? xml.replace(/\n\s*(<!--.*?-->)\n?\s*/g, '$1') : xml
 
 // ============================================================================
 // Serializer
