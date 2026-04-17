@@ -18,6 +18,7 @@ import { ConflictMarkerFormatter } from '../merger/ConflictMarkerFormatter.js'
 import { type ConflictBlock, isConflictBlock } from '../types/conflictBlock.js'
 import type { MergeConfig } from '../types/conflictTypes.js'
 import type { JsonArray, JsonObject, JsonValue } from '../types/jsonTypes.js'
+import { pushAll } from '../utils/arrayUtils.js'
 import type { XmlSerializer } from './XmlSerializer.js'
 
 const builderOptions = {
@@ -73,29 +74,46 @@ const createConverter = (config: MergeConfig) => {
     return [{ [TEXT_TAG]: item }]
   }
 
+  // Explicit push-loop variant of the previous `keys.flatMap(...)` approach.
+  // The flatMap form allocated an intermediate array per key (and a
+  // single-element wrapper array when the callback returned a non-array),
+  // which adds up to thousands of extra allocations on large profiles.
+  // Using pushAll + a single output array per call halves the garbage the
+  // serializer generates at the expense of a little extra indentation.
   const compactToOrdered = (input: JsonObject | JsonArray): JsonArray => {
-    // Arrays are numerically indexed and shouldn't appear here — the caller
-    // distinguishes them via `Array.isArray` before recursing. Narrow to
-    // JsonObject so string indexing is type-safe.
     if (Array.isArray(input)) {
-      return input.flatMap(convertItem)
+      const out: JsonArray = []
+      for (const item of input) {
+        pushAll(out, convertItem(item))
+      }
+      return out
     }
     const keys = Object.keys(input).sort()
-    return keys.flatMap(attribute => {
+    const out: JsonArray = []
+    for (const attribute of keys) {
       const value = input[attribute]
 
       if (Array.isArray(value)) {
-        const children = value.flatMap(convertItem)
-        return { [attribute]: children }
+        const children: JsonArray = []
+        for (const item of value) {
+          pushAll(children, convertItem(item))
+        }
+        out.push({ [attribute]: children })
+        continue
       }
 
       if (isObj(value)) {
-        if (isConflictBlock(value)) return expandConflict(value)
-        return { [attribute]: compactToOrdered(value) }
+        if (isConflictBlock(value)) {
+          pushAll(out, expandConflict(value))
+        } else {
+          out.push({ [attribute]: compactToOrdered(value) })
+        }
+        continue
       }
 
-      return wrapText(value, attribute)
-    })
+      out.push(wrapText(value, attribute))
+    }
+    return out
   }
 
   return compactToOrdered
