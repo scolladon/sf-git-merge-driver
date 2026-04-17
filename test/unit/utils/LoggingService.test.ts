@@ -181,7 +181,10 @@ describe('LoggingService', () => {
       const yyyy = now.getFullYear()
       const mm = String(now.getMonth() + 1).padStart(2, '0')
       const dd = String(now.getDate()).padStart(2, '0')
-      expect(filePath).toContain(`.sf/sf-${yyyy}-${mm}-${dd}.log`)
+      // Accept both / and \ as path separator (cross-platform)
+      expect(filePath).toMatch(
+        new RegExp(`\\.sf[/\\\\]sf-${yyyy}-${mm}-${dd}\\.log$`)
+      )
     })
 
     it('Given meta data, When written, Then entry includes meta field', async () => {

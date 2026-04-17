@@ -83,6 +83,7 @@ describe('InstallService', () => {
     expect(driverCall).toBeDefined()
     const driverLine = driverCall?.[1] as string
     // Absolute path, ends with /bin/merge-driver.cjs, wrapped in double quotes.
-    expect(driverLine).toMatch(/ "\/.+\/bin\/merge-driver\.cjs"/)
+    // On Windows the POSIX normalization produces D:/a/... (drive letter, forward slashes).
+    expect(driverLine).toMatch(/ ".+\/bin\/merge-driver\.cjs"/)
   })
 })
