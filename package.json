@@ -13,7 +13,7 @@
     "url": "git+https://github.com/scolladon/sf-git-merge-driver.git"
   },
   "dependencies": {
-    "@nodable/flexible-xml-parser": "^1.1.1",
+    "@nodable/flexible-xml-parser": "1.1.1",
     "@oclif/core": "^4.10.5",
     "@salesforce/core": "^8.28.3",
     "@salesforce/sf-plugins-core": "^12.2.6",

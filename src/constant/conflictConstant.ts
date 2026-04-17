@@ -1,4 +1,7 @@
 export const DEFAULT_CONFLICT_MARKER_SIZE = 7
+// Cap prevents pathological -L values (e.g. 2^31-1) from triggering RangeError
+// via String.repeat() and from blowing up generated regex/output size.
+export const MAX_CONFLICT_MARKER_SIZE = 100
 export const ANCESTOR_CONFLICT_MARKER = '|'
 export const LOCAL_CONFLICT_MARKER = '<'
 export const OTHER_CONFLICT_MARKER = '>'

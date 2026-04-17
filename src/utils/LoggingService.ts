@@ -52,6 +52,11 @@ const LOG_LEVEL_THRESHOLD = parseLevel(
 )
 const MIRROR_TO_STDERR = process.env['SF_LOG_STDERR'] === 'true'
 
+// Cached once at module load — hostname() is a syscall and pid is constant
+// for the lifetime of the process. Avoids per-emit gethostname() overhead.
+const HOSTNAME = hostname()
+const PID = process.pid
+
 const LOG_DIR = join(homedir(), '.sf')
 let dirEnsured = false
 function ensureLogDir(): void {
@@ -76,8 +81,8 @@ function emit(level: number, message: string, meta: unknown): void {
   const entry: Record<string, unknown> = {
     level,
     time: Date.now(),
-    pid: process.pid,
-    hostname: hostname(),
+    pid: PID,
+    hostname: HOSTNAME,
     name: PLUGIN_NAME,
     msg: message,
   }

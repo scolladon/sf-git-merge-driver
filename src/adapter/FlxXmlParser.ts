@@ -7,41 +7,67 @@ import {
 import type { JsonObject } from '../types/jsonTypes.js'
 import type { ParsedXml, XmlParser } from './XmlParser.js'
 
-// valueParsers works at runtime but is missing from the type definitions
+// valueParsers works at runtime on the output builder but is missing from X2jOptions
 const flxOptions = {
   skip: { attributes: false, declaration: true },
   tags: { valueParsers: [] },
   attributes: { valueParsers: [] },
   nameFor: { cdata: CDATA_PROP_NAME, comment: XML_COMMENT_PROP_NAME },
-  entityParseOptions: { default: false },
+  doctypeOptions: { enabled: false, maxEntityCount: 100, maxEntitySize: 10000 },
 } as X2jOptions
 
-const cleanParserBugs = (record: Record<string, unknown>): void => {
-  for (const key of Object.keys(record)) {
-    const val = record[key]
-    if (typeof val !== 'object' || val === null) continue
-    const child = val as Record<string, unknown>
-    delete child['@_version']
-    delete child['@_encoding']
-    if (CDATA_PROP_NAME in child && '#text' in child && child['#text'] === '') {
-      delete child['#text']
+const stripDeclarationArtifacts = (root: JsonObject): JsonObject => {
+  const cleaned: JsonObject = {}
+  for (const key of Object.keys(root)) {
+    const val = root[key]
+    if (val === null || typeof val !== 'object' || Array.isArray(val)) {
+      cleaned[key] = val
+      continue
     }
-    cleanParserBugs(child)
+    const child = val as JsonObject
+    const childCleaned: JsonObject = {}
+    for (const childKey of Object.keys(child)) {
+      if (childKey === '@_version' || childKey === '@_encoding') continue
+      childCleaned[childKey] = child[childKey]
+    }
+    cleaned[key] = childCleaned
   }
+  return cleaned
 }
 
-const extractNamespaces = (parsed: JsonObject): JsonObject => {
+const hasEmptyCdataText = (node: JsonObject): boolean =>
+  CDATA_PROP_NAME in node && '#text' in node && node['#text'] === ''
+
+const pruneEmptyCdataText = (value: unknown): unknown => {
+  if (value === null || typeof value !== 'object') return value
+  if (Array.isArray(value)) return value.map(pruneEmptyCdataText)
+  const obj = value as JsonObject
+  const out: JsonObject = {}
+  for (const key of Object.keys(obj)) {
+    if (hasEmptyCdataText(obj) && key === '#text') continue
+    out[key] = pruneEmptyCdataText(obj[key]) as JsonObject[string]
+  }
+  return out
+}
+
+const extractNamespaces = (
+  parsed: JsonObject
+): { content: JsonObject; namespaces: JsonObject } => {
   const namespaces: JsonObject = {}
+  const content: JsonObject = {}
   for (const key of Object.keys(parsed)) {
     const childObj = parsed[key] as JsonObject
+    const cleanedChild: JsonObject = {}
     for (const childKey of Object.keys(childObj)) {
       if (childKey.startsWith(NAMESPACE_PREFIX)) {
         namespaces[childKey] = childObj[childKey]
-        delete childObj[childKey]
+      } else {
+        cleanedChild[childKey] = childObj[childKey]
       }
     }
+    content[key] = cleanedChild
   }
-  return namespaces
+  return { content, namespaces }
 }
 
 export class FlxXmlParser implements XmlParser {
@@ -49,8 +75,8 @@ export class FlxXmlParser implements XmlParser {
 
   parse(xml: string): ParsedXml {
     const raw = this.parser.parse(xml) as JsonObject
-    cleanParserBugs(raw as Record<string, unknown>)
-    const namespaces = extractNamespaces(raw)
-    return { content: raw, namespaces }
+    const afterDeclaration = stripDeclarationArtifacts(raw)
+    const afterCdataPrune = pruneEmptyCdataText(afterDeclaration) as JsonObject
+    return extractNamespaces(afterCdataPrune)
   }
 }
