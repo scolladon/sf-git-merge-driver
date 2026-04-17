@@ -331,7 +331,10 @@ describe('bin/driver', () => {
       vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 
       await import('../../../src/bin/driver.js')
-      await new Promise(r => setTimeout(r, 50))
+      // Flush microtask queue so main().then() settles
+      await Promise.resolve()
+      await Promise.resolve()
+      await Promise.resolve()
 
       // slice(2) gives ['--version'] → main returns 0 → exit(0)
       expect(exitSpy).toHaveBeenCalledWith(0)
@@ -358,7 +361,10 @@ describe('bin/driver', () => {
       }) as never)
 
       await import('../../../src/bin/driver.js')
-      await new Promise(r => setTimeout(r, 50))
+      // Flush microtask queue so the rejection handler settles
+      await Promise.resolve()
+      await Promise.resolve()
+      await Promise.resolve()
 
       expect(exitSpy).toHaveBeenCalledWith(1)
       const msgs = stderrSpy.mock.calls.map(c => c[0] as string)

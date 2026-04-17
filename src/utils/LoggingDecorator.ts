@@ -10,7 +10,6 @@ export function log(className: string) {
     const original = descriptor.value
 
     descriptor.value = function (...args: any[]) {
-      const tag = lazy`${className}.${propertyKey}`
       Logger.trace(lazy`${className}.${propertyKey}: entry`)
 
       const call = () => original.call(this, ...args)
@@ -18,11 +17,11 @@ export function log(className: string) {
       if (original.constructor.name === 'AsyncFunction') {
         return call().then(
           (result: any) => {
-            Logger.trace(lazy`${tag()}: exit`)
+            Logger.trace(lazy`${className}.${propertyKey}: exit`)
             return result
           },
           (err: unknown) => {
-            Logger.trace(lazy`${tag()}: exit (error)`)
+            Logger.trace(lazy`${className}.${propertyKey}: exit (error)`)
             throw err
           }
         )
