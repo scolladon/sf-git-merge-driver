@@ -173,7 +173,7 @@ describe('bin/merge-driver.cjs', () => {
       expect(stderr).to.match(/^sf-git-merge-driver:/)
     })
 
-    it('Given a non-existent -O file, When running, Then exit 2 with "file not found"', () => {
+    it('Given a non-existent -O file, When running, Then exit 2 and stderr reports the ENOENT system error', () => {
       const { status, stderr } = runBinary([
         '-O',
         'does-not-exist.xml',
@@ -185,7 +185,7 @@ describe('bin/merge-driver.cjs', () => {
         join(BIN_FOLDER, 'output.xml'),
       ])
       expect(status).to.equal(2)
-      expect(stderr).to.include('file not found')
+      expect(stderr).to.include('ENOENT')
     })
 
     it('Given unknown flag, When running, Then exit 2 with "unknown argument"', () => {
