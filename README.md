@@ -393,7 +393,7 @@ EXAMPLES
     $ sf git merge driver install
 ```
 
-_See code: [src/commands/git/merge/driver/install.ts](https://github.com/scolladon/sf-git-merge-driver/blob/v1.6.1/src/commands/git/merge/driver/install.ts)_
+_See code: [src/commands/git/merge/driver/install.ts](https://github.com/scolladon/sf-git-merge-driver/blob/main/src/commands/git/merge/driver/install.ts)_
 
 ## `sf git merge driver run`
 
@@ -440,7 +440,7 @@ EXAMPLES
   - output-file is the path to the file where the merged content will be written
 ```
 
-_See code: [src/commands/git/merge/driver/run.ts](https://github.com/scolladon/sf-git-merge-driver/blob/v1.6.1/src/commands/git/merge/driver/run.ts)_
+_See code: [src/commands/git/merge/driver/run.ts](https://github.com/scolladon/sf-git-merge-driver/blob/main/src/commands/git/merge/driver/run.ts)_
 
 ## `sf git merge driver uninstall`
 
@@ -470,7 +470,7 @@ EXAMPLES
     $ sf git merge driver uninstall
 ```
 
-_See code: [src/commands/git/merge/driver/uninstall.ts](https://github.com/scolladon/sf-git-merge-driver/blob/v1.6.1/src/commands/git/merge/driver/uninstall.ts)_
+_See code: [src/commands/git/merge/driver/uninstall.ts](https://github.com/scolladon/sf-git-merge-driver/blob/main/src/commands/git/merge/driver/uninstall.ts)_
 <!-- commandsstop -->
 
 ## Changelog
