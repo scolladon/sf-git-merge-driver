@@ -96,4 +96,58 @@ describe('UninstallService', () => {
       await expect(sut.uninstallMergeDriver()).resolves.not.toThrow()
     })
   })
+
+  describe('A8 — combined line with user attributes + our merge', () => {
+    it('Given a line like `*.profile-meta.xml text=auto merge=salesforce-source`, When uninstalling, Then the user attributes survive and only `merge=...` is stripped', () => {
+      // Arrange — regression fix: the old regex deleted the whole line,
+      // destroying the user's `text=auto`.
+      readFileMocked.mockResolvedValue(
+        '*.profile-meta.xml text=auto eol=lf merge=salesforce-source\n'
+      )
+
+      // Act
+      return sut.uninstallMergeDriver().then(() => {
+        // Assert
+        expect(writeFile).toHaveBeenCalledTimes(1)
+        const written = (writeFile as unknown as Mock).mock
+          .calls[0][1] as string
+        expect(written).toContain('*.profile-meta.xml')
+        expect(written).toContain('text=auto')
+        expect(written).toContain('eol=lf')
+        expect(written).not.toContain('merge=salesforce-source')
+      })
+    })
+  })
+
+  describe('A10 — CRLF preservation on Windows-flavoured files', () => {
+    it('Given a CRLF-terminated attributes file, When uninstalling, Then the output keeps CRLF endings (no mixed LF/CRLF)', () => {
+      // Arrange
+      readFileMocked.mockResolvedValue(
+        '* text=auto\r\n*.profile-meta.xml merge=salesforce-source\r\n'
+      )
+
+      // Act
+      return sut.uninstallMergeDriver().then(() => {
+        // Assert
+        const written = (writeFile as unknown as Mock).mock
+          .calls[0][1] as string
+        expect(written).toBe('* text=auto\r\n')
+        // Sanity check: no stray LF-only terminators
+        expect(written).not.toMatch(/[^\r]\n/)
+      })
+    })
+  })
+
+  describe('no-op — attributes file has no driver lines', () => {
+    it('Given an attributes file that does not reference our driver, When uninstalling, Then writeFile is NOT called (no spurious rewrites)', () => {
+      // Arrange
+      readFileMocked.mockResolvedValue('* text=auto\n*.sh text\n')
+
+      // Act
+      return sut.uninstallMergeDriver().then(() => {
+        // Assert — no plan actions means no file rewrite
+        expect(writeFile).not.toHaveBeenCalled()
+      })
+    })
+  })
 })

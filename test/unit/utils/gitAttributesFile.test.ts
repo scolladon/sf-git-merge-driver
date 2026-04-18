@@ -4,6 +4,7 @@ import {
   addRule,
   getMerge,
   parse,
+  ruleWithoutAttr,
   serialise,
 } from '../../../src/utils/gitAttributesFile.js'
 
@@ -396,6 +397,44 @@ describe('gitAttributesFile helpers', () => {
 
       // Assert
       expect(out).toContain('*.bin -text')
+    })
+  })
+
+  describe('ruleWithoutAttr', () => {
+    it('Given a rule with merge + string attr, When removing merge, Then the rule keeps the string attr and drops merge', () => {
+      // Arrange
+      const rule = parse(
+        '*.profile-meta.xml text=auto merge=salesforce-source\n'
+      ).lines[0]
+
+      // Act + Assert
+      if (rule.kind !== 'rule') throw new Error('unreachable')
+      const next = ruleWithoutAttr(rule, 'merge')
+      expect(next.attrs.has('merge')).toBe(false)
+      expect(next.attrs.get('text')).toBe('auto')
+      expect(next.raw).toBe('*.profile-meta.xml text=auto')
+    })
+
+    it('Given a rule with merge + bare-true attr, When removing merge, Then the raw serialises the bare attr correctly', () => {
+      // Arrange
+      const rule = parse('*.profile-meta.xml binary merge=salesforce-source\n')
+        .lines[0]
+
+      // Act + Assert
+      if (rule.kind !== 'rule') throw new Error('unreachable')
+      const next = ruleWithoutAttr(rule, 'merge')
+      expect(next.raw).toBe('*.profile-meta.xml binary')
+    })
+
+    it('Given a rule with merge + negated attr, When removing merge, Then the raw serialises the negated attr correctly', () => {
+      // Arrange
+      const rule = parse('*.profile-meta.xml -text merge=salesforce-source\n')
+        .lines[0]
+
+      // Act + Assert
+      if (rule.kind !== 'rule') throw new Error('unreachable')
+      const next = ruleWithoutAttr(rule, 'merge')
+      expect(next.raw).toBe('*.profile-meta.xml -text')
     })
   })
 })

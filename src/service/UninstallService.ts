@@ -1,15 +1,40 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { simpleGit } from 'simple-git'
 import { DRIVER_NAME } from '../constant/driverConstant.js'
-import { GIT_EOL } from '../constant/gitConstant.js'
+import {
+  type Line,
+  parse,
+  ruleWithoutAttr,
+  serialise,
+} from '../utils/gitAttributesFile.js'
 import { getGitAttributesPath } from '../utils/gitUtils.js'
 import { log } from '../utils/LoggingDecorator.js'
 import { Logger } from '../utils/LoggingService.js'
+import { planUninstall, type UninstallPlan } from './GitAttributesPlanner.js'
 
-// This match lines like: "*.profile-meta.xml merge=sf-git-merge-driver"
-const MERGE_DRIVER_CONFIG = new RegExp(
-  String.raw`.*\s+merge\s*=\s*${DRIVER_NAME}\s*$`
-)
+/**
+ * Apply an uninstall plan to a line list:
+ *   - `drop-line` removes the line entirely.
+ *   - `remove-merge-attr` rewrites the rule line via `ruleWithoutAttr`,
+ *     stripping only the `merge=<our-driver>` token and re-serialising
+ *     the raw so the user's other attributes survive (A8 data-loss fix).
+ */
+const applyUninstallPlan = (
+  lines: readonly Line[],
+  plan: UninstallPlan
+): Line[] => {
+  const drop = new Set<number>()
+  const rewrite = new Set<number>()
+  for (const action of plan.actions) {
+    if (action.kind === 'drop-line') drop.add(action.lineIndex)
+    else rewrite.add(action.lineIndex)
+  }
+  return lines.flatMap((line, index) => {
+    if (drop.has(index)) return []
+    if (!rewrite.has(index) || line.kind !== 'rule') return [line]
+    return [ruleWithoutAttr(line, 'merge')]
+  })
+}
 
 export class UninstallService {
   @log('UninstallService')
@@ -28,13 +53,15 @@ export class UninstallService {
     try {
       const gitAttributesPath = await getGitAttributesPath()
       // Throws when the file does not exist
-      const gitAttributes = await readFile(gitAttributesPath, {
-        encoding: 'utf8',
-      })
-      const filteredAttributes = gitAttributes
-        .split(GIT_EOL)
-        .filter(line => !MERGE_DRIVER_CONFIG.test(line))
-      await writeFile(gitAttributesPath, filteredAttributes.join(GIT_EOL))
+      const raw = await readFile(gitAttributesPath, { encoding: 'utf8' })
+      const parsed = parse(raw)
+      const plan = planUninstall(parsed)
+      if (plan.actions.length === 0) return
+      const nextLines = applyUninstallPlan(parsed.lines, plan)
+      await writeFile(
+        gitAttributesPath,
+        serialise({ ...parsed, lines: nextLines })
+      )
     } catch (error) {
       Logger.error(
         'Merge driver uninstallation failed to cleanup git attributes',
