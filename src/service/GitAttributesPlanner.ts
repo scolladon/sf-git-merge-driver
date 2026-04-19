@@ -6,17 +6,34 @@ import {
 } from '../utils/gitAttributesFile.js'
 
 /**
+ * Prefix that marks a comment line recording the original driver we
+ * replaced during an `--on-conflict=overwrite` install. `uninstall`
+ * parses this prefix to restore the prior driver's rule line.
+ *
+ * Shape: `# sf-git-merge-driver overwrote: <original raw line>`
+ */
+export const OVERWRITE_ANNOTATION_PREFIX = '# sf-git-merge-driver overwrote: '
+
+/**
  * An action in an uninstall plan — what to do with a single line of
  * `.git/info/attributes`. Plans are applied by `UninstallService`, and
  * the shape is also what `--dry-run` renders to the user.
  *
  * `drop-line` is safe (line is pure `<pattern> merge=salesforce-source`
  * or equivalent); `remove-merge-attr` is the A8 fix — keep the user's
- * other attributes on the line and only strip our `merge=` token.
+ * other attributes on the line and only strip our `merge=` token;
+ * `restore-overwrite` reverts an install-time overwrite by writing the
+ * original raw line back (paired with a `drop-line` for the annotation
+ * comment above it).
  */
 export type UninstallAction =
   | { readonly kind: 'drop-line'; readonly lineIndex: number }
   | { readonly kind: 'remove-merge-attr'; readonly lineIndex: number }
+  | {
+      readonly kind: 'restore-overwrite'
+      readonly lineIndex: number
+      readonly originalRaw: string
+    }
 
 export type UninstallPlan = {
   readonly actions: readonly UninstallAction[]
@@ -26,13 +43,36 @@ export type UninstallPlan = {
  * Walk every rule in the parsed file; for rules whose `merge=` attribute
  * matches our driver, emit the appropriate action. Comments, blanks, and
  * rules for other merge drivers are ignored (no action).
+ *
+ * Additionally, an annotation comment of the form
+ * `# sf-git-merge-driver overwrote: <raw>` immediately above one of our
+ * rule lines triggers `restore-overwrite` — the rule is replaced with
+ * the captured raw, and the annotation comment is dropped.
  */
 export const planUninstall = (file: ParsedFile): UninstallPlan => {
   const actions: UninstallAction[] = []
+  // Loop counter advances strictly — no need to skip over already-queued
+  // annotation-drops because we only look backwards (i - 1) to detect
+  // them, and the annotation line itself is a comment, not a rule, so
+  // it never enters the rule-handling branches.
   for (let i = 0; i < file.lines.length; i++) {
     const line = file.lines[i]
     if (line.kind !== 'rule') continue
     if (getMerge(line) !== DRIVER_NAME) continue
+
+    // Check for an overwrite annotation on the preceding line.
+    const prev = i > 0 ? file.lines[i - 1] : undefined
+    if (
+      prev &&
+      prev.kind === 'comment' &&
+      prev.raw.startsWith(OVERWRITE_ANNOTATION_PREFIX)
+    ) {
+      const originalRaw = prev.raw.slice(OVERWRITE_ANNOTATION_PREFIX.length)
+      actions.push({ kind: 'drop-line', lineIndex: i - 1 })
+      actions.push({ kind: 'restore-overwrite', lineIndex: i, originalRaw })
+      continue
+    }
+
     // Rule mentions our driver. If the only attribute is our merge, the
     // whole line can be dropped safely; otherwise the user has other
     // attributes on the same line and we must preserve them by keeping
@@ -50,9 +90,11 @@ export const planUninstall = (file: ParsedFile): UninstallPlan => {
  * Conflict policy for `planInstall`.
  *   - `abort`: conflicts appear in the plan as `conflict` actions; the
  *     service refuses to write and surfaces the list to the user.
- *   - `skip`: (deferred — step 5) no-op for the conflicting pattern.
- *   - `overwrite`: (deferred — step 5) rewrite the user's line with our
- *     driver and an annotation comment for uninstall-time restore.
+ *   - `skip`: planner emits `skip-conflict` — the service leaves the
+ *     user's line untouched and does NOT add our driver for that glob.
+ *   - `overwrite`: planner emits `overwrite` — the service replaces the
+ *     user's line with our driver and inserts an annotation comment so
+ *     uninstall can restore.
  */
 export type ConflictPolicy = 'abort' | 'skip' | 'overwrite'
 
@@ -74,6 +116,21 @@ export type InstallAction =
       readonly pattern: string
       readonly existingDriver: string
       readonly lineIndex: number
+    }
+  | {
+      readonly kind: 'skip-conflict'
+      readonly pattern: string
+      readonly existingDriver: string
+      readonly lineIndex: number
+    }
+  | {
+      readonly kind: 'overwrite'
+      readonly pattern: string
+      readonly existingDriver: string
+      readonly lineIndex: number
+      /** Full raw text of the user's original rule line — used to
+       *  build the annotation comment so uninstall can restore. */
+      readonly originalRaw: string
     }
 
 export type InstallPlan = {
@@ -101,18 +158,40 @@ const indexRulesByPattern = (
   return byPattern
 }
 
+const actionForConflict = (
+  pattern: string,
+  lineIndex: number,
+  rule: RuleLine,
+  existingDriver: string,
+  policy: ConflictPolicy
+): InstallAction => {
+  if (policy === 'skip') {
+    return { kind: 'skip-conflict', pattern, existingDriver, lineIndex }
+  }
+  if (policy === 'overwrite') {
+    return {
+      kind: 'overwrite',
+      pattern,
+      existingDriver,
+      lineIndex,
+      originalRaw: rule.raw,
+    }
+  }
+  return { kind: 'conflict', pattern, existingDriver, lineIndex }
+}
+
 /**
  * Decide, for each desired pattern, whether we already own it (skip),
- * someone else owns it (conflict), or it's absent (add). Deduplicate
- * any redundant copies of our own rule as a silent healing pass.
+ * someone else owns it (conflict / skip-conflict / overwrite), or it's
+ * absent (add). Deduplicate redundant copies of our own rule silently.
  *
- * Step 5 will add a `policy: ConflictPolicy` argument and change the
- * shape of the plan when policy is 'skip' or 'overwrite'. For now the
- * planner always returns conflict actions as-is and the service throws.
+ * Policy changes only the conflict branch — patterns without competing
+ * drivers behave the same regardless of policy.
  */
 export const planInstall = (
   file: ParsedFile,
-  desiredPatterns: readonly string[]
+  desiredPatterns: readonly string[],
+  policy: ConflictPolicy = 'abort'
 ): InstallPlan => {
   const byPattern = indexRulesByPattern(file)
   const actions: InstallAction[] = []
@@ -136,12 +215,15 @@ export const planInstall = (
     })
     if (otherFirst) {
       const existingDriver = getMerge(otherFirst.rule) as string
-      actions.push({
-        kind: 'conflict',
-        pattern,
-        existingDriver,
-        lineIndex: otherFirst.index,
-      })
+      actions.push(
+        actionForConflict(
+          pattern,
+          otherFirst.index,
+          otherFirst.rule,
+          existingDriver,
+          policy
+        )
+      )
       continue
     }
     actions.push({ kind: 'add', pattern })

@@ -19,6 +19,10 @@ import { planUninstall, type UninstallPlan } from './GitAttributesPlanner.js'
  *   - `remove-merge-attr` rewrites the rule line via `ruleWithoutAttr`,
  *     stripping only the `merge=<our-driver>` token and re-serialising
  *     the raw so the user's other attributes survive (A8 data-loss fix).
+ *   - `restore-overwrite` re-parses the captured original raw line and
+ *     replaces the current line with it, undoing an install-time
+ *     overwrite. The paired `drop-line` for the annotation comment
+ *     above is emitted by the planner and handled here uniformly.
  */
 const applyUninstallPlan = (
   lines: readonly Line[],
@@ -26,12 +30,22 @@ const applyUninstallPlan = (
 ): Line[] => {
   const drop = new Set<number>()
   const rewrite = new Set<number>()
+  const restore = new Map<number, string>()
   for (const action of plan.actions) {
     if (action.kind === 'drop-line') drop.add(action.lineIndex)
-    else rewrite.add(action.lineIndex)
+    else if (action.kind === 'remove-merge-attr') rewrite.add(action.lineIndex)
+    else restore.set(action.lineIndex, action.originalRaw)
   }
   return lines.flatMap((line, index) => {
     if (drop.has(index)) return []
+    const restoreRaw = restore.get(index)
+    if (restoreRaw !== undefined) {
+      // `originalRaw` was captured from a serialised rule by the
+      // planner, so parse always yields exactly one line — no need for
+      // a defensive fallback. Cast with `!` documents that narrowing
+      // without adding an untested else branch to coverage.
+      return [parse(restoreRaw).lines[0] as Line]
+    }
     if (!rewrite.has(index) || line.kind !== 'rule') return [line]
     return [ruleWithoutAttr(line, 'merge')]
   })

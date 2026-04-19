@@ -4,6 +4,7 @@ import {
   addRule,
   getMerge,
   parse,
+  ruleWithAttr,
   ruleWithoutAttr,
   serialise,
 } from '../../../src/utils/gitAttributesFile.js'
@@ -435,6 +436,53 @@ describe('gitAttributesFile helpers', () => {
       if (rule.kind !== 'rule') throw new Error('unreachable')
       const next = ruleWithoutAttr(rule, 'merge')
       expect(next.raw).toBe('*.profile-meta.xml -text')
+    })
+  })
+
+  describe('ruleWithAttr', () => {
+    it('Given a rule without the attribute, When setting it, Then the raw gains the new token at the end', () => {
+      // Arrange
+      const rule = parse('*.profile-meta.xml text=auto\n').lines[0]
+
+      // Act + Assert
+      if (rule.kind !== 'rule') throw new Error('unreachable')
+      const next = ruleWithAttr(rule, 'merge', 'salesforce-source')
+      expect(next.attrs.get('merge')).toBe('salesforce-source')
+      expect(next.raw).toBe(
+        '*.profile-meta.xml text=auto merge=salesforce-source'
+      )
+    })
+
+    it('Given a rule that already has the attribute, When setting it again, Then the existing value is replaced (no duplicate token)', () => {
+      // Arrange — overwrite from some-other-tool to salesforce-source
+      const rule = parse('*.profile-meta.xml merge=some-other-tool\n').lines[0]
+
+      // Act + Assert
+      if (rule.kind !== 'rule') throw new Error('unreachable')
+      const next = ruleWithAttr(rule, 'merge', 'salesforce-source')
+      expect(next.attrs.get('merge')).toBe('salesforce-source')
+      const mergeTokens = next.raw.match(/merge=/g) ?? []
+      expect(mergeTokens).toHaveLength(1)
+    })
+
+    it('Given a rule, When setting a bare-true attribute, Then the raw ends with the attr name alone', () => {
+      // Arrange
+      const rule = parse('* text=auto\n').lines[0]
+
+      // Act + Assert
+      if (rule.kind !== 'rule') throw new Error('unreachable')
+      const next = ruleWithAttr(rule, 'binary', true)
+      expect(next.raw).toBe('* text=auto binary')
+    })
+
+    it('Given a rule, When setting a negated attribute, Then the raw uses the "-attr" form', () => {
+      // Arrange
+      const rule = parse('* text=auto\n').lines[0]
+
+      // Act + Assert
+      if (rule.kind !== 'rule') throw new Error('unreachable')
+      const next = ruleWithAttr(rule, 'executable', false)
+      expect(next.raw).toBe('* text=auto -executable')
     })
   })
 })

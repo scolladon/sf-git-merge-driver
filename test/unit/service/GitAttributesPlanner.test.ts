@@ -418,4 +418,115 @@ describe('GitAttributesPlanner.planInstall', () => {
       expect(plan.dedupDrops).toEqual([])
     })
   })
+
+  describe('conflict policy — skip', () => {
+    it('Given a conflicting driver with policy=skip, When planning, Then action is `skip-conflict` (no `conflict`, no `add`)', () => {
+      // Arrange
+      const input = '*.profile-meta.xml merge=some-other-tool\n'
+      const pf = parse(input)
+
+      // Act
+      const plan = planInstall(pf, ['*.profile-meta.xml'], 'skip')
+
+      // Assert — planner downgrades the conflict to a skip-conflict
+      // action so the service writes nothing for this pattern. The
+      // other-tool line remains the source of truth for that glob.
+      expect(plan.actions).toEqual([
+        {
+          kind: 'skip-conflict',
+          pattern: '*.profile-meta.xml',
+          existingDriver: 'some-other-tool',
+          lineIndex: 0,
+        },
+      ])
+    })
+  })
+
+  describe('conflict policy — overwrite', () => {
+    it('Given a conflicting driver with policy=overwrite, When planning, Then action is `overwrite` carrying the original raw line', () => {
+      // Arrange
+      const input = '*.profile-meta.xml merge=some-other-tool\n'
+      const pf = parse(input)
+
+      // Act
+      const plan = planInstall(pf, ['*.profile-meta.xml'], 'overwrite')
+
+      // Assert — planner records the original line so the applier can
+      // write an annotation comment alongside the replacement. The
+      // annotation lets `uninstall` restore the prior driver.
+      expect(plan.actions).toEqual([
+        {
+          kind: 'overwrite',
+          pattern: '*.profile-meta.xml',
+          existingDriver: 'some-other-tool',
+          lineIndex: 0,
+          originalRaw: '*.profile-meta.xml merge=some-other-tool',
+        },
+      ])
+    })
+  })
+
+  describe('conflict policy — default is abort (backward compat)', () => {
+    it('Given planInstall called without a policy argument, When planning a conflict, Then the `conflict` action is emitted (unchanged from step 3)', () => {
+      // Arrange
+      const input = '*.profile-meta.xml merge=some-other-tool\n'
+      const pf = parse(input)
+
+      // Act
+      const plan = planInstall(pf, ['*.profile-meta.xml'])
+
+      // Assert
+      expect(plan.actions).toEqual([
+        {
+          kind: 'conflict',
+          pattern: '*.profile-meta.xml',
+          existingDriver: 'some-other-tool',
+          lineIndex: 0,
+        },
+      ])
+    })
+  })
+})
+
+describe('GitAttributesPlanner.planUninstall — annotation-based restore', () => {
+  it('Given an annotation comment above our driver line, When planning uninstall, Then action is `restore-overwrite` carrying the original raw and the annotation line is also dropped', () => {
+    // Arrange — the shape that `overwrite` install produces
+    const input =
+      '# sf-git-merge-driver overwrote: *.profile-meta.xml merge=some-other-tool\n' +
+      '*.profile-meta.xml merge=salesforce-source\n'
+    const pf = parse(input)
+
+    // Act
+    const plan = planUninstall(pf)
+
+    // Assert — restore the captured original, and drop the annotation
+    // comment that announced the overwrite.
+    expect(plan.actions).toEqual([
+      {
+        kind: 'drop-line',
+        lineIndex: 0,
+      },
+      {
+        kind: 'restore-overwrite',
+        lineIndex: 1,
+        originalRaw: '*.profile-meta.xml merge=some-other-tool',
+      },
+    ])
+  })
+
+  it('Given an annotation comment NOT followed by one of our driver lines, When planning, Then the annotation is preserved (we did not write it)', () => {
+    // Arrange — defensive: a user-typed comment happens to share our
+    // prefix. We do not destroy it unless it sits directly above our
+    // rule (the shape only install produces).
+    const input =
+      '# sf-git-merge-driver overwrote: just some random text\n' +
+      '* text=auto\n'
+    const pf = parse(input)
+
+    // Act
+    const plan = planUninstall(pf)
+
+    // Assert — no restore, no drop; nothing for the planner to do.
+    expect(plan.actions).toEqual([])
+  })
 })

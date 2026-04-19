@@ -2,6 +2,7 @@ import { Messages } from '@salesforce/core'
 import { Flags, SfCommand } from '@salesforce/sf-plugins-core'
 import { DRIVER_NAME } from '../../../../constant/driverConstant.js'
 import { PLUGIN_NAME } from '../../../../constant/pluginConstant.js'
+import type { ConflictPolicy } from '../../../../service/GitAttributesPlanner.js'
 import {
   DRIVER_COMMAND,
   DRIVER_NAME_CONFIG_VALUE,
@@ -23,6 +24,16 @@ const formatDryRunReport = (outcome: InstallOutcome): string => {
   const skips = plan.actions.filter(a => a.kind === 'skip')
   const conflicts = plan.actions.flatMap(a =>
     a.kind === 'conflict'
+      ? [{ pattern: a.pattern, existingDriver: a.existingDriver }]
+      : []
+  )
+  const skippedConflicts = plan.actions.flatMap(a =>
+    a.kind === 'skip-conflict'
+      ? [{ pattern: a.pattern, existingDriver: a.existingDriver }]
+      : []
+  )
+  const overwrites = plan.actions.flatMap(a =>
+    a.kind === 'overwrite'
       ? [{ pattern: a.pattern, existingDriver: a.existingDriver }]
       : []
   )
@@ -50,10 +61,28 @@ const formatDryRunReport = (outcome: InstallOutcome): string => {
   }
   lines.push(`  ${skips.length} rule(s) already present (skipped)`)
   lines.push(`  ${dedupCount} legacy duplicate line(s) would be removed`)
+  if (skippedConflicts.length > 0) {
+    lines.push('')
+    lines.push(
+      `${skippedConflicts.length} conflict(s) left to their current driver (--on-conflict=skip):`
+    )
+    for (const c of skippedConflicts) {
+      lines.push(`    ${c.pattern} → merge=${c.existingDriver}`)
+    }
+  }
+  if (overwrites.length > 0) {
+    lines.push('')
+    lines.push(
+      `${overwrites.length} conflict(s) would be overwritten (--on-conflict=overwrite); uninstall will restore them:`
+    )
+    for (const c of overwrites) {
+      lines.push(`    ${c.pattern} (was merge=${c.existingDriver})`)
+    }
+  }
   if (conflicts.length > 0) {
     lines.push('')
     lines.push(
-      `⚠ ${conflicts.length} conflict(s) — installation would abort without --on-conflict=skip|overwrite (planned for a later step):`
+      `⚠ ${conflicts.length} conflict(s) — installation would abort. Re-run with --on-conflict=skip or --on-conflict=overwrite (or --force) to proceed:`
     )
     for (const c of conflicts) {
       lines.push(`    ${c.pattern} → merge=${c.existingDriver}`)
@@ -61,6 +90,12 @@ const formatDryRunReport = (outcome: InstallOutcome): string => {
   }
   return lines.join('\n')
 }
+
+const CONFLICT_POLICIES: readonly ConflictPolicy[] = [
+  'abort',
+  'skip',
+  'overwrite',
+]
 
 export default class Install extends SfCommand<void> {
   public static override readonly summary = messages.getMessage('summary')
@@ -77,16 +112,31 @@ export default class Install extends SfCommand<void> {
         'Plan the install without writing to git config or .git/info/attributes. Exits 0; shows the list of rules that would be added/skipped/conflict.',
       default: false,
     }),
+    'on-conflict': Flags.option({
+      summary:
+        'How to handle patterns already owned by another merge driver in .git/info/attributes. Default: abort (refuse to change anything).',
+      options: CONFLICT_POLICIES,
+      default: 'abort' as ConflictPolicy,
+    })(),
+    force: Flags.boolean({
+      summary:
+        'Alias for --on-conflict=overwrite. Non-interactive shortcut for CI.',
+      default: false,
+    }),
   }
 
   @log('Install')
   public async run(): Promise<void> {
     const { flags } = await this.parse(Install)
     const dryRun = flags['dry-run']
+    const onConflict: ConflictPolicy = flags.force
+      ? 'overwrite'
+      : flags['on-conflict']
 
     try {
       const outcome = await new InstallService().installMergeDriver({
         dryRun,
+        onConflict,
       })
       if (dryRun) {
         this.log(formatDryRunReport(outcome))

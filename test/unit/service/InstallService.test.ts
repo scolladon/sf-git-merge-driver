@@ -218,6 +218,88 @@ describe('InstallService', () => {
     })
   })
 
+  describe('on-conflict=skip', () => {
+    it('Given another driver on our glob, When installing with onConflict=skip, Then the conflicting line is left untouched and no error is thrown', async () => {
+      // Arrange
+      readFileMocked.mockResolvedValue(
+        '*.profile-meta.xml merge=some-other-tool\n'
+      )
+
+      // Act
+      await sut.installMergeDriver({ onConflict: 'skip' })
+
+      // Assert — file may still be written (to add the rest of our
+      // patterns), but the user's line is untouched
+      expect(writeFileMocked).toHaveBeenCalled()
+      const [, content] = writeFileMocked.mock.calls[0] as [string, string]
+      expect(content).toContain('*.profile-meta.xml merge=some-other-tool')
+      // And our driver was NOT added for that glob — the user's line wins
+      const ourProfileLines = content
+        .split('\n')
+        .filter(l => l === `*.profile-meta.xml merge=${DRIVER_NAME}`)
+      expect(ourProfileLines).toHaveLength(0)
+    })
+  })
+
+  describe('on-conflict=overwrite', () => {
+    it('Given another driver on our glob, When installing with onConflict=overwrite, Then the user line is replaced with our driver AND an annotation comment records the original raw', async () => {
+      // Arrange
+      readFileMocked.mockResolvedValue(
+        '*.profile-meta.xml merge=some-other-tool\n'
+      )
+
+      // Act
+      await sut.installMergeDriver({ onConflict: 'overwrite' })
+
+      // Assert
+      expect(writeFileMocked).toHaveBeenCalled()
+      const [, content] = writeFileMocked.mock.calls[0] as [string, string]
+      // Annotation above, our driver on the replaced line
+      expect(content).toContain(
+        '# sf-git-merge-driver overwrote: *.profile-meta.xml merge=some-other-tool'
+      )
+      expect(content).toContain(`*.profile-meta.xml merge=${DRIVER_NAME}`)
+      // Original user line is gone (replaced)
+      const originalLines = content
+        .split('\n')
+        .filter(l => l === '*.profile-meta.xml merge=some-other-tool')
+      expect(originalLines).toHaveLength(0)
+    })
+  })
+
+  describe('round-trip — overwrite install + uninstall restores user driver', () => {
+    // This is the critical contract for the overwrite policy: after
+    // overwrite-then-uninstall, the file looks as if we were never there.
+    it("Given overwrite install then uninstall with the same attributes file, Then the user's original driver line is restored", async () => {
+      // Use real fs flow in-process via the parse/planner helpers.
+      // We simulate the install by running the service with a mock
+      // readFile, capturing the written content, then feeding that
+      // content back into the uninstall planner.
+      const seed = '*.profile-meta.xml merge=some-other-tool\n'
+      readFileMocked.mockResolvedValue(seed)
+      await sut.installMergeDriver({ onConflict: 'overwrite' })
+      const [, afterInstall] = writeFileMocked.mock.calls[0] as [string, string]
+      expect(afterInstall).toContain('# sf-git-merge-driver overwrote:')
+
+      // Simulate uninstall reading the same content we just wrote.
+      const { UninstallService } = await import(
+        '../../../src/service/UninstallService.js'
+      )
+      readFileMocked.mockReset()
+      readFileMocked.mockResolvedValue(afterInstall)
+      writeFileMocked.mockClear()
+      await new UninstallService().uninstallMergeDriver()
+      const [, afterUninstall] = writeFileMocked.mock.calls[0] as [
+        string,
+        string,
+      ]
+
+      // Assert — the user's original line is back, annotation + our
+      // driver line are gone.
+      expect(afterUninstall).toBe(seed)
+    })
+  })
+
   describe('dry-run', () => {
     it('Given dryRun=true on an empty repo, When installing, Then neither git config nor writeFile is called; the plan is returned', async () => {
       // Arrange — default ENOENT for readFile

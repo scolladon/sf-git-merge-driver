@@ -172,6 +172,29 @@ export const ruleWithoutAttr = (rule: RuleLine, attrName: string): RuleLine => {
   }
 }
 
+/**
+ * Return a new RuleLine with the given attribute set to `value`. If the
+ * attribute already exists on the rule it is overwritten (and the new
+ * value is placed at the end of the serialised token order, matching
+ * `addRule`'s output). Used by the install-time overwrite policy to
+ * swap a conflicting driver to ours without losing the user's other
+ * attributes on the same line.
+ */
+export const ruleWithAttr = (
+  rule: RuleLine,
+  attrName: string,
+  value: AttrValue
+): RuleLine => {
+  const nextAttrs = new Map(rule.attrs)
+  nextAttrs.delete(attrName)
+  nextAttrs.set(attrName, value)
+  return {
+    ...rule,
+    attrs: nextAttrs,
+    raw: serialiseRuleRaw(rule.pattern, nextAttrs),
+  }
+}
+
 const serialiseAttrToken = (name: string, value: AttrValue): string => {
   if (value === true) return name
   if (value === false) return `-${name}`

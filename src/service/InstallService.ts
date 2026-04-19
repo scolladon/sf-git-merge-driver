@@ -9,13 +9,21 @@ import {
 } from '../constant/metadataConstant.js'
 import {
   addRule,
+  type Line,
   type ParsedFile,
   parse,
+  type RuleLine,
+  ruleWithAttr,
   serialise,
 } from '../utils/gitAttributesFile.js'
 import { getGitAttributesPath } from '../utils/gitUtils.js'
 import { log } from '../utils/LoggingDecorator.js'
-import { type InstallPlan, planInstall } from './GitAttributesPlanner.js'
+import {
+  type ConflictPolicy,
+  type InstallPlan,
+  OVERWRITE_ANNOTATION_PREFIX,
+  planInstall,
+} from './GitAttributesPlanner.js'
 
 // Resolved from this compiled module's location:
 //   <plugin-root>/lib/service/InstallService.js → ../../bin/merge-driver.cjs
@@ -82,6 +90,14 @@ export type InstallOptions = {
    * formatting them for the user; no `InstallConflictError` is thrown.
    */
   readonly dryRun?: boolean
+  /**
+   * How to handle patterns already owned by another merge driver.
+   * Default 'abort' (throw InstallConflictError); 'skip' leaves the
+   * user's line alone and does not add ours; 'overwrite' replaces the
+   * user's line with ours and inserts an annotation comment so the
+   * subsequent uninstall can restore the prior driver.
+   */
+  readonly onConflict?: ConflictPolicy
 }
 
 export type InstallOutcome = {
@@ -111,15 +127,55 @@ const readAttributesOrEmpty = async (path: string): Promise<string> => {
   }
 }
 
+/**
+ * Apply an install plan to the parsed file:
+ *   - Drop dedup lines.
+ *   - For each `overwrite` action, replace the existing rule line with
+ *     our driver AND insert an annotation comment above it carrying the
+ *     original raw, so uninstall can restore.
+ *   - For each `add` action, append a new rule at the end.
+ *   - `skip` and `skip-conflict` are no-ops for the file — either we
+ *     already own the pattern, or we deliberately defer to the existing
+ *     driver.
+ */
 const applyInstallPlan = (
   parsed: ParsedFile,
   plan: InstallPlan
 ): ParsedFile => {
   const dedup = new Set(plan.dedupDrops)
-  const kept = parsed.lines.flatMap((line, index) =>
-    dedup.has(index) ? [] : [line]
-  )
-  let next: ParsedFile = { ...parsed, lines: kept }
+  const overwrites = new Map<
+    number,
+    Extract<(typeof plan.actions)[number], { kind: 'overwrite' }>
+  >()
+  for (const action of plan.actions) {
+    if (action.kind === 'overwrite') overwrites.set(action.lineIndex, action)
+  }
+
+  const rewrittenLines: Line[] = []
+  for (let i = 0; i < parsed.lines.length; i++) {
+    if (dedup.has(i)) continue
+    const existing = parsed.lines[i]
+    const overwrite = overwrites.get(i)
+    if (!overwrite) {
+      rewrittenLines.push(existing)
+      continue
+    }
+    // Insert annotation comment above the rewritten rule. The planner
+    // only emits `overwrite` for rule lines (see planInstall), so the
+    // cast here is a contract narrowing rather than an assumption.
+    const annotation: Line = {
+      kind: 'comment',
+      raw: `${OVERWRITE_ANNOTATION_PREFIX}${overwrite.originalRaw}`,
+    }
+    const withOurDriver: Line = ruleWithAttr(
+      existing as RuleLine,
+      'merge',
+      DRIVER_NAME
+    )
+    rewrittenLines.push(annotation, withOurDriver)
+  }
+
+  let next: ParsedFile = { ...parsed, lines: rewrittenLines }
   for (const action of plan.actions) {
     if (action.kind !== 'add') continue
     next = addRule(next, action.pattern, [['merge', DRIVER_NAME]])
@@ -133,6 +189,7 @@ export class InstallService {
     options: InstallOptions = {}
   ): Promise<InstallOutcome> {
     const dryRun = options.dryRun ?? false
+    const policy: ConflictPolicy = options.onConflict ?? 'abort'
 
     // Plan first — reading the file and diffing against the desired
     // pattern set is side-effect free, so we can do it up front and
@@ -140,14 +197,16 @@ export class InstallService {
     const gitAttributesPath = await getGitAttributesPath()
     const raw = await readAttributesOrEmpty(gitAttributesPath)
     const parsed = parse(raw)
-    const plan = planInstall(parsed, DESIRED_PATTERNS)
+    const plan = planInstall(parsed, DESIRED_PATTERNS, policy)
 
     if (dryRun) {
       return { plan, dryRun: true, wroteAttributes: false, gitAttributesPath }
     }
 
-    // Surface conflicts before any write so an `abort` policy leaves
-    // git config and the attributes file untouched.
+    // `conflict` actions only appear when policy === 'abort'; for
+    // 'skip' they become `skip-conflict`, for 'overwrite' they become
+    // `overwrite`. Surfacing them before any write keeps the abort
+    // policy strictly non-destructive.
     const conflicts = plan.actions.flatMap(action =>
       action.kind === 'conflict'
         ? [{ pattern: action.pattern, existingDriver: action.existingDriver }]
