@@ -466,6 +466,106 @@ describe('GitAttributesPlanner.planInstall', () => {
     })
   })
 
+  describe('A9 — commented-out driver line (user disabled us)', () => {
+    it('Given a commented-out driver line for one of our patterns, When planning install, Then a warning is surfaced and the pattern is still added (live rule lives below the comment)', () => {
+      // Arrange — `# *.profile-meta.xml merge=salesforce-source` shouldn't
+      // prevent us from re-adding the live rule, but it's useful to
+      // surface because users who manually disabled us will see two
+      // lines after install and wonder why.
+      const input = '# *.profile-meta.xml merge=salesforce-source\n'
+      const pf = parse(input)
+
+      // Act
+      const plan = planInstall(pf, ['*.profile-meta.xml'])
+
+      // Assert — live rule is added; commented-out warning is recorded
+      // in the plan so the command can log it.
+      expect(plan.actions).toEqual([
+        { kind: 'add', pattern: '*.profile-meta.xml' },
+      ])
+      expect(plan.commentedOutWarnings).toEqual([
+        { pattern: '*.profile-meta.xml', lineIndex: 0 },
+      ])
+    })
+
+    it('Given no commented-out driver lines, When planning install, Then commentedOutWarnings is empty', () => {
+      // Arrange
+      const pf = parse('*.profile-meta.xml merge=salesforce-source\n')
+
+      // Act
+      const plan = planInstall(pf, ['*.profile-meta.xml'])
+
+      // Assert
+      expect(plan.commentedOutWarnings).toEqual([])
+    })
+
+    it('Given a commented-out driver for a pattern OUTSIDE the desired set, When planning install, Then no warning is emitted', () => {
+      // Arrange — user kept a comment about a legacy glob we no longer
+      // target. Not our business.
+      const pf = parse('# *.old-meta.xml merge=salesforce-source\n')
+
+      // Act
+      const plan = planInstall(pf, ['*.profile-meta.xml'])
+
+      // Assert
+      expect(plan.commentedOutWarnings).toEqual([])
+    })
+  })
+
+  describe('-text footgun — glob marked binary', () => {
+    it('Given one of our patterns has `-text` on a separate rule, When planning install, Then textAttributeWarnings is populated', () => {
+      // Arrange — with `-text`, git treats the file as binary and
+      // never invokes a merge driver, so our install would be silently
+      // inactive. Surface it so the user can fix or confirm.
+      const input = '*.profile-meta.xml -text\n'
+      const pf = parse(input)
+
+      // Act
+      const plan = planInstall(pf, ['*.profile-meta.xml'])
+
+      // Assert
+      expect(plan.textAttributeWarnings).toEqual([
+        { pattern: '*.profile-meta.xml', lineIndex: 0 },
+      ])
+    })
+
+    it('Given one of our patterns has `-text` combined with other attrs on the same line, When planning install, Then the warning still fires', () => {
+      // Arrange
+      const pf = parse('*.profile-meta.xml -text eol=lf\n')
+
+      // Act
+      const plan = planInstall(pf, ['*.profile-meta.xml'])
+
+      // Assert
+      expect(plan.textAttributeWarnings).toEqual([
+        { pattern: '*.profile-meta.xml', lineIndex: 0 },
+      ])
+    })
+
+    it('Given a pattern with `text=auto` (set, not unset), When planning install, Then no `-text` warning is emitted', () => {
+      // Arrange
+      const pf = parse('*.profile-meta.xml text=auto\n')
+
+      // Act
+      const plan = planInstall(pf, ['*.profile-meta.xml'])
+
+      // Assert — `text=auto` is fine; only explicit `-text` (false) is
+      // the footgun we warn about.
+      expect(plan.textAttributeWarnings).toEqual([])
+    })
+
+    it('Given a `-text` rule on a pattern NOT in the desired set, When planning install, Then no warning is emitted', () => {
+      // Arrange — we only care about patterns we plan to own.
+      const pf = parse('*.bin -text\n')
+
+      // Act
+      const plan = planInstall(pf, ['*.profile-meta.xml'])
+
+      // Assert
+      expect(plan.textAttributeWarnings).toEqual([])
+    })
+  })
+
   describe('conflict policy — default is abort (backward compat)', () => {
     it('Given planInstall called without a policy argument, When planning a conflict, Then the `conflict` action is emitted (unchanged from step 3)', () => {
       // Arrange

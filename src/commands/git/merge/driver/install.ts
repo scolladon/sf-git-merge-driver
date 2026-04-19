@@ -129,6 +129,24 @@ const formatDryRunReport = (outcome: InstallOutcome): string => {
       lines.push(`    ${c.pattern} → merge=${c.existingDriver}`)
     }
   }
+  if (plan.textAttributeWarnings.length > 0) {
+    lines.push('')
+    lines.push(
+      `⚠ ${plan.textAttributeWarnings.length} pattern(s) marked -text (binary) — driver will be inactive on these until you remove -text:`
+    )
+    for (const w of plan.textAttributeWarnings) {
+      lines.push(`    ${w.pattern} (line ${w.lineIndex + 1})`)
+    }
+  }
+  if (plan.commentedOutWarnings.length > 0) {
+    lines.push('')
+    lines.push(
+      `ℹ ${plan.commentedOutWarnings.length} commented-out driver line(s) detected — install will add a live rule below each; consider removing the commented lines:`
+    )
+    for (const w of plan.commentedOutWarnings) {
+      lines.push(`    ${w.pattern} (line ${w.lineIndex + 1})`)
+    }
+  }
   return lines.join('\n')
 }
 
@@ -225,6 +243,19 @@ export default class Install extends SfCommand<void> {
       if (dryRun) {
         this.log(formatDryRunReport(outcome))
         return
+      }
+      // Surface diagnostic warnings to the user after a successful
+      // install. These don't alter installation state — they're cues
+      // that the driver may not fire until the user takes action.
+      for (const w of outcome.plan.textAttributeWarnings) {
+        this.warn(
+          `${w.pattern} is marked \`-text\` (binary) on line ${w.lineIndex + 1} of .git/info/attributes. Git does not invoke merge drivers on binary files; the merge driver will be installed but inactive for this glob until you remove \`-text\`.`
+        )
+      }
+      for (const w of outcome.plan.commentedOutWarnings) {
+        this.warn(
+          `${w.pattern} has a commented-out driver rule on line ${w.lineIndex + 1} of .git/info/attributes. The live rule has been added below it — consider removing the commented line to avoid confusion.`
+        )
       }
       Logger.info('Merge driver installed successfully')
     } catch (error) {

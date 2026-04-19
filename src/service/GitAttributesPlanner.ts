@@ -133,6 +133,13 @@ export type InstallAction =
       readonly originalRaw: string
     }
 
+/** A diagnostic a planner surfaces on the install path so the command
+ *  layer can log a warning without altering the attributes file. */
+export type PatternDiagnostic = {
+  readonly pattern: string
+  readonly lineIndex: number
+}
+
 export type InstallPlan = {
   readonly actions: readonly InstallAction[]
   /**
@@ -141,6 +148,22 @@ export type InstallPlan = {
    * with duplicates by the pre-plan install path (or manual edits).
    */
   readonly dedupDrops: readonly number[]
+  /**
+   * Patterns where a `-text` (text=false) attribute is set on the
+   * same glob, which makes git treat matching files as binary and
+   * completely bypass any merge driver. Install still proceeds, but
+   * our driver will be silently inactive on these patterns until the
+   * user removes `-text`. No auto-fix — user decides.
+   */
+  readonly textAttributeWarnings: readonly PatternDiagnostic[]
+  /**
+   * Patterns with a commented-out driver line
+   * (`# *.profile-meta.xml merge=salesforce-source`). The user
+   * explicitly disabled the driver at some point; install still adds
+   * a live rule (so the driver works) but the command layer is told
+   * so it can surface a warning.
+   */
+  readonly commentedOutWarnings: readonly PatternDiagnostic[]
 }
 
 /** Internal helper: index every rule by pattern for O(1) lookups. */
@@ -156,6 +179,31 @@ const indexRulesByPattern = (
     else byPattern.set(line.pattern, [{ index: i, rule: line }])
   }
   return byPattern
+}
+
+/**
+ * Detect commented-out driver lines of the form:
+ *   `# *.profile-meta.xml merge=salesforce-source`
+ * with optional leading whitespace. Matches for any of our desired
+ * patterns only.
+ */
+const detectCommentedOutDriverLines = (
+  file: ParsedFile,
+  desiredPatterns: ReadonlySet<string>
+): PatternDiagnostic[] => {
+  const diagnostics: PatternDiagnostic[] = []
+  const expectedSuffix = ` merge=${DRIVER_NAME}`
+  for (let i = 0; i < file.lines.length; i++) {
+    const line = file.lines[i]
+    if (line.kind !== 'comment') continue
+    // Strip the leading `#` and any whitespace that follows
+    const body = line.raw.replace(/^\s*#\s*/, '').trimEnd()
+    if (!body.endsWith(expectedSuffix)) continue
+    const pattern = body.slice(0, -expectedSuffix.length).trim()
+    if (!desiredPatterns.has(pattern)) continue
+    diagnostics.push({ pattern, lineIndex: i })
+  }
+  return diagnostics
 }
 
 const actionForConflict = (
@@ -194,11 +242,22 @@ export const planInstall = (
   policy: ConflictPolicy = 'abort'
 ): InstallPlan => {
   const byPattern = indexRulesByPattern(file)
+  const desiredSet = new Set(desiredPatterns)
   const actions: InstallAction[] = []
   const dedupDrops: number[] = []
+  const textAttributeWarnings: PatternDiagnostic[] = []
 
   for (const pattern of desiredPatterns) {
     const matches = byPattern.get(pattern) ?? []
+    // `-text` on any rule with this pattern (regardless of whether
+    // that rule mentions a merge driver) makes git treat matching
+    // files as binary — our driver will never fire. Emit one warning
+    // per (pattern, line) pair.
+    for (const match of matches) {
+      if (match.rule.attrs.get('text') === false) {
+        textAttributeWarnings.push({ pattern, lineIndex: match.index })
+      }
+    }
     const oursFirst = matches.find(m => getMerge(m.rule) === DRIVER_NAME)
     if (oursFirst) {
       actions.push({ kind: 'skip', pattern, lineIndex: oursFirst.index })
@@ -229,5 +288,12 @@ export const planInstall = (
     actions.push({ kind: 'add', pattern })
   }
 
-  return { actions, dedupDrops }
+  const commentedOutWarnings = detectCommentedOutDriverLines(file, desiredSet)
+
+  return {
+    actions,
+    dedupDrops,
+    textAttributeWarnings,
+    commentedOutWarnings,
+  }
 }
