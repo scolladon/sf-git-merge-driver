@@ -21,3 +21,15 @@ If another merge driver is already configured on one of our globs, install abort
 - Take over conflicting globs non-interactively (for CI):
 
   <%= config.bin %> <%= command.id %> --force
+
+# flags.dry-run.summary
+
+Plan the install without writing to git config or .git/info/attributes. Exits 0; shows the list of rules that would be added/skipped/conflict.
+
+# flags.on-conflict.summary
+
+How to handle patterns already owned by another merge driver in .git/info/attributes. Default: abort (refuse to change anything).
+
+# flags.force.summary
+
+Alias for --on-conflict=overwrite. Non-interactive shortcut for CI.

@@ -15,3 +15,7 @@ Removes the `merge.salesforce-source` section from `.git/config` and strips the 
 - Preview the changes that would be written:
 
   <%= config.bin %> <%= command.id %> --dry-run
+
+# flags.dry-run.summary
+
+Plan the uninstall without touching git config or .git/info/attributes. Exits 0; shows what would be removed.

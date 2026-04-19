@@ -20,8 +20,7 @@ export default class Uninstall extends SfCommand<void> {
 
   public static override readonly flags = {
     'dry-run': Flags.boolean({
-      summary:
-        'Plan the uninstall without touching git config or .git/info/attributes. Exits 0; shows what would be removed.',
+      summary: messages.getMessage('flags.dry-run.summary'),
       default: false,
     }),
   }

@@ -83,19 +83,16 @@ export default class Install extends SfCommand<void> {
 
   public static override readonly flags = {
     'dry-run': Flags.boolean({
-      summary:
-        'Plan the install without writing to git config or .git/info/attributes. Exits 0; shows the list of rules that would be added/skipped/conflict.',
+      summary: messages.getMessage('flags.dry-run.summary'),
       default: false,
     }),
     'on-conflict': Flags.option({
-      summary:
-        'How to handle patterns already owned by another merge driver in .git/info/attributes. Default: abort (refuse to change anything).',
+      summary: messages.getMessage('flags.on-conflict.summary'),
       options: CONFLICT_POLICIES,
       default: 'abort' as ConflictPolicy,
     })(),
     force: Flags.boolean({
-      summary:
-        'Alias for --on-conflict=overwrite. Non-interactive shortcut for CI.',
+      summary: messages.getMessage('flags.force.summary'),
       default: false,
     }),
   }
