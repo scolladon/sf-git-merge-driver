@@ -5,34 +5,21 @@ import {
   planUninstall,
   type UninstallPlan,
 } from '../../../src/service/GitAttributesPlanner.js'
-import {
-  addRule,
-  parse,
-  ruleWithoutAttr,
-  serialise,
-} from '../../../src/utils/gitAttributesFile.js'
+import { applyInstallPlan } from '../../../src/service/InstallService.js'
+import { applyUninstallPlan } from '../../../src/service/UninstallService.js'
+import { parse, serialise } from '../../../src/utils/gitAttributesFile.js'
 
 /**
- * planUninstall maps a parsed `.git/info/attributes` to a list of actions
- * that cleanly remove the driver's presence while preserving any user
- * attributes that happen to share the same line. Both the plan itself
- * and the serialised result of applying it are asserted, because the
- * plan is also what `--dry-run` will show to users.
+ * Apply helpers reuse the services' real `applyInstallPlan` /
+ * `applyUninstallPlan` so these tests cannot drift against production
+ * behaviour. The previous local reimplementations are gone — drift
+ * was hiding a real bug (restore-overwrite actions were silently
+ * ignored at the test level).
  */
-
 const applyPlan = (input: string, plan: UninstallPlan): string => {
   const parsed = parse(input)
-  const actionByIndex = new Map(plan.actions.map(a => [a.lineIndex, a]))
-  const kept = parsed.lines.flatMap((line, index) => {
-    const action = actionByIndex.get(index)
-    if (!action) return [line]
-    if (action.kind === 'drop-line') return []
-    // remove-merge-attr — reuse the shared helper so the test mirrors
-    // what UninstallService actually does.
-    if (line.kind !== 'rule') return [line]
-    return [ruleWithoutAttr(line, 'merge')]
-  })
-  return serialise({ ...parsed, lines: kept })
+  const nextLines = applyUninstallPlan(parsed.lines, plan)
+  return serialise({ ...parsed, lines: nextLines })
 }
 
 describe('GitAttributesPlanner.planUninstall', () => {
@@ -179,29 +166,11 @@ describe('GitAttributesPlanner.planUninstall', () => {
 /**
  * planInstall decides, for each pattern we want to own, whether to add a
  * new line, silently dedup existing ones, or flag a conflict with
- * another tool. The planner is pure domain — no I/O, no policy
- * enforcement; the service reads the plan and chooses how to apply.
+ * another tool. Apply helper reuses the real service function.
  */
-const applyInstallPlan = (
-  input: string,
-  patterns: readonly string[],
-  plan: InstallPlan
-): string => {
+const applyInstallPlanToString = (input: string, plan: InstallPlan): string => {
   const parsed = parse(input)
-  const dedup = new Set(plan.dedupDrops)
-  const kept = parsed.lines.flatMap((line, index) =>
-    dedup.has(index) ? [] : [line]
-  )
-  let next = { ...parsed, lines: kept }
-  for (const action of plan.actions) {
-    if (action.kind !== 'add') continue
-    // Derived via the shared helper so the test matches the service
-    next = addRule(next, action.pattern, [['merge', 'salesforce-source']])
-  }
-  // `patterns` is accepted for symmetry with the service API but not
-  // used here — the plan already contains resolved actions.
-  void patterns
-  return serialise(next)
+  return serialise(applyInstallPlan(parsed, plan))
 }
 
 describe('GitAttributesPlanner.planInstall', () => {
@@ -236,7 +205,7 @@ describe('GitAttributesPlanner.planInstall', () => {
       expect(plan.actions).toEqual([
         { kind: 'add', pattern: '*.profile-meta.xml' },
       ])
-      const applied = applyInstallPlan(input, ['*.profile-meta.xml'], plan)
+      const applied = applyInstallPlanToString(input, plan)
       expect(applied).toBe(
         '* text=auto eol=lf\n*.sh text\n*.profile-meta.xml merge=salesforce-source\n'
       )
@@ -275,7 +244,7 @@ describe('GitAttributesPlanner.planInstall', () => {
         { kind: 'skip', pattern: '*.profile-meta.xml', lineIndex: 0 },
       ])
       expect(plan.dedupDrops).toEqual([1])
-      const applied = applyInstallPlan(input, ['*.profile-meta.xml'], plan)
+      const applied = applyInstallPlanToString(input, plan)
       expect(applied).toBe('*.profile-meta.xml merge=salesforce-source\n')
     })
 
@@ -344,7 +313,7 @@ describe('GitAttributesPlanner.planInstall', () => {
       expect(plan.actions).toEqual([
         { kind: 'add', pattern: '*.profile-meta.xml' },
       ])
-      const applied = applyInstallPlan(input, ['*.profile-meta.xml'], plan)
+      const applied = applyInstallPlanToString(input, plan)
       expect(applied).toBe(
         '*.profile-meta.xml text=auto eol=lf\n*.profile-meta.xml merge=salesforce-source\n'
       )
@@ -394,6 +363,38 @@ describe('GitAttributesPlanner.planInstall', () => {
         },
         { kind: 'add', pattern: '*.labels-meta.xml' },
       ])
+    })
+  })
+
+  describe('planInstall+applyInstallPlan integration — overwrite + dedup round-trip', () => {
+    it('Given policy=overwrite on a conflicting file, When the plan is applied and then planUninstall runs, Then the original user driver is restored byte-identical', () => {
+      // Arrange — the seed is what a real user would have before our
+      // first install under --on-conflict=overwrite.
+      const seed = '*.profile-meta.xml merge=user-driver\n'
+      const pf = parse(seed)
+
+      // Act — install with overwrite + apply
+      const installPlan = planInstall(pf, ['*.profile-meta.xml'], 'overwrite')
+      expect(installPlan.actions).toHaveLength(1)
+      expect(installPlan.actions[0]?.kind).toBe('overwrite')
+      const afterInstall = serialise(applyInstallPlan(pf, installPlan))
+      expect(afterInstall).toContain(
+        '# sf-git-merge-driver overwrote: *.profile-meta.xml merge=user-driver'
+      )
+      expect(afterInstall).toContain(
+        '*.profile-meta.xml merge=salesforce-source'
+      )
+
+      // Act — uninstall + apply
+      const afterInstallParsed = parse(afterInstall)
+      const uninstallPlan = planUninstall(afterInstallParsed)
+      const afterUninstall = serialise({
+        ...afterInstallParsed,
+        lines: applyUninstallPlan(afterInstallParsed.lines, uninstallPlan),
+      })
+
+      // Assert — seed restored byte-identical
+      expect(afterUninstall).toBe(seed)
     })
   })
 

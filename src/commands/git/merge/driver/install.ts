@@ -1,12 +1,13 @@
 import { createInterface } from 'node:readline'
 import { Messages } from '@salesforce/core'
 import { Flags, SfCommand } from '@salesforce/sf-plugins-core'
-import { DRIVER_NAME } from '../../../../constant/driverConstant.js'
 import { PLUGIN_NAME } from '../../../../constant/pluginConstant.js'
 import type { ConflictPolicy } from '../../../../service/GitAttributesPlanner.js'
 import {
-  DRIVER_COMMAND,
-  DRIVER_NAME_CONFIG_VALUE,
+  formatInstallDryRunReport,
+  shouldPromptForPolicy,
+} from '../../../../service/InstallReports.js'
+import {
   InstallConflictError,
   type InstallOutcome,
   InstallService,
@@ -22,10 +23,9 @@ type PolicyPrompt = (
 ) => Promise<ConflictPolicy>
 
 /**
- * Ask the user on stdin how to handle conflicts. Invoked only when
- * `--on-conflict` is unset AND stdout is a TTY AND the planner emitted
- * conflict actions. Kept as a dependency-injectable function so tests
- * can drive the command without opening a real readline.
+ * Map a raw terminal answer to a `ConflictPolicy`. Pure — exported so
+ * the answer classifier can be table-tested directly (tight feedback
+ * loop for mutation testing); also used by `defaultPolicyPrompt` below.
  */
 export const parsePromptAnswer = (raw: string): ConflictPolicy => {
   const normalised = raw.trim().toLowerCase()
@@ -65,99 +65,6 @@ const defaultPolicyPrompt: PolicyPrompt = async conflicts => {
 
 Messages.importMessagesDirectoryFromMetaUrl(import.meta.url)
 const messages = Messages.loadMessages(PLUGIN_NAME, 'install')
-
-const SAMPLE_COUNT = 5
-
-const formatDryRunReport = (outcome: InstallOutcome): string => {
-  const { plan, gitAttributesPath } = outcome
-  const adds = plan.actions.filter(a => a.kind === 'add')
-  const skips = plan.actions.filter(a => a.kind === 'skip')
-  const conflicts = plan.actions.flatMap(a =>
-    a.kind === 'conflict'
-      ? [{ pattern: a.pattern, existingDriver: a.existingDriver }]
-      : []
-  )
-  const skippedConflicts = plan.actions.flatMap(a =>
-    a.kind === 'skip-conflict'
-      ? [{ pattern: a.pattern, existingDriver: a.existingDriver }]
-      : []
-  )
-  const overwrites = plan.actions.flatMap(a =>
-    a.kind === 'overwrite'
-      ? [{ pattern: a.pattern, existingDriver: a.existingDriver }]
-      : []
-  )
-  const dedupCount = plan.dedupDrops.length
-
-  const lines: string[] = []
-  lines.push('DRY RUN — no changes applied.')
-  lines.push('')
-  lines.push('git config:')
-  lines.push(
-    `  would set merge.${DRIVER_NAME}.name = "${DRIVER_NAME_CONFIG_VALUE}"`
-  )
-  lines.push(`  would set merge.${DRIVER_NAME}.driver = ${DRIVER_COMMAND}`)
-  lines.push('')
-  lines.push(`${gitAttributesPath}:`)
-  lines.push(`  ${adds.length} rule(s) would be added`)
-  if (adds.length > 0) {
-    const preview = adds
-      .slice(0, SAMPLE_COUNT)
-      .map(a => a.pattern)
-      .join(', ')
-    const more =
-      adds.length > SAMPLE_COUNT ? `, … ${adds.length - SAMPLE_COUNT} more` : ''
-    lines.push(`    ${preview}${more}`)
-  }
-  lines.push(`  ${skips.length} rule(s) already present (skipped)`)
-  lines.push(`  ${dedupCount} legacy duplicate line(s) would be removed`)
-  if (skippedConflicts.length > 0) {
-    lines.push('')
-    lines.push(
-      `${skippedConflicts.length} conflict(s) left to their current driver (--on-conflict=skip):`
-    )
-    for (const c of skippedConflicts) {
-      lines.push(`    ${c.pattern} → merge=${c.existingDriver}`)
-    }
-  }
-  if (overwrites.length > 0) {
-    lines.push('')
-    lines.push(
-      `${overwrites.length} conflict(s) would be overwritten (--on-conflict=overwrite); uninstall will restore them:`
-    )
-    for (const c of overwrites) {
-      lines.push(`    ${c.pattern} (was merge=${c.existingDriver})`)
-    }
-  }
-  if (conflicts.length > 0) {
-    lines.push('')
-    lines.push(
-      `⚠ ${conflicts.length} conflict(s) — installation would abort. Re-run with --on-conflict=skip or --on-conflict=overwrite (or --force) to proceed:`
-    )
-    for (const c of conflicts) {
-      lines.push(`    ${c.pattern} → merge=${c.existingDriver}`)
-    }
-  }
-  if (plan.textAttributeWarnings.length > 0) {
-    lines.push('')
-    lines.push(
-      `⚠ ${plan.textAttributeWarnings.length} pattern(s) marked -text (binary) — driver will be inactive on these until you remove -text:`
-    )
-    for (const w of plan.textAttributeWarnings) {
-      lines.push(`    ${w.pattern} (line ${w.lineIndex + 1})`)
-    }
-  }
-  if (plan.commentedOutWarnings.length > 0) {
-    lines.push('')
-    lines.push(
-      `ℹ ${plan.commentedOutWarnings.length} commented-out driver line(s) detected — install will add a live rule below each; consider removing the commented lines:`
-    )
-    for (const w of plan.commentedOutWarnings) {
-      lines.push(`    ${w.pattern} (line ${w.lineIndex + 1})`)
-    }
-  }
-  return lines.join('\n')
-}
 
 const CONFLICT_POLICIES: readonly ConflictPolicy[] = [
   'abort',
@@ -201,23 +108,6 @@ export default class Install extends SfCommand<void> {
    */
   protected promptPolicy: PolicyPrompt = defaultPolicyPrompt
 
-  /**
-   * True when the interactive policy prompt should run: `--on-conflict`
-   * unset (still 'abort' default), `--force` unset, stdout is a TTY.
-   * Non-TTY (CI) invocations without the flag keep the strict abort
-   * default so nothing surprising happens in automation.
-   */
-  private shouldPromptForPolicy(flags: {
-    'on-conflict': ConflictPolicy
-    force: boolean
-    'dry-run': boolean
-  }): boolean {
-    if (flags['dry-run']) return false
-    if (flags.force) return false
-    if (flags['on-conflict'] !== 'abort') return false
-    return Boolean(process.stdout.isTTY)
-  }
-
   @log('Install')
   public async run(): Promise<void> {
     const { flags } = await this.parse(Install)
@@ -229,7 +119,14 @@ export default class Install extends SfCommand<void> {
       ? 'overwrite'
       : flags['on-conflict']
 
-    if (this.shouldPromptForPolicy(flags)) {
+    if (
+      shouldPromptForPolicy({
+        dryRun,
+        force: flags.force,
+        onConflict: flags['on-conflict'],
+        isTTY: Boolean(process.stdout.isTTY),
+      })
+    ) {
       // Run a cheap dry-run first so we know whether to prompt at all.
       const preview = await new InstallService().installMergeDriver({
         dryRun: true,
@@ -252,17 +149,15 @@ export default class Install extends SfCommand<void> {
       })
     } catch (error) {
       if (error instanceof InstallConflictError) {
-        // `this.error` throws a CLIError internally — no need to
-        // re-throw after it. We branch here so any other error type
-        // propagates naturally via the outer catch shape oclif
-        // expects.
+        // `this.error` throws a CLIError internally — the outer catch
+        // never re-enters. Any other error type propagates naturally.
         this.error(error.message, { exit: 2 })
       }
       throw error
     }
 
     if (dryRun) {
-      this.log(formatDryRunReport(outcome))
+      this.log(formatInstallDryRunReport(outcome))
       return
     }
     // Surface diagnostic warnings to the user after a successful

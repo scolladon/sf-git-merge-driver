@@ -293,18 +293,27 @@ export const planInstall = (
     }
     // `oursFirst` is guaranteed falsy at this point (continue above
     // otherwise), so any rule with a string merge= on this pattern
-    // is by definition a different driver. The `!== DRIVER_NAME`
-    // check is therefore structurally redundant — we keep only the
-    // `typeof merge === 'string'` guard.
-    const otherFirst = matches.find(m => typeof getMerge(m.rule) === 'string')
-    if (otherFirst) {
-      const existingDriver = getMerge(otherFirst.rule) as string
+    // is by definition a different driver. Capture the driver name
+    // via an explicit narrowing loop instead of a cast — keeps the
+    // type contract sound without relying on `.find` predicate
+    // narrowing (which TS doesn't thread through chained calls).
+    let otherMatch:
+      | { index: number; rule: RuleLine; existingDriver: string }
+      | undefined
+    for (const m of matches) {
+      const existingDriver = getMerge(m.rule)
+      if (typeof existingDriver === 'string') {
+        otherMatch = { index: m.index, rule: m.rule, existingDriver }
+        break
+      }
+    }
+    if (otherMatch) {
       actions.push(
         actionForConflict(
           pattern,
-          otherFirst.index,
-          otherFirst.rule,
-          existingDriver,
+          otherMatch.index,
+          otherMatch.rule,
+          otherMatch.existingDriver,
           policy
         )
       )

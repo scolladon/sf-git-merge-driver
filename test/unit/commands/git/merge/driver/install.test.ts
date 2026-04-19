@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parsePromptAnswer } from '../../../src/commands/git/merge/driver/install.js'
+import { parsePromptAnswer } from '../../../../../../src/commands/git/merge/driver/install.js'
 
 /**
  * Direct tests for the pure helpers exported by the install command.
