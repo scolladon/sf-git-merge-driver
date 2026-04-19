@@ -217,4 +217,44 @@ describe('InstallService', () => {
       await expect(sut.installMergeDriver()).rejects.toThrow('EACCES')
     })
   })
+
+  describe('dry-run', () => {
+    it('Given dryRun=true on an empty repo, When installing, Then neither git config nor writeFile is called; the plan is returned', async () => {
+      // Arrange — default ENOENT for readFile
+      // Act
+      const outcome = await sut.installMergeDriver({ dryRun: true })
+
+      // Assert — nothing written, plan reflects a fresh install
+      expect(writeFileMocked).not.toHaveBeenCalled()
+      expect(mockedAddConfig).not.toHaveBeenCalled()
+      expect(outcome.dryRun).toBe(true)
+      expect(outcome.wroteAttributes).toBe(false)
+      // Every desired pattern shows up as `add`
+      const addPatterns = outcome.plan.actions.flatMap(a =>
+        a.kind === 'add' ? [a.pattern] : []
+      )
+      expect(addPatterns.length).toBe(
+        METADATA_TYPES_PATTERNS.length + MANIFEST_PATTERNS.length
+      )
+    })
+
+    it('Given dryRun=true with a conflicting file, When installing, Then InstallConflictError is NOT thrown (conflicts show in plan)', async () => {
+      // Arrange
+      readFileMocked.mockResolvedValue(
+        '*.profile-meta.xml merge=some-other-tool\n'
+      )
+
+      // Act — dry run returns normally; no throw
+      const outcome = await sut.installMergeDriver({ dryRun: true })
+
+      // Assert — plan carries the conflict so the command can render it
+      const conflicts = outcome.plan.actions.flatMap(a =>
+        a.kind === 'conflict' ? [a] : []
+      )
+      expect(conflicts).toHaveLength(1)
+      expect(conflicts[0]?.existingDriver).toBe('some-other-tool')
+      expect(writeFileMocked).not.toHaveBeenCalled()
+      expect(mockedAddConfig).not.toHaveBeenCalled()
+    })
+  })
 })

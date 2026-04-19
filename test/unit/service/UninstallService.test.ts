@@ -150,4 +150,29 @@ describe('UninstallService', () => {
       })
     })
   })
+
+  describe('dry-run', () => {
+    it('Given dryRun=true, When uninstalling, Then git config is NOT touched, writeFile is NOT called, and the plan is returned', async () => {
+      // Arrange
+      readFileMocked.mockResolvedValue(
+        '*.profile-meta.xml merge=salesforce-source\n*.profile-meta.xml text=auto merge=salesforce-source\n'
+      )
+
+      // Act
+      const outcome = await sut.uninstallMergeDriver({ dryRun: true })
+
+      // Assert — side effects suppressed
+      expect(mockedRaw).not.toHaveBeenCalled()
+      expect(writeFile).not.toHaveBeenCalled()
+
+      // Assert — plan preview available: one drop, one rewrite
+      expect(outcome.dryRun).toBe(true)
+      expect(outcome.wroteAttributes).toBe(false)
+      expect(outcome.removedConfigSection).toBe(false)
+      expect(outcome.plan.actions).toEqual([
+        { kind: 'drop-line', lineIndex: 0 },
+        { kind: 'remove-merge-attr', lineIndex: 1 },
+      ])
+    })
+  })
 })

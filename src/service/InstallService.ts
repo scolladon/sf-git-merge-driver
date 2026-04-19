@@ -38,9 +38,11 @@ const BINARY_PATH = BINARY_PATH_RAW.replace(/\\/g, '/')
 // %P output, %L conflict-marker-size, %S ancestor-label, %X local-label,
 // %Y other-label. All 8 are passed — this wires %S (new) through to the
 // binary's -S flag; previous install omitted %S, forcing the static default.
-const DRIVER_COMMAND =
+export const DRIVER_COMMAND =
   `sh -c 'node "${BINARY_PATH}" -O "$1" -A "$2" -B "$3" -P "$4" -L "$5" -S "$6" -X "$7" -Y "$8"'` +
   ' -- %O %A %B %P %L %S %X %Y'
+
+export const DRIVER_NAME_CONFIG_VALUE = 'Salesforce source merge driver'
 
 const DESIRED_PATTERNS: readonly string[] = [
   ...METADATA_TYPES_PATTERNS.map(p => `*.${p}-meta.xml`),
@@ -72,6 +74,24 @@ export class InstallConflictError extends Error {
   }
 }
 
+export type InstallOptions = {
+  /**
+   * When true, plan the install and return the plan without touching
+   * `.git/config` or `.git/info/attributes`. The returned plan may
+   * contain `conflict` actions — the command layer is responsible for
+   * formatting them for the user; no `InstallConflictError` is thrown.
+   */
+  readonly dryRun?: boolean
+}
+
+export type InstallOutcome = {
+  readonly plan: InstallPlan
+  readonly dryRun: boolean
+  /** True when writeFile was called on the attributes file. */
+  readonly wroteAttributes: boolean
+  readonly gitAttributesPath: string
+}
+
 /**
  * Read `.git/info/attributes` best-effort: a missing file is equivalent
  * to an empty one. Any other I/O error propagates.
@@ -91,21 +111,43 @@ const readAttributesOrEmpty = async (path: string): Promise<string> => {
   }
 }
 
+const applyInstallPlan = (
+  parsed: ParsedFile,
+  plan: InstallPlan
+): ParsedFile => {
+  const dedup = new Set(plan.dedupDrops)
+  const kept = parsed.lines.flatMap((line, index) =>
+    dedup.has(index) ? [] : [line]
+  )
+  let next: ParsedFile = { ...parsed, lines: kept }
+  for (const action of plan.actions) {
+    if (action.kind !== 'add') continue
+    next = addRule(next, action.pattern, [['merge', DRIVER_NAME]])
+  }
+  return next
+}
+
 export class InstallService {
   @log('InstallService')
-  public async installMergeDriver(): Promise<InstallPlan> {
-    const git = simpleGit({ unsafe: { allowUnsafeMergeDriver: true } })
-    await git.addConfig(
-      `merge.${DRIVER_NAME}.name`,
-      'Salesforce source merge driver'
-    )
-    await git.addConfig(`merge.${DRIVER_NAME}.driver`, DRIVER_COMMAND)
+  public async installMergeDriver(
+    options: InstallOptions = {}
+  ): Promise<InstallOutcome> {
+    const dryRun = options.dryRun ?? false
 
+    // Plan first — reading the file and diffing against the desired
+    // pattern set is side-effect free, so we can do it up front and
+    // bail early for dry-run before touching git config.
     const gitAttributesPath = await getGitAttributesPath()
     const raw = await readAttributesOrEmpty(gitAttributesPath)
     const parsed = parse(raw)
     const plan = planInstall(parsed, DESIRED_PATTERNS)
 
+    if (dryRun) {
+      return { plan, dryRun: true, wroteAttributes: false, gitAttributesPath }
+    }
+
+    // Surface conflicts before any write so an `abort` policy leaves
+    // git config and the attributes file untouched.
     const conflicts = plan.actions.flatMap(action =>
       action.kind === 'conflict'
         ? [{ pattern: action.pattern, existingDriver: action.existingDriver }]
@@ -113,24 +155,21 @@ export class InstallService {
     )
     if (conflicts.length > 0) throw new InstallConflictError(conflicts)
 
-    // Apply the plan: drop duplicates, then append new rules.
-    const dedup = new Set(plan.dedupDrops)
-    const kept = parsed.lines.flatMap((line, index) =>
-      dedup.has(index) ? [] : [line]
-    )
-    let next: ParsedFile = { ...parsed, lines: kept }
-    for (const action of plan.actions) {
-      if (action.kind !== 'add') continue
-      next = addRule(next, action.pattern, [['merge', DRIVER_NAME]])
-    }
+    // git config goes first so the merge driver is defined before any
+    // attribute rule references it.
+    const git = simpleGit({ unsafe: { allowUnsafeMergeDriver: true } })
+    await git.addConfig(`merge.${DRIVER_NAME}.name`, DRIVER_NAME_CONFIG_VALUE)
+    await git.addConfig(`merge.${DRIVER_NAME}.driver`, DRIVER_COMMAND)
 
-    // Skip the write if the file is already in the desired state —
-    // saves an I/O and keeps timestamps stable for tooling.
+    // Apply plan and write attributes file only if the result differs
+    // from what was read — saves an I/O and keeps timestamps stable.
+    const next = applyInstallPlan(parsed, plan)
     const after = serialise(next)
-    if (after !== raw) {
+    const wroteAttributes = after !== raw
+    if (wroteAttributes) {
       await writeFile(gitAttributesPath, after)
     }
 
-    return plan
+    return { plan, dryRun: false, wroteAttributes, gitAttributesPath }
   }
 }

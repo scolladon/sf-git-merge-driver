@@ -3,6 +3,7 @@ import { simpleGit } from 'simple-git'
 import { DRIVER_NAME } from '../constant/driverConstant.js'
 import {
   type Line,
+  type ParsedFile,
   parse,
   ruleWithoutAttr,
   serialise,
@@ -36,37 +37,74 @@ const applyUninstallPlan = (
   })
 }
 
+export type UninstallOptions = {
+  /**
+   * When true, plan the uninstall and return the plan without touching
+   * `.git/config` or `.git/info/attributes`.
+   */
+  readonly dryRun?: boolean
+}
+
+export type UninstallOutcome = {
+  readonly plan: UninstallPlan
+  readonly dryRun: boolean
+  readonly wroteAttributes: boolean
+  readonly removedConfigSection: boolean
+  readonly gitAttributesPath: string | undefined
+}
+
 export class UninstallService {
   @log('UninstallService')
-  public async uninstallMergeDriver(): Promise<void> {
-    const git = simpleGit()
-    try {
-      // Throws when the merge driver is not installed
-      await git.raw(['config', '--remove-section', `merge.${DRIVER_NAME}`])
-    } catch (error) {
-      Logger.error(
-        'Merge driver uninstallation failed to cleanup git config',
-        error
-      )
+  public async uninstallMergeDriver(
+    options: UninstallOptions = {}
+  ): Promise<UninstallOutcome> {
+    const dryRun = options.dryRun ?? false
+
+    let removedConfigSection = false
+    if (!dryRun) {
+      const git = simpleGit()
+      try {
+        // Throws when the merge driver is not installed
+        await git.raw(['config', '--remove-section', `merge.${DRIVER_NAME}`])
+        removedConfigSection = true
+      } catch (error) {
+        Logger.error(
+          'Merge driver uninstallation failed to cleanup git config',
+          error
+        )
+      }
     }
 
+    let gitAttributesPath: string | undefined
+    let plan: UninstallPlan = { actions: [] }
+    let wroteAttributes = false
     try {
-      const gitAttributesPath = await getGitAttributesPath()
+      gitAttributesPath = await getGitAttributesPath()
       // Throws when the file does not exist
       const raw = await readFile(gitAttributesPath, { encoding: 'utf8' })
-      const parsed = parse(raw)
-      const plan = planUninstall(parsed)
-      if (plan.actions.length === 0) return
-      const nextLines = applyUninstallPlan(parsed.lines, plan)
-      await writeFile(
-        gitAttributesPath,
-        serialise({ ...parsed, lines: nextLines })
-      )
+      const parsed: ParsedFile = parse(raw)
+      plan = planUninstall(parsed)
+      if (plan.actions.length > 0 && !dryRun) {
+        const nextLines = applyUninstallPlan(parsed.lines, plan)
+        await writeFile(
+          gitAttributesPath,
+          serialise({ ...parsed, lines: nextLines })
+        )
+        wroteAttributes = true
+      }
     } catch (error) {
       Logger.error(
         'Merge driver uninstallation failed to cleanup git attributes',
         error
       )
+    }
+
+    return {
+      plan,
+      dryRun,
+      wroteAttributes,
+      removedConfigSection,
+      gitAttributesPath,
     }
   }
 }
