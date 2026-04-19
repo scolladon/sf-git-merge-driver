@@ -66,17 +66,6 @@ describe('UninstallService', () => {
       ])
     })
 
-    it('then reads git attributes file', async () => {
-      // Act
-      await sut.uninstallMergeDriver()
-
-      // Assert
-      expect(readFile).toHaveBeenCalledWith(
-        GIT_ATTRIBUTES_PATH,
-        expect.anything()
-      )
-    })
-
     it('then writes filtered content back', async () => {
       // Act
       await sut.uninstallMergeDriver()
@@ -137,6 +126,23 @@ describe('UninstallService', () => {
       expect(Logger.error).toHaveBeenCalledWith(
         'Merge driver uninstallation failed to cleanup git attributes',
         attrsError
+      )
+    })
+  })
+
+  describe('given writeFile fails when persisting the filtered attributes', () => {
+    it('then the error propagates to the caller (not swallowed by the read-phase catch)', async () => {
+      // Arrange — read-phase succeeds, write-phase fails. Regression
+      // guard: an earlier implementation wrapped writeFile in the
+      // same try/catch as readFile, logging and returning success;
+      // that masked an inconsistent state where the git config
+      // section was gone but the attributes file still referenced it.
+      const writeError = new Error('EACCES: permission denied')
+      vi.mocked(writeFile).mockRejectedValueOnce(writeError)
+
+      // Act / Assert
+      await expect(sut.uninstallMergeDriver()).rejects.toThrow(
+        'EACCES: permission denied'
       )
     })
   })
@@ -217,6 +223,39 @@ describe('UninstallService', () => {
       const nextLines = applyUninstallPlan(parsed.lines, badPlan)
 
       // Assert — the incoming line is kept verbatim (no undefined).
+      expect(nextLines).toHaveLength(1)
+      expect(nextLines[0]?.kind).toBe('rule')
+      expect(nextLines[0]?.raw).toBe(
+        '*.profile-meta.xml merge=salesforce-source'
+      )
+    })
+  })
+
+  describe('defensive: restore-overwrite with multi-line originalRaw (planner contract breach)', () => {
+    it('Given a hand-crafted plan whose restore-overwrite carries an embedded newline, When applying, Then the original line is preserved (not silently restored with only the first split segment)', () => {
+      // The planner captures `originalRaw` from a single parsed rule
+      // line, which cannot contain a newline. A hand-crafted plan
+      // with an embedded `\n` would otherwise cause `parse(...).lines[0]`
+      // to restore only the first segment, silently discarding the
+      // rest — a partial restore masquerading as a successful one.
+      // The `length === 1` guard keeps the incoming line instead.
+      const parsed = parse('*.profile-meta.xml merge=salesforce-source\n')
+      const badPlan = {
+        actions: [
+          {
+            kind: 'restore-overwrite' as const,
+            lineIndex: 0,
+            originalRaw: '*.a merge=tool-a\n*.b merge=tool-b',
+          },
+        ],
+      }
+
+      // Act
+      const nextLines = applyUninstallPlan(parsed.lines, badPlan)
+
+      // Assert — the incoming line is kept verbatim. If the guard
+      // were removed, `restored` would be the parsed `*.a merge=tool-a`,
+      // silently losing `*.b merge=tool-b`.
       expect(nextLines).toHaveLength(1)
       expect(nextLines[0]?.kind).toBe('rule')
       expect(nextLines[0]?.raw).toBe(

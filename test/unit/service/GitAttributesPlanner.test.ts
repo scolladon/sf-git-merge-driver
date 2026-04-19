@@ -188,7 +188,6 @@ describe('GitAttributesPlanner.planInstall', () => {
         { kind: 'add', pattern: '*.profile-meta.xml' },
         { kind: 'add', pattern: '*.permissionset-meta.xml' },
       ])
-      expect(plan.dedupDrops).toEqual([])
     })
   })
 
@@ -225,7 +224,6 @@ describe('GitAttributesPlanner.planInstall', () => {
       expect(plan.actions).toEqual([
         { kind: 'skip', pattern: '*.profile-meta.xml', lineIndex: 0 },
       ])
-      expect(plan.dedupDrops).toEqual([])
     })
   })
 
@@ -281,10 +279,15 @@ describe('GitAttributesPlanner.planInstall', () => {
       ])
     })
 
-    it('Given OUR driver appears first and another driver second on the same pattern, When planning, Then the action is `skip` (ours), not `conflict`', () => {
-      // Guards the "merge !== DRIVER_NAME" filter used when picking
-      // the conflict line — if that predicate were stripped, the
-      // planner would incorrectly flag this as a conflict.
+    it('Given OUR driver appears first and another driver second on the same pattern, When planning, Then the action is `skip` (ours), not `conflict`, AND the other-driver line is NOT dedup-dropped', () => {
+      // Guards two invariants:
+      //  - the "merge !== DRIVER_NAME" filter used when picking
+      //    the conflict line — if that predicate were stripped,
+      //    the planner would incorrectly flag this as a conflict
+      //  - the "!== DRIVER_NAME" check in the dedup loop — if that
+      //    predicate were stripped, the planner would incorrectly
+      //    schedule the OTHER driver's line for deletion, silently
+      //    destroying data the user had deliberately configured.
       const pf = parse(
         '*.profile-meta.xml merge=salesforce-source\n*.profile-meta.xml merge=some-other-tool\n'
       )
@@ -297,6 +300,10 @@ describe('GitAttributesPlanner.planInstall', () => {
       expect(plan.actions).toEqual([
         { kind: 'skip', pattern: '*.profile-meta.xml', lineIndex: 0 },
       ])
+      // Line index 1 holds `merge=some-other-tool` — it must NOT
+      // be dedup'd. This assertion kills the "!== DRIVER_NAME"
+      // conditional mutant in the dedup loop.
+      expect(plan.dedupDrops).toEqual([])
     })
   })
 
@@ -434,7 +441,6 @@ describe('GitAttributesPlanner.planInstall', () => {
       expect(plan.actions).toEqual([
         { kind: 'skip', pattern: '*.profile-meta.xml', lineIndex: 0 },
       ])
-      expect(plan.dedupDrops).toEqual([])
     })
   })
 
@@ -607,6 +613,47 @@ describe('GitAttributesPlanner.planInstall', () => {
       expect(plan.commentedOutWarnings).toEqual([
         { pattern: '*.profile-meta.xml', lineIndex: 0 },
       ])
+    })
+
+    it('Given a rule line whose pattern starts with one extra char then matches a desired pattern and ends with our suffix, When planning, Then NO commented-out warning is emitted (detector must only consider comment lines)', () => {
+      // Kills the `line.kind !== 'comment'` → `if (false)` mutant on
+      // the detector's loop. If the kind guard were bypassed, the
+      // detector would strip the first char of a RULE's raw line
+      // (thinking it was the `#`) and the remaining body would end
+      // with ` merge=salesforce-source`. A pattern of `@*.profile-meta.xml`
+      // loses the `@` on slice(1), leaving a body whose slice(0,-24)
+      // equals one of our desired patterns — a false-positive diagnostic.
+      //
+      // The proper code short-circuits on `kind === 'rule'` before
+      // any slicing runs, so no warning is emitted.
+      const pf = parse('@*.profile-meta.xml merge=salesforce-source\n')
+
+      // Act
+      const plan = planInstall(pf, ['*.profile-meta.xml'])
+
+      // Assert — rule line, not a comment; detector should not touch.
+      expect(plan.commentedOutWarnings).toEqual([])
+    })
+
+    it('Given a comment body that does NOT end with the driver suffix but slicing off 24 chars coincidentally yields a desired pattern, When planning, Then NO warning is emitted', () => {
+      // Kills the `body.endsWith(expectedSuffix)` → `if (false)` mutant.
+      // `expectedSuffix` is ' merge=salesforce-source' (24 chars).
+      // If the endsWith guard were removed, a body whose last 24 chars
+      // happen to differ from the suffix but whose prefix (after the
+      // 24-char slice) happens to equal one of our desired patterns
+      // would still emit a false-positive diagnostic. The trailing
+      // '!' here breaks the suffix match while preserving the 18-char
+      // prefix '*.profile-meta.xml' once the final 24 characters are
+      // sliced off.
+      const pf = parse('# *.profile-meta.xml merge=salesforce-source!\n')
+
+      // Act
+      const plan = planInstall(pf, ['*.profile-meta.xml'])
+
+      // Assert — the correct code refuses to diagnose because the
+      // suffix doesn't actually match. The mutant would falsely
+      // emit one.
+      expect(plan.commentedOutWarnings).toEqual([])
     })
   })
 

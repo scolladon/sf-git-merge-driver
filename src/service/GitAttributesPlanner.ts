@@ -179,7 +179,9 @@ export type InstallPlan = {
 /** Internal helper: index every rule by pattern for O(1) lookups.
  *  Returns a ReadonlyMap of readonly arrays — callers must not mutate.
  *  The map is built locally and never escapes the planner module, so
- *  this is a defensive typing rather than a runtime concern. */
+ *  the readonly typing is a defensive signature rather than a runtime
+ *  concern. Buckets are grown with `push` — cheap and bounded by the
+ *  small, typically-zero count of duplicate-pattern rules in the file. */
 const indexRulesByPattern = (
   file: ParsedFile
 ): ReadonlyMap<string, readonly { index: number; rule: RuleLine }[]> => {
@@ -187,16 +189,12 @@ const indexRulesByPattern = (
   for (let i = 0; i < file.lines.length; i++) {
     const line = file.lines[i]
     if (line.kind !== 'rule') continue
-    const existing = byPattern.get(line.pattern)
-    // Rebuild rather than mutate: aligns with the project's immutable
-    // data convention. The extra copy is bounded by duplicates of the
-    // same pattern in the file (typically 0 or 1).
-    byPattern.set(
-      line.pattern,
-      existing
-        ? [...existing, { index: i, rule: line }]
-        : [{ index: i, rule: line }]
-    )
+    const bucket = byPattern.get(line.pattern)
+    if (bucket) {
+      bucket.push({ index: i, rule: line })
+    } else {
+      byPattern.set(line.pattern, [{ index: i, rule: line }])
+    }
   }
   return byPattern
 }
@@ -216,11 +214,12 @@ const detectCommentedOutDriverLines = (
   for (let i = 0; i < file.lines.length; i++) {
     const line = file.lines[i]
     if (line.kind !== 'comment') continue
-    // Comment lines always start with `#` (optionally preceded by
-    // whitespace), followed optionally by more whitespace. `trim`
-    // collapses both ends, then we drop the `#` prefix and any
-    // whitespace following it in one pass.
-    const body = line.raw.trim().replace(/^#\s*/, '')
+    // The parser guarantees a comment's trimmed form starts with `#`
+    // (see `parseLine` in gitAttributesFile.ts). Drop that prefix;
+    // any whitespace between `#` and the pattern is absorbed by the
+    // final `trim()` on the extracted pattern below, so this function
+    // does not call `.trimStart()` on the intermediate body.
+    const body = line.raw.trim().slice(1)
     if (!body.endsWith(expectedSuffix)) continue
     const pattern = body.slice(0, -expectedSuffix.length).trim()
     if (!desiredPatterns.has(pattern)) continue

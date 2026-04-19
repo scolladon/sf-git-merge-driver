@@ -40,12 +40,15 @@ export const applyUninstallPlan = (
     if (drop.has(index)) return []
     const restoreRaw = restore.get(index)
     if (restoreRaw !== undefined) {
-      // The planner rejects empty annotation bodies (see
-      // GitAttributesPlanner.planUninstall), so `restoreRaw` always
-      // has non-whitespace content here and parse yields ≥1 line.
-      // If the contract ever breaks, fall back to keeping the
-      // original line instead of writing undefined into the output.
-      const restored = parse(restoreRaw).lines[0]
+      // The planner captures `originalRaw` from a single parsed rule
+      // line, so the round-trip string is guaranteed not to contain a
+      // newline. Parsing it yields exactly one line. If a crafted
+      // annotation body with an embedded newline ever slipped past
+      // the planner, `parse(...).lines[0]` would silently drop the
+      // rest — keep the existing line instead to avoid partial
+      // restores masquerading as successful ones.
+      const restoredLines = parse(restoreRaw).lines
+      const restored = restoredLines.length === 1 ? restoredLines[0] : undefined
       return restored ? [restored] : [line]
     }
     if (!rewrite.has(index) || line.kind !== 'rule') return [line]
@@ -94,25 +97,31 @@ export class UninstallService {
     let gitAttributesPath: string | undefined
     let plan: UninstallPlan = { actions: [] }
     let wroteAttributes = false
+    // Read-and-plan is best-effort (file may not exist, or the git-dir
+    // lookup may fail in an unusual repo). Write is NOT: a failure to
+    // persist uninstall changes must surface to the caller so the user
+    // knows the attributes file still references a driver that is now
+    // undefined in git config. Splitting the two scopes avoids the
+    // uninstall-success-but-silently-inconsistent state.
+    let serialised: string | undefined
     try {
       gitAttributesPath = await getGitAttributesPath()
-      // Throws when the file does not exist
       const raw = await readFile(gitAttributesPath, { encoding: 'utf8' })
       const parsed: ParsedFile = parse(raw)
       plan = planUninstall(parsed)
       if (plan.actions.length > 0 && !dryRun) {
         const nextLines = applyUninstallPlan(parsed.lines, plan)
-        await writeFile(
-          gitAttributesPath,
-          serialise({ ...parsed, lines: nextLines })
-        )
-        wroteAttributes = true
+        serialised = serialise({ ...parsed, lines: nextLines })
       }
     } catch (error) {
       Logger.error(
         'Merge driver uninstallation failed to cleanup git attributes',
         error
       )
+    }
+    if (serialised !== undefined && gitAttributesPath !== undefined) {
+      await writeFile(gitAttributesPath, serialised)
+      wroteAttributes = true
     }
 
     return {
