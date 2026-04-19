@@ -1,3 +1,4 @@
+import { createInterface } from 'node:readline'
 import { Messages } from '@salesforce/core'
 import { Flags, SfCommand } from '@salesforce/sf-plugins-core'
 import { DRIVER_NAME } from '../../../../constant/driverConstant.js'
@@ -12,6 +13,46 @@ import {
 } from '../../../../service/InstallService.js'
 import { log } from '../../../../utils/LoggingDecorator.js'
 import { Logger } from '../../../../utils/LoggingService.js'
+
+type PolicyPrompt = (
+  conflicts: readonly {
+    pattern: string
+    existingDriver: string
+  }[]
+) => Promise<ConflictPolicy>
+
+/**
+ * Ask the user on stdin how to handle conflicts. Invoked only when
+ * `--on-conflict` is unset AND stdout is a TTY AND the planner emitted
+ * conflict actions. Kept as a dependency-injectable function so tests
+ * can drive the command without opening a real readline.
+ */
+const defaultPolicyPrompt: PolicyPrompt = async conflicts => {
+  const rl = createInterface({ input: process.stdin, output: process.stdout })
+  try {
+    process.stdout.write(
+      `\n${conflicts.length} pattern(s) already configured with a different merge driver:\n`
+    )
+    for (const c of conflicts) {
+      process.stdout.write(`  ${c.pattern} → merge=${c.existingDriver}\n`)
+    }
+    process.stdout.write(
+      '\nHow should we proceed?\n' +
+        '  [a] abort     (safe, no changes)\n' +
+        '  [s] skip      (leave those globs with the other driver)\n' +
+        '  [o] overwrite (replace; uninstall will restore)\n'
+    )
+    const answer = await new Promise<string>(resolve => {
+      rl.question('Enter a / s / o [a]: ', resolve)
+    })
+    const normalised = answer.trim().toLowerCase()
+    if (normalised === 's' || normalised === 'skip') return 'skip'
+    if (normalised === 'o' || normalised === 'overwrite') return 'overwrite'
+    return 'abort'
+  } finally {
+    rl.close()
+  }
+}
 
 Messages.importMessagesDirectoryFromMetaUrl(import.meta.url)
 const messages = Messages.loadMessages(PLUGIN_NAME, 'install')
@@ -125,13 +166,56 @@ export default class Install extends SfCommand<void> {
     }),
   }
 
+  /**
+   * Hook for tests — overrides the interactive prompt implementation.
+   * Kept protected so test doubles can swap in without going through
+   * readline. In production, stdout-isTTY is the gate; in tests the
+   * caller supplies a stub.
+   */
+  protected promptPolicy: PolicyPrompt = defaultPolicyPrompt
+
+  /**
+   * True when the interactive policy prompt should run: `--on-conflict`
+   * unset (still 'abort' default), `--force` unset, stdout is a TTY.
+   * Non-TTY (CI) invocations without the flag keep the strict abort
+   * default so nothing surprising happens in automation.
+   */
+  private shouldPromptForPolicy(flags: {
+    'on-conflict': ConflictPolicy
+    force: boolean
+    'dry-run': boolean
+  }): boolean {
+    if (flags['dry-run']) return false
+    if (flags.force) return false
+    if (flags['on-conflict'] !== 'abort') return false
+    return Boolean(process.stdout.isTTY)
+  }
+
   @log('Install')
   public async run(): Promise<void> {
     const { flags } = await this.parse(Install)
     const dryRun = flags['dry-run']
-    const onConflict: ConflictPolicy = flags.force
+
+    // First pass: use the requested policy directly unless we need to
+    // surface conflicts to a human first.
+    let onConflict: ConflictPolicy = flags.force
       ? 'overwrite'
       : flags['on-conflict']
+
+    if (this.shouldPromptForPolicy(flags)) {
+      // Run a cheap dry-run first so we know whether to prompt at all.
+      const preview = await new InstallService().installMergeDriver({
+        dryRun: true,
+      })
+      const conflicts = preview.plan.actions.flatMap(a =>
+        a.kind === 'conflict'
+          ? [{ pattern: a.pattern, existingDriver: a.existingDriver }]
+          : []
+      )
+      if (conflicts.length > 0) {
+        onConflict = await this.promptPolicy(conflicts)
+      }
+    }
 
     try {
       const outcome = await new InstallService().installMergeDriver({
