@@ -319,7 +319,11 @@ Uninstalls the local git merge driver for the given org and branch.
 
 ```
 USAGE
-  $ sf git merge driver disable [--json] [--flags-dir <value>]
+  $ sf git merge driver disable [--json] [--flags-dir <value>] [--dry-run]
+
+FLAGS
+  --dry-run  Plan the uninstall without touching git config or .git/info/attributes. Exits 0; shows what would be
+             removed.
 
 GLOBAL FLAGS
   --flags-dir=<value>  Import flag values from a directory.
@@ -347,7 +351,15 @@ Installs a local git merge driver for the given org and branch.
 
 ```
 USAGE
-  $ sf git merge driver enable [--json] [--flags-dir <value>]
+  $ sf git merge driver enable [--json] [--flags-dir <value>] [--dry-run] [--on-conflict abort|skip|overwrite] [--force]
+
+FLAGS
+  --dry-run               Plan the install without writing to git config or .git/info/attributes. Exits 0; shows the
+                          list of rules that would be added/skipped/conflict.
+  --force                 Alias for --on-conflict=overwrite. Non-interactive shortcut for CI.
+  --on-conflict=<option>  [default: abort] How to handle patterns already owned by another merge driver in
+                          .git/info/attributes. Default: abort (refuse to change anything).
+                          <options: abort|skip|overwrite>
 
 GLOBAL FLAGS
   --flags-dir=<value>  Import flag values from a directory.
@@ -375,7 +387,16 @@ Installs a local git merge driver for the given org and branch.
 
 ```
 USAGE
-  $ sf git merge driver install [--json] [--flags-dir <value>]
+  $ sf git merge driver install [--json] [--flags-dir <value>] [--dry-run] [--on-conflict abort|skip|overwrite]
+  [--force]
+
+FLAGS
+  --dry-run               Plan the install without writing to git config or .git/info/attributes. Exits 0; shows the
+                          list of rules that would be added/skipped/conflict.
+  --force                 Alias for --on-conflict=overwrite. Non-interactive shortcut for CI.
+  --on-conflict=<option>  [default: abort] How to handle patterns already owned by another merge driver in
+                          .git/info/attributes. Default: abort (refuse to change anything).
+                          <options: abort|skip|overwrite>
 
 GLOBAL FLAGS
   --flags-dir=<value>  Import flag values from a directory.
@@ -452,7 +473,11 @@ Uninstalls the local git merge driver for the given org and branch.
 
 ```
 USAGE
-  $ sf git merge driver uninstall [--json] [--flags-dir <value>]
+  $ sf git merge driver uninstall [--json] [--flags-dir <value>] [--dry-run]
+
+FLAGS
+  --dry-run  Plan the uninstall without touching git config or .git/info/attributes. Exits 0; shows what would be
+             removed.
 
 GLOBAL FLAGS
   --flags-dir=<value>  Import flag values from a directory.
