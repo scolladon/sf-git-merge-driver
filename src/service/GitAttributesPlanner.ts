@@ -64,15 +64,23 @@ export const planUninstall = (file: ParsedFile): UninstallPlan => {
     // `file.lines[-1]` is undefined in JS, so no explicit bounds
     // check needed — the `prev?.kind === 'comment'` gate below
     // handles both "missing" and "wrong kind" with one expression.
+    //
+    // Empty annotation bodies (`# sf-git-merge-driver overwrote: `
+    // with nothing after) are ignored — writing an empty rule back
+    // would corrupt the file. The annotation is treated as an
+    // ordinary comment in that case, and the driver rule falls
+    // through to the standard drop-line / remove-merge-attr path.
     const prev = file.lines[i - 1]
     if (
       prev?.kind === 'comment' &&
       prev.raw.startsWith(OVERWRITE_ANNOTATION_PREFIX)
     ) {
       const originalRaw = prev.raw.slice(OVERWRITE_ANNOTATION_PREFIX.length)
-      actions.push({ kind: 'drop-line', lineIndex: i - 1 })
-      actions.push({ kind: 'restore-overwrite', lineIndex: i, originalRaw })
-      continue
+      if (originalRaw.trim().length > 0) {
+        actions.push({ kind: 'drop-line', lineIndex: i - 1 })
+        actions.push({ kind: 'restore-overwrite', lineIndex: i, originalRaw })
+        continue
+      }
     }
 
     // Rule mentions our driver. If the only attribute is our merge, the
@@ -168,17 +176,27 @@ export type InstallPlan = {
   readonly commentedOutWarnings: readonly PatternDiagnostic[]
 }
 
-/** Internal helper: index every rule by pattern for O(1) lookups. */
+/** Internal helper: index every rule by pattern for O(1) lookups.
+ *  Returns a ReadonlyMap of readonly arrays — callers must not mutate.
+ *  The map is built locally and never escapes the planner module, so
+ *  this is a defensive typing rather than a runtime concern. */
 const indexRulesByPattern = (
   file: ParsedFile
-): Map<string, { index: number; rule: RuleLine }[]> => {
+): ReadonlyMap<string, readonly { index: number; rule: RuleLine }[]> => {
   const byPattern = new Map<string, { index: number; rule: RuleLine }[]>()
   for (let i = 0; i < file.lines.length; i++) {
     const line = file.lines[i]
     if (line.kind !== 'rule') continue
     const existing = byPattern.get(line.pattern)
-    if (existing) existing.push({ index: i, rule: line })
-    else byPattern.set(line.pattern, [{ index: i, rule: line }])
+    // Rebuild rather than mutate: aligns with the project's immutable
+    // data convention. The extra copy is bounded by duplicates of the
+    // same pattern in the file (typically 0 or 1).
+    byPattern.set(
+      line.pattern,
+      existing
+        ? [...existing, { index: i, rule: line }]
+        : [{ index: i, rule: line }]
+    )
   }
   return byPattern
 }

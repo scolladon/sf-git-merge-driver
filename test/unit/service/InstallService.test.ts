@@ -7,11 +7,14 @@ import {
   METADATA_TYPES_PATTERNS,
 } from '../../../src/constant/metadataConstant.js'
 import {
+  applyInstallPlan,
   DRIVER_COMMAND,
   DRIVER_NAME_CONFIG_VALUE,
+  escapeBinaryPath,
   InstallConflictError,
   InstallService,
 } from '../../../src/service/InstallService.js'
+import { parse } from '../../../src/utils/gitAttributesFile.js'
 import { getGitAttributesPath } from '../../../src/utils/gitUtils.js'
 
 vi.mock('node:fs/promises')
@@ -53,6 +56,43 @@ describe('InstallService', () => {
     readFileMocked.mockRejectedValue(ENOENT)
   })
 
+  describe('escapeBinaryPath', () => {
+    it.each([
+      // [input, expected, reason]
+      ['/plain/path', '/plain/path', 'no escape needed'],
+      ['C:\\\\Users\\path', 'C://Users/path', 'Windows backslashes → POSIX'],
+      [
+        '/opt/%Alib/bin',
+        '/opt/%%Alib/bin',
+        'git placeholder letters MUST be protected',
+      ],
+      ['/opt/%%A/bin', '/opt/%%%%A/bin', 'existing %% also doubles (safe)'],
+      ['/tmp/$PATH', '/tmp/\\$PATH', 'dollar escaped (inner double-quotes)'],
+      [
+        '/tmp/`whoami`',
+        '/tmp/\\`whoami\\`',
+        'backtick escaped (command substitution)',
+      ],
+      [
+        '/tmp/with"quote',
+        '/tmp/with\\"quote',
+        'double-quote closes the inner "…" context',
+      ],
+      [
+        "/tmp/user's dir",
+        "/tmp/user'\\''s dir",
+        "single-quote escape via POSIX '\\'' idiom",
+      ],
+      [
+        '/a/$b`c"d\'e',
+        "/a/\\$b\\`c\\\"d'\\''e",
+        'all five shell-meta escapes compose',
+      ],
+    ])('Given path %j, When escaping, Then result is %j (%s)', (input, expected, _reason) => {
+      expect(escapeBinaryPath(input)).toBe(expected)
+    })
+  })
+
   describe('module-level DRIVER_COMMAND', () => {
     it('has the expected shape: sh -c wrapper, forward-slash POSIX binary path, all 8 placeholders', () => {
       // Kills path-escape regex mutations that would drop the
@@ -64,6 +104,18 @@ describe('InstallService', () => {
       )
       expect(DRIVER_COMMAND).not.toMatch(/\\/) // no backslashes — POSIX path
       expect(DRIVER_NAME_CONFIG_VALUE).toBe('Salesforce source merge driver')
+    })
+
+    it('the literal %O/%A/%B/%P/%L/%S/%X/%Y placeholder sequence appears EXACTLY once (the trailing `-- %O %A ...` list)', () => {
+      // Kills a subtle class of bug: if the binary path itself
+      // contains a literal `%A`-like sequence, git will substitute
+      // its merge-conflict file path there before spawning the
+      // shell, corrupting the command. The path-escape chain now
+      // doubles `%` to `%%`, so the placeholder sequence must still
+      // appear exactly once in the final command string — the
+      // trailing ` -- %O %A %B %P %L %S %X %Y` list that git expands.
+      const matches = DRIVER_COMMAND.match(/%[OABPLSXY]/g) ?? []
+      expect(matches).toEqual(['%O', '%A', '%B', '%P', '%L', '%S', '%X', '%Y'])
     })
   })
 
@@ -306,6 +358,36 @@ describe('InstallService', () => {
       // The two conflict lines are separated by a newline (not
       // concatenated), which guards against `lines.join('')`.
       expect(err.message).toMatch(/tool-a\n {2}\*\.permissionset-meta\.xml/)
+    })
+  })
+
+  describe('defensive: overwrite action pointing at a non-rule line', () => {
+    it('Given a hand-crafted plan whose overwrite points at a comment line, When applying, Then applyInstallPlan throws with a clear message (future-proofs the planner contract)', () => {
+      // Arrange — comment at index 0, not a rule. A real plan from
+      // `planInstall` would never do this, but if the planner ever
+      // changes and emits `overwrite` for a non-rule index, the
+      // guard in applyInstallPlan prevents a silent .attrs-undefined
+      // crash inside ruleWithAttr.
+      const parsed = parse('# just a comment\n')
+      const badPlan = {
+        actions: [
+          {
+            kind: 'overwrite' as const,
+            pattern: '*.profile-meta.xml',
+            existingDriver: 'other',
+            lineIndex: 0,
+            originalRaw: '*.profile-meta.xml merge=other',
+          },
+        ],
+        dedupDrops: [],
+        textAttributeWarnings: [],
+        commentedOutWarnings: [],
+      }
+
+      // Act + Assert
+      expect(() => applyInstallPlan(parsed, badPlan)).toThrow(
+        /planInstall emitted 'overwrite' for non-rule line/
+      )
     })
   })
 

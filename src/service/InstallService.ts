@@ -12,7 +12,6 @@ import {
   type Line,
   type ParsedFile,
   parse,
-  type RuleLine,
   ruleWithAttr,
   serialise,
 } from '../utils/gitAttributesFile.js'
@@ -33,14 +32,34 @@ const BINARY_PATH_RAW = join(
   ...BINARY_RELATIVE
 )
 
-// Ensure POSIX separators (Windows join() uses backslash) and escape both
-// single and double quotes so the path embeds safely inside the
-// `sh -c '…"…"…'` double-quoted context.
-const BINARY_PATH = BINARY_PATH_RAW.replace(/\\/g, '/')
-  .replace(/\$/g, '\\$')
-  .replace(/`/g, '\\`')
-  .replace(/"/g, '\\"')
-  .replace(/'/g, "'\\''")
+/**
+ * Escape a filesystem path for embedding inside the `sh -c '…"…"…'`
+ * driver command we store in `git config`. Exported for direct
+ * mutation-testing with crafted inputs; the module-level `BINARY_PATH`
+ * constant is its only production caller.
+ *
+ * Escapes (in fixed order, because each stage's output must not
+ * re-trigger the next stage):
+ *  1. POSIX-normalise: `\` → `/` (Windows join() yields backslashes)
+ *  2. Double every `%`: git expands `%O %A %B %P %L %S %X %Y` placeholders
+ *     inside the stored driver command before passing it to the shell,
+ *     so a literal `%A` in the path would corrupt the substitution.
+ *  3. Escape `$` and backtick: sh -c's inner "…${BINARY_PATH}…" context
+ *     would otherwise evaluate them as variable/command expansion.
+ *  4. Escape `"`: closes the inner double-quote context.
+ *  5. Escape `'`: closes the outer sh -c '…' single-quote context (the
+ *     POSIX idiom `'\''` is used).
+ */
+export const escapeBinaryPath = (raw: string): string =>
+  raw
+    .replace(/\\/g, '/')
+    .replace(/%/g, '%%')
+    .replace(/\$/g, '\\$')
+    .replace(/`/g, '\\`')
+    .replace(/"/g, '\\"')
+    .replace(/'/g, "'\\''")
+
+const BINARY_PATH = escapeBinaryPath(BINARY_PATH_RAW)
 
 // git's merge-driver placeholder convention: %O ancestor, %A local, %B other,
 // %P output, %L conflict-marker-size, %S ancestor-label, %X local-label,
@@ -138,7 +157,7 @@ const readAttributesOrEmpty = async (path: string): Promise<string> => {
  *     already own the pattern, or we deliberately defer to the existing
  *     driver.
  */
-const applyInstallPlan = (
+export const applyInstallPlan = (
   parsed: ParsedFile,
   plan: InstallPlan
 ): ParsedFile => {
@@ -160,18 +179,21 @@ const applyInstallPlan = (
       rewrittenLines.push(existing)
       continue
     }
-    // Insert annotation comment above the rewritten rule. The planner
-    // only emits `overwrite` for rule lines (see planInstall), so the
-    // cast here is a contract narrowing rather than an assumption.
+    // The planner only emits `overwrite` for rule lines (see
+    // planInstall's conflict branch), but enforce it at runtime so
+    // a future planner change surfaces as a loud error instead of
+    // a silent .attrs-is-undefined crash inside ruleWithAttr.
+    if (existing.kind !== 'rule') {
+      throw new Error(
+        `planInstall emitted 'overwrite' for non-rule line at index ${i}: ${existing.kind}`
+      )
+    }
+    // Insert annotation comment above the rewritten rule.
     const annotation: Line = {
       kind: 'comment',
       raw: `${OVERWRITE_ANNOTATION_PREFIX}${overwrite.originalRaw}`,
     }
-    const withOurDriver: Line = ruleWithAttr(
-      existing as RuleLine,
-      'merge',
-      DRIVER_NAME
-    )
+    const withOurDriver: Line = ruleWithAttr(existing, 'merge', DRIVER_NAME)
     rewrittenLines.push(annotation, withOurDriver)
   }
 

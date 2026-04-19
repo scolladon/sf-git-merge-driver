@@ -2,7 +2,11 @@ import { readFile, writeFile } from 'node:fs/promises'
 import simpleGit from 'simple-git'
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest'
 import { DRIVER_NAME } from '../../../src/constant/driverConstant.js'
-import { UninstallService } from '../../../src/service/UninstallService.js'
+import {
+  applyUninstallPlan,
+  UninstallService,
+} from '../../../src/service/UninstallService.js'
+import { parse } from '../../../src/utils/gitAttributesFile.js'
 import { getGitAttributesPath } from '../../../src/utils/gitUtils.js'
 import { Logger } from '../../../src/utils/LoggingService.js'
 
@@ -188,6 +192,36 @@ describe('UninstallService', () => {
         // Assert — no plan actions means no file rewrite
         expect(writeFile).not.toHaveBeenCalled()
       })
+    })
+  })
+
+  describe('defensive: restore-overwrite with empty originalRaw (planner contract breach)', () => {
+    it('Given a hand-crafted plan whose restore-overwrite carries an empty originalRaw, When applying, Then the original line is preserved (not replaced with undefined)', () => {
+      // The real planner rejects empty annotation bodies, but if a
+      // future change emits restore-overwrite with no content,
+      // `parse('').lines[0]` is undefined. The defensive fallback
+      // preserves the incoming line so the serialise stage never
+      // dereferences `undefined.raw`.
+      const parsed = parse('*.profile-meta.xml merge=salesforce-source\n')
+      const badPlan = {
+        actions: [
+          {
+            kind: 'restore-overwrite' as const,
+            lineIndex: 0,
+            originalRaw: '',
+          },
+        ],
+      }
+
+      // Act
+      const nextLines = applyUninstallPlan(parsed.lines, badPlan)
+
+      // Assert — the incoming line is kept verbatim (no undefined).
+      expect(nextLines).toHaveLength(1)
+      expect(nextLines[0]?.kind).toBe('rule')
+      expect(nextLines[0]?.raw).toBe(
+        '*.profile-meta.xml merge=salesforce-source'
+      )
     })
   })
 

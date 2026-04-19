@@ -27,6 +27,13 @@ type PolicyPrompt = (
  * conflict actions. Kept as a dependency-injectable function so tests
  * can drive the command without opening a real readline.
  */
+export const parsePromptAnswer = (raw: string): ConflictPolicy => {
+  const normalised = raw.trim().toLowerCase()
+  if (normalised === 's' || normalised === 'skip') return 'skip'
+  if (normalised === 'o' || normalised === 'overwrite') return 'overwrite'
+  return 'abort'
+}
+
 const defaultPolicyPrompt: PolicyPrompt = async conflicts => {
   const rl = createInterface({ input: process.stdin, output: process.stdout })
   try {
@@ -43,12 +50,14 @@ const defaultPolicyPrompt: PolicyPrompt = async conflicts => {
         '  [o] overwrite (replace; uninstall will restore)\n'
     )
     const answer = await new Promise<string>(resolve => {
+      // An early stdin EOF (e.g., piped empty input, detached TTY)
+      // would otherwise leave `rl.question`'s callback unresolved —
+      // 'close' fires in that case, so we resolve with '' and let
+      // parsePromptAnswer fall back to 'abort'.
+      rl.once('close', () => resolve(''))
       rl.question('Enter a / s / o [a]: ', resolve)
     })
-    const normalised = answer.trim().toLowerCase()
-    if (normalised === 's' || normalised === 'skip') return 'skip'
-    if (normalised === 'o' || normalised === 'overwrite') return 'overwrite'
-    return 'abort'
+    return parsePromptAnswer(answer)
   } finally {
     rl.close()
   }
@@ -235,34 +244,40 @@ export default class Install extends SfCommand<void> {
       }
     }
 
+    let outcome: InstallOutcome
     try {
-      const outcome = await new InstallService().installMergeDriver({
+      outcome = await new InstallService().installMergeDriver({
         dryRun,
         onConflict,
       })
-      if (dryRun) {
-        this.log(formatDryRunReport(outcome))
-        return
-      }
-      // Surface diagnostic warnings to the user after a successful
-      // install. These don't alter installation state — they're cues
-      // that the driver may not fire until the user takes action.
-      for (const w of outcome.plan.textAttributeWarnings) {
-        this.warn(
-          `${w.pattern} is marked \`-text\` (binary) on line ${w.lineIndex + 1} of .git/info/attributes. Git does not invoke merge drivers on binary files; the merge driver will be installed but inactive for this glob until you remove \`-text\`.`
-        )
-      }
-      for (const w of outcome.plan.commentedOutWarnings) {
-        this.warn(
-          `${w.pattern} has a commented-out driver rule on line ${w.lineIndex + 1} of .git/info/attributes. The live rule has been added below it — consider removing the commented line to avoid confusion.`
-        )
-      }
-      Logger.info('Merge driver installed successfully')
     } catch (error) {
       if (error instanceof InstallConflictError) {
+        // `this.error` throws a CLIError internally — no need to
+        // re-throw after it. We branch here so any other error type
+        // propagates naturally via the outer catch shape oclif
+        // expects.
         this.error(error.message, { exit: 2 })
       }
       throw error
     }
+
+    if (dryRun) {
+      this.log(formatDryRunReport(outcome))
+      return
+    }
+    // Surface diagnostic warnings to the user after a successful
+    // install. These don't alter installation state — they're cues
+    // that the driver may not fire until the user takes action.
+    for (const w of outcome.plan.textAttributeWarnings) {
+      this.warn(
+        `${w.pattern} is marked \`-text\` (binary) on line ${w.lineIndex + 1} of .git/info/attributes. Git does not invoke merge drivers on binary files; the merge driver will be installed but inactive for this glob until you remove \`-text\`.`
+      )
+    }
+    for (const w of outcome.plan.commentedOutWarnings) {
+      this.warn(
+        `${w.pattern} has a commented-out driver rule on line ${w.lineIndex + 1} of .git/info/attributes. The live rule has been added below it — consider removing the commented line to avoid confusion.`
+      )
+    }
+    Logger.info('Merge driver installed successfully')
   }
 }

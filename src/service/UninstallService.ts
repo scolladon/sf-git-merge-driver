@@ -24,7 +24,7 @@ import { planUninstall, type UninstallPlan } from './GitAttributesPlanner.js'
  *     overwrite. The paired `drop-line` for the annotation comment
  *     above is emitted by the planner and handled here uniformly.
  */
-const applyUninstallPlan = (
+export const applyUninstallPlan = (
   lines: readonly Line[],
   plan: UninstallPlan
 ): Line[] => {
@@ -40,11 +40,13 @@ const applyUninstallPlan = (
     if (drop.has(index)) return []
     const restoreRaw = restore.get(index)
     if (restoreRaw !== undefined) {
-      // `originalRaw` was captured from a serialised rule by the
-      // planner, so parse always yields exactly one line — no need for
-      // a defensive fallback. Cast with `!` documents that narrowing
-      // without adding an untested else branch to coverage.
-      return [parse(restoreRaw).lines[0] as Line]
+      // The planner rejects empty annotation bodies (see
+      // GitAttributesPlanner.planUninstall), so `restoreRaw` always
+      // has non-whitespace content here and parse yields ≥1 line.
+      // If the contract ever breaks, fall back to keeping the
+      // original line instead of writing undefined into the output.
+      const restored = parse(restoreRaw).lines[0]
+      return restored ? [restored] : [line]
     }
     if (!rewrite.has(index) || line.kind !== 'rule') return [line]
     return [ruleWithoutAttr(line, 'merge')]

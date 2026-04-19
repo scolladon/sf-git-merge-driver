@@ -727,6 +727,37 @@ describe('GitAttributesPlanner.planUninstall — annotation-based restore', () =
     expect(plan.actions).toEqual([])
   })
 
+  it('Given an annotation with an empty body above our driver, When planning uninstall, Then NO restore is emitted and the driver rule falls through to drop-line (no crash)', () => {
+    // Kills the empty-body crash: `parse("")` yields zero lines, so
+    // writing `undefined` into the attributes file would corrupt it.
+    // The planner ignores annotations whose body is empty / whitespace.
+    const input =
+      '# sf-git-merge-driver overwrote: \n' +
+      '*.profile-meta.xml merge=salesforce-source\n'
+    const pf = parse(input)
+
+    // Act
+    const plan = planUninstall(pf)
+
+    // Assert — the annotation is treated as an ordinary comment (no
+    // action), the driver rule is dropped normally. The annotation
+    // itself stays; user can remove it if they want.
+    expect(plan.actions).toEqual([{ kind: 'drop-line', lineIndex: 1 }])
+  })
+
+  it('Given an annotation with a whitespace-only body, When planning uninstall, Then it is also treated as empty (no restore)', () => {
+    const input =
+      '# sf-git-merge-driver overwrote:    \n' +
+      '*.profile-meta.xml merge=salesforce-source\n'
+    const pf = parse(input)
+
+    // Act
+    const plan = planUninstall(pf)
+
+    // Assert
+    expect(plan.actions).toEqual([{ kind: 'drop-line', lineIndex: 1 }])
+  })
+
   it('Given our driver line at the very first file position (index 0, no prior line), When planning uninstall, Then it is treated as a plain drop-line (not a restore)', () => {
     // Kills the `i > 0 ? file.lines[i - 1] : undefined` mutants: if
     // that guard is removed, `file.lines[-1]` is undefined — same
