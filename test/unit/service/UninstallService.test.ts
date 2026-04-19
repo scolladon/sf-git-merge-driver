@@ -4,10 +4,27 @@ import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest'
 import { DRIVER_NAME } from '../../../src/constant/driverConstant.js'
 import { UninstallService } from '../../../src/service/UninstallService.js'
 import { getGitAttributesPath } from '../../../src/utils/gitUtils.js'
+import { Logger } from '../../../src/utils/LoggingService.js'
 
 vi.mock('node:fs/promises')
 vi.mock('simple-git')
 vi.mock('../../../src/utils/gitUtils.js')
+vi.mock('../../../src/utils/LoggingService.js', async importOriginal => {
+  const actual =
+    await importOriginal<
+      typeof import('../../../src/utils/LoggingService.js')
+    >()
+  return {
+    ...actual,
+    Logger: {
+      trace: vi.fn(),
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    },
+  }
+})
 
 const GIT_ATTRIBUTES_PATH = '.git/info/attributes'
 const ATTRIBUTES_CONTENT = `*.xml merge=salesforce-source\nsome other content`
@@ -66,6 +83,18 @@ describe('UninstallService', () => {
         FILTERED_CONTENT
       )
     })
+
+    it('then the outcome reports wroteAttributes=true and removedConfigSection=true', async () => {
+      // Act
+      const outcome = await sut.uninstallMergeDriver()
+
+      // Assert — explicit boolean pins so mutants flipping true→false
+      // on the flag assignments are killed.
+      expect(outcome.removedConfigSection).toBe(true)
+      expect(outcome.wroteAttributes).toBe(true)
+      expect(outcome.dryRun).toBe(false)
+      expect(outcome.gitAttributesPath).toBe(GIT_ATTRIBUTES_PATH)
+    })
   })
 
   describe('given config cleanup fails when uninstalling', () => {
@@ -85,15 +114,26 @@ describe('UninstallService', () => {
   })
 
   describe('given both config and attributes cleanup fail when uninstalling', () => {
-    it('then fails silently', async () => {
+    it('then fails silently AND both errors are logged with their distinct prefixes', async () => {
       // Arrange
-      mockedRaw.mockRejectedValue(new Error('Failed to cleanup git config'))
-      readFileMocked.mockRejectedValue(
-        new Error('Failed to cleanup git attributes')
-      )
+      const configError = new Error('Failed to cleanup git config')
+      const attrsError = new Error('Failed to cleanup git attributes')
+      mockedRaw.mockRejectedValue(configError)
+      readFileMocked.mockRejectedValue(attrsError)
 
-      // Act & Assert
+      // Act
       await expect(sut.uninstallMergeDriver()).resolves.not.toThrow()
+
+      // Assert — exact log-message prefixes guard against mutants that
+      // gut the string literals to "".
+      expect(Logger.error).toHaveBeenCalledWith(
+        'Merge driver uninstallation failed to cleanup git config',
+        configError
+      )
+      expect(Logger.error).toHaveBeenCalledWith(
+        'Merge driver uninstallation failed to cleanup git attributes',
+        attrsError
+      )
     })
   })
 

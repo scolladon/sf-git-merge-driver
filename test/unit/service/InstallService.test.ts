@@ -7,6 +7,8 @@ import {
   METADATA_TYPES_PATTERNS,
 } from '../../../src/constant/metadataConstant.js'
 import {
+  DRIVER_COMMAND,
+  DRIVER_NAME_CONFIG_VALUE,
   InstallConflictError,
   InstallService,
 } from '../../../src/service/InstallService.js'
@@ -51,6 +53,20 @@ describe('InstallService', () => {
     readFileMocked.mockRejectedValue(ENOENT)
   })
 
+  describe('module-level DRIVER_COMMAND', () => {
+    it('has the expected shape: sh -c wrapper, forward-slash POSIX binary path, all 8 placeholders', () => {
+      // Kills path-escape regex mutations that would drop the
+      // forward-slash normalisation or strip quote escaping. Also
+      // pins the constant `DRIVER_NAME_CONFIG_VALUE` string so
+      // mutations like `this.name = ""` on derived values are caught.
+      expect(DRIVER_COMMAND).toMatch(
+        /^sh -c 'node ".+\/bin\/merge-driver\.cjs" -O "\$1" -A "\$2" -B "\$3" -P "\$4" -L "\$5" -S "\$6" -X "\$7" -Y "\$8"' -- %O %A %B %P %L %S %X %Y$/
+      )
+      expect(DRIVER_COMMAND).not.toMatch(/\\/) // no backslashes — POSIX path
+      expect(DRIVER_NAME_CONFIG_VALUE).toBe('Salesforce source merge driver')
+    })
+  })
+
   describe('git config', () => {
     it('Given any install invocation, When running, Then writes the two git-config entries exactly once', async () => {
       // Act
@@ -66,6 +82,18 @@ describe('InstallService', () => {
         `merge.${DRIVER_NAME}.driver`,
         expect.stringMatching(DRIVER_LINE_PATTERN)
       )
+    })
+
+    it('Given simpleGit is created, Then it receives { unsafe: { allowUnsafeMergeDriver: true } } so the sh -c driver is accepted', async () => {
+      // Act
+      await sut.installMergeDriver()
+
+      // Assert — the option matters: without it simple-git refuses to
+      // set driver commands that invoke sh. Exact-shape assertion so
+      // mutation drops of any key are caught.
+      expect(simpleGitMock).toHaveBeenCalledWith({
+        unsafe: { allowUnsafeMergeDriver: true },
+      })
     })
 
     it('Given the resolved binary path, When installing, Then it points at bin/merge-driver.cjs relative to the plugin root', async () => {
@@ -112,6 +140,35 @@ describe('InstallService', () => {
       expect(writeFileMocked).toHaveBeenCalledTimes(1)
       const [, content] = writeFileMocked.mock.calls[0] as [string, string]
       expect(content).toContain(`merge=${DRIVER_NAME}`)
+    })
+
+    it('Given a non-dry-run install, Then the outcome reports dryRun=false and wroteAttributes=true', async () => {
+      // Arrange — triggers write path
+      // Act
+      const outcome = await sut.installMergeDriver()
+
+      // Assert — explicit booleans; kills ReturnValue mutations that
+      // flip `dryRun: false` → `dryRun: true`.
+      expect(outcome.dryRun).toBe(false)
+      expect(outcome.wroteAttributes).toBe(true)
+    })
+
+    it('Given an idempotent re-install, Then wroteAttributes is false (no I/O)', async () => {
+      // Arrange — seed the file with every pattern already present
+      const seeded =
+        METADATA_TYPES_PATTERNS.map(
+          p => `*.${p}-meta.xml merge=${DRIVER_NAME}`
+        ).join('\n') +
+        '\n' +
+        MANIFEST_PATTERNS.map(p => `${p} merge=${DRIVER_NAME}`).join('\n') +
+        '\n'
+      readFileMocked.mockResolvedValue(seeded)
+
+      // Act
+      const outcome = await sut.installMergeDriver()
+
+      // Assert
+      expect(outcome.wroteAttributes).toBe(false)
     })
   })
 
@@ -204,6 +261,52 @@ describe('InstallService', () => {
         },
       ])
     })
+
+    it('Given a single conflict, Then the error message names the pattern, the other driver, and the total count', async () => {
+      // Arrange
+      readFileMocked.mockResolvedValue(
+        '*.profile-meta.xml merge=some-other-tool\n'
+      )
+
+      // Act
+      const err = (await sut
+        .installMergeDriver()
+        .catch(e => e)) as InstallConflictError
+
+      // Assert — exact-message so mutations that gut the template
+      // literal (empty string, dropped lines.join, etc.) are caught.
+      expect(err.name).toBe('InstallConflictError')
+      expect(err.message).toBe(
+        'Installation aborted: 1 pattern(s) already configured with a different merge driver.\n  *.profile-meta.xml is already owned by merge=some-other-tool'
+      )
+    })
+
+    it('Given multiple conflicts, Then each pattern appears on its own line in the error message', async () => {
+      // Arrange — two patterns each owned by a different driver
+      readFileMocked.mockResolvedValue(
+        '*.profile-meta.xml merge=tool-a\n*.permissionset-meta.xml merge=tool-b\n'
+      )
+
+      // Act
+      const err = (await sut
+        .installMergeDriver()
+        .catch(e => e)) as InstallConflictError
+
+      // Assert — newline-joined list; mutations that strip the join or
+      // the per-line formatter fail here.
+      expect(err.message).toContain(
+        '2 pattern(s) already configured with a different merge driver.'
+      )
+      expect(err.message).toContain(
+        '  *.profile-meta.xml is already owned by merge=tool-a'
+      )
+      expect(err.message).toContain(
+        '  *.permissionset-meta.xml is already owned by merge=tool-b'
+      )
+      // The two conflict lines are separated by a newline (not
+      // concatenated), which guards against `lines.join('')`.
+      expect(err.message).toMatch(/tool-a\n {2}\*\.permissionset-meta\.xml/)
+    })
   })
 
   describe('unexpected read errors', () => {
@@ -215,6 +318,33 @@ describe('InstallService', () => {
 
       // Act + Assert
       await expect(sut.installMergeDriver()).rejects.toThrow('EACCES')
+    })
+
+    it('Given readFile rejects with a bare string (not an object), When installing, Then the error propagates', async () => {
+      // Defensive — the ENOENT classifier narrows on `typeof err === 'object'`
+      // specifically. A string reject should bypass the fallback.
+      readFileMocked.mockRejectedValue('oops')
+      await expect(sut.installMergeDriver()).rejects.toBe('oops')
+    })
+
+    it('Given readFile rejects with null, When installing, Then the error propagates (null is not a readable Node error)', async () => {
+      // Kills the `err && …` and `typeof === object` mutations that would
+      // otherwise treat null as "missing file → fall back to empty".
+      readFileMocked.mockRejectedValue(null)
+      await expect(sut.installMergeDriver()).rejects.toBeNull()
+    })
+
+    it('Given readFile rejects ENOENT on a fresh repo, When installing, Then the fallback returns empty and writeFile creates the file populated with our patterns', async () => {
+      // Explicit ENOENT-handling assertion — kills the "Stryker was here!"
+      // string mutation on the fallback return value.
+      readFileMocked.mockRejectedValue(ENOENT)
+      await sut.installMergeDriver()
+      const [, content] = writeFileMocked.mock.calls[0] as [string, string]
+      // The fallback supplies '' which parses to an empty attributes
+      // file, so the resulting output must start cleanly with our
+      // first pattern (no "Stryker was here!" preamble, no stray
+      // prefix from a non-empty fallback).
+      expect(content.startsWith('*.')).toBe(true)
     })
   })
 

@@ -61,10 +61,12 @@ export const planUninstall = (file: ParsedFile): UninstallPlan => {
     if (getMerge(line) !== DRIVER_NAME) continue
 
     // Check for an overwrite annotation on the preceding line.
-    const prev = i > 0 ? file.lines[i - 1] : undefined
+    // `file.lines[-1]` is undefined in JS, so no explicit bounds
+    // check needed — the `prev?.kind === 'comment'` gate below
+    // handles both "missing" and "wrong kind" with one expression.
+    const prev = file.lines[i - 1]
     if (
-      prev &&
-      prev.kind === 'comment' &&
+      prev?.kind === 'comment' &&
       prev.raw.startsWith(OVERWRITE_ANNOTATION_PREFIX)
     ) {
       const originalRaw = prev.raw.slice(OVERWRITE_ANNOTATION_PREFIX.length)
@@ -196,8 +198,11 @@ const detectCommentedOutDriverLines = (
   for (let i = 0; i < file.lines.length; i++) {
     const line = file.lines[i]
     if (line.kind !== 'comment') continue
-    // Strip the leading `#` and any whitespace that follows
-    const body = line.raw.replace(/^\s*#\s*/, '').trimEnd()
+    // Comment lines always start with `#` (optionally preceded by
+    // whitespace), followed optionally by more whitespace. `trim`
+    // collapses both ends, then we drop the `#` prefix and any
+    // whitespace following it in one pass.
+    const body = line.raw.trim().replace(/^#\s*/, '')
     if (!body.endsWith(expectedSuffix)) continue
     const pattern = body.slice(0, -expectedSuffix.length).trim()
     if (!desiredPatterns.has(pattern)) continue
@@ -268,10 +273,12 @@ export const planInstall = (
       }
       continue
     }
-    const otherFirst = matches.find(m => {
-      const merge = getMerge(m.rule)
-      return typeof merge === 'string' && merge !== DRIVER_NAME
-    })
+    // `oursFirst` is guaranteed falsy at this point (continue above
+    // otherwise), so any rule with a string merge= on this pattern
+    // is by definition a different driver. The `!== DRIVER_NAME`
+    // check is therefore structurally redundant — we keep only the
+    // `typeof merge === 'string'` guard.
+    const otherFirst = matches.find(m => typeof getMerge(m.rule) === 'string')
     if (otherFirst) {
       const existingDriver = getMerge(otherFirst.rule) as string
       actions.push(

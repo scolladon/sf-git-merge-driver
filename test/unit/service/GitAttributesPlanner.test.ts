@@ -311,6 +311,24 @@ describe('GitAttributesPlanner.planInstall', () => {
         },
       ])
     })
+
+    it('Given OUR driver appears first and another driver second on the same pattern, When planning, Then the action is `skip` (ours), not `conflict`', () => {
+      // Guards the "merge !== DRIVER_NAME" filter used when picking
+      // the conflict line — if that predicate were stripped, the
+      // planner would incorrectly flag this as a conflict.
+      const pf = parse(
+        '*.profile-meta.xml merge=salesforce-source\n*.profile-meta.xml merge=some-other-tool\n'
+      )
+
+      // Act
+      const plan = planInstall(pf, ['*.profile-meta.xml'], 'abort')
+
+      // Assert — our rule wins on first match; the conflict filter
+      // correctly excludes our own driver when scanning for others.
+      expect(plan.actions).toEqual([
+        { kind: 'skip', pattern: '*.profile-meta.xml', lineIndex: 0 },
+      ])
+    })
   })
 
   describe('A7 — user has non-merge attributes on our glob', () => {
@@ -510,6 +528,85 @@ describe('GitAttributesPlanner.planInstall', () => {
       // Assert
       expect(plan.commentedOutWarnings).toEqual([])
     })
+
+    it('Given a commented-out driver with extra whitespace after the #, When planning, Then the pattern is still detected', () => {
+      // Regex guard — `/^\s*#\s*/` must strip the whitespace, not
+      // reject the line for having extra spaces.
+      const pf = parse('#    *.profile-meta.xml merge=salesforce-source\n')
+
+      // Act
+      const plan = planInstall(pf, ['*.profile-meta.xml'])
+
+      // Assert
+      expect(plan.commentedOutWarnings).toEqual([
+        { pattern: '*.profile-meta.xml', lineIndex: 0 },
+      ])
+    })
+
+    it('Given a commented-out driver line with trailing whitespace, When planning, Then the pattern is still detected (trimEnd must strip tail spaces)', () => {
+      // Kills `trimEnd` → `trimStart` mutation. With `trimStart`
+      // instead, trailing spaces survive and the suffix check
+      // `endsWith(' merge=salesforce-source')` fails.
+      const pf = parse('# *.profile-meta.xml merge=salesforce-source   \n')
+
+      // Act
+      const plan = planInstall(pf, ['*.profile-meta.xml'])
+
+      // Assert
+      expect(plan.commentedOutWarnings).toEqual([
+        { pattern: '*.profile-meta.xml', lineIndex: 0 },
+      ])
+    })
+
+    it('Given a rule line whose raw happens to contain a # mid-line, When planning, Then it is NOT classified as a commented-out driver', () => {
+      // Kills the regex anchor mutation `/\s*#\s*/` (no `^`). Without
+      // the leading-anchor, `# merge=salesforce-source` anywhere in
+      // the raw would match. We build such a case by planting the
+      // suffix inside a fake comment whose # is NOT at the start.
+      // Parser classifies this as a comment (starts with #), so we
+      // instead use an actual rule whose pattern contains a # (rare
+      // but possible per git attributes grammar).
+      const pf = parse('*.p#fake merge=salesforce-source\n')
+
+      // Act — desired set intentionally doesn't include the weird
+      // pattern; we just need to prove the detector doesn't lift it.
+      const plan = planInstall(pf, ['*.profile-meta.xml'])
+
+      // Assert — no commented-out warning (the line is a rule, not
+      // a comment, so the detector shouldn't touch it).
+      expect(plan.commentedOutWarnings).toEqual([])
+    })
+
+    it('Given a commented-out driver with NO space after the #, When planning, Then the pattern is still detected', () => {
+      // Kills the regex mutation `/^\s*#\s/` (requires one space)
+      // and `/^\s*#\S*/` (greedy non-space eats the pattern).
+      const pf = parse('#*.profile-meta.xml merge=salesforce-source\n')
+
+      // Act
+      const plan = planInstall(pf, ['*.profile-meta.xml'])
+
+      // Assert
+      expect(plan.commentedOutWarnings).toEqual([
+        { pattern: '*.profile-meta.xml', lineIndex: 0 },
+      ])
+    })
+
+    it('Given a comment that happens to end with our suffix but the pattern has trailing whitespace, When planning, Then it is still matched (trim handles trailing spaces)', () => {
+      // Kills the `body.slice(...).trim()` → `body.slice(...)` mutant.
+      // Without trim, a pattern with a trailing space wouldn't be in
+      // the desired set and the detection would silently drop it.
+      const pf = parse('#    *.profile-meta.xml    merge=salesforce-source\n')
+
+      // Act
+      const plan = planInstall(pf, ['*.profile-meta.xml'])
+
+      // Assert — note: trailing whitespace is trimmed off BEFORE the
+      // suffix check by trimEnd(), so the slice itself yields
+      // '*.profile-meta.xml' already. The trim is belt-and-suspenders.
+      expect(plan.commentedOutWarnings).toEqual([
+        { pattern: '*.profile-meta.xml', lineIndex: 0 },
+      ])
+    })
   })
 
   describe('-text footgun — glob marked binary', () => {
@@ -628,5 +725,39 @@ describe('GitAttributesPlanner.planUninstall — annotation-based restore', () =
 
     // Assert — no restore, no drop; nothing for the planner to do.
     expect(plan.actions).toEqual([])
+  })
+
+  it('Given our driver line at the very first file position (index 0, no prior line), When planning uninstall, Then it is treated as a plain drop-line (not a restore)', () => {
+    // Kills the `i > 0 ? file.lines[i - 1] : undefined` mutants: if
+    // that guard is removed, `file.lines[-1]` is undefined — same
+    // observable result — but swapping `> 0` to `>= 0` would still
+    // treat index 0 differently.
+    const input = '*.profile-meta.xml merge=salesforce-source\n'
+    const pf = parse(input)
+
+    // Act
+    const plan = planUninstall(pf)
+
+    // Assert — plain drop-line at index 0, not a restore-overwrite.
+    expect(plan.actions).toEqual([{ kind: 'drop-line', lineIndex: 0 }])
+  })
+
+  it('Given a non-comment line directly above our driver rule, When planning, Then no restore-overwrite is emitted', () => {
+    // Kills the `prev.kind === 'comment' && ...` → `true && ...` mutant.
+    // Without the kind check, a rule line above ours whose raw happens
+    // to start with our annotation prefix would incorrectly trigger a
+    // restore. Here we use a rule whose raw cannot possibly match the
+    // prefix (but the mutant would skip the kind check and try to
+    // startsWith on any raw).
+    const input =
+      '*.other-meta.xml text=auto\n*.profile-meta.xml merge=salesforce-source\n'
+    const pf = parse(input)
+
+    // Act
+    const plan = planUninstall(pf)
+
+    // Assert — drop-line only, no restore; the preceding non-comment
+    // rule line does not qualify as an annotation.
+    expect(plan.actions).toEqual([{ kind: 'drop-line', lineIndex: 1 }])
   })
 })

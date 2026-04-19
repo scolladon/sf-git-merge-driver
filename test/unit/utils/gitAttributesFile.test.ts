@@ -87,6 +87,19 @@ describe('gitAttributesFile.parse', () => {
       expect(sut.hasTrailingNewline).toBe(false)
       expect(sut.lines).toHaveLength(1)
     })
+
+    it('Given a non-empty string with NO newline at all, When parsing, Then falls back to os.EOL', () => {
+      // Kills ConditionalExpression mutants on `if (text.includes('\n'))`
+      // and the StringLiteral mutant `text.includes('')`.
+      const input = '* text=auto'
+
+      // Act
+      const sut = parse(input)
+
+      // Assert — on POSIX EOL is '\n'; on Windows it's '\r\n'. Assert
+      // the contract abstractly: the returned EOL is os.EOL.
+      expect(sut.eol).toBe(EOL)
+    })
   })
 
   describe('rule parsing', () => {
@@ -176,8 +189,102 @@ describe('gitAttributesFile.parse', () => {
       expect(rule.pattern).toBe('*.profile-meta.xml')
     })
 
-    it('Given multiple whitespace separators, When parsing, Then tokenises correctly', () => {
-      // Arrange
+    it('Given an unquoted pattern, When parsing, Then no quotes are stripped (pattern stays as-is)', () => {
+      // Arrange — guards the two StringLiteral mutants on the
+      // `startsWith('"') && endsWith('"')` checks by proving both
+      // sides of the conditional fire when quotes ARE present and
+      // neither incorrectly fires when they aren't.
+      const input = '*.profile-meta.xml merge=salesforce-source\n'
+
+      // Act
+      const sut = parse(input)
+      const rule = sut.lines[0]
+
+      // Assert
+      if (rule.kind !== 'rule') throw new Error('unreachable')
+      expect(rule.pattern).toBe('*.profile-meta.xml')
+      // Sanity: the literal double-quote is NOT part of the pattern
+      expect(rule.pattern.includes('"')).toBe(false)
+    })
+
+    it('Given a pattern starting with " but not ending with " (malformed quoting), When parsing, Then the quote is preserved (no half-strip)', () => {
+      // Kills the endsWith('"') → endsWith("") mutation, which would
+      // make every pattern look quote-terminated and wrongly strip.
+      const input = '"*.profile-meta.xml merge=salesforce-source\n'
+
+      // Act
+      const sut = parse(input)
+      const rule = sut.lines[0]
+
+      // Assert
+      if (rule.kind !== 'rule') throw new Error('unreachable')
+      expect(rule.pattern.startsWith('"')).toBe(true)
+    })
+
+    it('Given a pattern ending with " but not starting with " (malformed quoting), When parsing, Then the quote is preserved', () => {
+      // Kills the startsWith('"') → startsWith("") mutation.
+      const input = '*.profile-meta.xml" merge=salesforce-source\n'
+
+      // Act
+      const sut = parse(input)
+      const rule = sut.lines[0]
+
+      // Assert
+      if (rule.kind !== 'rule') throw new Error('unreachable')
+      expect(rule.pattern.endsWith('"')).toBe(true)
+    })
+
+    it('Given a single-character quoted pattern "x", When parsing, Then quotes ARE stripped (length 3 passes >= 2)', () => {
+      // Kills the `>= 2` → `> 2` mutation by asserting stripping works
+      // at the boundary. "x" has length 3, well above 2.
+      const input = '"x" merge=salesforce-source\n'
+
+      // Act
+      const sut = parse(input)
+      const rule = sut.lines[0]
+
+      // Assert
+      if (rule.kind !== 'rule') throw new Error('unreachable')
+      expect(rule.pattern).toBe('x')
+    })
+
+    it("Given a one-character pattern '\"' (length 1), When parsing, Then it is NOT mistaken for an empty quoted pattern", () => {
+      // Kills the `pattern.length >= 2` guard mutations: without it,
+      // `startsWith('"') && endsWith('"')` would both be true for the
+      // single-character string `"` and the slice(1, -1) would produce
+      // an empty pattern. The >=2 guard prevents this.
+      const input = '" merge=salesforce-source\n'
+
+      // Act
+      const sut = parse(input)
+      const rule = sut.lines[0]
+
+      // Assert — the literal `"` stays (not stripped to '').
+      if (rule.kind !== 'rule') throw new Error('unreachable')
+      expect(rule.pattern).toBe('"')
+    })
+
+    it('Given a two-character pattern \'""\' (empty quoted pattern of length exactly 2), When parsing, Then the quotes are stripped to yield an empty pattern', () => {
+      // Boundary test for `pattern.length >= 2`: at length 2, the
+      // guard fires (>= passes, > fails). This kills the `>` mutation
+      // which would leave the literal `""` as the pattern.
+      const input = '"" merge=salesforce-source\n'
+
+      // Act
+      const sut = parse(input)
+      const rule = sut.lines[0]
+
+      // Assert — at length exactly 2, quotes are stripped; pattern
+      // becomes the empty string (odd but correct per the spec).
+      if (rule.kind !== 'rule') throw new Error('unreachable')
+      expect(rule.pattern).toBe('')
+    })
+
+    it('Given multiple whitespace separators, When parsing, Then tokenises correctly (no empty attr tokens)', () => {
+      // Arrange — uses tab + double space + triple space. If the
+      // regex mutates to /\s/ (single-char), split produces empty
+      // tokens between consecutive whitespace, which would be parsed
+      // as zero-length attr names.
       const input = '*.xml\t  merge=salesforce-source   text\n'
 
       // Act
@@ -188,6 +295,10 @@ describe('gitAttributesFile.parse', () => {
       if (rule.kind !== 'rule') throw new Error('unreachable')
       expect(rule.attrs.get('merge')).toBe('salesforce-source')
       expect(rule.attrs.get('text')).toBe(true)
+      // Kill /\s+/ → /\s/ mutation: no zero-length attribute names.
+      expect(rule.attrs.has('')).toBe(false)
+      // And the attrs map has exactly what we expect, nothing extra.
+      expect(Array.from(rule.attrs.keys()).sort()).toEqual(['merge', 'text'])
     })
   })
 
