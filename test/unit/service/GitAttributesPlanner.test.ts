@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
+  type InstallPlan,
+  planInstall,
   planUninstall,
   type UninstallPlan,
 } from '../../../src/service/GitAttributesPlanner.js'
 import {
+  addRule,
   parse,
   ruleWithoutAttr,
   serialise,
@@ -169,6 +172,250 @@ describe('GitAttributesPlanner.planUninstall', () => {
       expect(plan.actions).toEqual([{ kind: 'drop-line', lineIndex: 1 }])
       expect(applied).toBe('* text=auto\r\n')
       expect(applied).not.toContain('\n\n') // no mixed EOL artefacts
+    })
+  })
+})
+
+/**
+ * planInstall decides, for each pattern we want to own, whether to add a
+ * new line, silently dedup existing ones, or flag a conflict with
+ * another tool. The planner is pure domain — no I/O, no policy
+ * enforcement; the service reads the plan and chooses how to apply.
+ */
+const applyInstallPlan = (
+  input: string,
+  patterns: readonly string[],
+  plan: InstallPlan
+): string => {
+  const parsed = parse(input)
+  const dedup = new Set(plan.dedupDrops)
+  const kept = parsed.lines.flatMap((line, index) =>
+    dedup.has(index) ? [] : [line]
+  )
+  let next = { ...parsed, lines: kept }
+  for (const action of plan.actions) {
+    if (action.kind !== 'add') continue
+    // Derived via the shared helper so the test matches the service
+    next = addRule(next, action.pattern, [['merge', 'salesforce-source']])
+  }
+  // `patterns` is accepted for symmetry with the service API but not
+  // used here — the plan already contains resolved actions.
+  void patterns
+  return serialise(next)
+}
+
+describe('GitAttributesPlanner.planInstall', () => {
+  describe('A1/A2 — empty or missing file', () => {
+    it('Given an empty file, When planning install, Then every pattern gets an `add` action', () => {
+      // Arrange
+      const pf = parse('')
+      const patterns = ['*.profile-meta.xml', '*.permissionset-meta.xml']
+
+      // Act
+      const plan = planInstall(pf, patterns)
+
+      // Assert
+      expect(plan.actions).toEqual([
+        { kind: 'add', pattern: '*.profile-meta.xml' },
+        { kind: 'add', pattern: '*.permissionset-meta.xml' },
+      ])
+      expect(plan.dedupDrops).toEqual([])
+    })
+  })
+
+  describe('A3 — file has rules on non-overlapping globs', () => {
+    it('Given unrelated rules, When planning install, Then only `add` actions for our patterns; user content untouched', () => {
+      // Arrange
+      const input = '* text=auto eol=lf\n*.sh text\n'
+      const pf = parse(input)
+
+      // Act
+      const plan = planInstall(pf, ['*.profile-meta.xml'], 'abort')
+
+      // Assert
+      expect(plan.actions).toEqual([
+        { kind: 'add', pattern: '*.profile-meta.xml' },
+      ])
+      const applied = applyInstallPlan(input, ['*.profile-meta.xml'], plan)
+      expect(applied).toBe(
+        '* text=auto eol=lf\n*.sh text\n*.profile-meta.xml merge=salesforce-source\n'
+      )
+    })
+  })
+
+  describe('A4 — idempotent re-install', () => {
+    it('Given our rule is already present, When planning install, Then action is `skip` (no add, no conflict)', () => {
+      // Arrange
+      const input = '*.profile-meta.xml merge=salesforce-source\n'
+      const pf = parse(input)
+
+      // Act
+      const plan = planInstall(pf, ['*.profile-meta.xml'], 'abort')
+
+      // Assert
+      expect(plan.actions).toEqual([
+        { kind: 'skip', pattern: '*.profile-meta.xml', lineIndex: 0 },
+      ])
+      expect(plan.dedupDrops).toEqual([])
+    })
+  })
+
+  describe('dedup — legacy duplicates', () => {
+    it('Given the same `pattern merge=salesforce-source` line appears twice, When planning install, Then the extra copy is silently dropped (skip + dedup)', () => {
+      // Arrange — the shape left behind by a previous buggy install path
+      const input =
+        '*.profile-meta.xml merge=salesforce-source\n*.profile-meta.xml merge=salesforce-source\n'
+      const pf = parse(input)
+
+      // Act
+      const plan = planInstall(pf, ['*.profile-meta.xml'], 'abort')
+
+      // Assert — skip the first, dedup the second; no-log-required healing
+      expect(plan.actions).toEqual([
+        { kind: 'skip', pattern: '*.profile-meta.xml', lineIndex: 0 },
+      ])
+      expect(plan.dedupDrops).toEqual([1])
+      const applied = applyInstallPlan(input, ['*.profile-meta.xml'], plan)
+      expect(applied).toBe('*.profile-meta.xml merge=salesforce-source\n')
+    })
+
+    it('Given three duplicate copies, When planning install, Then two are dedup-dropped', () => {
+      // Arrange
+      const input = '*.profile-meta.xml merge=salesforce-source\n'.repeat(3)
+      const pf = parse(input)
+
+      // Act
+      const plan = planInstall(pf, ['*.profile-meta.xml'], 'abort')
+
+      // Assert
+      expect(plan.dedupDrops).toEqual([1, 2])
+    })
+  })
+
+  describe('A6 — conflict with another merge driver', () => {
+    it('Given `merge=<other>` on our glob, When planning install, Then action is `conflict` carrying the existing driver name', () => {
+      // Arrange
+      const input = '*.profile-meta.xml merge=some-other-tool\n'
+      const pf = parse(input)
+
+      // Act
+      const plan = planInstall(pf, ['*.profile-meta.xml'], 'abort')
+
+      // Assert
+      expect(plan.actions).toEqual([
+        {
+          kind: 'conflict',
+          pattern: '*.profile-meta.xml',
+          existingDriver: 'some-other-tool',
+          lineIndex: 0,
+        },
+      ])
+    })
+  })
+
+  describe('A7 — user has non-merge attributes on our glob', () => {
+    it('Given a rule with text/eol but no merge, When planning install, Then `add` is emitted (new line; git accumulates attrs across lines)', () => {
+      // Arrange
+      const input = '*.profile-meta.xml text=auto eol=lf\n'
+      const pf = parse(input)
+
+      // Act
+      const plan = planInstall(pf, ['*.profile-meta.xml'], 'abort')
+
+      // Assert
+      expect(plan.actions).toEqual([
+        { kind: 'add', pattern: '*.profile-meta.xml' },
+      ])
+      const applied = applyInstallPlan(input, ['*.profile-meta.xml'], plan)
+      expect(applied).toBe(
+        '*.profile-meta.xml text=auto eol=lf\n*.profile-meta.xml merge=salesforce-source\n'
+      )
+    })
+  })
+
+  describe('A8 — user has combined merge=ours + other attrs', () => {
+    it('Given a combined line, When planning install, Then action is `skip` (we are already the configured driver)', () => {
+      // Arrange
+      const input = '*.profile-meta.xml text=auto merge=salesforce-source\n'
+      const pf = parse(input)
+
+      // Act
+      const plan = planInstall(pf, ['*.profile-meta.xml'], 'abort')
+
+      // Assert
+      expect(plan.actions).toEqual([
+        { kind: 'skip', pattern: '*.profile-meta.xml', lineIndex: 0 },
+      ])
+    })
+  })
+
+  describe('mixed pattern set', () => {
+    it('Given a mix of absent / already-ours / conflicting patterns, When planning install, Then each pattern gets its correct action independently', () => {
+      // Arrange
+      const input =
+        '*.profile-meta.xml merge=salesforce-source\n' +
+        '*.permissionset-meta.xml merge=some-other-tool\n'
+      const pf = parse(input)
+      const patterns = [
+        '*.profile-meta.xml',
+        '*.permissionset-meta.xml',
+        '*.labels-meta.xml',
+      ]
+
+      // Act
+      const plan = planInstall(pf, patterns)
+
+      // Assert
+      expect(plan.actions).toEqual([
+        { kind: 'skip', pattern: '*.profile-meta.xml', lineIndex: 0 },
+        {
+          kind: 'conflict',
+          pattern: '*.permissionset-meta.xml',
+          existingDriver: 'some-other-tool',
+          lineIndex: 1,
+        },
+        { kind: 'add', pattern: '*.labels-meta.xml' },
+      ])
+    })
+  })
+
+  describe('non-rule lines in the file', () => {
+    it('Given the file has comments and blanks, When planning install, Then they are ignored by the pattern index (not misinterpreted as rules)', () => {
+      // Arrange — the indexRulesByPattern pass must skip comment/blank
+      // lines cleanly so their line indices never leak into actions.
+      const input = '# header\n\n*.profile-meta.xml merge=salesforce-source\n'
+      const pf = parse(input)
+
+      // Act
+      const plan = planInstall(pf, ['*.profile-meta.xml'])
+
+      // Assert — skip action references the rule line (index 2), not the
+      // comment or blank that precede it.
+      expect(plan.actions).toEqual([
+        { kind: 'skip', pattern: '*.profile-meta.xml', lineIndex: 2 },
+      ])
+    })
+  })
+
+  describe('dedup filter — only-our-driver duplicates are counted', () => {
+    it('Given the same pattern has both our rule and another rule without merge, When planning install, Then the non-ours rule is NOT dedup-dropped', () => {
+      // Arrange — first rule is ours, second rule is on the same pattern
+      // but carries user attributes (no merge token). That second rule
+      // should survive — dedup only targets redundant copies of OUR
+      // driver, not unrelated user rules on the same pattern.
+      const input =
+        '*.profile-meta.xml merge=salesforce-source\n' +
+        '*.profile-meta.xml text=auto\n'
+      const pf = parse(input)
+
+      // Act
+      const plan = planInstall(pf, ['*.profile-meta.xml'])
+
+      // Assert
+      expect(plan.actions).toEqual([
+        { kind: 'skip', pattern: '*.profile-meta.xml', lineIndex: 0 },
+      ])
+      expect(plan.dedupDrops).toEqual([])
     })
   })
 })
