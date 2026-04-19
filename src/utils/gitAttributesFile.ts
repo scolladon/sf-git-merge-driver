@@ -160,7 +160,7 @@ export const addRule = (
  * Return a new RuleLine with the given attribute removed, keeping the
  * pattern and all other attributes intact. Used by uninstall planners to
  * strip `merge=<driver>` from combined lines without losing the user's
- * other attributes (A8 regression fix).
+ * other attributes.
  */
 export const ruleWithoutAttr = (rule: RuleLine, attrName: string): RuleLine => {
   const nextAttrs = new Map(rule.attrs)

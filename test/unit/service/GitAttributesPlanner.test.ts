@@ -90,7 +90,7 @@ describe('GitAttributesPlanner.planUninstall', () => {
     })
   })
 
-  describe('A8 — combined lines (user attributes + our merge)', () => {
+  describe('combined lines (user attributes + our merge)', () => {
     it('Given a combined line with our merge driver, When planning, Then action is remove-merge-attr (not drop-line) and the user attributes survive serialisation', () => {
       // Arrange
       const input =
@@ -132,7 +132,7 @@ describe('GitAttributesPlanner.planUninstall', () => {
 
   describe('comments and commented-out driver lines', () => {
     it('Given a commented-out driver line, When planning, Then no actions are emitted (comment stays)', () => {
-      // Arrange — A9 scenario from the spike
+      // Arrange — commented-out driver line on one of our globs
       const input = '# *.profile-meta.xml merge=salesforce-source\n'
       const pf = parse(input)
 
@@ -144,7 +144,7 @@ describe('GitAttributesPlanner.planUninstall', () => {
     })
   })
 
-  describe('A10 — CRLF preservation', () => {
+  describe('CRLF preservation', () => {
     it('Given a CRLF file with a pure driver line, When applying the plan, Then the remaining file keeps CRLF endings', () => {
       // Arrange
       const input =
@@ -174,7 +174,7 @@ const applyInstallPlanToString = (input: string, plan: InstallPlan): string => {
 }
 
 describe('GitAttributesPlanner.planInstall', () => {
-  describe('A1/A2 — empty or missing file', () => {
+  describe('empty or missing file', () => {
     it('Given an empty file, When planning install, Then every pattern gets an `add` action', () => {
       // Arrange
       const pf = parse('')
@@ -191,7 +191,7 @@ describe('GitAttributesPlanner.planInstall', () => {
     })
   })
 
-  describe('A3 — file has rules on non-overlapping globs', () => {
+  describe('file has rules on non-overlapping globs', () => {
     it('Given unrelated rules, When planning install, Then only `add` actions for our patterns; user content untouched', () => {
       // Arrange
       const input = '* text=auto eol=lf\n*.sh text\n'
@@ -211,7 +211,7 @@ describe('GitAttributesPlanner.planInstall', () => {
     })
   })
 
-  describe('A4 — idempotent re-install', () => {
+  describe('idempotent re-install', () => {
     it('Given our rule is already present, When planning install, Then action is `skip` (no add, no conflict)', () => {
       // Arrange
       const input = '*.profile-meta.xml merge=salesforce-source\n'
@@ -259,7 +259,7 @@ describe('GitAttributesPlanner.planInstall', () => {
     })
   })
 
-  describe('A6 — conflict with another merge driver', () => {
+  describe('conflict with another merge driver', () => {
     it('Given `merge=<other>` on our glob, When planning install, Then action is `conflict` carrying the existing driver name', () => {
       // Arrange
       const input = '*.profile-meta.xml merge=some-other-tool\n'
@@ -307,7 +307,7 @@ describe('GitAttributesPlanner.planInstall', () => {
     })
   })
 
-  describe('A7 — user has non-merge attributes on our glob', () => {
+  describe('user has non-merge attributes on our glob', () => {
     it('Given a rule with text/eol but no merge, When planning install, Then `add` is emitted (new line; git accumulates attrs across lines)', () => {
       // Arrange
       const input = '*.profile-meta.xml text=auto eol=lf\n'
@@ -327,7 +327,7 @@ describe('GitAttributesPlanner.planInstall', () => {
     })
   })
 
-  describe('A8 — user has combined merge=ours + other attrs', () => {
+  describe('user has combined merge=ours + other attrs', () => {
     it('Given a combined line, When planning install, Then action is `skip` (we are already the configured driver)', () => {
       // Arrange
       const input = '*.profile-meta.xml text=auto merge=salesforce-source\n'
@@ -491,7 +491,7 @@ describe('GitAttributesPlanner.planInstall', () => {
     })
   })
 
-  describe('A9 — commented-out driver line (user disabled us)', () => {
+  describe('commented-out driver line (user disabled us)', () => {
     it('Given a commented-out driver line for one of our patterns, When planning install, Then a warning is surfaced and the pattern is still added (live rule lives below the comment)', () => {
       // Arrange — `# *.profile-meta.xml merge=salesforce-source` shouldn't
       // prevent us from re-adding the live rule, but it's useful to

@@ -18,7 +18,7 @@ import { planUninstall, type UninstallPlan } from './GitAttributesPlanner.js'
  *   - `drop-line` removes the line entirely.
  *   - `remove-merge-attr` rewrites the rule line via `ruleWithoutAttr`,
  *     stripping only the `merge=<our-driver>` token and re-serialising
- *     the raw so the user's other attributes survive (A8 data-loss fix).
+ *     the raw so the user's other attributes on the same line survive.
  *   - `restore-overwrite` re-parses the captured original raw line and
  *     replaces the current line with it, undoing an install-time
  *     overwrite. The paired `drop-line` for the annotation comment

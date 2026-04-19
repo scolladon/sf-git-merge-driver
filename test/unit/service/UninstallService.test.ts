@@ -147,7 +147,7 @@ describe('UninstallService', () => {
     })
   })
 
-  describe('A8 — combined line with user attributes + our merge', () => {
+  describe('combined line with user attributes + our merge', () => {
     it('Given a line like `*.profile-meta.xml text=auto merge=salesforce-source`, When uninstalling, Then the user attributes survive and only `merge=...` is stripped', () => {
       // Arrange — regression fix: the old regex deleted the whole line,
       // destroying the user's `text=auto`.
@@ -169,7 +169,7 @@ describe('UninstallService', () => {
     })
   })
 
-  describe('A10 — CRLF preservation on Windows-flavoured files', () => {
+  describe('CRLF preservation on Windows-flavoured files', () => {
     it('Given a CRLF-terminated attributes file, When uninstalling, Then the output keeps CRLF endings (no mixed LF/CRLF)', () => {
       // Arrange
       readFileMocked.mockResolvedValue(

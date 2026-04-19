@@ -20,8 +20,8 @@ export const OVERWRITE_ANNOTATION_PREFIX = '# sf-git-merge-driver overwrote: '
  * the shape is also what `--dry-run` renders to the user.
  *
  * `drop-line` is safe (line is pure `<pattern> merge=salesforce-source`
- * or equivalent); `remove-merge-attr` is the A8 fix — keep the user's
- * other attributes on the line and only strip our `merge=` token;
+ * or equivalent); `remove-merge-attr` keeps the user's other
+ * attributes on the line and only strips our `merge=` token;
  * `restore-overwrite` reverts an install-time overwrite by writing the
  * original raw line back (paired with a `drop-line` for the annotation
  * comment above it).

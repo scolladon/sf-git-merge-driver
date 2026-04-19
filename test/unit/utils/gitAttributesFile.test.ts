@@ -356,35 +356,32 @@ describe('gitAttributesFile.parse', () => {
 })
 
 describe('gitAttributesFile.serialise', () => {
-  describe('round-trip invariants (A1-A10)', () => {
+  describe('round-trip invariants', () => {
     const fixtures: Array<[label: string, input: string]> = [
-      ['A2 empty with newline', '\n'],
-      ['A3 non-overlapping rules', '* text=auto eol=lf\n*.sh text eol=lf\n'],
+      ['empty with newline', '\n'],
+      ['non-overlapping rules', '* text=auto eol=lf\n*.sh text eol=lf\n'],
       [
-        'A4 our exact rules',
+        'our exact rules',
         '*.profile-meta.xml merge=salesforce-source\n*.permissionset-meta.xml merge=salesforce-source\n',
       ],
       [
-        'A5 our rules + a legacy one',
+        'our rules + a legacy one',
         '*.profile-meta.xml merge=salesforce-source\n*.dropped-meta.xml merge=salesforce-source\n',
       ],
       [
-        'A6 other driver on our glob',
+        'other driver on our glob',
         '*.profile-meta.xml merge=some-other-tool\n',
       ],
+      ['non-merge attrs on our glob', '*.profile-meta.xml text=auto eol=lf\n'],
       [
-        'A7 non-merge attrs on our glob',
-        '*.profile-meta.xml text=auto eol=lf\n',
-      ],
-      [
-        'A8 combined line (user attrs + our merge)',
+        'combined line (user attrs + our merge)',
         '*.profile-meta.xml text=auto merge=salesforce-source\n',
       ],
       [
-        'A9 commented out driver',
+        'commented-out driver',
         '# *.profile-meta.xml merge=salesforce-source\n',
       ],
-      ['A10 CRLF', '*.profile-meta.xml merge=salesforce-source\r\n'],
+      ['CRLF', '*.profile-meta.xml merge=salesforce-source\r\n'],
       ['blank + comments + rules', '# header\n\n*.xml text=auto\n\n# done\n'],
       ['no trailing newline', '*.xml text=auto'],
     ]

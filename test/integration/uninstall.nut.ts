@@ -83,7 +83,7 @@ describe('git merge driver uninstall', () => {
     expect(gitConfigOutput).not.to.include(`merge.${DRIVER_NAME}.recursive`)
   })
 
-  describe('A8 — combined line preservation', () => {
+  describe('combined line preservation', () => {
     it('Given a line like `*.profile-meta.xml text=auto merge=salesforce-source`, When uninstalling, Then `text=auto` survives and only `merge=` is stripped', () => {
       // Arrange
       resetRepo()

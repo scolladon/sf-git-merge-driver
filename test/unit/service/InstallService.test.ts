@@ -162,7 +162,7 @@ describe('InstallService', () => {
     })
   })
 
-  describe('A1/A2 — fresh install (attributes file missing or empty)', () => {
+  describe('fresh install (attributes file missing or empty)', () => {
     it('Given the attributes file does not exist, When installing, Then writeFile creates it with every desired pattern', async () => {
       // Arrange — readFile already rejects with ENOENT by default
       // Act
@@ -224,7 +224,7 @@ describe('InstallService', () => {
     })
   })
 
-  describe('A3 — pre-existing unrelated rules survive', () => {
+  describe('pre-existing unrelated rules survive', () => {
     it('Given rules on non-overlapping globs, When installing, Then user content is preserved and our rules are appended', async () => {
       // Arrange
       readFileMocked.mockResolvedValue('* text=auto\n*.sh text\n')
@@ -239,7 +239,7 @@ describe('InstallService', () => {
     })
   })
 
-  describe('A4 — idempotent re-install', () => {
+  describe('idempotent re-install', () => {
     it('Given the attributes file already has every pattern with our driver, When installing, Then writeFile is NOT called (no spurious rewrite)', async () => {
       // Arrange — seed the file with exactly what an install would produce
       const seeded =
@@ -281,7 +281,7 @@ describe('InstallService', () => {
     })
   })
 
-  describe('A6 — conflict with another merge driver', () => {
+  describe('conflict with another merge driver', () => {
     it('Given another driver is already configured on one of our globs, When installing with abort policy, Then InstallConflictError is thrown and writeFile is NOT called', async () => {
       // Arrange
       readFileMocked.mockResolvedValue(
