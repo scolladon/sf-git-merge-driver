@@ -1,27 +1,40 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: it is dynamic by definition */
 import { Logger, lazy } from './LoggingService.js'
 
-export function log(
-  target: any,
-  propertyKey: string,
-  descriptor: PropertyDescriptor
-): void {
-  const original = descriptor.value
+export function log(className: string) {
+  return function (
+    _target: any,
+    propertyKey: string,
+    descriptor: PropertyDescriptor
+  ): void {
+    const original = descriptor.value
 
-  descriptor.value = function (...args: any[]) {
-    Logger.trace(lazy`${target.constructor.name}.${propertyKey}: entry`)
+    descriptor.value = function (...args: any[]) {
+      Logger.trace(lazy`${className}.${propertyKey}: entry`)
 
-    const call = () => original.call(this, ...args)
+      const call = () => original.call(this, ...args)
 
-    const logResult = (result: any) => {
-      Logger.trace(lazy`${target.constructor.name}.${propertyKey}: exit`)
-      return result
-    }
+      if (original.constructor.name === 'AsyncFunction') {
+        return call().then(
+          (result: any) => {
+            Logger.trace(lazy`${className}.${propertyKey}: exit`)
+            return result
+          },
+          (err: unknown) => {
+            Logger.trace(lazy`${className}.${propertyKey}: exit (error)`)
+            throw err
+          }
+        )
+      }
 
-    if (original.constructor.name === 'AsyncFunction') {
-      return call().then(logResult)
-    } else {
-      return logResult(call())
+      try {
+        const result = call()
+        Logger.trace(lazy`${className}.${propertyKey}: exit`)
+        return result
+      } catch (err) {
+        Logger.trace(lazy`${className}.${propertyKey}: exit (error)`)
+        throw err
+      }
     }
   }
 }

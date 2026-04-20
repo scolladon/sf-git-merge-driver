@@ -20,7 +20,7 @@ export default class Install extends SfCommand<void> {
 
   public static override readonly flags = {}
 
-  @log
+  @log('Install')
   public async run(): Promise<void> {
     try {
       await new UninstallService().uninstallMergeDriver()

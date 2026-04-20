@@ -5,6 +5,7 @@ export default {
     'test/perf/**/*.{ts,mjs}',
     'bin/dev.js',
     'bin/run.js',
+    'src/bin/driver.ts',
     'src/commands/git/merge/driver/install.ts',
     'src/commands/git/merge/driver/run.ts',
     'src/commands/git/merge/driver/uninstall.ts',

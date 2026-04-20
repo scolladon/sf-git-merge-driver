@@ -19,7 +19,7 @@ export default class Uninstall extends SfCommand<void> {
 
   public static override readonly flags = {}
 
-  @log
+  @log('Uninstall')
   public async run(): Promise<void> {
     await new UninstallService().uninstallMergeDriver()
     Logger.info('Merge driver uninstalled successfully')

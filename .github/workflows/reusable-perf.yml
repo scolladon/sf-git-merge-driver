@@ -38,20 +38,24 @@ jobs:
 
       - name: Run baseline benchmarks (base branch)
         if: ${{ !inputs.auto-push }}
+        continue-on-error: true
         env:
           BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD~1' }}
         run: |
           git checkout --detach "$BASE_REF"
-          npm run test:perf
-          cp perf-runtime.json perf-runtime-base.json
-          cp perf-memory.json perf-memory-base.json
-          git checkout -
+          npm install
+          npm run test:perf || true
+          cp perf-runtime.json perf-runtime-base.json 2>/dev/null || true
+          cp perf-memory.json perf-memory-base.json 2>/dev/null || true
+          git checkout --force -
+          npm install
 
       - name: Run benchmarks
         run: npm run test:perf
 
       - name: Compare against baseline (same runner)
         if: ${{ !inputs.auto-push }}
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -59,6 +63,9 @@ jobs:
 
       - name: Generate preview with trends
         run: node test/perf/preview.mjs gh-pages-data
+
+      - name: Clean working tree for benchmark action
+        run: git checkout -- .
 
       - name: Runtime benchmark
         uses: benchmark-action/github-action-benchmark@v1

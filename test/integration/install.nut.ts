@@ -4,10 +4,15 @@ import { join } from 'node:path'
 import { execCmd } from '@salesforce/cli-plugins-testkit'
 import { expect } from 'chai'
 import { after, before, describe, it } from 'mocha'
-import {
-  DRIVER_NAME,
-  RUN_PLUGIN_COMMAND,
-} from '../../src/constant/driverConstant.js'
+import { DRIVER_NAME } from '../../src/constant/driverConstant.js'
+
+// The installed driver line now references an absolute path to
+// bin/merge-driver.cjs and includes %S (ancestor-conflict-label). Match
+// the shape rather than the exact path.
+const DRIVER_LINE_PATTERN = new RegExp(
+  `^merge\\.${DRIVER_NAME}\\.driver=sh -c 'node ".+/bin/merge-driver\\.cjs" -O "\\$1" -A "\\$2" -B "\\$3" -P "\\$4" -L "\\$5" -S "\\$6" -X "\\$7" -Y "\\$8"' -- %O %A %B %P %L %S %X %Y$`,
+  'm'
+)
 
 const ROOT_FOLDER = './test/data'
 
@@ -51,36 +56,41 @@ describe('git merge driver install', () => {
     expect(gitConfigOutput).to.include(
       `merge.${DRIVER_NAME}.name=Salesforce source merge driver`
     )
-    expect(gitConfigOutput).to.include(
-      `merge.${DRIVER_NAME}.driver=sh -c '${RUN_PLUGIN_COMMAND} -O "$1" -A "$2" -B "$3" -P "$4" -L "$5" -X "$6" -Y "$7"' -- %O %A %B %P %L %X %Y`
-    )
+    expect(gitConfigOutput).to.match(DRIVER_LINE_PATTERN)
   })
 
-  it('reinstalls merge driver correctly', () => {
-    // Arrange
-    // Driver is already installed from previous test
-
-    // Act
+  it('reinstalls merge driver idempotently (no duplicate .gitattributes lines)', () => {
+    // Arrange — ensure driver is installed (self-contained, not dependent on prior test)
     execCmd('git merge driver install', {
       ensureExitCode: 0,
       cwd: ROOT_FOLDER,
     })
 
-    // Assert
+    // Act — install again
+    execCmd('git merge driver install', {
+      ensureExitCode: 0,
+      cwd: ROOT_FOLDER,
+    })
+
+    // Assert — .gitattributes has each pattern exactly ONCE (no duplication)
     const gitattributesPath = join(ROOT_FOLDER, '.git/info/attributes')
-    expect(existsSync(gitattributesPath)).to.be.true
-
     const gitattributesContent = readFileSync(gitattributesPath, 'utf-8')
-    expect(gitattributesContent).to.include(`.xml merge=${DRIVER_NAME}`)
+    const lines = gitattributesContent
+      .split('\n')
+      .filter(l => l.includes(`merge=${DRIVER_NAME}`))
+    const uniqueLines = new Set(lines)
+    expect(lines.length).to.equal(
+      uniqueLines.size,
+      `Duplicate .gitattributes lines found:\n${lines.join('\n')}`
+    )
 
+    // Assert — git config driver entry present (not duplicated)
     const gitConfigOutput = execSync('git config --list', {
       cwd: ROOT_FOLDER,
     }).toString()
     expect(gitConfigOutput).to.include(
       `merge.${DRIVER_NAME}.name=Salesforce source merge driver`
     )
-    expect(gitConfigOutput).to.include(
-      `merge.${DRIVER_NAME}.driver=sh -c '${RUN_PLUGIN_COMMAND} -O "$1" -A "$2" -B "$3" -P "$4" -L "$5" -X "$6" -Y "$7"' -- %O %A %B %P %L %X %Y`
-    )
+    expect(gitConfigOutput).to.match(DRIVER_LINE_PATTERN)
   })
 })

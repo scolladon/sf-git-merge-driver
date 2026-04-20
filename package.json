@@ -4,25 +4,27 @@
   "version": "1.6.1",
   "exports": "./lib/driver/MergeDriver.js",
   "type": "module",
+  "bin": {
+    "sf-git-merge-driver": "./bin/merge-driver.cjs"
+  },
   "author": "Sébastien Colladon (colladonsebastien@gmail.com)",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/scolladon/sf-git-merge-driver.git"
   },
   "dependencies": {
-    "@nodable/flexible-xml-parser": "^1.1.0",
+    "@nodable/flexible-xml-parser": "^1.1.1",
     "@oclif/core": "^4.10.5",
     "@salesforce/core": "^8.28.3",
     "@salesforce/sf-plugins-core": "^12.2.6",
-    "fast-equals": "^6.0.0",
-    "fast-xml-parser": "^5.6.0",
+    "fast-xml-builder": "^1.1.5",
     "simple-git": "^3.36.0"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.12",
     "@commitlint/config-conventional": "^20.5.0",
     "@oclif/plugin-help": "^6.2.44",
-    "@salesforce/cli-plugins-testkit": "^5.3.52",
+    "@salesforce/cli-plugins-testkit": "^5.3.53",
     "@salesforce/dev-config": "^4.3.3",
     "@stryker-mutator/core": "^9.6.1",
     "@stryker-mutator/typescript-checker": "^9.6.1",
@@ -30,6 +32,8 @@
     "@types/chai": "^5.2.3",
     "@vitest/coverage-v8": "^4.1.4",
     "chai": "^6.2.2",
+    "esbuild": "^0.28.0",
+    "fast-xml-parser": "^5.7.1",
     "husky": "^9.1.7",
     "knip": "^6.4.1",
     "mocha": "^11.7.5",
@@ -38,7 +42,7 @@
     "shx": "^0.4.0",
     "ts-node": "^10.9.2",
     "tslib": "^2.8.1",
-    "typescript": "^6.0.2",
+    "typescript": "^6.0.3",
     "vitest": "^4.1.4",
     "wireit": "^0.14.12"
   },
@@ -73,6 +77,8 @@
   },
   "scripts": {
     "build": "wireit",
+    "build:bin": "wireit",
+    "build:bin:debug": "wireit",
     "clean:package-manager": "wireit",
     "clean": "wireit",
     "compile": "wireit",
@@ -113,8 +119,36 @@
         "lint"
       ]
     },
+    "build:bin": {
+      "command": "node tooling/build-bin.mjs",
+      "files": [
+        "lib/**/*.js",
+        "tooling/build-bin.mjs",
+        "package.json"
+      ],
+      "output": [
+        "bin/merge-driver.cjs"
+      ],
+      "dependencies": [
+        "compile"
+      ]
+    },
+    "build:bin:debug": {
+      "command": "node tooling/build-bin.mjs --debug",
+      "files": [
+        "lib/**/*.js",
+        "tooling/build-bin.mjs",
+        "package.json"
+      ],
+      "output": [
+        "bin/merge-driver.cjs"
+      ],
+      "dependencies": [
+        "compile"
+      ]
+    },
     "clean": {
-      "command": "shx rm -rf 'reports/*' .nyc_output oclif.manifest.json package.tgz 'sfdx-git-delta-*.tgz' 'stderr*.txt' 'stdout*.txt' '.stryker-tmp/*' perf-result.txt perf-raw.json perf-runtime.json perf-memory.json",
+      "command": "shx rm -rf 'reports/*' .nyc_output oclif.manifest.json package.tgz 'sfdx-git-delta-*.tgz' 'stderr*.txt' 'stdout*.txt' '.stryker-tmp/*' perf-result.txt perf-raw.json perf-runtime.json perf-memory.json bin/merge-driver.cjs",
       "files": [
         "lib",
         "reports/*",
@@ -226,7 +260,8 @@
         "README.md"
       ],
       "dependencies": [
-        "build"
+        "build",
+        "build:bin"
       ],
       "output": [
         "README.md"
@@ -293,7 +328,8 @@
       ],
       "dependencies": [
         "lint",
-        "build"
+        "build",
+        "build:bin"
       ]
     },
     "test:unit": {
@@ -326,7 +362,8 @@
         "perf-memory.json"
       ],
       "dependencies": [
-        "compile"
+        "compile",
+        "build:bin"
       ]
     }
   }

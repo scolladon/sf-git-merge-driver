@@ -12,7 +12,7 @@ const MERGE_DRIVER_CONFIG = new RegExp(
 )
 
 export class UninstallService {
-  @log
+  @log('UninstallService')
   public async uninstallMergeDriver(): Promise<void> {
     const git = simpleGit()
     try {

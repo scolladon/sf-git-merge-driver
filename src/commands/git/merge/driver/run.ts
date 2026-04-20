@@ -24,6 +24,16 @@ export default class Run extends SfCommand<void> {
     messages.getMessage('description')
   public static override readonly examples = messages.getMessages('examples')
 
+  // Native oclif command-level deprecation: emits a formatted warning via
+  // `formatCommandDeprecationWarning` on every invocation AND marks the
+  // command deprecated in `--help` output. Replaces the previous manual
+  // stderr banner so there is a single source of truth for the notice.
+  public static override readonly state = 'deprecated'
+  public static override readonly deprecationOptions = {
+    version: '2.0.0',
+    to: 'sf git merge driver install',
+  }
+
   public static override readonly flags = {
     'ancestor-file': Flags.string({
       char: 'O',
@@ -72,7 +82,7 @@ export default class Run extends SfCommand<void> {
     }),
   }
 
-  @log
+  @log('Run')
   public async run(): Promise<void> {
     Logger.info('Merge starting')
     const { flags } = await this.parse(Run)

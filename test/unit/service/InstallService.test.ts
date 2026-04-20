@@ -1,10 +1,7 @@
 import { appendFile } from 'node:fs/promises'
 import simpleGit from 'simple-git'
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest'
-import {
-  DRIVER_NAME,
-  RUN_PLUGIN_COMMAND,
-} from '../../../src/constant/driverConstant.js'
+import { DRIVER_NAME } from '../../../src/constant/driverConstant.js'
 import {
   MANIFEST_PATTERNS,
   METADATA_TYPES_PATTERNS,
@@ -25,26 +22,33 @@ simpleGitMock.mockReturnValue({
 const getGitAttributesPathMocked = getGitAttributesPath as Mock
 const appendFileMocked = vi.mocked(appendFile)
 
+// Shape the new driver line must match. The absolute path is resolved at
+// InstallService module load via import.meta.url; we assert its suffix and
+// the 8-placeholder layout (including %S) rather than the full string.
+const DRIVER_LINE_PATTERN =
+  /^sh -c 'node ".+\/bin\/merge-driver\.cjs" -O "\$1" -A "\$2" -B "\$3" -P "\$4" -L "\$5" -S "\$6" -X "\$7" -Y "\$8"' -- %O %A %B %P %L %S %X %Y$/
+
 describe('InstallService', () => {
   let sut: InstallService // System Under Test
 
   beforeEach(() => {
-    // Arrange
     sut = new InstallService()
     mockedAddConfig.mockClear()
     appendFileMocked.mockClear()
     getGitAttributesPathMocked.mockResolvedValue('.git/info/attributes')
   })
 
-  it('should install successfully when given valid parameters', async () => {
+  it('Given a clean repo, When installing, Then git config and .gitattributes are written with the new binary-driver line', async () => {
     // Act
     await sut.installMergeDriver()
 
-    // Assert
+    // Assert — git open
     expect(getGitAttributesPathMocked).toHaveBeenCalledTimes(1)
     expect(simpleGitMock).toHaveBeenCalledWith({
       unsafe: { allowUnsafeMergeDriver: true },
     })
+
+    // Assert — two git config entries (name + driver)
     expect(mockedAddConfig).toHaveBeenCalledTimes(2)
     expect(mockedAddConfig).toHaveBeenCalledWith(
       `merge.${DRIVER_NAME}.name`,
@@ -52,11 +56,11 @@ describe('InstallService', () => {
     )
     expect(mockedAddConfig).toHaveBeenCalledWith(
       `merge.${DRIVER_NAME}.driver`,
-      `sh -c '${RUN_PLUGIN_COMMAND} -O "$1" -A "$2" -B "$3" -P "$4" -L "$5" -X "$6" -Y "$7"' -- %O %A %B %P %L %X %Y`
+      expect.stringMatching(DRIVER_LINE_PATTERN)
     )
-    expect(appendFileMocked).toHaveBeenCalledTimes(1)
 
-    // Generate the expected content for .gitattributes
+    // Assert — .gitattributes append
+    expect(appendFileMocked).toHaveBeenCalledTimes(1)
     const expectedMetadataPatterns = METADATA_TYPES_PATTERNS.map(
       pattern => `*.${pattern}-meta.xml merge=${DRIVER_NAME}`
     ).join('\n')
@@ -64,11 +68,22 @@ describe('InstallService', () => {
       pattern => `${pattern} merge=${DRIVER_NAME}`
     ).join('\n')
     const expectedContent = `${expectedMetadataPatterns}\n${expectedManifestPatterns}\n`
-
     expect(appendFileMocked).toHaveBeenCalledWith(
       '.git/info/attributes',
       expectedContent,
       { flag: 'a' }
     )
+  })
+
+  it('Given the resolved binary path, When installing, Then it points at bin/merge-driver.cjs relative to the plugin root', async () => {
+    await sut.installMergeDriver()
+    const driverCall = mockedAddConfig.mock.calls.find(
+      ([key]) => key === `merge.${DRIVER_NAME}.driver`
+    )
+    expect(driverCall).toBeDefined()
+    const driverLine = driverCall?.[1] as string
+    // Absolute path, ends with /bin/merge-driver.cjs, wrapped in double quotes.
+    // On Windows the POSIX normalization produces D:/a/... (drive letter, forward slashes).
+    expect(driverLine).toMatch(/ ".+\/bin\/merge-driver\.cjs"/)
   })
 })

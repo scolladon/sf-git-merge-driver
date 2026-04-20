@@ -1,4 +1,4 @@
-import { XMLBuilder } from 'fast-xml-parser'
+import Builder, { type XMLBuilder } from 'fast-xml-builder'
 import {
   ANCESTOR_CONFLICT_MARKER,
   LOCAL_CONFLICT_MARKER,
@@ -99,14 +99,23 @@ const createConverter = (config: MergeConfig) => {
 // Namespace + Post-processing
 // ============================================================================
 
-const insertNamespaces = (output: JsonArray, namespaces: JsonObject): void => {
-  if (Object.keys(namespaces).length === 0 || output.length === 0) return
-  const root = output[0] as JsonObject
-  root[NAMESPACE_ROOT] = { ...namespaces }
+const insertNamespaces = (
+  output: JsonArray,
+  namespaces: JsonObject
+): JsonArray => {
+  if (Object.keys(namespaces).length === 0 || output.length === 0) return output
+  const [first, ...rest] = output
+  return [
+    { ...(first as JsonObject), [NAMESPACE_ROOT]: { ...namespaces } },
+    ...rest,
+  ]
 }
 
+// XMLBuilder's format:true inserts \n + indentation around comments.
+// Salesforce metadata uses inline comments — strip only builder-added
+// newlines+indentation, not horizontal whitespace within a line.
 const correctComments = (xml: string): string =>
-  xml.includes('<!--') ? xml.replace(/\s+<!--(.*?)-->\s+/g, '<!--$1-->') : xml
+  xml.includes('<!--') ? xml.replace(/\n\s*(<!--.*?-->)\n?\s*/g, '$1') : xml
 
 // ============================================================================
 // Serializer
@@ -120,16 +129,16 @@ export class FxpXmlSerializer implements XmlSerializer {
   constructor(config: MergeConfig) {
     this.formatter = new ConflictMarkerFormatter(config)
     this.convert = createConverter(config)
-    this.builder = new XMLBuilder(builderOptions)
+    this.builder = new Builder(builderOptions)
   }
 
   serialize(mergedOutput: JsonArray, namespaces: JsonObject): string {
     const ordered = mergedOutput.flatMap((item: JsonValue) =>
       isObj(item) ? this.convert(item) : [{ [TEXT_TAG]: item }]
     )
-    insertNamespaces(ordered, namespaces)
+    const withNamespaces = insertNamespaces(ordered, namespaces)
 
-    const xml: string = this.builder.build(ordered)
+    const xml: string = this.builder.build(withNamespaces)
 
     let result = XML_DECL.concat(xml)
     result = this.formatter.handleSpecialEntities(result)
