@@ -6,6 +6,7 @@ import { defaultConfig } from '../../../utils/testConfig.js'
 
 const fieldPermissionsKey =
   MetadataService.getKeyFieldExtractor('fieldPermissions')
+const picklistValueKey = MetadataService.getKeyFieldExtractor('value')
 
 describe('KeyedArrayMergeNode', () => {
   describe('merge with key field (fieldPermissions)', () => {
@@ -225,6 +226,344 @@ describe('KeyedArrayMergeNode', () => {
     })
   })
 
+  describe('merge with key field and isOrdered=true (picklist value)', () => {
+    it('should merge arrays with same elements without conflict', () => {
+      // Arrange
+      const ancestor = [{ fullName: 'Hot', default: 'false' }]
+      const local = [{ fullName: 'Hot', default: 'false' }]
+      const other = [{ fullName: 'Hot', default: 'false' }]
+      const sut = new KeyedArrayMergeNode(
+        ancestor,
+        local,
+        other,
+        'value',
+        picklistValueKey,
+        true
+      )
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+    })
+
+    it('should add new element from other', () => {
+      // Arrange
+      const ancestor = [{ fullName: 'Hot', default: 'false' }]
+      const local = [{ fullName: 'Hot', default: 'false' }]
+      const other = [
+        { fullName: 'Hot', default: 'false' },
+        { fullName: 'Warm', default: 'false' },
+      ]
+      const sut = new KeyedArrayMergeNode(
+        ancestor,
+        local,
+        other,
+        'value',
+        picklistValueKey,
+        true
+      )
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      expect(result.output.length).toBe(2)
+    })
+
+    it('should add new element from local', () => {
+      // Arrange
+      const ancestor = [{ fullName: 'Hot', default: 'false' }]
+      const local = [
+        { fullName: 'Hot', default: 'false' },
+        { fullName: 'Warm', default: 'false' },
+      ]
+      const other = [{ fullName: 'Hot', default: 'false' }]
+      const sut = new KeyedArrayMergeNode(
+        ancestor,
+        local,
+        other,
+        'value',
+        picklistValueKey,
+        true
+      )
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      expect(result.output.length).toBe(2)
+    })
+
+    it('should remove element deleted in local when other unchanged', () => {
+      // Arrange
+      const ancestor = [
+        { fullName: 'Hot', default: 'false' },
+        { fullName: 'Warm', default: 'false' },
+      ]
+      const local = [{ fullName: 'Hot', default: 'false' }]
+      const other = [
+        { fullName: 'Hot', default: 'false' },
+        { fullName: 'Warm', default: 'false' },
+      ]
+      const sut = new KeyedArrayMergeNode(
+        ancestor,
+        local,
+        other,
+        'value',
+        picklistValueKey,
+        true
+      )
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      expect(result.output.length).toBe(1)
+    })
+
+    it('should remove element deleted in other when local unchanged', () => {
+      // Arrange
+      const ancestor = [
+        { fullName: 'Hot', default: 'false' },
+        { fullName: 'Warm', default: 'false' },
+      ]
+      const local = [
+        { fullName: 'Hot', default: 'false' },
+        { fullName: 'Warm', default: 'false' },
+      ]
+      const other = [{ fullName: 'Hot', default: 'false' }]
+      const sut = new KeyedArrayMergeNode(
+        ancestor,
+        local,
+        other,
+        'value',
+        picklistValueKey,
+        true
+      )
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      expect(result.output.length).toBe(1)
+    })
+
+    it('should handle modification in other (ancestor equals local)', () => {
+      // Arrange
+      const ancestor = [{ fullName: 'Hot', default: 'false' }]
+      const local = [{ fullName: 'Hot', default: 'false' }]
+      const other = [{ fullName: 'Hot', default: 'true' }]
+      const sut = new KeyedArrayMergeNode(
+        ancestor,
+        local,
+        other,
+        'value',
+        picklistValueKey,
+        true
+      )
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+    })
+
+    it('should handle modification in local (ancestor equals other)', () => {
+      // Arrange
+      const ancestor = [{ fullName: 'Hot', default: 'false' }]
+      const local = [{ fullName: 'Hot', default: 'true' }]
+      const other = [{ fullName: 'Hot', default: 'false' }]
+      const sut = new KeyedArrayMergeNode(
+        ancestor,
+        local,
+        other,
+        'value',
+        picklistValueKey,
+        true
+      )
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+    })
+
+    it('should create conflict when both local and other modify same element differently', () => {
+      // Arrange
+      const ancestor = [{ fullName: 'Hot', default: 'false' }]
+      const local = [{ fullName: 'Hot', default: 'true' }]
+      const other = [{ fullName: 'Hot', default: 'maybe' }]
+      const sut = new KeyedArrayMergeNode(
+        ancestor,
+        local,
+        other,
+        'value',
+        picklistValueKey,
+        true
+      )
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(true)
+    })
+
+    it('should not conflict when both local and other make same modification', () => {
+      // Arrange
+      const ancestor = [{ fullName: 'Hot', default: 'false' }]
+      const local = [{ fullName: 'Hot', default: 'true' }]
+      const other = [{ fullName: 'Hot', default: 'true' }]
+      const sut = new KeyedArrayMergeNode(
+        ancestor,
+        local,
+        other,
+        'value',
+        picklistValueKey,
+        true
+      )
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+    })
+
+    it('should accept reorder when only one side reorders', () => {
+      // Arrange — local moves Warm before Hot; other keeps ancestor order
+      const ancestor = [
+        { fullName: 'Hot' },
+        { fullName: 'Warm' },
+        { fullName: 'Cold' },
+      ]
+      const local = [
+        { fullName: 'Warm' },
+        { fullName: 'Hot' },
+        { fullName: 'Cold' },
+      ]
+      const other = [
+        { fullName: 'Hot' },
+        { fullName: 'Warm' },
+        { fullName: 'Cold' },
+      ]
+      const sut = new KeyedArrayMergeNode(
+        ancestor,
+        local,
+        other,
+        'value',
+        picklistValueKey,
+        true
+      )
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      expect(result.output.length).toBe(3)
+    })
+
+    it('should conflict when both sides reorder overlapping elements (C4)', () => {
+      // Arrange — local swaps Hot/Warm; other swaps Warm/Cold; Warm moves in both
+      const ancestor = [
+        { fullName: 'Hot' },
+        { fullName: 'Warm' },
+        { fullName: 'Cold' },
+      ]
+      const local = [
+        { fullName: 'Warm' },
+        { fullName: 'Hot' },
+        { fullName: 'Cold' },
+      ]
+      const other = [
+        { fullName: 'Hot' },
+        { fullName: 'Cold' },
+        { fullName: 'Warm' },
+      ]
+      const sut = new KeyedArrayMergeNode(
+        ancestor,
+        local,
+        other,
+        'value',
+        picklistValueKey,
+        true
+      )
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(true)
+    })
+
+    it('should conflict when same element is added at different positions (C6)', () => {
+      // Arrange — both sides add 'Lukewarm' but at different positions
+      const ancestor = [{ fullName: 'Hot' }, { fullName: 'Cold' }]
+      const local = [
+        { fullName: 'Lukewarm' },
+        { fullName: 'Hot' },
+        { fullName: 'Cold' },
+      ]
+      const other = [
+        { fullName: 'Hot' },
+        { fullName: 'Cold' },
+        { fullName: 'Lukewarm' },
+      ]
+      const sut = new KeyedArrayMergeNode(
+        ancestor,
+        local,
+        other,
+        'value',
+        picklistValueKey,
+        true
+      )
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(true)
+    })
+
+    it('should conflict when disjoint additions coexist with diverged reorder (C7)', () => {
+      // Arrange — local reorders Hot/Cold and adds Warm; other adds disjoint Frozen
+      const ancestor = [{ fullName: 'Hot' }, { fullName: 'Cold' }]
+      const local = [
+        { fullName: 'Cold' },
+        { fullName: 'Hot' },
+        { fullName: 'Warm' },
+      ]
+      const other = [
+        { fullName: 'Hot' },
+        { fullName: 'Cold' },
+        { fullName: 'Frozen' },
+      ]
+      const sut = new KeyedArrayMergeNode(
+        ancestor,
+        local,
+        other,
+        'value',
+        picklistValueKey,
+        true
+      )
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(true)
+    })
+  })
+
   describe('merge without key field (unknown attribute)', () => {
     it('should create conflict for arrays without key extractor', () => {
       // Arrange
@@ -326,7 +665,7 @@ describe('KeyedArrayMergeNode', () => {
       const local = [{ field: 'Account.Name', editable: 'false' }]
       // other keeps Name but also deletes Type (same deletion)
       const other = [{ field: 'Account.Name', editable: 'false' }]
-      const node = new KeyedArrayMergeNode(
+      const sut = new KeyedArrayMergeNode(
         ancestor,
         local,
         other,
@@ -336,7 +675,7 @@ describe('KeyedArrayMergeNode', () => {
       )
 
       // Act
-      const result = node.merge(defaultConfig)
+      const result = sut.merge(defaultConfig)
 
       // Assert - deletion in both branches should not cause conflict
       expect(result.hasConflict).toBe(false)

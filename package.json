@@ -288,7 +288,7 @@
       ]
     },
     "test:integration": {
-      "command": "vitest run test/integration --fileParallelism=false --maxWorkers=1 --no-isolate",
+      "command": "vitest run test/integration --fileParallelism=false --maxWorkers=1",
       "files": [
         "src/**/*.ts",
         "test/**/*.test.ts",
