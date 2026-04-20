@@ -97,6 +97,8 @@ sf git merge driver install
 > **Upgrading from a previous version:** re-run `sf git merge driver install` in each repository after upgrading. Recent releases route conflicts through a bundled standalone binary (~80 ms per file instead of ~600 ms via the oclif command) — a 200-file rebase drops from ~120 s to ~16 s of merge-driver overhead. Previously-installed `.git/config` entries keep working via the retained oclif command, but do not receive the speedup until reinstall.
 >
 > Re-installing also wires git's `%S` placeholder into conflict markers: the ancestor-marker label now reflects git's own label (typically a short SHA) instead of the static `base` string. See the CHANGELOG for the exact before/after.
+>
+> **Safe install on upgrade.** If another merge driver is already configured on one of our metadata globs (e.g. a different Salesforce tool added its own `.git/info/attributes` line), install now aborts with a conflict report instead of silently stacking up. Use `--on-conflict=skip` to leave those globs alone, `--on-conflict=overwrite` (or `--force`) to take them over — in which case uninstall will restore the originals from an annotation comment. Add `--dry-run` to preview any install/uninstall plan before writing.
 
 ### Integration in VsCode SFDX-Hardis
 
@@ -315,22 +317,28 @@ git merge ...
 
 ## `sf git merge driver disable`
 
-Uninstalls the local git merge driver for the given org and branch.
+Uninstalls the local git merge driver from the current project.
 
 ```
 USAGE
-  $ sf git merge driver disable [--json] [--flags-dir <value>]
+  $ sf git merge driver disable [--json] [--flags-dir <value>] [--dry-run]
+
+FLAGS
+  --dry-run  Plan the uninstall without touching git config or .git/info/attributes. Exits 0; shows what would be
+             removed.
 
 GLOBAL FLAGS
   --flags-dir=<value>  Import flag values from a directory.
   --json               Format output as json.
 
 DESCRIPTION
-  Uninstalls the local git merge driver for the given org and branch.
+  Uninstalls the local git merge driver from the current project.
 
-  Uninstalls the local git merge driver for the given org and branch, by removing the merge driver content in the
-  `.git/info/attributes` files in the project, deleting the merge driver configuration from the `.git/config` of the
-  project, and removing the installed binary from the node_modules/.bin directory.
+  Removes the `merge.salesforce-source` section from `.git/config` and strips the driver's rules from
+  `.git/info/attributes`. Lines that combined the driver with user attributes (e.g. `*.profile-meta.xml text=auto
+  merge=salesforce-source`) are rewritten to keep the user attributes; only the `merge=` token is removed. If a previous
+  install used `--on-conflict=overwrite`, the original driver rule is restored from the annotation comment written at
+  install time. `--dry-run` previews the plan without writing.
 
 ALIASES
   $ sf git merge driver disable
@@ -339,26 +347,43 @@ EXAMPLES
   Uninstall the driver for a given project:
 
     $ sf git merge driver disable
+
+  Preview the changes that would be written:
+
+    $ sf git merge driver disable --dry-run
 ```
 
 ## `sf git merge driver enable`
 
-Installs a local git merge driver for the given org and branch.
+Installs a local git merge driver for Salesforce metadata in the current project.
 
 ```
 USAGE
-  $ sf git merge driver enable [--json] [--flags-dir <value>]
+  $ sf git merge driver enable [--json] [--flags-dir <value>] [--dry-run] [--on-conflict abort|skip|overwrite] [--force]
+
+FLAGS
+  --dry-run               Plan the install without writing to git config or .git/info/attributes. Exits 0; shows the
+                          list of rules that would be added/skipped/conflict.
+  --force                 Alias for --on-conflict=overwrite. Non-interactive shortcut for CI.
+  --on-conflict=<option>  [default: abort] How to handle patterns already owned by another merge driver in
+                          .git/info/attributes. Default: abort (refuse to change anything).
+                          <options: abort|skip|overwrite>
 
 GLOBAL FLAGS
   --flags-dir=<value>  Import flag values from a directory.
   --json               Format output as json.
 
 DESCRIPTION
-  Installs a local git merge driver for the given org and branch.
+  Installs a local git merge driver for Salesforce metadata in the current project.
 
-  Installs a local git merge driver for the given org and branch, by updating the `.git/info/attributes` files in the
-  project, creating a new merge driver configuration in the `.git/config` of the project, and installing the binary in
-  the node_modules/.bin directory.
+  Registers the driver in `.git/config` and adds one merge rule per Salesforce metadata glob to `.git/info/attributes`.
+  Safe to re-run: install is idempotent, preserves any user attributes already on the globs, and dedupes legacy
+  duplicate rules silently.
+
+  If another merge driver is already configured on one of our globs, install aborts by default and lists the conflicts.
+  Pass `--on-conflict=skip` to leave those globs to the other driver, `--on-conflict=overwrite` (or `--force`) to take
+  them over (uninstall restores the originals), or run the command from a TTY to be prompted interactively. `--dry-run`
+  previews the plan without writing.
 
 ALIASES
   $ sf git merge driver enable
@@ -367,26 +392,48 @@ EXAMPLES
   Install the driver for a given project:
 
     $ sf git merge driver enable
+
+  Preview the changes that would be written:
+
+    $ sf git merge driver enable --dry-run
+
+  Take over conflicting globs non-interactively (for CI):
+
+    $ sf git merge driver enable --force
 ```
 
 ## `sf git merge driver install`
 
-Installs a local git merge driver for the given org and branch.
+Installs a local git merge driver for Salesforce metadata in the current project.
 
 ```
 USAGE
-  $ sf git merge driver install [--json] [--flags-dir <value>]
+  $ sf git merge driver install [--json] [--flags-dir <value>] [--dry-run] [--on-conflict abort|skip|overwrite]
+  [--force]
+
+FLAGS
+  --dry-run               Plan the install without writing to git config or .git/info/attributes. Exits 0; shows the
+                          list of rules that would be added/skipped/conflict.
+  --force                 Alias for --on-conflict=overwrite. Non-interactive shortcut for CI.
+  --on-conflict=<option>  [default: abort] How to handle patterns already owned by another merge driver in
+                          .git/info/attributes. Default: abort (refuse to change anything).
+                          <options: abort|skip|overwrite>
 
 GLOBAL FLAGS
   --flags-dir=<value>  Import flag values from a directory.
   --json               Format output as json.
 
 DESCRIPTION
-  Installs a local git merge driver for the given org and branch.
+  Installs a local git merge driver for Salesforce metadata in the current project.
 
-  Installs a local git merge driver for the given org and branch, by updating the `.git/info/attributes` files in the
-  project, creating a new merge driver configuration in the `.git/config` of the project, and installing the binary in
-  the node_modules/.bin directory.
+  Registers the driver in `.git/config` and adds one merge rule per Salesforce metadata glob to `.git/info/attributes`.
+  Safe to re-run: install is idempotent, preserves any user attributes already on the globs, and dedupes legacy
+  duplicate rules silently.
+
+  If another merge driver is already configured on one of our globs, install aborts by default and lists the conflicts.
+  Pass `--on-conflict=skip` to leave those globs to the other driver, `--on-conflict=overwrite` (or `--force`) to take
+  them over (uninstall restores the originals), or run the command from a TTY to be prompted interactively. `--dry-run`
+  previews the plan without writing.
 
 ALIASES
   $ sf git merge driver enable
@@ -395,6 +442,14 @@ EXAMPLES
   Install the driver for a given project:
 
     $ sf git merge driver install
+
+  Preview the changes that would be written:
+
+    $ sf git merge driver install --dry-run
+
+  Take over conflicting globs non-interactively (for CI):
+
+    $ sf git merge driver install --force
 ```
 
 _See code: [src/commands/git/merge/driver/install.ts](https://github.com/scolladon/sf-git-merge-driver/blob/main/src/commands/git/merge/driver/install.ts)_
@@ -448,22 +503,28 @@ _See code: [src/commands/git/merge/driver/run.ts](https://github.com/scolladon/s
 
 ## `sf git merge driver uninstall`
 
-Uninstalls the local git merge driver for the given org and branch.
+Uninstalls the local git merge driver from the current project.
 
 ```
 USAGE
-  $ sf git merge driver uninstall [--json] [--flags-dir <value>]
+  $ sf git merge driver uninstall [--json] [--flags-dir <value>] [--dry-run]
+
+FLAGS
+  --dry-run  Plan the uninstall without touching git config or .git/info/attributes. Exits 0; shows what would be
+             removed.
 
 GLOBAL FLAGS
   --flags-dir=<value>  Import flag values from a directory.
   --json               Format output as json.
 
 DESCRIPTION
-  Uninstalls the local git merge driver for the given org and branch.
+  Uninstalls the local git merge driver from the current project.
 
-  Uninstalls the local git merge driver for the given org and branch, by removing the merge driver content in the
-  `.git/info/attributes` files in the project, deleting the merge driver configuration from the `.git/config` of the
-  project, and removing the installed binary from the node_modules/.bin directory.
+  Removes the `merge.salesforce-source` section from `.git/config` and strips the driver's rules from
+  `.git/info/attributes`. Lines that combined the driver with user attributes (e.g. `*.profile-meta.xml text=auto
+  merge=salesforce-source`) are rewritten to keep the user attributes; only the `merge=` token is removed. If a previous
+  install used `--on-conflict=overwrite`, the original driver rule is restored from the annotation comment written at
+  install time. `--dry-run` previews the plan without writing.
 
 ALIASES
   $ sf git merge driver disable
@@ -472,6 +533,10 @@ EXAMPLES
   Uninstall the driver for a given project:
 
     $ sf git merge driver uninstall
+
+  Preview the changes that would be written:
+
+    $ sf git merge driver uninstall --dry-run
 ```
 
 _See code: [src/commands/git/merge/driver/uninstall.ts](https://github.com/scolladon/sf-git-merge-driver/blob/main/src/commands/git/merge/driver/uninstall.ts)_
