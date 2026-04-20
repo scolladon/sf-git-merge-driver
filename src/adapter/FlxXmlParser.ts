@@ -13,7 +13,7 @@ const flxOptions = {
   tags: { valueParsers: [] },
   attributes: { valueParsers: [] },
   nameFor: { cdata: CDATA_PROP_NAME, comment: XML_COMMENT_PROP_NAME },
-  doctypeOptions: { enabled: false, maxEntityCount: 100, maxEntitySize: 10000 },
+  doctypeOptions: { enabled: false },
 } as X2jOptions
 
 const hasEmptyCdataText = (node: JsonObject): boolean =>
