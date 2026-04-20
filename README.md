@@ -98,7 +98,7 @@ sf git merge driver install
 >
 > Re-installing also wires git's `%S` placeholder into conflict markers: the ancestor-marker label now reflects git's own label (typically a short SHA) instead of the static `base` string. See the CHANGELOG for the exact before/after.
 >
-> **Safer install on upgrade.** If another merge driver is already configured on one of our metadata globs (e.g. a different Salesforce tool added its own `.git/info/attributes` line), install now aborts with a conflict report instead of silently stacking up. Use `--on-conflict=skip` to leave those globs alone, `--on-conflict=overwrite` (or `--force`) to take them over — in which case uninstall will restore the originals from an annotation comment. Add `--dry-run` to preview any install/uninstall plan before writing.
+> **Safe install on upgrade.** If another merge driver is already configured on one of our metadata globs (e.g. a different Salesforce tool added its own `.git/info/attributes` line), install now aborts with a conflict report instead of silently stacking up. Use `--on-conflict=skip` to leave those globs alone, `--on-conflict=overwrite` (or `--force`) to take them over — in which case uninstall will restore the originals from an annotation comment. Add `--dry-run` to preview any install/uninstall plan before writing.
 
 ### Integration in VsCode SFDX-Hardis
 
@@ -452,7 +452,7 @@ EXAMPLES
     $ sf git merge driver install --force
 ```
 
-_See code: [src/commands/git/merge/driver/install.ts](https://github.com/scolladon/sf-git-merge-driver/blob/v1.6.1/src/commands/git/merge/driver/install.ts)_
+_See code: [src/commands/git/merge/driver/install.ts](https://github.com/scolladon/sf-git-merge-driver/blob/main/src/commands/git/merge/driver/install.ts)_
 
 ## `sf git merge driver run`
 
@@ -499,7 +499,7 @@ EXAMPLES
   - output-file is the path to the file where the merged content will be written
 ```
 
-_See code: [src/commands/git/merge/driver/run.ts](https://github.com/scolladon/sf-git-merge-driver/blob/v1.6.1/src/commands/git/merge/driver/run.ts)_
+_See code: [src/commands/git/merge/driver/run.ts](https://github.com/scolladon/sf-git-merge-driver/blob/main/src/commands/git/merge/driver/run.ts)_
 
 ## `sf git merge driver uninstall`
 
@@ -539,7 +539,7 @@ EXAMPLES
     $ sf git merge driver uninstall --dry-run
 ```
 
-_See code: [src/commands/git/merge/driver/uninstall.ts](https://github.com/scolladon/sf-git-merge-driver/blob/v1.6.1/src/commands/git/merge/driver/uninstall.ts)_
+_See code: [src/commands/git/merge/driver/uninstall.ts](https://github.com/scolladon/sf-git-merge-driver/blob/main/src/commands/git/merge/driver/uninstall.ts)_
 <!-- commandsstop -->
 
 ## Changelog
