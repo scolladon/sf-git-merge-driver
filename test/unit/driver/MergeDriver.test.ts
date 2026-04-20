@@ -132,6 +132,21 @@ describe('MergeDriver', () => {
       expect(mockWriteFile).toHaveBeenCalledWith('OurFile', CRLF_CONTENT)
     })
 
+    it('given one readFile rejects when merging then rethrows that rejection and does not write', async () => {
+      // Arrange — ancestor read fails (e.g., ENOENT); others resolve.
+      const enoent = Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+      mockReadFile
+        .mockRejectedValueOnce(enoent)
+        .mockResolvedValueOnce(OUR_XML)
+        .mockResolvedValueOnce(THEIR_XML)
+
+      // Act + Assert — rejection is surfaced, write path is not reached.
+      await expect(
+        sut.mergeFiles('AncestorFile', 'OurFile', 'TheirFile')
+      ).rejects.toMatchObject({ code: 'ENOENT' })
+      expect(mockWriteFile).not.toHaveBeenCalled()
+    })
+
     it('given our file uses LF when merging then writes output unchanged', async () => {
       // Arrange
       mockReadFile

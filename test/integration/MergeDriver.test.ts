@@ -56,15 +56,7 @@ describe('MergeDriver (integration — real filesystem, no mocks)', () => {
   })
 
   afterEach(() => {
-    // `maxRetries`/`retryDelay` absorb Windows' occasional ENOTEMPTY on
-    // `rmdir` — antivirus / async handle-release can briefly lock files
-    // inside the temp dir even after `fs.promises.readFile` has resolved.
-    rmSync(workDir, {
-      recursive: true,
-      force: true,
-      maxRetries: 10,
-      retryDelay: 100,
-    })
+    rmSync(workDir, { recursive: true, force: true })
   })
 
   const writeFixture = (name: string, content: string): string => {
