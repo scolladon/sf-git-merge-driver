@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776693691437,
+  "lastUpdate": 1776697657009,
   "repoUrl": "https://github.com/scolladon/sf-git-merge-driver",
   "entries": {
     "Memory Benchmark": [
@@ -403,6 +403,138 @@ window.BENCHMARK_DATA = {
             "name": "serialize-large",
             "value": 14.1918,
             "range": "±1.52%",
+            "unit": "ms"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "colladonsebastien@gmail.com",
+            "name": "Sebastien",
+            "username": "scolladon"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "87491505e6cdd9447a02eaacc6dbbf73029a76d9",
+          "message": "fix(install): idempotent install, --dry-run, --on-conflict handling (#186)",
+          "timestamp": "2026-04-20T17:04:56+02:00",
+          "tree_id": "94ca7d00f79d8be7790cd9eea5422c91b45d41e2",
+          "url": "https://github.com/scolladon/sf-git-merge-driver/commit/87491505e6cdd9447a02eaacc6dbbf73029a76d9"
+        },
+        "date": 1776697656948,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "node bin/merge-driver.cjs --version",
+            "value": 39.7485,
+            "range": "±2.43%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-small-no-conflict",
+            "value": 1.9373,
+            "range": "±2.41%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-small-with-conflict",
+            "value": 1.8614,
+            "range": "±1.70%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-medium-no-conflict",
+            "value": 14.1537,
+            "range": "±2.92%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-medium-with-conflict",
+            "value": 14.0897,
+            "range": "±2.21%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-large-no-conflict",
+            "value": 55.6203,
+            "range": "±0.95%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-large-with-conflict",
+            "value": 55.7887,
+            "range": "±1.70%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-ordered-globalvalueset",
+            "value": 1.7291,
+            "range": "±1.67%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-picklist-customfield",
+            "value": 1.1714,
+            "range": "±2.01%",
+            "unit": "ms"
+          },
+          {
+            "name": "parse-small",
+            "value": 1.1351,
+            "range": "±1.73%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-small",
+            "value": 0.1766,
+            "range": "±2.41%",
+            "unit": "ms"
+          },
+          {
+            "name": "serialize-small",
+            "value": 0.387,
+            "range": "±0.94%",
+            "unit": "ms"
+          },
+          {
+            "name": "parse-medium",
+            "value": 8.5768,
+            "range": "±0.69%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-medium",
+            "value": 1.5359,
+            "range": "±2.80%",
+            "unit": "ms"
+          },
+          {
+            "name": "serialize-medium",
+            "value": 3.2067,
+            "range": "±1.22%",
+            "unit": "ms"
+          },
+          {
+            "name": "parse-large",
+            "value": 34.0372,
+            "range": "±0.62%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-large",
+            "value": 6.2915,
+            "range": "±3.21%",
+            "unit": "ms"
+          },
+          {
+            "name": "serialize-large",
+            "value": 13.5275,
+            "range": "±1.55%",
             "unit": "ms"
           }
         ]
