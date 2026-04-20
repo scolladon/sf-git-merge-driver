@@ -97,6 +97,7 @@
     "prepare": "husky",
     "prepublishOnly": "npm shrinkwrap",
     "test:build": "wireit",
+    "test:integration": "wireit",
     "test:typecheck": "wireit",
     "test:mutation": "wireit",
     "test:mutation:incremental": "wireit",
@@ -274,6 +275,7 @@
       "dependencies": [
         "build",
         "lint",
+        "test:integration",
         "test:unit",
         "test:nut"
       ]
@@ -283,6 +285,21 @@
       "dependencies": [
         "clean",
         "clean:package-manager"
+      ]
+    },
+    "test:integration": {
+      "command": "vitest run test/integration --fileParallelism=false --maxWorkers=1 --no-isolate",
+      "files": [
+        "src/**/*.ts",
+        "test/**/*.test.ts",
+        "messages/**",
+        "**/tsconfig.json",
+        "vitest.config.ts"
+      ],
+      "output": [],
+      "dependencies": [
+        "lint",
+        "test:typecheck"
       ]
     },
     "test:mutation": {
@@ -335,7 +352,7 @@
       ]
     },
     "test:unit": {
-      "command": "vitest run --coverage",
+      "command": "vitest run --coverage test/unit",
       "files": [
         "src/**/*.ts",
         "test/**/*.test.ts",
