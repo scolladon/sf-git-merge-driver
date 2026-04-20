@@ -226,10 +226,14 @@ Locate the binary from the sf-installed plugin (no separate `npm install -g` nee
 this is the same copy git uses, so there is no version-drift risk):
 
 ```bash
-# Resolve the plugin root from sf's plugin registry (user-installed plugins)
+# Unix/Linux version — Resolve the plugin root from sf's plugin registry (user-installed plugins)
 PLUGIN_ROOT=$(dirname "$(sf plugins inspect sf-git-merge-driver --json | jq -r '.[0].options.root')")/node_modules/sf-git-merge-driver
 DRIVER="$PLUGIN_ROOT/bin/merge-driver.cjs"
 
+# Powershell version — Resolve the plugin root from sf's plugin registry (user-installed plugins)
+$DRIVER = Join-Path (Join-Path (Split-Path ((sf plugins inspect sf-git-merge-driver --json | ConvertFrom-Json)[0].options.root) -Parent) "node_modules/sf-git-merge-driver") "bin/merge-driver.cjs"
+
+# Execution
 # POSIX — the binary has a shebang and +x, so it's directly executable:
 "$DRIVER" -O base.xml -A local.xml -B other.xml -P merged.xml
 
