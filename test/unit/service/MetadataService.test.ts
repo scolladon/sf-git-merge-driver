@@ -330,6 +330,18 @@ describe('MetadataService', () => {
           expected: 'monday,wednesday',
         },
         {
+          name: 'handles loginHours with null element (defensive fallback returns empty key)',
+          metadataType: 'loginHours',
+          testObject: null as unknown as Record<string, unknown>,
+          expected: '',
+        },
+        {
+          name: 'handles loginHours with scalar element (defensive fallback returns empty key)',
+          metadataType: 'loginHours',
+          testObject: 'not-an-object' as unknown as Record<string, unknown>,
+          expected: '',
+        },
+        {
           name: 'handles loginIpRanges correctly',
           metadataType: 'loginIpRanges',
           testObject: {

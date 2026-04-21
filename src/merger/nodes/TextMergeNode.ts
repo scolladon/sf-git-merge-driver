@@ -5,14 +5,17 @@ import { getScenario } from '../MergeScenarioFactory.js'
 import { getTextMergeStrategy } from '../strategies/TextMergeStrategy.js'
 import type { MergeNode } from './MergeNode.js'
 
-const toObj = (value: JsonValue | null, attrib: string): JsonObject =>
+// `null` is already in JsonValue; `undefined` distinguishes the
+// "key not present on this side" case propagated from JsonMerger/
+// ScenarioStrategy via getJsonProp/toJsonObjectOrEmpty + direct indexing.
+const toObj = (value: JsonValue | undefined, attrib: string): JsonObject =>
   value == null ? {} : { [attrib]: value }
 
 export class TextMergeNode implements MergeNode {
   constructor(
-    private readonly ancestor: JsonValue | null,
-    private readonly local: JsonValue | null,
-    private readonly other: JsonValue | null,
+    private readonly ancestor: JsonValue | undefined,
+    private readonly local: JsonValue | undefined,
+    private readonly other: JsonValue | undefined,
     private readonly attribute: string
   ) {}
 

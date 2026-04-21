@@ -2,8 +2,8 @@ import { pushAll } from '../utils/arrayUtils.js'
 import type { JsonArray, JsonValue } from './jsonTypes.js'
 
 export interface MergeResult {
-  output: JsonArray
-  hasConflict: boolean
+  readonly output: JsonArray
+  readonly hasConflict: boolean
 }
 
 const EMPTY_ARRAY: JsonArray = []
@@ -52,7 +52,7 @@ export const wrapWithRootKey = (
 }
 
 export const buildEarlyResult = (
-  value: JsonValue,
+  value: JsonValue | undefined,
   rootKeyName?: string
 ): MergeResult => {
   const content: JsonArray =

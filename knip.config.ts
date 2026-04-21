@@ -10,7 +10,7 @@ export default {
     'src/commands/git/merge/driver/run.ts',
     'src/commands/git/merge/driver/uninstall.ts',
   ],
-  project: ['**/*.{ts,js,json,yml}'],
+  project: ['**/*.{ts,js}'],
   ignoreDependencies: ['@commitlint/config-conventional'],
   ignore: ['vitest.config.perf.ts'],
   ignoreBinaries: ['commitlint', 'jscpd', 'npm-check-updates'],

@@ -1,9 +1,9 @@
-import { existsSync } from 'node:fs'
 import {
   DEFAULT_ANCESTOR_CONFLICT_TAG,
   DEFAULT_CONFLICT_MARKER_SIZE,
   DEFAULT_LOCAL_CONFLICT_TAG,
   DEFAULT_OTHER_CONFLICT_TAG,
+  MAX_CONFLICT_MARKER_SIZE,
 } from '../constant/conflictConstant.js'
 import { MergeDriver } from '../driver/MergeDriver.js'
 import type { MergeConfig } from '../types/conflictTypes.js'
@@ -21,7 +21,7 @@ Flags:
   -A   local/ours file (required, must exist; merged result is written back here)
   -B   other/theirs file (required, must exist)
   -P   output file (required, must exist; accepted per git contract)
-  -L   conflict marker size (integer >= 1, default ${DEFAULT_CONFLICT_MARKER_SIZE})
+  -L   conflict marker size (integer 1-${MAX_CONFLICT_MARKER_SIZE}, default ${DEFAULT_CONFLICT_MARKER_SIZE})
   -S   ancestor conflict tag (default ${DEFAULT_ANCESTOR_CONFLICT_TAG})
   -X   local conflict tag (default ${DEFAULT_LOCAL_CONFLICT_TAG})
   -Y   other conflict tag (default ${DEFAULT_OTHER_CONFLICT_TAG})
@@ -92,8 +92,10 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
   let conflictMarkerSize: number = DEFAULT_CONFLICT_MARKER_SIZE
   if (rawL !== undefined && rawL !== '') {
     const n = Number(rawL)
-    if (!Number.isInteger(n) || n < 1) {
-      throw new Error(`-L must be an integer >= 1 (got '${rawL}')`)
+    if (!Number.isInteger(n) || n < 1 || n > MAX_CONFLICT_MARKER_SIZE) {
+      throw new Error(
+        `-L must be an integer 1-${MAX_CONFLICT_MARKER_SIZE} (got '${rawL}')`
+      )
     }
     conflictMarkerSize = n
   }
@@ -127,19 +129,6 @@ export async function main(argv: readonly string[]): Promise<number> {
     return USAGE_EXIT_CODE
   }
 
-  const paths = [
-    parsed.ancestorFile,
-    parsed.localFile,
-    parsed.otherFile,
-    parsed.outputFile,
-  ]
-  for (const p of paths) {
-    if (!existsSync(p)) {
-      process.stderr.write(`sf-git-merge-driver: file not found: ${p}\n`)
-      return USAGE_EXIT_CODE
-    }
-  }
-
   try {
     const driver = new MergeDriver(parsed.config)
     const hasConflict = await driver.mergeFiles(
@@ -149,6 +138,16 @@ export async function main(argv: readonly string[]): Promise<number> {
     )
     return hasConflict ? CONFLICT_EXIT_CODE : SUCCESS_EXIT_CODE
   } catch (err) {
+    // A missing input file surfaces here as ENOENT from fs/promises.readFile —
+    // classify it as a usage error rather than a merge conflict.
+    if (
+      err &&
+      typeof err === 'object' &&
+      (err as NodeJS.ErrnoException).code === 'ENOENT'
+    ) {
+      process.stderr.write(`sf-git-merge-driver: ${toMessage(err)}\n`)
+      return USAGE_EXIT_CODE
+    }
     process.stderr.write(`sf-git-merge-driver: ${toMessage(err)}\n`)
     return CONFLICT_EXIT_CODE
   }

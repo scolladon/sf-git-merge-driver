@@ -38,10 +38,13 @@ jobs:
       - name: Unit test
         run: npm run test:unit
 
+      - name: Integration test
+        run: npm run test:integration
+
       - name: Install cli
         run: npm install -g @salesforce/cli
 
-      - name: Integration test
+      - name: Nut test
         run: npm run test:nut
 
       - uses: actions/upload-artifact@v6

@@ -84,10 +84,11 @@ Implementation: [MergeNodeFactory.ts](src/merger/nodes/MergeNodeFactory.ts)
 ### MergeOrchestrator
 
 The central coordinator that:
-1. Determines the merge scenario using `MergeScenarioFactory`
-2. Applies early termination optimization when all inputs are equal
-3. Selects the appropriate strategy via `getScenarioStrategy()`
-4. Builds the `MergeContext` and executes the strategy
+1. Determines the merge scenario using the `getScenario()` function (in `MergeScenarioFactory.ts`)
+2. Selects the appropriate strategy via `getScenarioStrategy()`
+3. Builds the `MergeContext` and executes the strategy
+
+Early termination when all inputs are equal lives in `AllPresentStrategy.execute()` (and `LocalAndOtherStrategy.execute()`) via `jsonEqual` fast-paths — see section "Early Termination Optimization" below.
 
 ```typescript
 class MergeOrchestrator {
@@ -102,9 +103,11 @@ Immutable context object passed to strategies:
 ```typescript
 interface MergeContext {
   readonly config: MergeConfig
-  readonly ancestor: JsonValue
-  readonly local: JsonValue
-  readonly other: JsonValue
+  // `| undefined` preserves the "key not present on this side" distinction
+  // from JsonValue null so strategies can branch on existence separately.
+  readonly ancestor: JsonValue | undefined
+  readonly local: JsonValue | undefined
+  readonly other: JsonValue | undefined
   readonly attribute: string | undefined
   readonly nodeFactory: MergeNodeFactory
   readonly rootKey: RootKeyInfo | undefined
@@ -204,7 +207,7 @@ flowchart TD
     end
 
     subgraph Runtime["Runtime (per file, thousands per rebase)"]
-        Binary["bin/merge-driver.cjs<br/>(esbuild-bundled, ~101 KB)"]
+        Binary["bin/merge-driver.cjs<br/>(esbuild-bundled, ~118 KB)"]
         ArgvParser["argv parser<br/>(no oclif, no SF core)"]
         MD["MergeDriver.mergeFiles"]
     end
@@ -240,7 +243,7 @@ Deprecation is encoded natively via oclif's command-level deprecation API
 The binary is produced by esbuild from the compiled TypeScript:
 
 ```
-src/**/*.ts → tsc → lib/**/*.js → esbuild (minify, treeshake, cjs) → bin/merge-driver.cjs (~101 KB, mode 755)
+src/**/*.ts → tsc → lib/**/*.js → esbuild (minify, treeshake, cjs) → bin/merge-driver.cjs (~118 KB, mode 755)
 ```
 
 Key build choices:
@@ -261,6 +264,8 @@ The binary uses a pure-Node NDJSON logger ([LoggingService.ts](src/utils/Logging
 
 The `@log('ClassName')` decorator ([LoggingDecorator.ts](src/utils/LoggingDecorator.ts)) emits trace-level entry/exit logs for instrumented methods, including on async rejection and sync throw.
 
+When the resolved log threshold at module init is above `trace` (the usual case — default is `warn`), the decorator installs **no wrapper at all**: the descriptor is left untouched, so decorated methods fall through unchanged with no closure, tagged-template, or async-detection cost per call. The short-circuit is evaluated exactly once per process via `isLevelEnabled(LOG_LEVELS.trace)`.
+
 ### Deep Equality
 
 Element comparison uses a custom iterative `jsonEqual` ([jsonEqual.ts](src/utils/jsonEqual.ts)) instead of `fast-equals`. Stack-safe via explicit work stack; key-order-independent for objects, order-significant for arrays.
@@ -275,8 +280,8 @@ flowchart TD
 
     subgraph "Parser Adapter"
         Parse["FlxXmlParser.parse()"]
+        Normalize["normalizeParsed: strip @_version/@_encoding + empty #text next to CDATA (single recursive pass)"]
         Extract["Extract namespaces (@_)"]
-        Clean["Clean parser bugs"]
     end
 
     subgraph "Domain (format-agnostic)"
@@ -297,7 +302,7 @@ flowchart TD
         Result["XML Output (merged file)"]
     end
 
-    XML --> Parse --> Extract --> Clean --> Orchestrator
+    XML --> Parse --> Normalize --> Extract --> Orchestrator
     Orchestrator --> Strategy
     Strategy --> Nodes
     Strategy --> Conflict

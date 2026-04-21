@@ -15,12 +15,22 @@ export class MergeDriver {
     ourFile: string,
     theirFile: string
   ): Promise<boolean> {
-    // Read all three versions
-    const [ancestorContent, ourContent, theirContent] = await Promise.all(
+    // Read all three versions. `allSettled` (over `all`) guarantees every
+    // readFile has released its file descriptor before we surface an error
+    // — otherwise the losers would linger in the background holding fds,
+    // which on Windows blocks temp-dir cleanup with ENOTEMPTY.
+    const results = await Promise.allSettled(
       [ancestorFile, ourFile, theirFile]
         .map(normalize)
         .map(path => readFile(path, 'utf8'))
     )
+    const rejected = results.find(r => r.status === 'rejected')
+    if (rejected) {
+      throw (rejected as PromiseRejectedResult).reason
+    }
+    const [ancestorContent, ourContent, theirContent] = (
+      results as PromiseFulfilledResult<string>[]
+    ).map(r => r.value)
 
     const xmlMerger = new XmlMerger(this.config)
 

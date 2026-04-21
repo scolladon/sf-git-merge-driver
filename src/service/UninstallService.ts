@@ -56,7 +56,7 @@ export const applyUninstallPlan = (
   })
 }
 
-export type UninstallOptions = {
+type UninstallOptions = {
   /**
    * When true, plan the uninstall and return the plan without touching
    * `.git/config` or `.git/info/attributes`.

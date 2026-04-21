@@ -18,6 +18,7 @@ import { ConflictMarkerFormatter } from '../merger/ConflictMarkerFormatter.js'
 import { type ConflictBlock, isConflictBlock } from '../types/conflictBlock.js'
 import type { MergeConfig } from '../types/conflictTypes.js'
 import type { JsonArray, JsonObject, JsonValue } from '../types/jsonTypes.js'
+import { pushAll } from '../utils/arrayUtils.js'
 import type { XmlSerializer } from './XmlSerializer.js'
 
 const builderOptions = {
@@ -34,8 +35,12 @@ const builderOptions = {
 // Compact → Ordered Format Converter (created per-serialization with config)
 // ============================================================================
 
+// Strict narrowing: arrays are structurally objects but carry numeric indexes,
+// so accepting them as `JsonObject` would let them flow into compactToOrdered
+// (which was narrowed to JsonObject-only for correctness and performance).
+// Excluding arrays here guarantees that narrowing is sound at every callsite.
 const isObj = (x: unknown): x is JsonObject =>
-  typeof x === 'object' && x !== null
+  typeof x === 'object' && x !== null && !Array.isArray(x)
 
 const createConverter = (config: MergeConfig) => {
   const wrapText = (value: JsonValue, attribute: string): JsonObject =>
@@ -73,23 +78,42 @@ const createConverter = (config: MergeConfig) => {
     return [{ [TEXT_TAG]: item }]
   }
 
-  const compactToOrdered = (input: JsonObject | JsonArray): JsonArray => {
+  // Explicit push-loop variant of the previous `keys.flatMap(...)` approach.
+  // The flatMap form allocated an intermediate array per key (and a
+  // single-element wrapper array when the callback returned a non-array),
+  // which adds up to thousands of extra allocations on large profiles.
+  // Using pushAll + a single output array per call halves the garbage the
+  // serializer generates at the expense of a little extra indentation.
+  //
+  // All call sites (convertItem, serialize) narrow via isObj before calling
+  // in, so input is always a JsonObject — no JsonArray branch needed.
+  const compactToOrdered = (input: JsonObject): JsonArray => {
     const keys = Object.keys(input).sort()
-    return keys.flatMap(attribute => {
+    const out: JsonArray = []
+    for (const attribute of keys) {
       const value = input[attribute]
 
       if (Array.isArray(value)) {
-        const children = value.flatMap(convertItem)
-        return { [attribute]: children }
+        const children: JsonArray = []
+        for (const item of value) {
+          pushAll(children, convertItem(item))
+        }
+        out.push({ [attribute]: children })
+        continue
       }
 
       if (isObj(value)) {
-        if (isConflictBlock(value)) return expandConflict(value)
-        return { [attribute]: compactToOrdered(value) }
+        if (isConflictBlock(value)) {
+          pushAll(out, expandConflict(value))
+        } else {
+          out.push({ [attribute]: compactToOrdered(value) })
+        }
+        continue
       }
 
-      return wrapText(value, attribute)
-    })
+      out.push(wrapText(value, attribute))
+    }
+    return out
   }
 
   return compactToOrdered
@@ -111,11 +135,15 @@ const insertNamespaces = (
   ]
 }
 
-// XMLBuilder's format:true inserts \n + indentation around comments.
+// XMLBuilder's format:true inserts `\n + indentation` before comments.
 // Salesforce metadata uses inline comments — strip only builder-added
-// newlines+indentation, not horizontal whitespace within a line.
+// newlines+indentation before each comment, not horizontal whitespace within
+// a line. Previously the trailing `\n?\s*` group consumed the leading
+// whitespace of the next element which caused consecutive comments to be
+// silently concatenated; by only consuming the leading whitespace we keep
+// the regex pure and the `g` flag handles back-to-back comments correctly.
 const correctComments = (xml: string): string =>
-  xml.includes('<!--') ? xml.replace(/\n\s*(<!--.*?-->)\n?\s*/g, '$1') : xml
+  xml.includes('<!--') ? xml.replace(/\n\s*(<!--.*?-->)/g, '$1') : xml
 
 // ============================================================================
 // Serializer
@@ -123,7 +151,7 @@ const correctComments = (xml: string): string =>
 
 export class FxpXmlSerializer implements XmlSerializer {
   private readonly formatter: ConflictMarkerFormatter
-  private readonly convert: (input: JsonObject | JsonArray) => JsonArray
+  private readonly convert: (input: JsonObject) => JsonArray
   private readonly builder: XMLBuilder
 
   constructor(config: MergeConfig) {

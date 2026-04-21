@@ -5,6 +5,7 @@ import {
   DEFAULT_CONFLICT_MARKER_SIZE,
   DEFAULT_LOCAL_CONFLICT_TAG,
   DEFAULT_OTHER_CONFLICT_TAG,
+  MAX_CONFLICT_MARKER_SIZE,
 } from '../../../../constant/conflictConstant.js'
 import { PLUGIN_NAME } from '../../../../constant/pluginConstant.js'
 import { MergeDriver } from '../../../../driver/MergeDriver.js'
@@ -63,6 +64,10 @@ export default class Run extends SfCommand<void> {
       char: 'L',
       summary: messages.getMessage('flags.conflict-marker-size.summary'),
       min: 1,
+      // Mirrors the binary-entry-point cap in src/bin/driver.ts — prevents
+      // RangeError / large-string DoS from String.repeat(n) in the
+      // conflict-marker formatter and serializer.
+      max: MAX_CONFLICT_MARKER_SIZE,
       default: DEFAULT_CONFLICT_MARKER_SIZE,
     }),
     'ancestor-conflict-tag': Flags.string({

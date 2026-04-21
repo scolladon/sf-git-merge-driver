@@ -50,7 +50,22 @@ function parseLevel(raw: string | undefined): number {
 const LOG_LEVEL_THRESHOLD = parseLevel(
   process.env['SF_LOG_LEVEL'] ?? process.env['SFDX_LOG_LEVEL']
 )
+
+/**
+ * Exposed so decorators/call-sites can skip building expensive log payloads
+ * (lazy template closures, stringification) when the level isn't enabled.
+ * Values mirror pino (trace=10, debug=20, info=30, warn=40, error=50, fatal=60).
+ */
+export const isLevelEnabled = (level: number): boolean =>
+  level >= LOG_LEVEL_THRESHOLD
+
+export const LOG_LEVELS = LEVELS
 const MIRROR_TO_STDERR = process.env['SF_LOG_STDERR'] === 'true'
+
+// Cached once at module load — hostname() is a syscall and pid is constant
+// for the lifetime of the process. Avoids per-emit gethostname() overhead.
+const HOSTNAME = hostname()
+const PID = process.pid
 
 const LOG_DIR = join(homedir(), '.sf')
 let dirEnsured = false
@@ -76,8 +91,8 @@ function emit(level: number, message: string, meta: unknown): void {
   const entry: Record<string, unknown> = {
     level,
     time: Date.now(),
-    pid: process.pid,
-    hostname: hostname(),
+    pid: PID,
+    hostname: HOSTNAME,
     name: PLUGIN_NAME,
     msg: message,
   }

@@ -2,11 +2,6 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mockExistsSync = vi.fn()
-vi.mock('node:fs', () => ({
-  existsSync: mockExistsSync,
-}))
-
 const mockMergeFiles = vi.fn()
 const mockMergeDriverCtor = vi.fn()
 vi.mock('../../../src/driver/MergeDriver.js', () => ({
@@ -26,7 +21,6 @@ const { assertNodeVersion, parseArgs, main } = await import(
 
 describe('bin/driver', () => {
   beforeEach(() => {
-    mockExistsSync.mockReset().mockReturnValue(true)
     mockMergeFiles.mockReset().mockResolvedValue(false)
     mockMergeDriverCtor.mockReset()
   })
@@ -34,6 +28,10 @@ describe('bin/driver', () => {
   describe('assertNodeVersion', () => {
     it('Given Node 20, When asserting, Then returns without throwing', () => {
       expect(() => assertNodeVersion('20.5.0')).not.toThrow()
+    })
+
+    it('Given Node 20.0.0 exact boundary, When asserting, Then returns without throwing', () => {
+      expect(() => assertNodeVersion('20.0.0')).not.toThrow()
     })
 
     it('Given Node 22, When asserting, Then returns without throwing', () => {
@@ -196,19 +194,41 @@ describe('bin/driver', () => {
     it('Given non-integer -L, When parsing, Then throws', () => {
       expect(() =>
         parseArgs(['-O', 'a', '-A', 'b', '-B', 'c', '-P', 'd', '-L', 'abc'])
-      ).toThrow(/-L must be an integer >= 1/)
+      ).toThrow(/-L must be an integer 1-100/)
     })
 
     it('Given -L 0, When parsing, Then throws', () => {
       expect(() =>
         parseArgs(['-O', 'a', '-A', 'b', '-B', 'c', '-P', 'd', '-L', '0'])
-      ).toThrow(/-L must be an integer >= 1/)
+      ).toThrow(/-L must be an integer 1-100/)
     })
 
     it('Given negative -L, When parsing, Then throws', () => {
       expect(() =>
         parseArgs(['-O', 'a', '-A', 'b', '-B', 'c', '-P', 'd', '-L', '-3'])
-      ).toThrow(/-L must be an integer >= 1/)
+      ).toThrow(/-L must be an integer 1-100/)
+    })
+
+    it('Given -L above upper bound, When parsing, Then throws', () => {
+      expect(() =>
+        parseArgs(['-O', 'a', '-A', 'b', '-B', 'c', '-P', 'd', '-L', '101'])
+      ).toThrow(/-L must be an integer 1-100/)
+    })
+
+    it('Given -L at upper bound 100, When parsing, Then accepts it', () => {
+      const args = parseArgs([
+        '-O',
+        'a',
+        '-A',
+        'b',
+        '-B',
+        'c',
+        '-P',
+        'd',
+        '-L',
+        '100',
+      ])
+      expect(args.config.conflictMarkerSize).toBe(100)
     })
   })
 
@@ -310,8 +330,14 @@ describe('bin/driver', () => {
       stderr.mockRestore()
     })
 
-    it('Given non-existent -O file, When running, Then exits 2 with "file not found"', async () => {
-      mockExistsSync.mockImplementation((p: string) => p !== 'a')
+    it('Given missing input file (ENOENT), When running, Then exits 2 classifying it as a usage error', async () => {
+      const enoent = Object.assign(
+        new Error("ENOENT: no such file or directory, open 'a'"),
+        {
+          code: 'ENOENT',
+        }
+      )
+      mockMergeFiles.mockRejectedValue(enoent)
       const stderr = vi
         .spyOn(process.stderr, 'write')
         .mockImplementation(() => true)
@@ -320,7 +346,7 @@ describe('bin/driver', () => {
 
       expect(code).toBe(2)
       const msg = stderr.mock.calls[0][0] as string
-      expect(msg).toContain('sf-git-merge-driver: file not found: a')
+      expect(msg).toContain('ENOENT')
       stderr.mockRestore()
     })
   })

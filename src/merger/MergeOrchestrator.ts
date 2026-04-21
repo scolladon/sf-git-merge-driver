@@ -16,9 +16,9 @@ export class MergeOrchestrator {
   ) {}
 
   merge(
-    ancestor: JsonValue,
-    local: JsonValue,
-    other: JsonValue,
+    ancestor: JsonValue | undefined,
+    local: JsonValue | undefined,
+    other: JsonValue | undefined,
     attribute?: string,
     rootKey?: RootKeyInfo
   ): MergeResult {

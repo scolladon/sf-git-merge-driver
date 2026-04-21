@@ -1,11 +1,11 @@
 import type { MergeConfig } from '../../types/conflictTypes.js'
-import type { JsonArray, JsonObject } from '../../types/jsonTypes.js'
+import type { JsonArray } from '../../types/jsonTypes.js'
 import type { MergeResult } from '../../types/mergeResult.js'
 import { combineResults, withConflict } from '../../types/mergeResult.js'
 import { buildConflictMarkers } from '../ConflictMarkerBuilder.js'
 import { MergeOrchestrator } from '../MergeOrchestrator.js'
 import type { KeyExtractor } from './KeyedArrayIndex.js'
-import { buildKeyedMap } from './KeyedArrayIndex.js'
+import { indexKeyedArrays } from './KeyedArrayIndex.js'
 import type { KeyedArrayMergeStrategy } from './KeyedArrayMergeStrategy.js'
 import type { MergeNode } from './MergeNode.js'
 import { defaultNodeFactory } from './MergeNodeFactory.js'
@@ -48,10 +48,14 @@ class UnorderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   ) {}
 
   merge(config: MergeConfig): MergeResult {
-    const allKeys = this.collectAllKeys()
-    const keyedAncestor = buildKeyedMap(this.ancestor, this.keyField)
-    const keyedLocal = buildKeyedMap(this.local, this.keyField)
-    const keyedOther = buildKeyedMap(this.other, this.keyField)
+    // Fused single-pass traversal — one keyField() call per item instead of
+    // two (previously: collectAllKeys + buildKeyedMap both invoked keyField).
+    const { keyedAncestor, keyedLocal, keyedOther, allKeys } = indexKeyedArrays(
+      this.ancestor,
+      this.local,
+      this.other,
+      this.keyField
+    )
 
     const results: MergeResult[] = []
     const orchestrator = new MergeOrchestrator(config, defaultNodeFactory)
@@ -73,16 +77,6 @@ class UnorderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     }
 
     return combineResults(results)
-  }
-
-  private collectAllKeys(): Set<string> {
-    const allKeys = new Set<string>()
-    for (const arr of [this.ancestor, this.local, this.other]) {
-      for (const item of arr) {
-        allKeys.add(this.keyField(item as JsonObject))
-      }
-    }
-    return allKeys
   }
 }
 

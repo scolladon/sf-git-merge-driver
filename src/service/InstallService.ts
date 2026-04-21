@@ -101,7 +101,7 @@ export class InstallConflictError extends Error {
   }
 }
 
-export type InstallOptions = {
+type InstallOptions = {
   /**
    * When true, plan the install and return the plan without touching
    * `.git/config` or `.git/info/attributes`. The returned plan may

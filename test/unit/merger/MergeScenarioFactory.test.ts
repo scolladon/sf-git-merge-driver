@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getScenario } from '../../../src/merger/MergeScenarioFactory.js'
+import type { JsonValue } from '../../../src/types/jsonTypes.js'
 import { MergeScenario } from '../../../src/types/mergeScenario.js'
 
 describe('MergeScenarioFactory', () => {

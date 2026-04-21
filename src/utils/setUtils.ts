@@ -1,4 +1,7 @@
-export const setsEqual = (a: Set<string>, b: Set<string>): boolean => {
+export const setsEqual = (
+  a: ReadonlySet<string>,
+  b: ReadonlySet<string>
+): boolean => {
   if (a.size !== b.size) return false
   for (const item of a) {
     if (!b.has(item)) return false
@@ -6,7 +9,10 @@ export const setsEqual = (a: Set<string>, b: Set<string>): boolean => {
   return true
 }
 
-export const setsIntersect = (a: Set<string>, b: Set<string>): boolean => {
+export const setsIntersect = (
+  a: ReadonlySet<string>,
+  b: ReadonlySet<string>
+): boolean => {
   for (const item of a) {
     if (b.has(item)) return true
   }

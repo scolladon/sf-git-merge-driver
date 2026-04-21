@@ -58,7 +58,8 @@ const METADATA_KEY_EXTRACTORS = {
     return [layout, recordType].filter(x => x !== String(undefined)).join('.')
   }, // Profile
   loginFlows: (el: JsonValue) => getPropertyValue(el, 'friendlyname'), // Profile
-  loginHours: (el: JsonValue) => Object.keys(el!).join(','), // Profile
+  loginHours: (el: JsonValue) =>
+    typeof el === 'object' && el !== null ? Object.keys(el).join(',') : '', // Profile
   loginIpRanges: (el: JsonValue) => {
     const startAddress = getPropertyValue(el, 'startAddress')
     const endAddress = getPropertyValue(el, 'endAddress')

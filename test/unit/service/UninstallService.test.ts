@@ -35,7 +35,7 @@ const ATTRIBUTES_CONTENT = `*.xml merge=salesforce-source\nsome other content`
 const FILTERED_CONTENT = 'some other content'
 
 const mockedRaw = vi.fn()
-const simpleGitMock = simpleGit as Mock
+const simpleGitMock = simpleGit as unknown as Mock
 simpleGitMock.mockReturnValue({
   raw: mockedRaw,
 })
@@ -286,6 +286,25 @@ describe('UninstallService', () => {
         { kind: 'drop-line', lineIndex: 0 },
         { kind: 'remove-merge-attr', lineIndex: 1 },
       ])
+    })
+  })
+
+  describe('given a CRLF-terminated .gitattributes file (Windows)', () => {
+    it('When uninstalling, Then preserves CRLF line endings and filters driver lines', async () => {
+      // Arrange — CRLF content with the driver line in the middle
+      readFileMocked.mockResolvedValue(
+        `# header\r\n*.xml merge=salesforce-source\r\ntrailing line\r\n`
+      )
+
+      // Act
+      await sut.uninstallMergeDriver()
+
+      // Assert — output re-joined with CRLF (no mixed endings), driver
+      // line removed, other lines preserved.
+      expect(writeFile).toHaveBeenCalledWith(
+        GIT_ATTRIBUTES_PATH,
+        '# header\r\ntrailing line\r\n'
+      )
     })
   })
 })

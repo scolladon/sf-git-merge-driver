@@ -1,5 +1,10 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: it is dynamic by definition */
-import { Logger, lazy } from './LoggingService.js'
+import { isLevelEnabled, LOG_LEVELS, Logger, lazy } from './LoggingService.js'
+
+// Resolved at module init. When the trace threshold is above LEVELS.trace the
+// decorator leaves methods untouched — avoiding closure + tagged-template
+// allocations per call in the hot path of the merge pipeline.
+const TRACE_ENABLED = isLevelEnabled(LOG_LEVELS.trace)
 
 export function log(className: string) {
   return function (
@@ -7,6 +12,8 @@ export function log(className: string) {
     propertyKey: string,
     descriptor: PropertyDescriptor
   ): void {
+    if (!TRACE_ENABLED) return
+
     const original = descriptor.value
 
     descriptor.value = function (...args: any[]) {

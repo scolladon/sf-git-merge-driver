@@ -264,6 +264,20 @@ describe('OrderedKeyedArrayMergeStrategy', () => {
       ['A', 'B', 'D'],
       ['A', conflict(['C'], ['B', 'C'], ['B']), 'D'],
     ],
+    // Gap-scoped addition conflict — exercises `detectGapConflict`
+    // (the branch whose redundant `!setsEqual(...)` clause was removed).
+    // Both sides share the ancestor spine [A, B] without any moves, and
+    // each adds a different disjoint key in the trailing gap. The spine
+    // stays intact and only the gap is marked as a conflict. Contrast
+    // with C7 above, where ordering divergence triggers a full-array
+    // conflict; this case is deliberately narrower.
+    [
+      'Gap conflict: disjoint additions in the trailing gap, no moves',
+      ['A', 'B'],
+      ['A', 'B', 'X'],
+      ['A', 'B', 'Y'],
+      ['A', 'B', conflict(['X'], [], ['Y'])],
+    ],
   ]
 
   // Additional scenarios to exercise gap analysis and spine processing branches
