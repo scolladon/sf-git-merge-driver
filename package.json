@@ -379,7 +379,7 @@
       "output": []
     },
     "test:perf": {
-      "command": "node --expose-gc ./node_modules/.bin/vitest bench --config vitest.config.perf.ts && node test/perf/formatResults.mjs",
+      "command": "node --expose-gc ./node_modules/.bin/vitest bench --config vitest.config.perf.ts && node test/perf/formatResults.mjs && node test/perf/binarySize.mjs",
       "files": [
         "src/**/*.ts",
         "test/perf/**",
@@ -389,7 +389,8 @@
       "output": [
         "perf-raw.json",
         "perf-runtime.json",
-        "perf-memory.json"
+        "perf-memory.json",
+        "perf-binary-size.json"
       ],
       "dependencies": [
         "compile",

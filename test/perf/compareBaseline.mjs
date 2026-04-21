@@ -2,6 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 
 const RUNTIME_THRESHOLD = 1.3
 const MEMORY_THRESHOLD = 1.5
+const SIZE_THRESHOLD = 1.1
 
 const loadJson = path =>
   existsSync(path) ? JSON.parse(readFileSync(path, 'utf-8')) : []
@@ -10,12 +11,20 @@ const baseRuntime = loadJson('perf-runtime-base.json')
 const prRuntime = loadJson('perf-runtime.json')
 const baseMemory = loadJson('perf-memory-base.json')
 const prMemory = loadJson('perf-memory.json')
+const baseSize = loadJson('perf-binary-size-base.json')
+const prSize = loadJson('perf-binary-size.json')
 
 const toMap = entries =>
   new Map(entries.map(entry => [entry.name, entry.value]))
 
 const baseRuntimeMap = toMap(baseRuntime)
 const baseMemoryMap = toMap(baseMemory)
+const baseSizeMap = toMap(baseSize)
+
+const formatBytes = n => {
+  const kb = n / 1024
+  return `${n.toLocaleString()} B (${kb.toFixed(2)} KB)`
+}
 
 const regressions = []
 const improvements = []
@@ -54,6 +63,24 @@ for (const entry of prMemory) {
   }
   if (ratio >= MEMORY_THRESHOLD) regressions.push(row)
   else if (ratio <= 1 / MEMORY_THRESHOLD) improvements.push(row)
+  else stable.push(row)
+}
+
+for (const entry of prSize) {
+  const baseVal = baseSizeMap.get(entry.name)
+  if (baseVal == null) continue
+  const ratio = entry.value / baseVal
+  const pct = ((ratio - 1) * 100).toFixed(1)
+  const row = {
+    name: `${entry.name} (size)`,
+    base: formatBytes(baseVal),
+    pr: formatBytes(entry.value),
+    unit: 'bytes',
+    ratio: ratio.toFixed(2),
+    change: ratio > 1 ? `+${pct}%` : `-${Math.abs(pct)}%`,
+  }
+  if (ratio >= SIZE_THRESHOLD) regressions.push(row)
+  else if (ratio <= 1 / SIZE_THRESHOLD) improvements.push(row)
   else stable.push(row)
 }
 
@@ -129,7 +156,7 @@ if (token && repo && prNumber) {
 if (regressions.length > 0) {
   // biome-ignore lint/suspicious/noConsole: CI output
   console.error(
-    `\n::error::${regressions.length} performance regression(s) detected (runtime threshold: ${RUNTIME_THRESHOLD}x, latency threshold: ${MEMORY_THRESHOLD}x)`
+    `\n::error::${regressions.length} performance regression(s) detected (runtime threshold: ${RUNTIME_THRESHOLD}x, latency threshold: ${MEMORY_THRESHOLD}x, binary-size threshold: ${SIZE_THRESHOLD}x)`
   )
   process.exit(1)
 }

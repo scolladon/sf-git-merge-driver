@@ -47,6 +47,7 @@ jobs:
           npm run test:perf || true
           cp perf-runtime.json perf-runtime-base.json 2>/dev/null || true
           cp perf-memory.json perf-memory-base.json 2>/dev/null || true
+          cp perf-binary-size.json perf-binary-size-base.json 2>/dev/null || true
           git checkout --force -
           npm install
 
@@ -100,6 +101,23 @@ jobs:
           alert-comment-cc-users: '@scolladon'
           benchmark-data-dir-path: dev/bench/memory
 
+      - name: Binary size benchmark
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: Binary Size Benchmark
+          tool: customSmallerIsBetter
+          output-file-path: ./perf-binary-size.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: ${{ inputs.auto-push }}
+          save-data-file: ${{ inputs.auto-push }}
+          skip-fetch-gh-pages: true
+          alert-threshold: '110%'
+          comment-on-alert: ${{ inputs.auto-push }}
+          fail-on-alert: false
+          summary-always: ${{ inputs.auto-push }}
+          alert-comment-cc-users: '@scolladon'
+          benchmark-data-dir-path: dev/bench/binary-size
+
       - name: Upload benchmark report
         uses: actions/upload-artifact@v6
         with:
@@ -108,4 +126,5 @@ jobs:
             perf-preview.html
             perf-runtime.json
             perf-memory.json
+            perf-binary-size.json
             perf-comparison.md
