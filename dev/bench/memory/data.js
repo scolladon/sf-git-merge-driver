@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776761599125,
+  "lastUpdate": 1776763435376,
   "repoUrl": "https://github.com/scolladon/sf-git-merge-driver",
   "entries": {
     "Memory Benchmark": [
@@ -559,6 +559,138 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/scolladon/sf-git-merge-driver/commit/e810eace9985c6bee4d0e5c33414741b6acae51e"
         },
         "date": 1776761599071,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "node bin/merge-driver.cjs --version",
+            "value": 37.4363,
+            "range": "±4.21%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-small-no-conflict",
+            "value": 1.8777,
+            "range": "±2.49%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-small-with-conflict",
+            "value": 1.7691,
+            "range": "±1.38%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-medium-no-conflict",
+            "value": 13.989,
+            "range": "±2.02%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-medium-with-conflict",
+            "value": 13.9665,
+            "range": "±2.91%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-large-no-conflict",
+            "value": 54.5942,
+            "range": "±1.07%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-large-with-conflict",
+            "value": 54.0475,
+            "range": "±1.22%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-ordered-globalvalueset",
+            "value": 1.6,
+            "range": "±1.21%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-picklist-customfield",
+            "value": 1.1366,
+            "range": "±2.16%",
+            "unit": "ms"
+          },
+          {
+            "name": "parse-small",
+            "value": 1.1433,
+            "range": "±1.78%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-small",
+            "value": 0.1869,
+            "range": "±3.05%",
+            "unit": "ms"
+          },
+          {
+            "name": "serialize-small",
+            "value": 0.3204,
+            "range": "±2.27%",
+            "unit": "ms"
+          },
+          {
+            "name": "parse-medium",
+            "value": 8.6938,
+            "range": "±0.81%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-medium",
+            "value": 1.6043,
+            "range": "±2.40%",
+            "unit": "ms"
+          },
+          {
+            "name": "serialize-medium",
+            "value": 2.553,
+            "range": "±3.75%",
+            "unit": "ms"
+          },
+          {
+            "name": "parse-large",
+            "value": 34.7194,
+            "range": "±0.56%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-large",
+            "value": 6.9184,
+            "range": "±4.05%",
+            "unit": "ms"
+          },
+          {
+            "name": "serialize-large",
+            "value": 10.6961,
+            "range": "±3.88%",
+            "unit": "ms"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "colladonsebastien@gmail.com",
+            "name": "Sebastien",
+            "username": "scolladon"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a6792f930412a8ca6ec618a85bceacb74a832108",
+          "message": "fix(release): anchor release-please to existing v-prefixed tags (#188)",
+          "timestamp": "2026-04-21T11:22:30+02:00",
+          "tree_id": "eb03412e1d67ca2e272943b358a36ae8bdb47ab9",
+          "url": "https://github.com/scolladon/sf-git-merge-driver/commit/a6792f930412a8ca6ec618a85bceacb74a832108"
+        },
+        "date": 1776763435323,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
