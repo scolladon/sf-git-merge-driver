@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.7.0](https://github.com/scolladon/sf-git-merge-driver/compare/v1.6.1...v1.7.0) (2026-04-21)
+
+
+### Features
+
+* **perf:** standalone binary merge driver (~7.5x faster) ([#184](https://github.com/scolladon/sf-git-merge-driver/issues/184)) ([ba74cfb](https://github.com/scolladon/sf-git-merge-driver/commit/ba74cfbbfa26f3ce597fc7a3453ce64fbeb1cf89))
+
+
+### Bug Fixes
+
+* **install:** idempotent install, --dry-run, --on-conflict handling ([#186](https://github.com/scolladon/sf-git-merge-driver/issues/186)) ([8749150](https://github.com/scolladon/sf-git-merge-driver/commit/87491505e6cdd9447a02eaacc6dbbf73029a76d9))
+* **release:** anchor release-please to existing v-prefixed tags ([#188](https://github.com/scolladon/sf-git-merge-driver/issues/188)) ([a6792f9](https://github.com/scolladon/sf-git-merge-driver/commit/a6792f930412a8ca6ec618a85bceacb74a832108))
+
+
+### Code Refactoring
+
+* improve code base for performance and maintenance ([#187](https://github.com/scolladon/sf-git-merge-driver/issues/187)) ([e810eac](https://github.com/scolladon/sf-git-merge-driver/commit/e810eace9985c6bee4d0e5c33414741b6acae51e))
+
 ## [1.6.1](https://github.com/scolladon/sf-git-merge-driver/compare/v1.6.0...v1.6.1) (2026-04-15)
 
 
