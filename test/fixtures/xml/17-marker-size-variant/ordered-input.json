@@ -1,0 +1,15 @@
+{
+  "ordered": [
+    {
+      "Root": [
+        {
+          "__conflict": true,
+          "local": [{ "v": "L" }],
+          "ancestor": [{ "v": "A" }],
+          "other": [{ "v": "O" }]
+        }
+      ]
+    }
+  ],
+  "namespaces": {}
+}

@@ -1,0 +1,11 @@
+{
+  "ordered": [
+    {
+      "Root": [
+        { "value": "updated" },
+        { "tag": { "@_attr": "a", "#text": "body" } }
+      ]
+    }
+  ],
+  "namespaces": { "@_xmlns": "http://x" }
+}
