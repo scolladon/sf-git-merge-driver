@@ -77,6 +77,11 @@
 >   goal 2 pins parse-tree equivalence; `JsonMerger.mergeThreeWay`
 >   still receives three full in-memory trees. Streaming is only at
 >   the I/O boundaries.
+> - Phase 7 (streaming-merge algorithm) added as a **deferred
+>   follow-up** in new §10a, with cost (~15 senior-days), gain
+>   (section-sized RAM ceiling, meaningful only on pathological
+>   profiles), and an explicit arbitration gate. Decision deferred
+>   until C0–C6 has soaked and we have real data.
 
 ---
 
@@ -96,6 +101,7 @@ can walk the history.
 | C4 | `MergeDriver` cutover: production path flips to streams + atomic rename | New path is the only one the driver uses; old classes dead-but-present |
 | C5 | Soak / dogfood on the branch (see §8 — no code commit, just the gate) | — |
 | C6 | Deletion: remove `FlxXmlParser`, `FxpXmlSerializer`, `ConflictMarkerFormatter`, `fast-xml-builder` | Branch final state; ready for PR |
+| **Phase 7 (deferred)** | Streaming-merge algorithm — section-at-a-time parse/merge/write. **Not in this PR**, arbitrated after C0–C6 soaks. See §10a for cost/gain. | — |
 
 **No runtime flag.** Design §11 OQ2 decided against one. The
 commit-per-phase structure preserves the "old and new paths
@@ -755,6 +761,97 @@ Steps:
 
 This is the final commit on the branch. Open the single PR against
 `main` with C0–C6 in history.
+
+---
+
+## 10a. Phase 7 (deferred) — Streaming-merge algorithm
+
+**Not in this PR.** Documented here so the cost/gain analysis is
+recorded alongside the design. Implement this only after C0–C6 has
+landed and we have real stability + RAM data to arbitrate.
+
+### What it is
+
+Today's v1 design streams I/O but still buffers the full parse tree
+per side (design §2 non-goal; §13 future work). `JsonMerger.mergeThreeWay`
+receives three complete in-memory trees.
+
+Phase 7 redesigns the merge so one top-level section (e.g.,
+`<userPermissions>`, `<objectPermissions>`, `<fieldPermissions>` …)
+flows through parse → merge → write at a time and is released before
+the next section starts. Peak RAM becomes
+`max(section_size) × 3 sides` rather than `full_tree × 3 sides`.
+
+### Cost
+
+| Work | Est. |
+|---|---|
+| `IncrementalOutputBuilder` emitting `sectionComplete` events via async iterator | 2 d |
+| Three-stream lockstep barrier primitive (not in Node stdlib) | 2 d |
+| `JsonMerger` split (`mergeRoot` + `mergeSection`); rework `getUniqueSortedProps` for streaming semantics (pre-scan vs. catchup pass) | 2 d |
+| `XmlMerger.mergeStreams` rewrite as lockstep orchestrator | 2 d |
+| Out-of-order section handling (ancestor/ours/theirs may not present sections in identical order — look-ahead or re-sort) | 2 d |
+| Multi-producer backpressure: three readers pause together when the writer stalls | 1 d |
+| Rewrite affected unit + integration tests for incremental semantics | 3 d |
+| Error-mid-section recovery tests (partial `.tmp` flushed, rename-only-at-end discipline) | 1 d |
+| **Total** | **~15 senior-days** |
+
+**New risk surface introduced:** barrier deadlock, section-reorder
+byte drift, backpressure starvation, silent merge corruption from
+`getUniqueSortedProps` adaptation bugs. Every existing merger test
+would need rewriting.
+
+**Breaking change:** `XmlParser.parseStream` returns
+`AsyncIterator<Section>` instead of `Promise<Tree>`. Every caller
+affected. `JsonMerger.mergeThreeWay` splits into two methods.
+
+### Gain
+
+RAM only (speed and bundle unchanged).
+
+| Scenario | Current | v1 streaming-I/O (C0–C6) | Phase 7 streaming-merge |
+|---|---|---|---|
+| Typical profile (~500 KB) | ~4.5 MB | ~1.5 MB | ~1 MB |
+| Large profile (~10 MB, 5k `fieldPermissions`) | ~45 MB | ~15 MB | ~15 MB |
+| Pathological (~100 MB, huge `fieldPermissions` group) | ~450 MB | ~150 MB | **~15 MB** |
+
+v1 already kills the dominant costs (3× tree-clone walks, 4× output
+string copies). Phase 7 adds a **section-sized ceiling** on top —
+load-bearing only when a single section approaches whole-file size
+(pathological profiles) or CI memory is tight.
+
+### Arbitration gate
+
+After C0–C6 lands and soaks, revisit phase 7 with **concrete
+evidence**:
+
+- [ ] Benchmarks on real-customer pathological fixtures (if any
+      can be obtained) show v1's section-unbounded peak is a
+      bottleneck.
+- [ ] OR: an OOM / memory-pressure report from a user running the
+      driver on ≤ 1 GB CI.
+- [ ] OR: a `fieldPermissions`-heavy profile ≥ 50 MB emerges as a
+      common shape.
+
+If none of those appear within, say, two release cycles of C0–C6
+being on main: **decline phase 7**. The complexity + risk is not
+justified by the observed user population.
+
+If at least one appears: greenlight a phase-7 feature branch with
+its own design + plan iterations, treating this section as the
+starting cost/gain doc.
+
+### What to record during C0–C6 to inform this decision
+
+- Bench peak heapUsed on the three Profile tiers (§9.1).
+- Any user-reported issues tagged with memory, OOM, or CI-runner
+  exhaustion — even just anecdotal.
+- Shape distribution of profiles seen in dogfood: section sizes,
+  max-section-to-total ratio.
+
+These data points go into `docs/plans/2026-04-23-streaming-benchmarks.md`
+produced in phase 4 benchmarking — that doc becomes the phase-7
+arbitration input.
 
 ---
 
