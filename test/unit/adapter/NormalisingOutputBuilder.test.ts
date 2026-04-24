@@ -1,0 +1,94 @@
+import FlxParser from '@nodable/flexible-xml-parser'
+import { describe, expect, it } from 'vitest'
+import {
+  FLX_OPTIONS,
+  NormalisingOutputBuilderFactory,
+} from '../../../src/adapter/NormalisingOutputBuilder.js'
+
+const parse = (xml: string) => {
+  const parser = new FlxParser({
+    ...FLX_OPTIONS,
+    OutputBuilder: new NormalisingOutputBuilderFactory(),
+  })
+  return parser.parse(xml)
+}
+
+describe('NormalisingOutputBuilder', () => {
+  describe('given an XML document with a namespaced root', () => {
+    describe('when parsed', () => {
+      it('should strip @_version and @_encoding from the root element', () => {
+        const result = parse(
+          `<?xml version="1.0" encoding="UTF-8"?><Root xmlns="http://x"><v>1</v></Root>`
+        )
+        expect(result.content).toEqual({ Root: { v: '1' } })
+      })
+
+      it('should move @_xmlns into namespaces bucket', () => {
+        const result = parse(
+          `<?xml version="1.0" encoding="UTF-8"?><Root xmlns="http://x"><v>1</v></Root>`
+        )
+        expect(result.namespaces).toEqual({ '@_xmlns': 'http://x' })
+      })
+
+      it('should move every xmlns:prefix into namespaces bucket', () => {
+        const result = parse(
+          `<?xml version="1.0"?><Root xmlns="http://x" xmlns:ns1="http://y"><v>1</v></Root>`
+        )
+        expect(result.namespaces).toEqual({
+          '@_xmlns': 'http://x',
+          '@_xmlns:ns1': 'http://y',
+        })
+      })
+    })
+  })
+
+  describe('given an XML document without namespaces', () => {
+    it('when parsed then namespaces is an empty object', () => {
+      const result = parse(`<?xml version="1.0"?><Root><v>1</v></Root>`)
+      expect(result.namespaces).toEqual({})
+    })
+  })
+
+  describe('given attributes named version or encoding at non-root depth', () => {
+    it('when parsed then they are dropped (any-depth defensive filter)', () => {
+      const result = parse(
+        `<?xml version="1.0"?><Root><child version="9" encoding="x" real="kept">v</child></Root>`
+      )
+      expect(result.content).toEqual({
+        Root: { child: { '@_real': 'kept', '#text': 'v' } },
+      })
+    })
+  })
+
+  describe('given xmlns attribute on a non-root element', () => {
+    it('when parsed then it stays on the element (not promoted to namespaces)', () => {
+      const result = parse(
+        `<?xml version="1.0"?><Root><inner xmlns="http://y">v</inner></Root>`
+      )
+      expect(result.namespaces).toEqual({})
+      expect(result.content).toEqual({
+        Root: { inner: { '@_xmlns': 'http://y', '#text': 'v' } },
+      })
+    })
+  })
+
+  describe('given CDATA containing ]]>', () => {
+    it('when parsed then the CDATA value is preserved as array of segments', () => {
+      const result = parse(
+        `<?xml version="1.0"?><R><v><![CDATA[has ]]]]><![CDATA[> inside]]></v></R>`
+      )
+      expect(result.content).toEqual({
+        R: { v: { __cdata: ['has ]]', '> inside'] } },
+      })
+    })
+  })
+
+  describe('given a comment', () => {
+    it('when parsed then it is preserved under #xml__comment', () => {
+      const result = parse(`<?xml version="1.0"?><R><!-- hello --><v>1</v></R>`)
+      expect(result.content).toEqual({
+        R: { '#xml__comment': ' hello ', v: '1' },
+      })
+    })
+  })
+})
