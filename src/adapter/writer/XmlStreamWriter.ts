@@ -246,36 +246,57 @@ function* emitChildren(
       yield { kind: 'text', value: String(child) }
       continue
     }
-    for (const tagName of Object.keys(child).sort()) {
+    const keys = Object.keys(child)
+    // Fast path: elements produced by splitAttrsAndChildren's repeated-
+    // child expansion (`{[key]: entry}`) always have exactly one key,
+    // so the sort is a no-op — skip the allocation.
+    if (keys.length === 1) {
+      const tagName = keys[0]!
+      yield* emitElement(tagName, child[tagName] as JsonValue, [], markers)
+      continue
+    }
+    for (const tagName of keys.sort()) {
       yield* emitElement(tagName, child[tagName] as JsonValue, [], markers)
     }
   }
 }
 
+// Indent cache: depth is bounded (realistic Salesforce profiles reach
+// depth 4–5). String.repeat is cheap but memoising once saves
+// thousands of allocations on large documents.
+const indentCache: string[] = []
+const getIndent = (depth: number): string => {
+  let cached = indentCache[depth]
+  if (cached === undefined) {
+    cached = `\n${XML_INDENT.repeat(depth)}`
+    indentCache[depth] = cached
+  }
+  return cached
+}
+
 // Turn chunks into a string stream, applying the lastEndedWithGt rule
 // from design §6.3.2 for close-tag and mixed-content text indentation.
-const formatChunks = (chunks: Iterable<Chunk>): string[] => {
-  const out: string[] = []
+// Generator — consumers can pipeline without materialising the full
+// document (performance-review H1).
+function* formatChunks(chunks: Iterable<Chunk>): Generator<string> {
   const frames: Array<{ depth: number; endedWithGt: boolean }> = [
     { depth: 0, endedWithGt: false },
   ]
   let isFirstTopLevelAfterDecl = true
 
-  const indentFor = (depth: number) => `\n${XML_INDENT.repeat(depth)}`
-
   for (const chunk of chunks) {
     const top = frames[frames.length - 1]!
     if (chunk.kind === 'decl') {
-      out.push(XML_DECL)
+      yield XML_DECL
       continue
     }
     if (chunk.kind === 'open') {
       const attrStr = attrsToString(chunk.attrs)
       if (isFirstTopLevelAfterDecl) {
-        out.push(`<${chunk.name}${attrStr}>`)
+        yield `<${chunk.name}${attrStr}>`
         isFirstTopLevelAfterDecl = false
       } else {
-        out.push(`${indentFor(top.depth)}<${chunk.name}${attrStr}>`)
+        yield `${getIndent(top.depth)}<${chunk.name}${attrStr}>`
       }
       // Push the child frame; its `depth` is the level of ITS children.
       frames.push({ depth: top.depth + 1, endedWithGt: false })
@@ -288,9 +309,9 @@ const formatChunks = (chunks: Iterable<Chunk>): string[] => {
       // using the frame below `top`.
       const parentDepth = frames[frames.length - 2]!.depth
       if (top.endedWithGt) {
-        out.push(`${indentFor(parentDepth)}</${chunk.name}>`)
+        yield `${getIndent(parentDepth)}</${chunk.name}>`
       } else {
-        out.push(`</${chunk.name}>`)
+        yield `</${chunk.name}>`
       }
       frames.pop()
       frames[frames.length - 1]!.endedWithGt = true
@@ -298,28 +319,27 @@ const formatChunks = (chunks: Iterable<Chunk>): string[] => {
     }
     if (chunk.kind === 'text') {
       if (top.endedWithGt) {
-        out.push(`${indentFor(top.depth)}${chunk.value}`)
+        yield `${getIndent(top.depth)}${chunk.value}`
       } else {
-        out.push(chunk.value)
+        yield chunk.value
       }
       top.endedWithGt = false
       continue
     }
     if (chunk.kind === 'cdata') {
       if (top.endedWithGt) {
-        out.push(`${indentFor(top.depth)}<![CDATA[${chunk.value}]]>`)
+        yield `${getIndent(top.depth)}<![CDATA[${chunk.value}]]>`
       } else {
-        out.push(`<![CDATA[${chunk.value}]]>`)
+        yield `<![CDATA[${chunk.value}]]>`
       }
       top.endedWithGt = true
       continue
     }
     // comment: inline, no leading newline. Folds in current
     // post-correctComments behaviour by construction.
-    out.push(`<!--${chunk.value}-->`)
+    yield `<!--${chunk.value}-->`
     top.endedWithGt = true
   }
-  return out
 }
 
 // Design §6.3.3 line-state machine: strip horizontal whitespace before
@@ -339,6 +359,12 @@ class ConflictLineFilter {
   }
 
   push(chunk: string): string {
+    // Fast path: most chunks contain no newlines (open tags, close
+    // tags, text of leaf elements). Avoid the string[] allocation.
+    if (chunk.indexOf('\n') < 0) {
+      this.buf += chunk
+      return ''
+    }
     const out: string[] = []
     let working = chunk
     while (true) {
@@ -383,8 +409,8 @@ class ConflictLineFilter {
 }
 
 // Rewrite LF → target EOL at byte level. Kept orthogonal per §6.3.4.
-const applyEol = (chunks: string[], eol: '\n' | '\r\n'): string[] =>
-  eol === '\n' ? chunks : chunks.map(c => c.replace(/\r?\n/g, eol))
+const applyEol = (piece: string, eol: '\n' | '\r\n'): string =>
+  eol === '\n' ? piece : piece.replace(/\r?\n/g, eol)
 
 export class XmlStreamWriter {
   constructor(private readonly config: MergeConfig) {}
@@ -397,18 +423,24 @@ export class XmlStreamWriter {
   ): Promise<void> {
     if (ordered.length === 0) return
 
+    // Pipelined: each formatted string flows emit → format → filter
+    // → eol → out.write without accumulating an intermediate array of
+    // all document chunks. Keeps peak working set proportional to tree
+    // depth (the frame stack inside formatChunks) rather than node
+    // count. Addresses performance-review H1.
     const markers = buildConflictMarkers(this.config)
-    const formatted = formatChunks(emit(ordered, namespaces, markers))
     const filter = new ConflictLineFilter(this.config)
-    const filtered: string[] = []
-    for (const piece of formatted) filtered.push(filter.push(piece))
-    filtered.push(filter.end())
-
-    for (const piece of applyEol(filtered, eol)) {
-      if (piece.length === 0) continue
-      if (!out.write(piece)) {
+    const writePiece = async (piece: string): Promise<void> => {
+      if (piece.length === 0) return
+      const final = applyEol(piece, eol)
+      if (!out.write(final)) {
         await once(out, 'drain')
       }
     }
+
+    for (const piece of formatChunks(emit(ordered, namespaces, markers))) {
+      await writePiece(filter.push(piece))
+    }
+    await writePiece(filter.end())
   }
 }
