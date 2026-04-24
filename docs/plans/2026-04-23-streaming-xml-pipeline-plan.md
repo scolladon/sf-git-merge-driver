@@ -1,6 +1,6 @@
 # Implementation plan — Streaming XML pipeline
 
-> Status: **plan v4 (final — addressing review pass 3 polish findings)**.
+> Status: **plan v5 (single-PR delivery model)**.
 > Branch: `refactor/custom-xml-writer`.
 > Companion: `2026-04-23-streaming-xml-pipeline-design.md` (design v4).
 >
@@ -58,30 +58,56 @@
 >   guard for unit-test context (§8).
 > - `ParsedXml` → `NormalisedParseResult` type-rename sweep added
 >   to §15 acceptance checklist.
+>
+> **v4 → v5 delivery-model change (explicit user directive):**
+> - **Ship as one PR**, not six. All phases become sequential commits
+>   on `refactor/custom-xml-writer`; the PR merges the branch with
+>   full history.
+> - Phase 5 soak is **pre-merge dogfooding on the branch** (not
+>   post-merge on main). Acceptable because the branch is
+>   self-contained and revertable by amend/rebase before the single
+>   PR opens.
+> - Rollback model: per-commit revert **within the branch** before
+>   the PR lands. After merge, any regression ships as a revert PR
+>   (standard git flow).
+> - Phase 6 (deletion) becomes the **last commit** in the PR — same
+>   PR deletes `fast-xml-builder`, old parser, old serializer,
+>   `ConflictMarkerFormatter`. No lingering dead code post-merge.
+> - Merge-algorithm compatibility: **no change required.** Design §2
+>   goal 2 pins parse-tree equivalence; `JsonMerger.mergeThreeWay`
+>   still receives three full in-memory trees. Streaming is only at
+>   the I/O boundaries.
 
 ---
 
 ## 1. Summary of the work
 
-Six modules to add, three to modify, one dependency to remove. Phased
-over six PR-sized steps so each step ships a green `main` and can be
-rolled back independently.
+Six modules to add, three to modify, one dependency to remove.
+**Delivered as a single PR** against `main` from branch
+`refactor/custom-xml-writer`, with one commit per phase so reviewers
+can walk the history.
 
-| Phase | Deliverable | Mergeable independently? |
+| Commit (phase) | Deliverable | Branch state after commit |
 |---|---|---|
-| 0 | Fixture harness; curated golden files with `parity`/`divergence` tagging | Yes (tests only) |
-| 1 | `NormalisingOutputBuilder` + `StreamingXmlParser` — new code, no wiring into `MergeDriver` yet | Yes |
-| 2 | Writer stack (`XmlEmitter` → `IndentationFormatter` → `ConflictIndentFormatter` → `EolTransform` → `XmlStreamWriter`) — new code, no wiring yet | Yes |
-| 3 | `XmlMerger.mergeStreams` (new method) side-by-side with existing `mergeThreeWay`. Exercised only by dedicated tests. | Yes |
-| 4 | `MergeDriver` cutover: single PR that flips production path to streams, rename-for-atomic, peek-EOL. Old `FlxXmlParser`/`FxpXmlSerializer` still on disk, unused. | Yes — this is the live-traffic cutover |
-| 5 | Soak period: 14 days on main with clean daily NUT + zero tagged issues. No code changes. | — (observation phase) |
-| 6 | Deletion: remove old parser, serializer, `fast-xml-builder`, `handleSpecialEntities`, the original `correctConflictIndent`, and rename the new classes onto the canonical names. | Yes — cleanup |
+| C0 | Fixture harness; curated golden files with `parity`/`divergence` tagging | Tests only; pipeline unchanged |
+| C1 | `NormalisingOutputBuilder` + `StreamingXmlParser` — new code, no wiring into `MergeDriver` yet | New parser exists; old parser still wired in prod |
+| C2 | Writer stack (`XmlEmitter` → `IndentationFormatter` → `ConflictIndentFormatter` → `EolTransform` → `XmlStreamWriter`) | New writer exists; old serializer still wired in prod |
+| C3 | `XmlMerger.mergeStreams` new method side-by-side with existing `mergeThreeWay` | Both paths exist; only tests call the new one |
+| C4 | `MergeDriver` cutover: production path flips to streams + atomic rename | New path is the only one the driver uses; old classes dead-but-present |
+| C5 | Soak / dogfood on the branch (see §8 — no code commit, just the gate) | — |
+| C6 | Deletion: remove `FlxXmlParser`, `FxpXmlSerializer`, `ConflictMarkerFormatter`, `fast-xml-builder` | Branch final state; ready for PR |
 
 **No runtime flag.** Design §11 OQ2 decided against one. The
-phased-rollout property we still need (ability to test both paths in
-parallel) is preserved by keeping the old classes compiled, callable,
-and test-exercised until phase 6 — but they are not called from
-production code after phase 4.
+commit-per-phase structure preserves the "old and new paths
+coexist" property commit-by-commit within the PR, without needing a
+config switch.
+
+**Algorithm compatibility.** `JsonMerger.mergeThreeWay` is not
+modified. Design §2 goal 2 pins parse-tree equivalence — the merger
+receives three full in-memory trees exactly as today, because the
+`NormalisingOutputBuilder` buffers the full parse tree before
+returning (streaming is only at the I/O boundary). Per-section
+streaming merge is explicitly deferred to design §13.
 
 ---
 
@@ -271,10 +297,11 @@ export function listFixtures(): Fixture[]
 - **No parity test yet** — the new pipeline doesn't exist. The parity
   assertions land with phases 1–4 as the new code arrives.
 
-**Exit criteria:** fixtures committed and curated. Reviewer sign-off on
-every `parity.json` decision.
+**Exit criteria:** fixtures committed and curated on the branch.
+Reviewer sign-off on every `parity.json` decision happens at final PR
+review time, not mid-branch.
 
-**Commit:** `test(parity): fixture harness + curated golden files for design §8 + §6.3.2 cases`.
+**Commit C0:** `test(parity): fixture harness + curated golden files for design §8 + §6.3.2 cases`.
 
 ---
 
@@ -338,7 +365,7 @@ the first element.
 coverage back to 100 %; no change to `FlxXmlParser`, `XmlMerger`, or
 `MergeDriver`.
 
-**Commit:** `feat(parser): StreamingXmlParser + NormalisingOutputBuilder`.
+**Commit C1:** `feat(parser): StreamingXmlParser + NormalisingOutputBuilder`.
 
 ---
 
@@ -420,7 +447,7 @@ produces byte-equal output. Every divergence fixture's new pipeline
 output matches `expected-new.xml`. 100 % branch coverage on all five
 new files. Stryker score ≥ baseline per file.
 
-**Commit:** `feat(writer): XmlStreamWriter stack (emitter + formatters + EolTransform)`.
+**Commit C2:** `feat(writer): XmlStreamWriter stack (emitter + formatters + EolTransform)`.
 
 ---
 
@@ -488,7 +515,7 @@ Production path still calls the old `mergeThreeWay`. Any existing
 fixture. `mergeThreeWay` untouched, all its tests green. Repo
 coverage 100 %.
 
-**Commit:** `feat(merger): XmlMerger.mergeStreams end-to-end streaming method`.
+**Commit C3:** `feat(merger): XmlMerger.mergeStreams end-to-end streaming method`.
 
 ---
 
@@ -562,31 +589,36 @@ New in `test/integration/MergeDriver.stream.test.ts`:
 - Benchmarks recorded per §9.
 - Repo coverage 100 %.
 
-**Commit:** `feat(driver): streaming MergeDriver (createReadStream + atomic rename)`.
+**Commit C4:** `feat(driver): streaming MergeDriver (createReadStream + atomic rename)`.
 
-**Release note:** cutover merges into `main` in a single PR. Tag a
-release-candidate; phase 5 soak begins.
+**Release note:** at this commit, the branch's production path is the
+streaming pipeline. The next step is pre-merge dogfooding (phase 5)
+before the deletion commit lands.
 
 ---
 
-## 8. Phase 5 — Soak (14 calendar days, no code)
+## 8. Phase 5 — Pre-merge dogfood (no commit)
 
-**Goal:** confirm the production path is stable before phase 6 deletes
-the old code.
+**Goal:** confirm the new pipeline is stable on the branch before
+the deletion commit (C6) removes the ability to fall back.
 
-Concrete gates (all must hold at end of 14 days):
+Because the feature is shipping as a single PR, "soak" cannot mean
+"on `main` for 14 days." Instead it is a **pre-merge dogfood period**
+on the branch. Concrete gates (all must hold before C6 is appended):
 
-- Phase 4 commit on `main` for ≥ 14 calendar days.
-- Daily CI run of `npm run test:nut` green every day.
-- Zero issues opened tagged `streaming-xml` or containing the phrase
-  "merge driver regression".
-- No release reverts touching `MergeDriver` / `XmlMerger` / `src/adapter/*`.
+- C4 exists on the branch for ≥ 7 calendar days.
+- `npm test` (build + lint + unit + NUT) green at HEAD every day.
+- Maintainer dogfoods at least one real merge conflict scenario on
+  a production SFDX repo (activate the branch-built binary via
+  `npm pack` + local install; run at least one `git merge` /
+  `git rebase` on a conflicted profile/permission-set file).
+- Bench numbers recorded per §9 and reviewed.
 
-**Observability.** The merge driver has no telemetry endpoint; users
-run it locally. Support path relies on `~/.sf/sf-YYYY-MM-DD.log`. Add
-a one-line `pipeline=streaming v=<version>` stamp to the driver's
-start-of-merge log line so users sharing logs for support include the
-pipeline version.
+**Observability.** Even within the branch, the merge driver has no
+telemetry — users run it locally. Add a one-line
+`pipeline=streaming v=<version>` stamp to the driver's start-of-merge
+log line so any dogfood trace captured for support includes the
+pipeline identity.
 
 **Call-site pin:** log call lives at the top of `MergeDriver.mergeFiles`
 (hit once per merge). The version source is:
@@ -606,13 +638,15 @@ TypeScript happy.
 
 We deliberately do NOT inject commit-SHA (would require a
 `tooling/build-bin.mjs` change + graceful `.git`-absent fallback for
-tarball installs — out of scope for phase 4; revisit if soak reveals
-version-level granularity is insufficient).
+tarball installs — out of scope; the branch name + PR URL provide
+the same traceability at this stage).
 
-If any gate fails during soak: fix forward (small PRs), reset the
-14-day clock. Do not move to phase 6 with unknown issues outstanding.
+If any gate fails during dogfood: fix forward on the branch
+(amend/add commits between C4 and C6). Reset the 7-day clock only
+if the fix is substantive.
 
-**No commit** — phase 5 is an observation period.
+**No commit** — phase 5 is an observation period. C6 is appended
+once all gates are green.
 
 ---
 
@@ -717,7 +751,10 @@ Steps:
 - Full test suite green.
 - `DESIGN.md` pre-push check clean.
 
-**Commit:** `refactor: remove legacy fast-xml-builder pipeline`.
+**Commit C6:** `refactor: remove legacy fast-xml-builder pipeline`.
+
+This is the final commit on the branch. Open the single PR against
+`main` with C0–C6 in history.
 
 ---
 
@@ -789,16 +826,17 @@ Each row is a checkbox in the phase-closing commit's PR description.
 
 ## 14. Rollback strategy
 
-Each phase is independently revertable until phase 6 deletes the old
-code:
+**Before the PR lands:** each commit C0–C6 is independently revertable
+on the branch via `git revert` or `git reset` + recommit. Because the
+commit order keeps old and new paths coexisting until C6, reverting
+C4 alone restores the legacy driver path; reverting C6 alone restores
+the legacy classes.
 
-- Phases 1, 2, 3: revert the phase commit → new code gone, old path
-  unchanged (never called).
-- Phase 4: revert → driver back to `readFile`/`writeFile` old path.
-  This is the only revert that affects production behaviour.
-- Phase 5: observation; no code to revert.
-- Phase 6: deletion. Post-merge, revert reinstates the old code.
-  Soak gate is the specific protection against needing this.
+**After the PR lands:** the merged PR is a single SHA on `main`. If a
+post-merge regression surfaces, ship a revert PR reinstating the full
+legacy pipeline. That is a heavy revert (all seven commits' worth),
+but the pre-merge dogfood period (§8) is the specific protection
+against needing it.
 
 ---
 
@@ -823,5 +861,5 @@ code:
 - [ ] Observability: `pipeline=streaming v=<version>` log line present.
 - [ ] `DESIGN.md` references up to date.
 - [ ] `CHANGELOG.md` entry shipped.
-- [ ] Phase 5 soak completed: 14 days, clean daily NUT, zero tagged
-      issues, no release reverts.
+- [ ] Phase 5 dogfood completed: ≥7 days on branch, clean daily
+      `npm test`, at least one real-world merge dogfood recorded.
