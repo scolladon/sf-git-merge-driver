@@ -27,9 +27,15 @@ for (const size of sizes) {
   const fixtures = generateProfileFixtures(size)
 
   describe(`merge-${size}`, () => {
-    bench(`merge-${size}-no-conflict`, () => {
+    // `instrumentedMerge` became async with the streaming pipeline
+    // (parseStream + writeTo return promises). Awaiting here is load-
+    // bearing: without it, the bench callback "finishes" before the
+    // internal streams end, and vitest's fork pool times out on
+    // teardown with "Timeout terminating forks worker" after the last
+    // sample — even though every bench reported a result.
+    bench(`merge-${size}-no-conflict`, async () => {
       const timer = new PhaseTimer()
-      instrumentedMerge(
+      await instrumentedMerge(
         fixtures.ancestor,
         fixtures.local,
         fixtures.other,
@@ -38,9 +44,9 @@ for (const size of sizes) {
       )
     })
 
-    bench(`merge-${size}-with-conflict`, () => {
+    bench(`merge-${size}-with-conflict`, async () => {
       const timer = new PhaseTimer()
-      instrumentedMerge(
+      await instrumentedMerge(
         fixtures.ancestor,
         fixtures.conflictLocal,
         fixtures.conflictOther,
@@ -54,9 +60,9 @@ for (const size of sizes) {
 describe('merge-ordered', () => {
   const ordered = generateOrderedFixtures()
 
-  bench('merge-ordered-globalvalueset', () => {
+  bench('merge-ordered-globalvalueset', async () => {
     const timer = new PhaseTimer()
-    instrumentedMerge(
+    await instrumentedMerge(
       ordered.ancestor,
       ordered.local,
       ordered.other,
@@ -69,9 +75,9 @@ describe('merge-ordered', () => {
 describe('merge-picklist', () => {
   const picklist = generatePicklistFixtures()
 
-  bench('merge-picklist-customfield', () => {
+  bench('merge-picklist-customfield', async () => {
     const timer = new PhaseTimer()
-    instrumentedMerge(
+    await instrumentedMerge(
       picklist.ancestor,
       picklist.local,
       picklist.other,
