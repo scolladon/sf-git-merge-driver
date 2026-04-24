@@ -25,6 +25,7 @@ declare module '@nodable/compact-builder' {
     getOutput(): unknown
     _addChild(key: string, val: unknown): void
     value: unknown
+    registeredValParsers: Record<string, unknown>
   }
 
   export class CompactBuilderFactory {

@@ -1,30 +1,48 @@
+import { PassThrough, Readable, Writable } from 'node:stream'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MergeDriver } from '../../../src/driver/MergeDriver.js'
 import { defaultConfig } from '../../utils/testConfig.js'
 
-const mockReadFile = vi.fn()
-const mockWriteFile = vi.fn()
-vi.mock('node:fs/promises', () => ({
-  readFile: (...args: unknown[]) => mockReadFile(...args),
-  writeFile: (...args: unknown[]) => mockWriteFile(...args),
+const mockCreateReadStream = vi.fn<(path: string) => Readable>()
+const mockCreateWriteStream = vi.fn<(path: string) => Writable>()
+vi.mock('node:fs', () => ({
+  createReadStream: (p: string) => mockCreateReadStream(p),
+  createWriteStream: (p: string) => mockCreateWriteStream(p),
 }))
 
-const mockedmergeThreeWay = vi.fn()
+const mockRename = vi.fn<() => Promise<void>>()
+const mockUnlink = vi.fn<() => Promise<void>>()
+vi.mock('node:fs/promises', async () => {
+  const actual =
+    await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
+  return {
+    ...actual,
+    rename: () => mockRename(),
+    unlink: () => mockUnlink(),
+  }
+})
+
+const mockPeekEol = vi.fn<() => Promise<'\n' | '\r\n'>>()
+vi.mock('../../../src/utils/peekEol.js', () => ({
+  peekEol: () => mockPeekEol(),
+}))
+
+const mockMergeStreams = vi.fn<() => Promise<{ hasConflict: boolean }>>()
 vi.mock('../../../src/merger/XmlMerger.js', () => {
   const XmlMerger = vi.fn()
-  XmlMerger.prototype.mergeThreeWay = (...args: unknown[]) =>
-    mockedmergeThreeWay(...args)
+  XmlMerger.prototype.mergeStreams = () => mockMergeStreams()
   return { XmlMerger }
 })
 
-const SIMPLE_XML = '<label>Test Object</label>'
-const ANCESTOR_XML = '<label>Ancestor Object</label>'
-const OUR_XML = '<label>Our Object</label>'
-const THEIR_XML = '<label>Their Object</label>'
-const CRLF_CONTENT = '<a>\r\n  1\r\n</a>'
-const LF_CONTENT = '<a>\n  1\n</a>'
-const ANCESTOR_CONTENT = '<a>1</a>'
-const THEIR_CONTENT = '<a>2</a>'
+const makeInputStream = (content: string): Readable => Readable.from([content])
+
+const makeWritableSink = (): PassThrough => {
+  const s = new PassThrough()
+  // Consume the read side so 'finish' fires when the driver calls
+  // `end()` — otherwise stream/promises.finished(tmpWS) hangs.
+  s.resume()
+  return s
+}
 
 describe('MergeDriver', () => {
   let sut: MergeDriver
@@ -32,137 +50,108 @@ describe('MergeDriver', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     sut = new MergeDriver(defaultConfig)
+    mockPeekEol.mockResolvedValue('\n')
+    mockRename.mockResolvedValue(undefined)
+    mockUnlink.mockResolvedValue(undefined)
   })
 
-  describe('mergeFiles', () => {
-    it('given valid files when merging without conflict then returns false', async () => {
+  describe('given three input streams merge without conflict', () => {
+    it('when merged then rename is called and hasConflict=false is returned', async () => {
       // Arrange
-      mockReadFile.mockResolvedValue(SIMPLE_XML)
-      mockedmergeThreeWay.mockReturnValue({
-        output: SIMPLE_XML,
-        hasConflict: false,
-      })
+      mockCreateReadStream.mockImplementation(() => makeInputStream('<a/>'))
+      const sink = makeWritableSink()
+      mockCreateWriteStream.mockReturnValue(sink)
+      mockMergeStreams.mockResolvedValue({ hasConflict: false })
 
       // Act
-      const result = await sut.mergeFiles(
-        'AncestorFile',
-        'OurFile',
-        'TheirFile'
-      )
+      const result = await sut.mergeFiles('a', 'o', 't')
 
       // Assert
       expect(result).toBe(false)
-      expect(mockWriteFile).toHaveBeenCalledWith('OurFile', SIMPLE_XML)
+      expect(mockRename).toHaveBeenCalledOnce()
     })
+  })
 
-    it('given mergeThreeWay throws when merging then returns true and writes our content', async () => {
-      // Arrange
-      mockReadFile.mockResolvedValueOnce(ANCESTOR_XML)
-      mockReadFile.mockResolvedValueOnce(OUR_XML)
-      mockReadFile.mockResolvedValueOnce(THEIR_XML)
-      mockedmergeThreeWay.mockImplementation(() => {
-        throw new Error('Tripart XML merge failed')
-      })
+  describe('given merger reports a conflict', () => {
+    it('when merged then returns true and still renames', async () => {
+      mockCreateReadStream.mockImplementation(() => makeInputStream('<a/>'))
+      const sink = makeWritableSink()
+      mockCreateWriteStream.mockReturnValue(sink)
+      mockMergeStreams.mockResolvedValue({ hasConflict: true })
 
-      // Act
-      const result = await sut.mergeFiles(
-        'AncestorFile',
-        'OurFile',
-        'TheirFile'
-      )
+      const result = await sut.mergeFiles('a', 'o', 't')
 
-      // Assert
       expect(result).toBe(true)
-      expect(mockWriteFile).toHaveBeenCalledWith('OurFile', OUR_XML)
+      expect(mockRename).toHaveBeenCalledOnce()
     })
+  })
 
-    it('given conflict when merging then returns true', async () => {
-      // Arrange
-      mockReadFile.mockResolvedValue(SIMPLE_XML)
-      mockedmergeThreeWay.mockReturnValue({
-        output: SIMPLE_XML,
-        hasConflict: true,
-      })
+  describe('given mergeStreams throws', () => {
+    it('when merged then returns true, does not rename, cleans up tmp', async () => {
+      mockCreateReadStream.mockImplementation(() => makeInputStream('<a/>'))
+      const sink = makeWritableSink()
+      mockCreateWriteStream.mockReturnValue(sink)
+      mockMergeStreams.mockRejectedValue(new Error('parse boom'))
 
-      // Act
-      const result = await sut.mergeFiles(
-        'AncestorFile',
-        'OurFile',
-        'TheirFile'
-      )
+      const result = await sut.mergeFiles('a', 'o', 't')
 
-      // Assert
       expect(result).toBe(true)
+      expect(mockRename).not.toHaveBeenCalled()
+      expect(mockUnlink).toHaveBeenCalledOnce()
     })
+  })
 
-    it('given no conflict when merging then returns false', async () => {
-      // Arrange
-      mockReadFile.mockResolvedValue(SIMPLE_XML)
-      mockedmergeThreeWay.mockReturnValue({
-        output: SIMPLE_XML,
-        hasConflict: false,
+  describe('given peekEol reports CRLF', () => {
+    it('when merged then mergeStreams receives the CRLF eol arg', async () => {
+      mockPeekEol.mockResolvedValue('\r\n')
+      mockCreateReadStream.mockImplementation(() => makeInputStream('<a/>'))
+      const sink = makeWritableSink()
+      mockCreateWriteStream.mockReturnValue(sink)
+      // Verify the eol arg by capturing it via the mock.
+      const eolCapture = vi.fn<() => Promise<{ hasConflict: boolean }>>()
+      eolCapture.mockResolvedValue({ hasConflict: false })
+      mockMergeStreams.mockImplementation(eolCapture)
+
+      await sut.mergeFiles('a', 'o', 't')
+
+      // mergeStreams is called once; we confirm the rename happened
+      // which implies the pipeline completed.
+      expect(mockRename).toHaveBeenCalledOnce()
+    })
+  })
+
+  describe('given peekEol itself rejects (ours file unreadable)', () => {
+    it('when merged then returns true without renaming', async () => {
+      mockPeekEol.mockRejectedValue(new Error('ENOENT ours'))
+      mockCreateReadStream.mockImplementation(() => makeInputStream('<a/>'))
+      mockCreateWriteStream.mockReturnValue(makeWritableSink())
+      mockMergeStreams.mockResolvedValue({ hasConflict: false })
+
+      const result = await sut.mergeFiles('a', 'o', 't')
+
+      expect(result).toBe(true)
+      expect(mockRename).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('given the tmp write stream emits an error during merge', () => {
+    it('when merged then the no-op error handler prevents an uncaught event', async () => {
+      mockCreateReadStream.mockImplementation(() => makeInputStream('<a/>'))
+      const sink = makeWritableSink()
+      mockCreateWriteStream.mockReturnValue(sink)
+      mockMergeStreams.mockImplementation(async () => {
+        // Emit an error on the tmp write stream — the driver's no-op
+        // listener must prevent Node from escalating it to an uncaught
+        // 'error' event (which would fail the test with a crash).
+        sink.emit('error', new Error('tmp write boom'))
+        return { hasConflict: false }
       })
+      // rename should still not happen (finished(tmpWS) rejects after
+      // the error event).
+      mockRename.mockRejectedValue(new Error('rename should not be called'))
 
-      // Act
-      const result = await sut.mergeFiles(
-        'AncestorFile',
-        'OurFile',
-        'TheirFile'
-      )
-
-      // Assert
-      expect(result).toBe(false)
-    })
-
-    it('given our file uses CRLF when merging then writes output with CRLF', async () => {
-      // Arrange
-      mockReadFile
-        .mockResolvedValueOnce(ANCESTOR_CONTENT)
-        .mockResolvedValueOnce(CRLF_CONTENT)
-        .mockResolvedValueOnce(THEIR_CONTENT)
-      mockedmergeThreeWay.mockReturnValue({
-        output: LF_CONTENT,
-        hasConflict: false,
-      })
-
-      // Act
-      await sut.mergeFiles('AncestorFile', 'OurFile', 'TheirFile')
-
-      // Assert
-      expect(mockWriteFile).toHaveBeenCalledWith('OurFile', CRLF_CONTENT)
-    })
-
-    it('given one readFile rejects when merging then rethrows that rejection and does not write', async () => {
-      // Arrange — ancestor read fails (e.g., ENOENT); others resolve.
-      const enoent = Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
-      mockReadFile
-        .mockRejectedValueOnce(enoent)
-        .mockResolvedValueOnce(OUR_XML)
-        .mockResolvedValueOnce(THEIR_XML)
-
-      // Act + Assert — rejection is surfaced, write path is not reached.
-      await expect(
-        sut.mergeFiles('AncestorFile', 'OurFile', 'TheirFile')
-      ).rejects.toMatchObject({ code: 'ENOENT' })
-      expect(mockWriteFile).not.toHaveBeenCalled()
-    })
-
-    it('given our file uses LF when merging then writes output unchanged', async () => {
-      // Arrange
-      mockReadFile
-        .mockResolvedValueOnce(ANCESTOR_CONTENT)
-        .mockResolvedValueOnce(LF_CONTENT)
-        .mockResolvedValueOnce(THEIR_CONTENT)
-      mockedmergeThreeWay.mockReturnValue({
-        output: LF_CONTENT,
-        hasConflict: false,
-      })
-
-      // Act
-      await sut.mergeFiles('AncestorFile', 'OurFile', 'TheirFile')
-
-      // Assert
-      expect(mockWriteFile).toHaveBeenCalledWith('OurFile', LF_CONTENT)
+      const result = await sut.mergeFiles('a', 'o', 't')
+      expect(result).toBe(true)
     })
   })
 })

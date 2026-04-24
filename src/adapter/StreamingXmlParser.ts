@@ -1,5 +1,5 @@
 import type { Readable } from 'node:stream'
-import FlxParser from '@nodable/flexible-xml-parser'
+import FlxParser, { type X2jOptions } from '@nodable/flexible-xml-parser'
 import {
   FLX_OPTIONS,
   type NormalisedParseResult,
@@ -18,11 +18,17 @@ export interface XmlParser {
 // ALREADY_STREAMING). A fresh instance per call is cheap — the
 // constructor pre-compiles options; no heavy state — and lets the
 // driver parse ancestor/ours/theirs in parallel safely.
-const newParser = () =>
-  new FlxParser({
+// Upstream's `OutputBuilder` option is typed against its own
+// ValueParser nominal shape; our factory subclasses CompactBuilderFactory
+// at runtime but TS treats them as structurally distinct. Cast through
+// `unknown` to bridge the nominal gap — runtime contract is preserved.
+const newParser = () => {
+  const options = {
     ...FLX_OPTIONS,
     OutputBuilder: new NormalisingOutputBuilderFactory(),
-  })
+  } as unknown as X2jOptions
+  return new FlxParser(options)
+}
 
 export class StreamingXmlParser implements XmlParser {
   parseString(xml: string): NormalisedParseResult {

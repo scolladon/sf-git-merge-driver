@@ -147,16 +147,20 @@ describe('MergeDriver (integration — real filesystem, no mocks)', () => {
     expect(restored).toBe(badXml)
   })
 
-  it('Given a missing ancestor file, When running mergeFiles, Then rejects with ENOENT (the driver does not silently swallow filesystem errors)', async () => {
-    // Arrange
+  it('Given a missing ancestor file, When running mergeFiles, Then rejects with ENOENT (bin classifies as usage error, exit 2)', async () => {
+    // Input-not-found is a caller contract violation (git passed us a
+    // bad path). The driver rethrows ENOENT so the bin can exit 2;
+    // other failures are swallowed and return hasConflict=true. `local`
+    // is never touched on disk — the write path is never reached.
     const ancestor = join(workDir, 'does-not-exist.xml')
-    const local = writeFixture('local.xml', PROFILE_LOCAL)
+    const localBytes = PROFILE_LOCAL
+    const local = writeFixture('local.xml', localBytes)
     const other = writeFixture('other.xml', PROFILE_OTHER)
     const sut = new MergeDriver(defaultConfig)
 
-    // Act + Assert
     await expect(sut.mergeFiles(ancestor, local, other)).rejects.toMatchObject({
       code: 'ENOENT',
     })
+    expect(readFileSync(local, 'utf8')).toBe(localBytes)
   })
 })

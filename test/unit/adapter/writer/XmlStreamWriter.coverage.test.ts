@@ -208,4 +208,88 @@ describe('XmlStreamWriter (coverage corners)', () => {
       expect(out).toContain('<B>y</B>')
     })
   })
+
+  describe('given a ConflictBlock at top-level', () => {
+    it('when serialized then the conflict markers expand in place', async () => {
+      const block = {
+        __conflict: true as const,
+        local: [{ v: 'L' }],
+        ancestor: [{ v: 'A' }],
+        other: [{ v: 'O' }],
+      }
+      const out = await serializeToString(sut, [block as never], {})
+      expect(out).toContain('<<<<<<<')
+      expect(out).toContain('=======')
+      expect(out).toContain('>>>>>>>')
+      expect(out).toContain('<v>L</v>')
+    })
+  })
+
+  describe('given a ConflictBlock as a direct property value', () => {
+    it('when serialized then the wrapper expands inline', async () => {
+      const block = {
+        __conflict: true as const,
+        local: [{ inner: 'L' }],
+        ancestor: [{ inner: 'A' }],
+        other: [{ inner: 'O' }],
+      }
+      const out = await serializeToString(
+        sut,
+        [{ Root: [{ wrapper: block as never }] }],
+        {}
+      )
+      expect(out).toContain('<<<<<<<')
+      expect(out).toContain('<inner>L</inner>')
+    })
+  })
+
+  describe('given a ConflictBlock with an empty side', () => {
+    it('when serialized then the empty side emits an EOL placeholder', async () => {
+      const block = {
+        __conflict: true as const,
+        local: [],
+        ancestor: [{ v: 'A' }],
+        other: [{ v: 'O' }],
+      }
+      const out = await serializeToString(sut, [block as never], {})
+      // Empty side still produces markers; ancestor/other expand normally.
+      expect(out).toContain('<<<<<<<')
+      expect(out).toContain('<v>A</v>')
+      expect(out).toContain('<v>O</v>')
+    })
+  })
+
+  describe('given a ConflictBlock whose content contains a scalar', () => {
+    it('when serialized then the scalar renders as raw text', async () => {
+      const block = {
+        __conflict: true as const,
+        local: ['raw-local' as unknown],
+        ancestor: [],
+        other: ['raw-other' as unknown],
+      }
+      const out = await serializeToString(sut, [block as never], {})
+      expect(out).toContain('raw-local')
+      expect(out).toContain('raw-other')
+    })
+  })
+
+  describe('given a nested ConflictBlock inside another conflict side', () => {
+    it('when serialized then the inner block expands recursively', async () => {
+      const inner = {
+        __conflict: true as const,
+        local: [{ deep: 'dL' }],
+        ancestor: [{ deep: 'dA' }],
+        other: [{ deep: 'dO' }],
+      }
+      const outer = {
+        __conflict: true as const,
+        local: [inner as never],
+        ancestor: [{ s: 'A' }],
+        other: [{ s: 'O' }],
+      }
+      const out = await serializeToString(sut, [outer as never], {})
+      expect(out).toContain('dL')
+      expect(out).toContain('dO')
+    })
+  })
 })

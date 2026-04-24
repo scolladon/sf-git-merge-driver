@@ -6,6 +6,7 @@ import {
   OTHER_CONFLICT_MARKER,
   SEPARATOR,
 } from '../../constant/conflictConstant.js'
+import { SALESFORCE_EOL } from '../../constant/metadataConstant.js'
 import {
   CDATA_PROP_NAME,
   NAMESPACE_ROOT,
@@ -13,6 +14,10 @@ import {
   XML_DECL,
   XML_INDENT,
 } from '../../constant/parserConstant.js'
+import {
+  type ConflictBlock,
+  isConflictBlock,
+} from '../../types/conflictBlock.js'
 import type { MergeConfig } from '../../types/conflictTypes.js'
 import type { JsonArray, JsonObject, JsonValue } from '../../types/jsonTypes.js'
 
@@ -46,6 +51,68 @@ const attrsToString = (
   attrs: ReadonlyArray<readonly [string, string]>
 ): string => attrs.map(([k, v]) => ` ${k}="${v}"`).join('')
 
+// When JsonMerger finds a three-way difference it can't resolve, it
+// emits a ConflictBlock object in place of the conflicting node. The
+// serializer's job is to expand that object into a stream of text and
+// element chunks that render as git-style conflict markers. Matches
+// FxpXmlSerializer.expandConflict at src/adapter/FxpXmlSerializer.ts:58.
+interface ConflictMarkers {
+  readonly local: string
+  readonly ancestor: string
+  readonly separator: string
+  readonly other: string
+}
+
+const buildConflictMarkers = (config: MergeConfig): ConflictMarkers => {
+  const size = config.conflictMarkerSize
+  return {
+    local: `${SALESFORCE_EOL}${LOCAL_CONFLICT_MARKER.repeat(size)} ${config.localConflictTag}`,
+    ancestor: `${ANCESTOR_CONFLICT_MARKER.repeat(size)} ${config.ancestorConflictTag}`,
+    separator: SEPARATOR.repeat(size),
+    other: `${OTHER_CONFLICT_MARKER.repeat(size)} ${config.otherConflictTag}`,
+  }
+}
+
+// One side of a conflict contains either a list of child elements (same
+// compact shape as a regular element body) OR scalars. Expand each item
+// to chunk form recursively. Empty sides emit a single EOL placeholder
+// to match the current pipeline byte layout.
+function* emitConflictContent(
+  content: JsonArray,
+  markers: ConflictMarkers
+): Generator<Chunk> {
+  if (content.length === 0) {
+    yield { kind: 'text', value: SALESFORCE_EOL }
+    return
+  }
+  for (const item of content) {
+    if (isConflictBlock(item)) {
+      yield* emitConflict(item, markers)
+      continue
+    }
+    if (!isObject(item)) {
+      yield { kind: 'text', value: String(item) }
+      continue
+    }
+    for (const tagName of Object.keys(item).sort()) {
+      yield* emitElement(tagName, item[tagName] as JsonValue, [], markers)
+    }
+  }
+}
+
+function* emitConflict(
+  block: ConflictBlock,
+  markers: ConflictMarkers
+): Generator<Chunk> {
+  yield { kind: 'text', value: markers.local }
+  yield* emitConflictContent(block.local, markers)
+  yield { kind: 'text', value: markers.ancestor }
+  yield* emitConflictContent(block.ancestor, markers)
+  yield { kind: 'text', value: markers.separator }
+  yield* emitConflictContent(block.other, markers)
+  yield { kind: 'text', value: markers.other }
+}
+
 // Traverse the compact merged tree and yield chunks, injecting
 // namespace attributes onto the first top-level element.
 // Caller in writeTo short-circuits on an empty input, so emit assumes
@@ -54,12 +121,17 @@ const attrsToString = (
 // fail to parse upstream before they reach the writer.
 function* emit(
   compactRoot: JsonArray,
-  namespaces: JsonObject
+  namespaces: JsonObject,
+  markers: ConflictMarkers
 ): Generator<Chunk> {
   yield { kind: 'decl' }
 
   let isFirstTopLevel = true
   for (const item of compactRoot) {
+    if (isConflictBlock(item)) {
+      yield* emitConflict(item, markers)
+      continue
+    }
     if (!isObject(item)) {
       yield { kind: 'text', value: String(item) }
       continue
@@ -76,7 +148,12 @@ function* emit(
         }
         isFirstTopLevel = false
       }
-      yield* emitElement(tagName, item[tagName] as JsonValue, extraAttrs)
+      yield* emitElement(
+        tagName,
+        item[tagName] as JsonValue,
+        extraAttrs,
+        markers
+      )
     }
   }
 }
@@ -84,7 +161,8 @@ function* emit(
 function* emitElement(
   name: string,
   body: JsonValue,
-  extraAttrs: ReadonlyArray<readonly [string, string]>
+  extraAttrs: ReadonlyArray<readonly [string, string]>,
+  markers: ConflictMarkers
 ): Generator<Chunk> {
   if (name === TEXT_KEY) {
     yield { kind: 'text', value: String(body) }
@@ -100,10 +178,20 @@ function* emitElement(
     return
   }
 
+  // A ConflictBlock can appear as a direct property value (not inside
+  // an array). Expand in place — matches FxpXmlSerializer's "wrapper:
+  // ConflictBlock" path at src/adapter/FxpXmlSerializer.ts:106-109.
+  if (body !== null && typeof body === 'object' && !Array.isArray(body)) {
+    if (isConflictBlock(body as JsonObject as JsonValue)) {
+      yield* emitConflict(body as ConflictBlock, markers)
+      return
+    }
+  }
+
   const { attrs, children } = splitAttrsAndChildren(body)
   const allAttrs = [...extraAttrs, ...attrs]
   yield { kind: 'open', name, attrs: allAttrs }
-  yield* emitChildren(children)
+  yield* emitChildren(children, markers)
   yield { kind: 'close', name }
 }
 
@@ -145,14 +233,21 @@ const splitAttrsAndChildren = (body: JsonValue): AttrsAndChildren => {
   return { attrs, children: childTags }
 }
 
-function* emitChildren(children: JsonArray): Generator<Chunk> {
+function* emitChildren(
+  children: JsonArray,
+  markers: ConflictMarkers
+): Generator<Chunk> {
   for (const child of children) {
+    if (isConflictBlock(child)) {
+      yield* emitConflict(child, markers)
+      continue
+    }
     if (!isObject(child)) {
       yield { kind: 'text', value: String(child) }
       continue
     }
     for (const tagName of Object.keys(child).sort()) {
-      yield* emitElement(tagName, child[tagName] as JsonValue, [])
+      yield* emitElement(tagName, child[tagName] as JsonValue, [], markers)
     }
   }
 }
@@ -302,7 +397,8 @@ export class XmlStreamWriter {
   ): Promise<void> {
     if (ordered.length === 0) return
 
-    const formatted = formatChunks(emit(ordered, namespaces))
+    const markers = buildConflictMarkers(this.config)
+    const formatted = formatChunks(emit(ordered, namespaces, markers))
     const filter = new ConflictLineFilter(this.config)
     const filtered: string[] = []
     for (const piece of formatted) filtered.push(filter.push(piece))
