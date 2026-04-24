@@ -4,11 +4,12 @@
  * Usage:
  *   npx 0x -- node test/perf/flamegraph-runner.mjs [small|medium|large]
  *
- * Runs XmlMerger.mergeThreeWay() in a tight loop for clean flamegraph profiling.
+ * Runs the streaming pipeline in a tight loop for clean flamegraph profiling.
  */
 
-import { FlxXmlParser } from '../../src/adapter/FlxXmlParser.js'
-import { FxpXmlSerializer } from '../../src/adapter/FxpXmlSerializer.js'
+import { PassThrough } from 'node:stream'
+import { StreamingXmlParser } from '../../src/adapter/StreamingXmlParser.js'
+import { XmlStreamWriter } from '../../src/adapter/writer/XmlStreamWriter.js'
 import { JsonMerger } from '../../src/merger/JsonMerger.js'
 import { generateProfileFixtures } from './fixtures/generateFixtures.js'
 
@@ -28,10 +29,10 @@ const fixtures = generateProfileFixtures(size)
 console.info(`Running ${iterations} iterations with ${size} fixtures...`)
 
 for (let i = 0; i < iterations; i++) {
-  const parser = new FlxXmlParser()
-  const ancestor = parser.parse(fixtures.ancestor)
-  const local = parser.parse(fixtures.local)
-  const other = parser.parse(fixtures.other)
+  const parser = new StreamingXmlParser()
+  const ancestor = parser.parseString(fixtures.ancestor)
+  const local = parser.parseString(fixtures.local)
+  const other = parser.parseString(fixtures.other)
 
   const namespaces = {
     ...ancestor.namespaces,
@@ -47,8 +48,11 @@ for (let i = 0; i < iterations; i++) {
   )
 
   if (mergedResult.output.length) {
-    const serializer = new FxpXmlSerializer(config)
-    serializer.serialize(mergedResult.output, namespaces)
+    const writer = new XmlStreamWriter(config)
+    const sink = new PassThrough()
+    sink.resume()
+    await writer.writeTo(sink, mergedResult.output, namespaces)
+    sink.end()
   }
 }
 

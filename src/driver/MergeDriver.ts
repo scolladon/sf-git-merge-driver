@@ -57,7 +57,7 @@ export class MergeDriver {
       tmpWS.on('error', noop)
 
       const merger = new XmlMerger(this.config)
-      const { hasConflict } = await merger.mergeStreams(
+      const { hasConflict } = await merger.mergeThreeWay(
         ancRS,
         oursRS,
         theirsRS,

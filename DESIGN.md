@@ -2,6 +2,15 @@
 
 This document describes the software architecture of the Salesforce Git Merge Driver.
 
+> **Streaming pipeline (2026-04-23)**: the XML parse + serialize path
+> below was reworked into a streaming pipeline. See
+> `docs/plans/2026-04-23-streaming-xml-pipeline-design.md` for the
+> authoritative architecture of `StreamingXmlParser`,
+> `NormalisingOutputBuilder`, and `XmlStreamWriter`. References to
+> `FlxXmlParser`, `FxpXmlSerializer`, and `ConflictMarkerFormatter`
+> below are to classes that were removed in that pipeline; the
+> merge-algorithm chapters remain accurate.
+
 ## Overview
 
 The merge driver implements a three-way merge algorithm specifically designed for Salesforce metadata XML files. It parses XML into JSON, performs intelligent merging based on metadata structure, and outputs the merged result back to XML.

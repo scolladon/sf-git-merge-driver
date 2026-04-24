@@ -17,7 +17,6 @@
     "@oclif/core": "^4.10.5",
     "@salesforce/core": "^8.28.3",
     "@salesforce/sf-plugins-core": "^12.2.6",
-    "fast-xml-builder": "^1.1.5",
     "simple-git": "^3.36.0"
   },
   "devDependencies": {

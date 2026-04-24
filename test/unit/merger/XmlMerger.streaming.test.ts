@@ -18,7 +18,7 @@ const runMergeStreams = async (
 ): Promise<{ output: string; hasConflict: boolean }> => {
   const sink = new PassThrough()
   const collector = collect(sink)
-  const result = await merger.mergeStreams(
+  const result = await merger.mergeThreeWay(
     Readable.from([ancestor]),
     Readable.from([ours]),
     Readable.from([theirs]),
@@ -29,7 +29,7 @@ const runMergeStreams = async (
   return { output, hasConflict: result.hasConflict }
 }
 
-describe('XmlMerger.mergeStreams', () => {
+describe('XmlMerger.mergeThreeWay', () => {
   const sut = new XmlMerger(defaultConfig)
 
   describe('given three identical documents', () => {
@@ -91,7 +91,7 @@ describe('XmlMerger.mergeStreams', () => {
       const sink = new PassThrough()
       sink.resume() // drain so writes don't back up
       await expect(
-        sut.mergeStreams(
+        sut.mergeThreeWay(
           Readable.from([goodDoc]),
           Readable.from([goodDoc]),
           badStream,

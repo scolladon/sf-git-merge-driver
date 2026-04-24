@@ -30,7 +30,7 @@ vi.mock('../../../src/utils/peekEol.js', () => ({
 const mockMergeStreams = vi.fn<() => Promise<{ hasConflict: boolean }>>()
 vi.mock('../../../src/merger/XmlMerger.js', () => {
   const XmlMerger = vi.fn()
-  XmlMerger.prototype.mergeStreams = () => mockMergeStreams()
+  XmlMerger.prototype.mergeThreeWay = () => mockMergeStreams()
   return { XmlMerger }
 })
 
@@ -86,7 +86,7 @@ describe('MergeDriver', () => {
     })
   })
 
-  describe('given mergeStreams throws', () => {
+  describe('given mergeThreeWay throws', () => {
     it('when merged then returns true, does not rename, cleans up tmp', async () => {
       mockCreateReadStream.mockImplementation(() => makeInputStream('<a/>'))
       const sink = makeWritableSink()
@@ -102,7 +102,7 @@ describe('MergeDriver', () => {
   })
 
   describe('given peekEol reports CRLF', () => {
-    it('when merged then mergeStreams receives the CRLF eol arg', async () => {
+    it('when merged then mergeThreeWay receives the CRLF eol arg', async () => {
       mockPeekEol.mockResolvedValue('\r\n')
       mockCreateReadStream.mockImplementation(() => makeInputStream('<a/>'))
       const sink = makeWritableSink()
@@ -114,7 +114,7 @@ describe('MergeDriver', () => {
 
       await sut.mergeFiles('a', 'o', 't')
 
-      // mergeStreams is called once; we confirm the rename happened
+      // mergeThreeWay is called once; we confirm the rename happened
       // which implies the pipeline completed.
       expect(mockRename).toHaveBeenCalledOnce()
     })

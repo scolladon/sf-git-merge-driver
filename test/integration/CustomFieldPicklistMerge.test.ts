@@ -1,6 +1,7 @@
 import { XMLParser } from 'fast-xml-parser'
 import { describe, expect, it } from 'vitest'
 import { XmlMerger } from '../../src/merger/XmlMerger.js'
+import { mergeXmlStrings } from '../utils/mergeXmlStrings.js'
 import { defaultConfig } from '../utils/testConfig.js'
 
 const parseXml = (xml: string) =>
@@ -123,23 +124,23 @@ describe('CustomField picklist merge (issue #174)', () => {
     </valueSet>
 </CustomField>`
 
-      it('should merge without conflict', () => {
+      it('should merge without conflict', async () => {
         // Arrange
         const merger = new XmlMerger(defaultConfig)
 
         // Act
-        const result = merger.mergeThreeWay(ancestor, local, other)
+        const result = await mergeXmlStrings(merger, ancestor, local, other)
 
         // Assert
         expect(result.hasConflict).toBe(false)
       })
 
-      it('should produce well-formed XML matching other version structure', () => {
+      it('should produce well-formed XML matching other version structure', async () => {
         // Arrange
         const merger = new XmlMerger(defaultConfig)
 
         // Act
-        const result = merger.mergeThreeWay(ancestor, local, other)
+        const result = await mergeXmlStrings(merger, ancestor, local, other)
         const parsed = parseXml(result.output)
         const field = parsed.CustomField
         const valueSet = field.valueSet
@@ -161,12 +162,12 @@ describe('CustomField picklist merge (issue #174)', () => {
         ])
       })
 
-      it('should not leak valueSet children to CustomField level', () => {
+      it('should not leak valueSet children to CustomField level', async () => {
         // Arrange
         const merger = new XmlMerger(defaultConfig)
 
         // Act
-        const result = merger.mergeThreeWay(ancestor, local, other)
+        const result = await mergeXmlStrings(merger, ancestor, local, other)
         const field = parseXml(result.output).CustomField
 
         // Assert

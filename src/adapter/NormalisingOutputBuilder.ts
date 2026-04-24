@@ -5,6 +5,9 @@ import {
   XML_COMMENT_PROP_NAME,
 } from '../constant/parserConstant.js'
 import type { JsonObject, JsonValue } from '../types/jsonTypes.js'
+import type { NormalisedParseResult } from './XmlParser.js'
+
+export type { NormalisedParseResult } from './XmlParser.js'
 
 // Parser options shared across every parseString / parseStream invocation.
 // valueParsers:[] keeps text and attribute values verbatim — matches the
@@ -18,11 +21,6 @@ export const FLX_OPTIONS = {
   nameFor: { cdata: CDATA_PROP_NAME, comment: XML_COMMENT_PROP_NAME },
   doctypeOptions: { enabled: false },
 } as X2jOptions
-
-export interface NormalisedParseResult {
-  readonly content: JsonObject
-  readonly namespaces: JsonObject
-}
 
 const XMLNS = 'xmlns'
 const VERSION = 'version'

@@ -11,7 +11,7 @@ const collect = async (stream: PassThrough): Promise<string> => {
   return Buffer.concat(chunks).toString('utf8')
 }
 
-describe('merger parity — mergeStreams vs expected.xml', () => {
+describe('merger parity — mergeThreeWay vs expected.xml', () => {
   const fixtures = listFixtures().filter(
     f =>
       f.inputs.ancestor !== undefined &&
@@ -21,11 +21,11 @@ describe('merger parity — mergeStreams vs expected.xml', () => {
 
   for (const fixture of fixtures) {
     describe(`given fixture ${fixture.id}`, () => {
-      it('when mergeStreams is run then output bytes match expected.xml', async () => {
+      it('when mergeThreeWay is run then output bytes match expected.xml', async () => {
         const merger = new XmlMerger(defaultConfig)
         const sink = new PassThrough()
         const collector = collect(sink)
-        await merger.mergeStreams(
+        await merger.mergeThreeWay(
           Readable.from([fixture.inputs.ancestor as string]),
           Readable.from([fixture.inputs.ours as string]),
           Readable.from([fixture.inputs.theirs as string]),
