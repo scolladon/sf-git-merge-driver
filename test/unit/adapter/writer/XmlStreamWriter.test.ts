@@ -403,4 +403,37 @@ describe('XmlStreamWriter', () => {
       expect(out).toContain('<s>O</s>')
     })
   })
+
+  describe('given a document whose serialized size crosses the 16 KiB flush threshold', () => {
+    it('when serialized then multiple batch-writes fire and the bytes still reconstruct exactly', async () => {
+      // The writer accumulates filter output into 16 KiB windows and
+      // flushes to `out.write` at the threshold. A small document stays
+      // entirely in one batch; we need a large one to exercise the
+      // `batch.length >= FLUSH_BYTES` branch. 1200 children ×
+      // ~30+ bytes each clears 32 KiB comfortably while staying cheap.
+      const children: Array<Record<string, string>> = []
+      for (let i = 0; i < 1200; i++) {
+        children.push({ item: `value-${String(i).padStart(4, '0')}` })
+      }
+      const writes: string[] = []
+      const sink = new PassThrough()
+      sink.on('data', (c: Buffer) => writes.push(c.toString('utf8')))
+      await sut.writeTo(sink, [{ Root: children }], {})
+      sink.end()
+      // Invariant 1: the batch-flush threshold triggered at least once
+      // mid-document, i.e. the writer did NOT coalesce everything into
+      // one final `out.write`. If the threshold branch never fired,
+      // every byte would land in the tail flush → exactly one write.
+      expect(writes.length).toBeGreaterThan(1)
+      const joined = writes.join('')
+      // Invariant 2: byte-exact reconstruction — batching must not
+      // reorder or drop content.
+      expect(joined).toContain('<item>value-0000</item>')
+      expect(joined).toContain('<item>value-0399</item>')
+      expect(joined.startsWith(`${DECL}\n<Root>`)).toBe(true)
+      expect(joined.endsWith('</Root>')).toBe(true)
+      // Sanity: length crosses the 16 KiB threshold.
+      expect(joined.length).toBeGreaterThan(16 * 1024)
+    })
+  })
 })

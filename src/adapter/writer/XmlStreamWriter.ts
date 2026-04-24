@@ -424,6 +424,17 @@ class ConflictLineFilter {
 const applyEol = (piece: string, eol: '\n' | '\r\n'): string =>
   eol === '\n' ? piece : piece.replace(/\r?\n/g, eol)
 
+// Flush threshold for the write-side accumulator. Matches the default
+// Node stream high-water-mark (16 KiB); batching up to that means we
+// call `out.write` at most once per high-water-mark window instead of
+// once per emitted chunk. Each `out.write` emits `'data'`, runs the
+// high-water-mark check, and may schedule a drain — per-call overhead
+// that dominates serialize CPU on small documents when the sink is
+// already in memory. A larger batch would amortise more but would also
+// inflate peak working set; 16 KiB is the smallest size that keeps
+// `write` cheap AND preserves streaming semantics.
+const FLUSH_BYTES = 16 * 1024
+
 export class XmlStreamWriter implements XmlSerializer {
   constructor(private readonly config: MergeConfig) {}
 
@@ -435,24 +446,35 @@ export class XmlStreamWriter implements XmlSerializer {
   ): Promise<void> {
     if (ordered.length === 0) return
 
-    // Pipelined: each formatted string flows emit → format → filter
-    // → eol → out.write without accumulating an intermediate array of
-    // all document chunks. Keeps peak working set proportional to tree
-    // depth (the frame stack inside formatChunks) rather than node
-    // count. Addresses performance-review H1.
+    // Pipelined: each formatted string flows emit → format → filter →
+    // accumulator → eol → out.write. The accumulator is the difference
+    // vs. a naive pipeline: it batches filter output into FLUSH_BYTES
+    // windows before calling out.write. Without it, a document emitting
+    // N chunks pays N `out.write()` calls (N event emissions + N
+    // drain-check pairs); with it we pay ⌈bytes/FLUSH_BYTES⌉.
     const markers = buildConflictMarkers(this.config)
     const filter = new ConflictLineFilter(this.config)
-    const writePiece = async (piece: string): Promise<void> => {
-      if (piece.length === 0) return
-      const final = applyEol(piece, eol)
+    let batch = ''
+    // `flush` is only called when there's work to write (the only call
+    // sites are the batch-size threshold inside the loop and the tail
+    // after the XML declaration has already flowed through, so batch is
+    // always non-empty at call time — an empty-guard branch here would
+    // be dead code and trip mutation testing).
+    const flush = async (): Promise<void> => {
+      const final = applyEol(batch, eol)
+      batch = ''
       if (!out.write(final)) {
         await once(out, 'drain')
       }
     }
 
     for (const piece of formatChunks(emit(ordered, namespaces, markers))) {
-      await writePiece(filter.push(piece))
+      const filtered = filter.push(piece)
+      if (filtered.length === 0) continue
+      batch += filtered
+      if (batch.length >= FLUSH_BYTES) await flush()
     }
-    await writePiece(filter.end())
+    batch += filter.end()
+    await flush()
   }
 }
