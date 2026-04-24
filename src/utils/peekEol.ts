@@ -3,6 +3,8 @@ import { open } from 'node:fs/promises'
 const CRLF = '\r\n'
 const LF = '\n'
 const PEEK_BYTES = 4096
+const NEWLINE = 0x0a
+const CR = 0x0d
 
 // Read up to the first 4 KB of `path` to detect the target EOL
 // convention without loading the whole file. Matches the semantics of
@@ -14,12 +16,16 @@ export const peekEol = async (path: string): Promise<'\n' | '\r\n'> => {
   try {
     const buf = Buffer.alloc(PEEK_BYTES)
     const { bytesRead } = await handle.read(buf, 0, PEEK_BYTES, 0)
-    for (let i = 0; i < bytesRead; i++) {
-      if (buf[i] === 0x0a /* \n */) {
-        return i > 0 && buf[i - 1] === 0x0d /* \r */ ? CRLF : LF
-      }
-    }
-    return LF
+    const view = buf.subarray(0, bytesRead)
+    const nlIdx = view.indexOf(NEWLINE)
+    // `nlIdx > 0` implies both "newline found" (nlIdx !== -1) and "not
+    // at position 0" in one check: when no newline is present,
+    // view.indexOf returns -1 and `-1 > 0` is false, falling through to
+    // LF — so an explicit `nlIdx < 0` early return would be redundant
+    // (and tripped over by equivalent-mutant reports).
+    //
+    // Stryker disable next-line ConditionalExpression,EqualityOperator: when nlIdx === 0 the predecessor byte is out-of-range; view[-1] yields undefined, and undefined !== CR, so both the weakened (`true`, `>=`) and strengthened variants return LF identically to the original `> 0` guard — equivalent mutant.
+    return nlIdx > 0 && view[nlIdx - 1] === CR ? CRLF : LF
   } finally {
     await handle.close()
   }

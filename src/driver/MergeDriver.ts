@@ -1,7 +1,7 @@
 import { createReadStream, createWriteStream } from 'node:fs'
 import { rename, unlink } from 'node:fs/promises'
 import { normalize } from 'node:path'
-import type { Readable } from 'node:stream'
+import type { Readable, Writable } from 'node:stream'
 import { finished } from 'node:stream/promises'
 import { XmlMerger } from '../merger/XmlMerger.js'
 import type { MergeConfig } from '../types/conflictTypes.js'
@@ -45,6 +45,7 @@ export class MergeDriver {
     const oursPath = normalize(ourFile)
     const tmpPath = oursPath + TMP_SUFFIX
     const readers: Readable[] = []
+    let tmpWS: Writable | undefined
 
     Logger.info(`pipeline=streaming v=${PIPELINE_VERSION}`)
 
@@ -57,13 +58,13 @@ export class MergeDriver {
           const rs = createReadStream(p)
           // Swallow 'error' events so `destroy()` in the finally block
           // never escalates to an unhandled event. Real errors are
-          // surfaced via the awaited mergeStreams promise instead.
+          // surfaced via the awaited mergeThreeWay promise instead.
           rs.on('error', noop)
           return rs
         })
       readers.push(ancRS, oursRS, theirsRS)
 
-      const tmpWS = createWriteStream(tmpPath)
+      tmpWS = createWriteStream(tmpPath)
       tmpWS.on('error', noop)
 
       const merger = new XmlMerger(this.config)
@@ -94,6 +95,10 @@ export class MergeDriver {
       return true
     } finally {
       for (const r of readers) r.destroy()
+      // Destroy tmpWS too — on Windows an open write handle blocks
+      // `safeUnlink` (EPERM) and leaves the tmp file on disk. `destroy()`
+      // is a no-op if the stream already ended cleanly on the happy path.
+      tmpWS?.destroy()
       await safeUnlink(tmpPath)
     }
   }

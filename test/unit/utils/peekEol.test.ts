@@ -1,7 +1,7 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { peekEol } from '../../../src/utils/peekEol.js'
 
 describe('peekEol', () => {
@@ -74,6 +74,54 @@ describe('peekEol', () => {
         expect(await peekEol(path)).toBe('\n')
       }
       expect(countActive()).toBeLessThanOrEqual(before)
+    })
+  })
+
+  describe('given peekEol is run with a handle-tracking open spy', () => {
+    it('when complete then each handle has close() invoked exactly once (mutant-kill for the finally block)', async () => {
+      // Kills the BlockStatement mutant on `finally { await
+      // handle.close() }`. The `getActiveResourcesInfo` check above is
+      // indirect: Node's FinalizationRegistry can close an orphaned
+      // handle before the next tick, so an empty finally looks "clean"
+      // in that counter. Here we wrap every handle returned by `open`
+      // and assert `close` was invoked on every one of them. If the
+      // finally block were emptied, close would never be called and
+      // `closeCalls` would stay at 0 while the spy shows ≥ 1 open.
+      const path = await write('spy-close.xml', 'ok\n')
+      vi.resetModules()
+      let openCalls = 0
+      let closeCalls = 0
+      vi.doMock('node:fs/promises', async () => {
+        const actual =
+          await vi.importActual<typeof import('node:fs/promises')>(
+            'node:fs/promises'
+          )
+        return {
+          ...actual,
+          open: async (...args: Parameters<typeof actual.open>) => {
+            openCalls++
+            const handle = await actual.open(...args)
+            const origClose = handle.close.bind(handle)
+            handle.close = async () => {
+              closeCalls++
+              return origClose()
+            }
+            return handle
+          },
+        }
+      })
+      try {
+        const { peekEol: isolated } = await import(
+          '../../../src/utils/peekEol.js'
+        )
+        const result = await isolated(path)
+        expect(result).toBe('\n')
+        expect(openCalls).toBe(1)
+        expect(closeCalls).toBe(1)
+      } finally {
+        vi.doUnmock('node:fs/promises')
+        vi.resetModules()
+      }
     })
   })
 })
