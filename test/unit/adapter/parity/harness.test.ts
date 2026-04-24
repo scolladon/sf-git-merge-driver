@@ -21,9 +21,15 @@ describe('golden-file fixture harness', () => {
         }
       })
 
-      it('when loaded then expected.xml is non-empty XML', () => {
-        expect(fixture.expectedCurrent.length).toBeGreaterThan(0)
-        expect(fixture.expectedCurrent).toMatch(/^<\?xml/)
+      it('when loaded then expected.xml is a well-formed document or empty', () => {
+        // The empty-output fixture (13-empty-output) pins that the
+        // writer emits no bytes for an empty input array — not even
+        // the XML declaration. Every other fixture starts with it.
+        if (fixture.expectedCurrent.length === 0) {
+          expect(fixture.id).toBe('13-empty-output')
+        } else {
+          expect(fixture.expectedCurrent).toMatch(/^<\?xml/)
+        }
       })
 
       it('when loaded then either merge inputs or ordered-input are present', () => {

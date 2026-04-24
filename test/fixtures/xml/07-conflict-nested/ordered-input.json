@@ -1,0 +1,22 @@
+{
+  "ordered": [
+    {
+      "Root": [
+        {
+          "__conflict": true,
+          "local": [
+            {
+              "__conflict": true,
+              "local": [{ "deep": "dL" }],
+              "ancestor": [{ "deep": "dA" }],
+              "other": [{ "deep": "dO" }]
+            }
+          ],
+          "ancestor": [{ "shallow": "base" }],
+          "other": [{ "shallow": "theirs" }]
+        }
+      ]
+    }
+  ],
+  "namespaces": {}
+}
