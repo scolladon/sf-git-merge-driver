@@ -14,6 +14,11 @@ describe('golden-file fixture harness', () => {
     })
 
     it('when loading then every fixture has non-empty expected bytes (or is the designated empty case)', () => {
+      // Convention: exactly one fixture is allowed to have empty
+      // expected.xml — `13-empty-output`, which pins the writer's
+      // no-bytes-for-empty-input contract. If a future fixture
+      // legitimately needs empty output, extend the allow-list here
+      // deliberately rather than soft-asserting.
       const empty = listFixtures().filter(f => f.expectedCurrent.length === 0)
       expect(empty.map(f => f.id)).toEqual(['13-empty-output'])
     })

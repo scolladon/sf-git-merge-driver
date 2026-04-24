@@ -1,10 +1,13 @@
 import { PassThrough, Readable } from 'node:stream'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-// This test covers the `typeof __VERSION__ !== 'undefined'` branch of
-// the PIPELINE_VERSION constant in MergeDriver. It forces a bundled
-// context by stubbing the global, then imports the driver fresh so the
-// module-level constant re-initialises with the stubbed value.
+// These tests cover both branches of the `typeof __VERSION__ !==
+// 'undefined'` ternary that initialises PIPELINE_VERSION in
+// MergeDriver. Each case re-imports the driver fresh after adjusting
+// the global — the module-level constant is captured at import time.
+//
+// Design: keep this file single-test-per-case. Every test does a
+// dynamic import + vi.resetModules, which is costly; don't bulk up.
 
 const mockCreateReadStream = vi.fn<(p: string) => Readable>(() =>
   Readable.from(['<a/>'])
@@ -66,6 +69,21 @@ describe('MergeDriver — PIPELINE_VERSION global', () => {
       const sut = new MergeDriver(defaultConfig)
       await sut.mergeFiles('a', 'o', 't')
       expect(loggedLines).toContain('pipeline=streaming v=9.9.9-test')
+    })
+  })
+
+  describe('given __VERSION__ is undefined (ts-node / vitest context)', () => {
+    it('when driver runs then logs the literal "dev" fallback', async () => {
+      // No stubGlobal — __VERSION__ is absent in the vitest default
+      // context. Kills both mutants on the PIPELINE_VERSION ternary:
+      //   - typeof !== 'undefined' → true  (would try to use the
+      //     absent global and either throw or log 'undefined')
+      //   - 'dev' → ''                    (would log empty version)
+      const { MergeDriver } = await import('../../../src/driver/MergeDriver.js')
+      const { defaultConfig } = await import('../../utils/testConfig.js')
+      const sut = new MergeDriver(defaultConfig)
+      await sut.mergeFiles('a', 'o', 't')
+      expect(loggedLines).toContain('pipeline=streaming v=dev')
     })
   })
 })
