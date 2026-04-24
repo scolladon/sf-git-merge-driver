@@ -6,8 +6,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 // context by stubbing the global, then imports the driver fresh so the
 // module-level constant re-initialises with the stubbed value.
 
-const mockCreateReadStream = vi.fn(() => Readable.from(['<a/>']))
-const mockCreateWriteStream = vi.fn(() => {
+const mockCreateReadStream = vi.fn<(p: string) => Readable>(() =>
+  Readable.from(['<a/>'])
+)
+const mockCreateWriteStream = vi.fn<(p: string) => PassThrough>(() => {
   const s = new PassThrough()
   s.resume()
   return s
@@ -19,7 +21,11 @@ vi.mock('node:fs', () => ({
 vi.mock('node:fs/promises', async () => {
   const actual =
     await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
-  return { ...actual, rename: async () => {}, unlink: async () => {} }
+  return {
+    ...actual,
+    rename: async () => undefined,
+    unlink: async () => undefined,
+  }
 })
 vi.mock('../../../src/utils/peekEol.js', () => ({
   peekEol: async () => '\n',
@@ -40,7 +46,7 @@ vi.mock('../../../src/utils/LoggingService.js', async () => {
     Logger: {
       ...actual.Logger,
       info: (line: string) => loggedLines.push(line),
-      error: () => {},
+      error: () => undefined,
     },
   }
 })

@@ -1,4 +1,4 @@
-import FlxParser from '@nodable/flexible-xml-parser'
+import FlxParser, { type X2jOptions } from '@nodable/flexible-xml-parser'
 import { describe, expect, it } from 'vitest'
 import {
   FLX_OPTIONS,
@@ -40,7 +40,7 @@ describe('upstream @nodable/flexible-xml-parser ordering invariant', () => {
       const parser = new FlxParser({
         ...FLX_OPTIONS,
         OutputBuilder: new Probe(),
-      })
+      } as unknown as X2jOptions)
       parser.parse(
         `<?xml version="1.0" encoding="UTF-8"?><Root xmlns="http://x"><v>1</v></Root>`
       )

@@ -86,6 +86,20 @@ describe('MergeDriver', () => {
     })
   })
 
+  describe('given mergeThreeWay rejects with ENOENT (bad input path)', () => {
+    it('when merged then the ENOENT is rethrown to the bin (usage-error exit 2)', async () => {
+      mockCreateReadStream.mockImplementation(() => makeInputStream('<a/>'))
+      mockCreateWriteStream.mockReturnValue(makeWritableSink())
+      const enoent = Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+      mockMergeStreams.mockRejectedValue(enoent)
+
+      await expect(sut.mergeFiles('a', 'o', 't')).rejects.toMatchObject({
+        code: 'ENOENT',
+      })
+      expect(mockRename).not.toHaveBeenCalled()
+    })
+  })
+
   describe('given mergeThreeWay throws', () => {
     it('when merged then returns true, does not rename, cleans up tmp', async () => {
       mockCreateReadStream.mockImplementation(() => makeInputStream('<a/>'))

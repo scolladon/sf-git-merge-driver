@@ -1,4 +1,4 @@
-import FlxParser from '@nodable/flexible-xml-parser'
+import FlxParser, { type X2jOptions } from '@nodable/flexible-xml-parser'
 import { describe, expect, it } from 'vitest'
 import {
   FLX_OPTIONS,
@@ -6,11 +6,14 @@ import {
 } from '../../../src/adapter/NormalisingOutputBuilder.js'
 
 const parse = (xml: string) => {
-  const parser = new FlxParser({
+  // Cast-through-unknown: upstream's OutputBuilder is typed against the
+  // library's internal ValueParser shape; our factory satisfies the
+  // runtime contract via CompactBuilderFactory inheritance.
+  const options = {
     ...FLX_OPTIONS,
     OutputBuilder: new NormalisingOutputBuilderFactory(),
-  })
-  return parser.parse(xml)
+  } as unknown as X2jOptions
+  return new FlxParser(options).parse(xml)
 }
 
 describe('NormalisingOutputBuilder', () => {

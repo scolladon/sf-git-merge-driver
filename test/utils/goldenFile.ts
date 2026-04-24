@@ -91,20 +91,43 @@ export const loadFixture = (id: string): Fixture => {
     ordered: JsonArray
     namespaces?: JsonObject
   }>(join(dir, 'ordered-input.json'))
-  return {
+
+  // exactOptionalPropertyTypes requires that optional properties
+  // either carry a defined value or be absent (not {key: undefined}).
+  // Build the object in-flight via a writable mutable shape, then
+  // assert-narrow to the readonly Fixture['inputs'] at return.
+  type MutableInputs = {
+    ancestor?: string
+    ours?: string
+    theirs?: string
+    ordered?: JsonArray
+    namespaces?: JsonObject
+  }
+  const inputs: MutableInputs = {}
+  const ancestor = readOptional(join(dir, 'ancestor.xml'))
+  if (ancestor !== undefined) inputs.ancestor = ancestor
+  const ours = readOptional(join(dir, 'ours.xml'))
+  if (ours !== undefined) inputs.ours = ours
+  const theirs = readOptional(join(dir, 'theirs.xml'))
+  if (theirs !== undefined) inputs.theirs = theirs
+  if (orderedInput !== undefined) {
+    inputs.ordered = orderedInput.ordered
+    if (orderedInput.namespaces !== undefined) {
+      inputs.namespaces = orderedInput.namespaces
+    }
+  }
+
+  const result: Fixture = {
     id,
     dir,
     parity,
-    inputs: {
-      ancestor: readOptional(join(dir, 'ancestor.xml')),
-      ours: readOptional(join(dir, 'ours.xml')),
-      theirs: readOptional(join(dir, 'theirs.xml')),
-      ordered: orderedInput?.ordered,
-      namespaces: orderedInput?.namespaces,
-    },
+    inputs: inputs as Fixture['inputs'],
     expectedCurrent,
-    expectedNew,
   }
+  if (expectedNew !== undefined) {
+    return { ...result, expectedNew }
+  }
+  return result
 }
 
 export const listFixtures = (): Fixture[] => {
