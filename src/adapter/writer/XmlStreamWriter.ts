@@ -20,6 +20,7 @@ import {
 } from '../../types/conflictBlock.js'
 import type { MergeConfig } from '../../types/conflictTypes.js'
 import type { JsonArray, JsonObject, JsonValue } from '../../types/jsonTypes.js'
+import type { XmlSerializer } from '../XmlSerializer.js'
 
 type Chunk =
   | { readonly kind: 'decl' }
@@ -77,6 +78,27 @@ const buildConflictMarkers = (config: MergeConfig): ConflictMarkers => {
 // compact shape as a regular element body) OR scalars. Expand each item
 // to chunk form recursively. Empty sides emit a single EOL placeholder
 // to match the current pipeline byte layout.
+// Branch off the two non-object item shapes (ConflictBlock, scalar) and
+// emit their chunks. Returns `true` if the item was consumed here, or
+// `false` if the caller still has to iterate the item's keys itself.
+// The conflict/scalar prelude is shared between emit() and
+// emitConflictContent() — factoring it avoids a copy-paste flagged by
+// jscpd at threshold 0%.
+function* emitNonObjectItem(
+  item: JsonValue,
+  markers: ConflictMarkers
+): Generator<Chunk, boolean> {
+  if (isConflictBlock(item)) {
+    yield* emitConflict(item, markers)
+    return true
+  }
+  if (!isObject(item)) {
+    yield { kind: 'text', value: String(item) }
+    return true
+  }
+  return false
+}
+
 function* emitConflictContent(
   content: JsonArray,
   markers: ConflictMarkers
@@ -86,16 +108,11 @@ function* emitConflictContent(
     return
   }
   for (const item of content) {
-    if (isConflictBlock(item)) {
-      yield* emitConflict(item, markers)
-      continue
-    }
-    if (!isObject(item)) {
-      yield { kind: 'text', value: String(item) }
-      continue
-    }
-    for (const tagName of Object.keys(item).sort()) {
-      yield* emitElement(tagName, item[tagName] as JsonValue, [], markers)
+    const consumed = yield* emitNonObjectItem(item, markers)
+    if (consumed) continue
+    const obj = item as JsonObject
+    for (const tagName of Object.keys(obj).sort()) {
+      yield* emitElement(tagName, obj[tagName] as JsonValue, [], markers)
     }
   }
 }
@@ -128,15 +145,10 @@ function* emit(
 
   let isFirstTopLevel = true
   for (const item of compactRoot) {
-    if (isConflictBlock(item)) {
-      yield* emitConflict(item, markers)
-      continue
-    }
-    if (!isObject(item)) {
-      yield { kind: 'text', value: String(item) }
-      continue
-    }
-    for (const tagName of Object.keys(item).sort()) {
+    const consumed = yield* emitNonObjectItem(item, markers)
+    if (consumed) continue
+    const obj = item as JsonObject
+    for (const tagName of Object.keys(obj).sort()) {
       if (tagName === NAMESPACE_ROOT) continue
       const extraAttrs: Array<readonly [string, string]> = []
       if (isFirstTopLevel) {
@@ -150,7 +162,7 @@ function* emit(
       }
       yield* emitElement(
         tagName,
-        item[tagName] as JsonValue,
+        obj[tagName] as JsonValue,
         extraAttrs,
         markers
       )
@@ -412,7 +424,7 @@ class ConflictLineFilter {
 const applyEol = (piece: string, eol: '\n' | '\r\n'): string =>
   eol === '\n' ? piece : piece.replace(/\r?\n/g, eol)
 
-export class XmlStreamWriter {
+export class XmlStreamWriter implements XmlSerializer {
   constructor(private readonly config: MergeConfig) {}
 
   async writeTo(

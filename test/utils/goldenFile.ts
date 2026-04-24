@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import type { JsonArray, JsonObject } from '../../src/types/jsonTypes.js'
 
-export type ParityMode =
+type ParityMode =
   | { readonly mode: 'parity' }
   | {
       readonly mode: 'divergence'
@@ -10,7 +10,7 @@ export type ParityMode =
       readonly adr: string
     }
 
-export interface Fixture {
+interface Fixture {
   readonly id: string
   readonly dir: string
   readonly parity: ParityMode
@@ -72,7 +72,7 @@ const readRequired = (path: string, dir: string, name: string): string => {
   return raw
 }
 
-export const loadFixture = (id: string): Fixture => {
+const loadFixture = (id: string): Fixture => {
   const dir = join(FIXTURES_ROOT, id)
   const parity = validateParity(
     JSON.parse(readRequired(join(dir, 'parity.json'), id, 'parity.json')),

@@ -2,16 +2,9 @@ import type { Readable } from 'node:stream'
 import FlxParser, { type X2jOptions } from '@nodable/flexible-xml-parser'
 import {
   FLX_OPTIONS,
-  type NormalisedParseResult,
   NormalisingOutputBuilderFactory,
 } from './NormalisingOutputBuilder.js'
-
-export type { NormalisedParseResult } from './NormalisingOutputBuilder.js'
-
-export interface XmlParser {
-  parseString(xml: string): NormalisedParseResult
-  parseStream(source: Readable): Promise<NormalisedParseResult>
-}
+import type { NormalisedParseResult, XmlParser } from './XmlParser.js'
 
 // The upstream @nodable/flexible-xml-parser is not reentrant: one
 // FlxParser instance cannot stream two documents concurrently (raises

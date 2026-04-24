@@ -7,8 +7,6 @@ import {
 import type { JsonObject, JsonValue } from '../types/jsonTypes.js'
 import type { NormalisedParseResult } from './XmlParser.js'
 
-export type { NormalisedParseResult } from './XmlParser.js'
-
 // Parser options shared across every parseString / parseStream invocation.
 // valueParsers:[] keeps text and attribute values verbatim — matches the
 // current pipeline. Without this, defaults coerce "1" → 1, "true" → true.
