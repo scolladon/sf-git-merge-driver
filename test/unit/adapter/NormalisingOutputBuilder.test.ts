@@ -77,6 +77,11 @@ describe('NormalisingOutputBuilder', () => {
 
   describe('given CDATA containing ]]>', () => {
     it('when parsed then the CDATA value is preserved as array of segments', () => {
+      // Upstream @nodable/flexible-xml-parser splits CDATA on `]]>` at
+      // parse time (design §6.1 "CDATA ]]> artefact"). If this upstream
+      // behaviour ever changes (to return a single pre-joined string),
+      // this test breaks intentionally — the writer's
+      // `]]]]><![CDATA[>` re-join assumes the array form.
       const result = parse(
         `<?xml version="1.0"?><R><v><![CDATA[has ]]]]><![CDATA[> inside]]></v></R>`
       )
@@ -92,6 +97,41 @@ describe('NormalisingOutputBuilder', () => {
       expect(result.content).toEqual({
         R: { '#xml__comment': ' hello ', v: '1' },
       })
+    })
+  })
+
+  describe('given a non-xmlns attribute on the root element', () => {
+    it('when parsed then the attribute stays on the element (not routed to namespaces)', () => {
+      // Guards the `name === XMLNS || name.startsWith("xmlns:")` check:
+      // mutating the left-hand disjunct to `true` would incorrectly
+      // route every root-level attribute into the namespaces bucket.
+      const result = parse(
+        `<?xml version="1.0"?><Root schemaLocation="http://x" id="42"><v>1</v></Root>`
+      )
+      expect(result.namespaces).toEqual({})
+      expect(result.content).toEqual({
+        Root: {
+          '@_schemaLocation': 'http://x',
+          '@_id': '42',
+          v: '1',
+        },
+      })
+    })
+  })
+
+  describe('given only an xmlns:prefix attribute on the root (no plain xmlns)', () => {
+    it('when parsed then the prefix branch still routes it to the namespaces bucket', () => {
+      // Separate from the plain `xmlns` path — this covers the
+      // `name.startsWith(XMLNS + ":")` branch specifically. Mutating
+      // that startsWith argument to the empty string would also match
+      // non-xmlns attributes; the previous test would catch that.
+      const result = parse(
+        `<?xml version="1.0"?><Root xmlns:ns1="http://only-prefix"><v>1</v></Root>`
+      )
+      expect(result.namespaces).toEqual({
+        '@_xmlns:ns1': 'http://only-prefix',
+      })
+      expect(result.content).toEqual({ Root: { v: '1' } })
     })
   })
 })

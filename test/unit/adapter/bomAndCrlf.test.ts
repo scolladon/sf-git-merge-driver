@@ -26,7 +26,7 @@ describe('BOM + CRLF edge cases', () => {
   })
 
   describe('given CRLF EOL target and a conflicting three-way merge', () => {
-    it('when merged with eol=\\r\\n then all LFs including conflict markers become CRLF', async () => {
+    it('when merged with eol=\\r\\n then markers end with \\r\\n, not bare \\n', async () => {
       const merger = new XmlMerger(defaultConfig)
       const base = `<?xml version="1.0"?><R><v>base</v></R>`
       const ours = `<?xml version="1.0"?><R><v>ours</v></R>`
@@ -42,13 +42,18 @@ describe('BOM + CRLF edge cases', () => {
       )
       sink.end()
       const out = await collector
-      // Every newline must be CRLF; no bare LF survives.
-      expect(out).toContain('\r\n')
+      // No bare LF anywhere — every newline must be CRLF.
       expect(out).not.toMatch(/(?<!\r)\n/)
-      // Conflict markers are present and their line endings are CRLF.
-      expect(out).toContain('<<<<<<<')
-      expect(out).toContain('=======')
-      expect(out).toContain('>>>>>>>')
+      // Byte-exact: each marker line ends with \r\n (not \n, not just \r).
+      // These patterns would fail if EolTransform was applied BEFORE
+      // ConflictLineFilter and the filter's pass-2 blank-line drop
+      // stripped marker line-endings.
+      expect(out).toMatch(/<<<<<<< ours\r\n/)
+      expect(out).toMatch(/\|\|\|\|\|\|\| base\r\n/)
+      expect(out).toMatch(/=======\r\n/)
+      // The final >>>>>>> theirs marker is the last line; it might not
+      // end with a newline at all (trailing-newline convention).
+      expect(out).toContain('>>>>>>> theirs')
     })
   })
 

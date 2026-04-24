@@ -3,6 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MergeDriver } from '../../../src/driver/MergeDriver.js'
 import { defaultConfig } from '../../utils/testConfig.js'
 
+// Mocks here are narrowly scoped: only the behaviours that are
+// impossible to trigger against the real filesystem reliably —
+// injecting an error on the tmp write stream mid-write, asserting the
+// exact `eol` arg propagates to mergeThreeWay. Everything else lives
+// in test/integration/MergeDriver.test.ts against real tmp files.
+
 const mockCreateReadStream = vi.fn<(path: string) => Readable>()
 const mockCreateWriteStream = vi.fn<(path: string) => Writable>()
 vi.mock('node:fs', () => ({
@@ -10,15 +16,13 @@ vi.mock('node:fs', () => ({
   createWriteStream: (p: string) => mockCreateWriteStream(p),
 }))
 
-const mockRename = vi.fn<() => Promise<void>>()
-const mockUnlink = vi.fn<() => Promise<void>>()
 vi.mock('node:fs/promises', async () => {
   const actual =
     await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
   return {
     ...actual,
-    rename: () => mockRename(),
-    unlink: () => mockUnlink(),
+    rename: async () => undefined,
+    unlink: async () => undefined,
   }
 })
 
@@ -27,10 +31,25 @@ vi.mock('../../../src/utils/peekEol.js', () => ({
   peekEol: () => mockPeekEol(),
 }))
 
-const mockMergeStreams = vi.fn<() => Promise<{ hasConflict: boolean }>>()
+const mockMergeThreeWay =
+  vi.fn<
+    (
+      a: Readable,
+      o: Readable,
+      t: Readable,
+      out: Writable,
+      eol?: '\n' | '\r\n'
+    ) => Promise<{ hasConflict: boolean }>
+  >()
 vi.mock('../../../src/merger/XmlMerger.js', () => {
   const XmlMerger = vi.fn()
-  XmlMerger.prototype.mergeThreeWay = () => mockMergeStreams()
+  XmlMerger.prototype.mergeThreeWay = (
+    a: Readable,
+    o: Readable,
+    t: Readable,
+    out: Writable,
+    eol?: '\n' | '\r\n'
+  ) => mockMergeThreeWay(a, o, t, out, eol)
   return { XmlMerger }
 })
 
@@ -38,132 +57,86 @@ const makeInputStream = (content: string): Readable => Readable.from([content])
 
 const makeWritableSink = (): PassThrough => {
   const s = new PassThrough()
-  // Consume the read side so 'finish' fires when the driver calls
-  // `end()` — otherwise stream/promises.finished(tmpWS) hangs.
+  // Consume read side so 'finish' fires on end() — otherwise
+  // stream/promises.finished(tmpWS) hangs.
   s.resume()
   return s
 }
 
-describe('MergeDriver', () => {
+describe('MergeDriver (unit — mock-required edge cases only)', () => {
   let sut: MergeDriver
 
   beforeEach(() => {
     vi.clearAllMocks()
     sut = new MergeDriver(defaultConfig)
     mockPeekEol.mockResolvedValue('\n')
-    mockRename.mockResolvedValue(undefined)
-    mockUnlink.mockResolvedValue(undefined)
+    mockCreateReadStream.mockImplementation(() => makeInputStream('<a/>'))
+    mockCreateWriteStream.mockReturnValue(makeWritableSink())
+    mockMergeThreeWay.mockResolvedValue({ hasConflict: false })
   })
 
-  describe('given three input streams merge without conflict', () => {
-    it('when merged then rename is called and hasConflict=false is returned', async () => {
-      // Arrange
-      mockCreateReadStream.mockImplementation(() => makeInputStream('<a/>'))
-      const sink = makeWritableSink()
-      mockCreateWriteStream.mockReturnValue(sink)
-      mockMergeStreams.mockResolvedValue({ hasConflict: false })
-
-      // Act
-      const result = await sut.mergeFiles('a', 'o', 't')
-
-      // Assert
-      expect(result).toBe(false)
-      expect(mockRename).toHaveBeenCalledOnce()
+  describe('given peekEol reports CRLF', () => {
+    it('when merged then mergeThreeWay is called with eol=\\r\\n', async () => {
+      mockPeekEol.mockResolvedValue('\r\n')
+      await sut.mergeFiles('a', 'o', 't')
+      expect(mockMergeThreeWay).toHaveBeenCalledOnce()
+      const eolArg = mockMergeThreeWay.mock.calls[0]![4]
+      expect(eolArg).toBe('\r\n')
     })
   })
 
-  describe('given merger reports a conflict', () => {
-    it('when merged then returns true and still renames', async () => {
-      mockCreateReadStream.mockImplementation(() => makeInputStream('<a/>'))
-      const sink = makeWritableSink()
-      mockCreateWriteStream.mockReturnValue(sink)
-      mockMergeStreams.mockResolvedValue({ hasConflict: true })
-
-      const result = await sut.mergeFiles('a', 'o', 't')
-
-      expect(result).toBe(true)
-      expect(mockRename).toHaveBeenCalledOnce()
+  describe('given peekEol reports LF', () => {
+    it('when merged then mergeThreeWay is called with eol=\\n', async () => {
+      mockPeekEol.mockResolvedValue('\n')
+      await sut.mergeFiles('a', 'o', 't')
+      const eolArg = mockMergeThreeWay.mock.calls[0]![4]
+      expect(eolArg).toBe('\n')
     })
   })
 
   describe('given mergeThreeWay rejects with ENOENT (bad input path)', () => {
-    it('when merged then the ENOENT is rethrown to the bin (usage-error exit 2)', async () => {
-      mockCreateReadStream.mockImplementation(() => makeInputStream('<a/>'))
-      mockCreateWriteStream.mockReturnValue(makeWritableSink())
+    it('when merged then ENOENT is rethrown for the bin to classify as exit 2', async () => {
       const enoent = Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
-      mockMergeStreams.mockRejectedValue(enoent)
+      mockMergeThreeWay.mockRejectedValue(enoent)
 
       await expect(sut.mergeFiles('a', 'o', 't')).rejects.toMatchObject({
         code: 'ENOENT',
       })
-      expect(mockRename).not.toHaveBeenCalled()
     })
   })
 
-  describe('given mergeThreeWay throws', () => {
-    it('when merged then returns true, does not rename, cleans up tmp', async () => {
-      mockCreateReadStream.mockImplementation(() => makeInputStream('<a/>'))
-      const sink = makeWritableSink()
-      mockCreateWriteStream.mockReturnValue(sink)
-      mockMergeStreams.mockRejectedValue(new Error('parse boom'))
-
+  describe('given mergeThreeWay rejects with a non-ENOENT error', () => {
+    it('when merged then returns hasConflict=true (leave-ours-alone policy)', async () => {
+      mockMergeThreeWay.mockRejectedValue(new Error('parse boom'))
       const result = await sut.mergeFiles('a', 'o', 't')
-
       expect(result).toBe(true)
-      expect(mockRename).not.toHaveBeenCalled()
-      expect(mockUnlink).toHaveBeenCalledOnce()
     })
   })
 
-  describe('given peekEol reports CRLF', () => {
-    it('when merged then mergeThreeWay receives the CRLF eol arg', async () => {
-      mockPeekEol.mockResolvedValue('\r\n')
-      mockCreateReadStream.mockImplementation(() => makeInputStream('<a/>'))
+  describe('given the tmp write stream emits error mid-merge', () => {
+    it('when merged then the no-op error listener prevents a process-level unhandled event', async () => {
+      // This scenario is hard to reproduce against a real filesystem
+      // (disk-full / permission-denied mid-write). Injecting the
+      // error on the mock sink is the cleanest route. The invariant
+      // under test is the listener itself: without the `tmpWS.on(
+      // 'error', noop)` registration in MergeDriver, Node would
+      // escalate the event to an uncaught exception and crash the
+      // process — failing this test. Resolution value is incidental.
       const sink = makeWritableSink()
       mockCreateWriteStream.mockReturnValue(sink)
-      // Verify the eol arg by capturing it via the mock.
-      const eolCapture = vi.fn<() => Promise<{ hasConflict: boolean }>>()
-      eolCapture.mockResolvedValue({ hasConflict: false })
-      mockMergeStreams.mockImplementation(eolCapture)
-
-      await sut.mergeFiles('a', 'o', 't')
-
-      // mergeThreeWay is called once; we confirm the rename happened
-      // which implies the pipeline completed.
-      expect(mockRename).toHaveBeenCalledOnce()
+      mockMergeThreeWay.mockImplementation(async () => {
+        sink.emit('error', new Error('tmp write boom'))
+        return { hasConflict: false }
+      })
+      // Just proving no uncaught event: the call resolves without
+      // the test runner blowing up.
+      await expect(sut.mergeFiles('a', 'o', 't')).resolves.toBeTypeOf('boolean')
     })
   })
 
   describe('given peekEol itself rejects (ours file unreadable)', () => {
-    it('when merged then returns true without renaming', async () => {
+    it('when merged then returns hasConflict=true without crashing', async () => {
       mockPeekEol.mockRejectedValue(new Error('ENOENT ours'))
-      mockCreateReadStream.mockImplementation(() => makeInputStream('<a/>'))
-      mockCreateWriteStream.mockReturnValue(makeWritableSink())
-      mockMergeStreams.mockResolvedValue({ hasConflict: false })
-
-      const result = await sut.mergeFiles('a', 'o', 't')
-
-      expect(result).toBe(true)
-      expect(mockRename).not.toHaveBeenCalled()
-    })
-  })
-
-  describe('given the tmp write stream emits an error during merge', () => {
-    it('when merged then the no-op error handler prevents an uncaught event', async () => {
-      mockCreateReadStream.mockImplementation(() => makeInputStream('<a/>'))
-      const sink = makeWritableSink()
-      mockCreateWriteStream.mockReturnValue(sink)
-      mockMergeStreams.mockImplementation(async () => {
-        // Emit an error on the tmp write stream — the driver's no-op
-        // listener must prevent Node from escalating it to an uncaught
-        // 'error' event (which would fail the test with a crash).
-        sink.emit('error', new Error('tmp write boom'))
-        return { hasConflict: false }
-      })
-      // rename should still not happen (finished(tmpWS) rejects after
-      // the error event).
-      mockRename.mockRejectedValue(new Error('rename should not be called'))
-
       const result = await sut.mergeFiles('a', 'o', 't')
       expect(result).toBe(true)
     })

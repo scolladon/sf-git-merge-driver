@@ -95,17 +95,24 @@ export class NormalisingOutputBuilderFactory extends CompactBuilderFactory {
     parserOptions: unknown,
     readonlyMatcher: unknown
   ): NormalisingOutputBuilder {
+    // We replicate the parent's getInstance body because we need to
+    // construct our OWN subclass (CompactBuilder's constructor takes
+    // the valParsers map as an argument). Under the current
+    // parser-options `valueParsers: []`, the registered parsers are
+    // never consulted — but spreading commonValParsers preserves the
+    // contract the upstream library documents for custom output
+    // builders. If a future release activates any default parser, the
+    // shared instance stays in sync with parent behaviour.
     const self = this as unknown as {
       resetValueParsers(): void
       commonValParsers: Record<string, unknown>
       options: unknown
     }
     self.resetValueParsers()
-    const valParsers = { ...self.commonValParsers }
     return new NormalisingOutputBuilder(
       parserOptions,
       self.options,
-      valParsers,
+      { ...self.commonValParsers },
       readonlyMatcher
     )
   }
