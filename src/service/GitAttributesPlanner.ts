@@ -26,7 +26,7 @@ export const OVERWRITE_ANNOTATION_PREFIX = '# sf-git-merge-driver overwrote: '
  * original raw line back (paired with a `drop-line` for the annotation
  * comment above it).
  */
-export type UninstallAction =
+type UninstallAction =
   | { readonly kind: 'drop-line'; readonly lineIndex: number }
   | { readonly kind: 'remove-merge-attr'; readonly lineIndex: number }
   | {
@@ -114,7 +114,7 @@ export type ConflictPolicy = 'abort' | 'skip' | 'overwrite'
  * yet have no source line, and `add` is the planner's way of saying
  * "append this pattern at the end".
  */
-export type InstallAction =
+type InstallAction =
   | { readonly kind: 'add'; readonly pattern: string }
   | {
       readonly kind: 'skip'
@@ -145,7 +145,7 @@ export type InstallAction =
 
 /** A diagnostic a planner surfaces on the install path so the command
  *  layer can log a warning without altering the attributes file. */
-export type PatternDiagnostic = {
+type PatternDiagnostic = {
   readonly pattern: string
   readonly lineIndex: number
 }

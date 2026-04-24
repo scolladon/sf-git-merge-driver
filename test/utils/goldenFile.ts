@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { JsonArray, JsonObject } from '../../src/types/jsonTypes.js'
 
 type ParityMode =
@@ -25,7 +26,13 @@ interface Fixture {
   readonly expectedNew?: string
 }
 
-const FIXTURES_ROOT = new URL('../fixtures/xml/', import.meta.url).pathname
+// `new URL().pathname` returns `/D:/...` on Windows with a leading slash,
+// which `path.join` then concatenates onto `D:\` producing invalid
+// `D:\D:\...`. `fileURLToPath` handles the drive-letter + slash
+// normalisation across POSIX and Windows.
+const FIXTURES_ROOT = fileURLToPath(
+  new URL('../fixtures/xml/', import.meta.url)
+)
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
