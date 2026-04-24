@@ -11,6 +11,14 @@ import { peekEol } from '../utils/peekEol.js'
 
 const TMP_SUFFIX = '.sf-merge-tmp'
 
+// Observability breadcrumb: written once per merge invocation into
+// ~/.sf/sf-YYYY-MM-DD.log so support can distinguish which pipeline
+// version a user was running when they share logs. `__VERSION__` is
+// injected by esbuild at bundle time; the guard covers ts-node/vitest
+// runs where the define doesn't exist.
+const PIPELINE_VERSION =
+  typeof __VERSION__ !== 'undefined' ? __VERSION__ : 'dev'
+
 const noop = (): void => {
   /* intentional no-op stream error swallower */
 }
@@ -37,6 +45,8 @@ export class MergeDriver {
     const oursPath = normalize(ourFile)
     const tmpPath = oursPath + TMP_SUFFIX
     const readers: Readable[] = []
+
+    Logger.info(`pipeline=streaming v=${PIPELINE_VERSION}`)
 
     try {
       const eol = await peekEol(oursPath)
