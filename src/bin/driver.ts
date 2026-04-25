@@ -8,11 +8,9 @@ import {
 import { MergeDriver } from '../driver/MergeDriver.js'
 import type { MergeConfig } from '../types/conflictTypes.js'
 
-// Injected by esbuild --define at build time; in dev/test falls back.
-declare const __VERSION__: string
-// Injected by esbuild --define at build time; `typeof` guard keeps tests
-// from triggering the main() invocation on module import.
-declare const __BUNDLED__: boolean
+// __VERSION__ + __BUNDLED__ are esbuild --define injections, ambient-declared in
+// src/types/globals.d.ts. Both are guarded with `typeof` at every call site
+// (in dev/test contexts the substitution doesn't happen and they are undefined).
 
 const USAGE = `Usage: sf-git-merge-driver -O <ancestor> -A <local> -B <other> -P <output> [-L n] [-S tag] [-X tag] [-Y tag]
 
