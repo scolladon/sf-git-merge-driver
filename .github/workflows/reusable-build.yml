@@ -41,6 +41,9 @@ jobs:
       - name: Integration test
         run: npm run test:integration
 
+      - name: Functional test
+        run: npm run test:functional
+
       - name: Install cli
         run: npm install -g @salesforce/cli
 

@@ -202,6 +202,17 @@ describe('TxmlXmlParser', () => {
     })
   })
 
+  describe('given input with trailing whitespace after the root element', () => {
+    // Pins assertBalancedTags's `next < 0 break` exit path: the
+    // tag-scan loop finishes iterating tags but the input still has
+    // unconsumed bytes (whitespace), so indexOf returns -1 and we
+    // break out instead of looping forever.
+    it('when parseString then the trailing whitespace is ignored and parsing succeeds', () => {
+      const result = sut.parseString(`<r><v>1</v></r>\n  \n`)
+      expect(result.content).toEqual({ r: { v: '1' } })
+    })
+  })
+
   describe('given malformed input — unclosed element', () => {
     it('when parseString then it throws (so MergeDriver can surface the failure as a conflict)', () => {
       expect(() =>

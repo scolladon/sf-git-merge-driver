@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { listFixtures } from '../../../utils/goldenFile.js'
+import { listFixtures } from '../utils/goldenFile.js'
 
 // The Zod-validated loader in test/utils/goldenFile.ts already throws
 // on malformed fixture directories, so the harness sanity check is an

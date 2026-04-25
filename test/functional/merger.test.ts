@@ -1,8 +1,8 @@
 import { PassThrough, Readable } from 'node:stream'
 import { describe, expect, it } from 'vitest'
-import { XmlMerger } from '../../../../src/merger/XmlMerger.js'
-import { listFixtures } from '../../../utils/goldenFile.js'
-import { defaultConfig } from '../../../utils/testConfig.js'
+import { XmlMerger } from '../../src/merger/XmlMerger.js'
+import { listFixtures } from '../utils/goldenFile.js'
+import { defaultConfig } from '../utils/testConfig.js'
 
 const collect = async (stream: PassThrough): Promise<string> => {
   const chunks: Buffer[] = []

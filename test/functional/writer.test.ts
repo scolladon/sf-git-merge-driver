@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { XmlStreamWriter } from '../../../../src/adapter/writer/XmlStreamWriter.js'
-import { listFixtures } from '../../../utils/goldenFile.js'
-import { serializeToString } from '../../../utils/serializeToString.js'
-import { defaultConfig } from '../../../utils/testConfig.js'
+import { XmlStreamWriter } from '../../src/adapter/writer/XmlStreamWriter.js'
+import { listFixtures } from '../utils/goldenFile.js'
+import { serializeToString } from '../utils/serializeToString.js'
+import { defaultConfig } from '../utils/testConfig.js'
 
 describe('writer parity — XmlStreamWriter vs current pipeline', () => {
   const fixtures = listFixtures().filter(f => f.inputs.ordered !== undefined)
