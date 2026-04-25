@@ -4,7 +4,7 @@ This document describes the software architecture of the Salesforce Git Merge Dr
 
 ## Overview
 
-The merge driver implements a three-way merge algorithm specifically designed for Salesforce metadata XML files. XML is parsed by a streaming reader into a compact JSON representation, the merge runs over that representation, and a streaming writer emits the result back as XML without ever materialising a full document in memory.
+The merge driver implements a three-way merge algorithm specifically designed for Salesforce metadata XML files. XML is parsed by a streaming reader into a compact JSON representation, the merge runs over that representation, and a recursive writer walks the merged tree into a single growable string buffer that is then written to the output sink. The writer is intentionally buffered rather than per-chunk streaming — at SF metadata sizes this is 30-45 % faster on serialize benches than the previous chunk-streaming approach (V8's cons-string optimisation + one final encode is cheaper than many small encoded writes).
 
 ## Design Patterns
 
@@ -154,11 +154,11 @@ The writer expands these into zdiff3-style conflict markers in the XML output:
 >>>>>>> theirs
 ```
 
-Marker expansion happens inline while the chunks flow through `XmlStreamWriter` — no separate post-processing pass. A two-pass `ConflictLineFilter` (strip horizontal whitespace before a marker, drop whitespace-only lines) keeps the byte layout identical to git's conventions.
+Marker expansion happens inline as the writer walker visits each `ConflictBlock` — no separate post-processing pass. A two-pass `ConflictLineFilter` (strip horizontal whitespace before a marker, drop whitespace-only lines) keeps the byte layout identical to git's conventions; the filter runs only when the merger reports `hasConflict=true`.
 
 ### Ports & Adapters (Hexagonal Architecture)
 
-The XML parsing and serialization are isolated behind port interfaces, keeping the merge domain free from library-specific format details. Both sides are streaming: the parser reads from a `Readable`, the writer pipes into a `Writable`, and peak working set stays proportional to tree depth rather than node count.
+The XML parsing and serialization are isolated behind port interfaces, keeping the merge domain free from library-specific format details. The parser reads from a `Readable`; the writer builds the serialized output into a single growable string buffer in one recursive walk, then emits it through `Writable.write` in one call (no-conflict path) or replays it through the conflict-line filter in 16 KiB windows (conflict path). The buffered approach is intentional — for SF metadata sizes (KB-MB) it beats per-chunk streaming by 30-45 % thanks to V8's cons-string optimisation.
 
 ```mermaid
 classDiagram
@@ -170,7 +170,7 @@ classDiagram
 
     class XmlSerializer {
         <<interface>>
-        +writeTo(out, ordered, namespaces, eol) Promise~void~
+        +writeTo(out, ordered, namespaces, eol, hasConflict) Promise~void~
     }
 
     class StreamingXmlParser {
@@ -184,7 +184,7 @@ classDiagram
     }
 
     class XmlStreamWriter {
-        +writeTo(out, ordered, namespaces, eol) Promise~void~
+        +writeTo(out, ordered, namespaces, eol, hasConflict) Promise~void~
     }
 
     XmlParser <|.. StreamingXmlParser
@@ -193,9 +193,9 @@ classDiagram
 ```
 
 - **`XmlParser` port** — Reads XML from a `Readable` (or a string), returns `NormalisedParseResult = { content, namespaces }`.
-- **`XmlSerializer` port** — Writes to a `Writable` in chunks: XML declaration, elements (open/close/cdata/comment), namespaces on the first top-level element, and inline conflict-block expansion.
+- **`XmlSerializer` port** — Writes the serialized document to a `Writable`: XML declaration, elements (open/close/cdata/comment), namespaces on the first top-level element, and inline conflict-block expansion. The optional `hasConflict` parameter (defaults to `true`) lets callers skip the conflict-line filter when the merge produced no `ConflictBlock` — the common case.
 - **`StreamingXmlParser`** — Adapter wrapping `@nodable/flexible-xml-parser` with a custom `NormalisingOutputBuilder` that strips leaked declaration attributes and splits root namespaces off the element into a dedicated bucket as the tree is built — no post-walk normalisation pass.
-- **`XmlStreamWriter`** — Generator-based serializer: `emit → formatChunks → ConflictLineFilter → applyEol → out.write`, with memoised indent strings and back-pressure via `once(out, 'drain')`.
+- **`XmlStreamWriter`** — Single recursive walker (`writeRoot` → `writeElement` → `writeChildren`) that appends serialized XML directly to a mutable `WalkState.buf` string. No generators, no per-chunk object allocations, no `for...of` over generators. `getIndent` memoises the per-depth `\n + N×indent` prefix. The walker is sync; only `writeTo` is async, awaiting `out.write`'s drain signal once at the end (no-conflict path) or per 16 KiB filter window (conflict path).
 
 ## Binary Entry Point
 
@@ -300,10 +300,9 @@ flowchart TD
         Conflict["ConflictBlock"]
     end
 
-    subgraph "Writer Adapter (streaming)"
-        Emit["emit: compact tree → chunk stream"]
-        Format["formatChunks: indent state machine"]
-        Filter["ConflictLineFilter: strip leading ws / drop blank lines"]
+    subgraph "Writer Adapter (buffered then flushed)"
+        Walk["writeRoot/writeElement: recursive walker into WalkState.buf"]
+        Filter["ConflictLineFilter (only when hasConflict=true): strip leading ws / drop blank lines"]
         Eol["applyEol: LF → CRLF if target demands"]
     end
 
@@ -315,9 +314,9 @@ flowchart TD
     Orchestrator --> Strategy
     Strategy --> Nodes
     Strategy --> Conflict
-    Nodes --> Emit
-    Conflict --> Emit
-    Emit --> Format --> Filter --> Eol --> Result
+    Nodes --> Walk
+    Conflict --> Walk
+    Walk --> Filter --> Eol --> Result
 ```
 
 ## Key Design Decisions
@@ -328,7 +327,7 @@ XML is converted to a compact JSON format for easier manipulation. The domain op
 - Scalars are plain values: `{ field: "value" }`
 - Nested elements are child objects: `{ parent: { child: "value" } }`
 - Namespace attributes are extracted by the parser adapter into a dedicated bucket, not left on the root element
-- The writer adapter walks the compact tree directly — splitting attributes (`@_`-prefixed keys) from children, expanding `ConflictBlock` objects inline into text markers, and yielding chunks without materialising an intermediate ordered representation
+- The writer adapter walks the compact tree directly — splitting attributes (`@_`-prefixed keys) from children, expanding `ConflictBlock` objects inline into text markers, and appending bytes to a single growable buffer without materialising an intermediate ordered representation or generator chunk objects
 
 ### 2. Key-Based Array Merging
 
