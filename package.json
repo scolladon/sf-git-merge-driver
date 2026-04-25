@@ -13,12 +13,11 @@
     "url": "git+https://github.com/scolladon/sf-git-merge-driver.git"
   },
   "dependencies": {
-    "@nodable/compact-builder": "^1.0.6",
-    "@nodable/flexible-xml-parser": "1.1.1",
     "@oclif/core": "^4.10.5",
     "@salesforce/core": "^8.28.4",
     "@salesforce/sf-plugins-core": "^12.2.6",
-    "simple-git": "^3.36.0"
+    "simple-git": "^3.36.0",
+    "txml": "^5.2.1"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.13",

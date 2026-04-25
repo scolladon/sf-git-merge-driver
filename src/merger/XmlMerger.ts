@@ -1,5 +1,5 @@
 import type { Readable, Writable } from 'node:stream'
-import { StreamingXmlParser } from '../adapter/StreamingXmlParser.js'
+import { TxmlXmlParser } from '../adapter/TxmlXmlParser.js'
 import { XmlStreamWriter } from '../adapter/writer/XmlStreamWriter.js'
 import type { MergeConfig } from '../types/conflictTypes.js'
 import type { JsonObject } from '../types/jsonTypes.js'
@@ -10,12 +10,12 @@ const mergeNamespaces = (...maps: JsonObject[]): JsonObject =>
   Object.assign({}, ...maps)
 
 export class XmlMerger {
-  private readonly parser: StreamingXmlParser
+  private readonly parser: TxmlXmlParser
   private readonly writer: XmlStreamWriter
   private readonly jsonMerger: JsonMerger
 
   constructor(config: MergeConfig) {
-    this.parser = new StreamingXmlParser()
+    this.parser = new TxmlXmlParser()
     this.writer = new XmlStreamWriter(config)
     this.jsonMerger = new JsonMerger(config)
   }

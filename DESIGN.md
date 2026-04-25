@@ -173,28 +173,22 @@ classDiagram
         +writeTo(out, ordered, namespaces, eol, hasConflict) Promise~void~
     }
 
-    class StreamingXmlParser {
+    class TxmlXmlParser {
         +parseStream(input) Promise~NormalisedParseResult~
         +parseString(xml) NormalisedParseResult
-    }
-
-    class NormalisingOutputBuilder {
-        filters @_version / @_encoding
-        routes root xmlns into namespaces bucket
     }
 
     class XmlStreamWriter {
         +writeTo(out, ordered, namespaces, eol, hasConflict) Promise~void~
     }
 
-    XmlParser <|.. StreamingXmlParser
+    XmlParser <|.. TxmlXmlParser
     XmlSerializer <|.. XmlStreamWriter
-    StreamingXmlParser --> NormalisingOutputBuilder : uses
 ```
 
 - **`XmlParser` port** — Reads XML from a `Readable` (or a string), returns `NormalisedParseResult = { content, namespaces }`.
 - **`XmlSerializer` port** — Writes the serialized document to a `Writable`: XML declaration, elements (open/close/cdata/comment), namespaces on the first top-level element, and inline conflict-block expansion. The optional `hasConflict` parameter (defaults to `true`) lets callers skip the conflict-line filter when the merge produced no `ConflictBlock` — the common case.
-- **`StreamingXmlParser`** — Adapter wrapping `@nodable/flexible-xml-parser` with a custom `NormalisingOutputBuilder` that strips leaked declaration attributes and splits root namespaces off the element into a dedicated bucket as the tree is built — no post-walk normalisation pass.
+- **`TxmlXmlParser`** — Adapter wrapping the `txml` library (1.5 KiB gzipped, zero deps after our preprocess). Pre-processes `<![CDATA[…]]>` regions into a sentinel element before parsing (txml flattens CDATA into text, losing the boundary the writer needs to preserve). After parsing, walks tXml's `TNode { tagName, attributes, children }` tree once, converting it to the compact JsonObject shape the merger and writer expect: collapses repeated same-name siblings into arrays, prefixes attributes with `@_`, extracts root `xmlns*` into the namespaces bucket, decodes the CDATA sentinel back into `__cdata` keys, and runs a tag-balance check to throw on malformed input (txml itself is permissive). The conversion is benchmark-measured 62-67 % faster end-to-end than the previous `@nodable/flexible-xml-parser` adapter, with a -70 % bundle-size reduction (110 KiB → 33.5 KiB). See `docs/plans/2026-04-25-parser-spike-txml-vs-sax.md` for the spike that justified the swap.
 - **`XmlStreamWriter`** — Single recursive walker (`writeRoot` → `writeElement` → `writeChildren`) that appends serialized XML directly to a mutable `WalkState.buf` string. No generators, no per-chunk object allocations, no `for...of` over generators. `getIndent` memoises the per-depth `\n + N×indent` prefix. The walker is sync; only `writeTo` is async, awaiting `out.write`'s drain signal once at the end (no-conflict path) or per 16 KiB filter window (conflict path).
 
 ## Binary Entry Point
@@ -288,9 +282,9 @@ flowchart TD
         XML["3 Readables (ancestor / ours / theirs)"]
     end
 
-    subgraph "Parser Adapter (streaming)"
-        Parse["StreamingXmlParser.parseStream"]
-        Normalise["NormalisingOutputBuilder: strip @_version/@_encoding, route root xmlns into namespaces bucket (in-line, no post-walk)"]
+    subgraph "Parser Adapter (txml + adapter)"
+        Parse["TxmlXmlParser.parseString"]
+        Normalise["TNode → compact JsonObject: extract root xmlns into namespaces bucket, decode CDATA sentinel, collapse repeated siblings into arrays"]
     end
 
     subgraph "Domain (format-agnostic)"

@@ -1,5 +1,5 @@
 import { PassThrough, Readable } from 'node:stream'
-import { StreamingXmlParser } from '../../../src/adapter/StreamingXmlParser.js'
+import { TxmlXmlParser } from '../../../src/adapter/TxmlXmlParser.js'
 import { XmlStreamWriter } from '../../../src/adapter/writer/XmlStreamWriter.js'
 import { JsonMerger } from '../../../src/merger/JsonMerger.js'
 import type { MergeConfig } from '../../../src/types/conflictTypes.js'
@@ -28,7 +28,7 @@ export const instrumentedMerge = async (
     Buffer.byteLength(localContent) +
     Buffer.byteLength(otherContent)
 
-  const parser = new StreamingXmlParser()
+  const parser = new TxmlXmlParser()
   const writer = new XmlStreamWriter(config)
   const jsonMerger = new JsonMerger(config)
 

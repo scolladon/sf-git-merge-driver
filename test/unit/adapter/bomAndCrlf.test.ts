@@ -1,6 +1,6 @@
 import { PassThrough, Readable } from 'node:stream'
 import { describe, expect, it } from 'vitest'
-import { StreamingXmlParser } from '../../../src/adapter/StreamingXmlParser.js'
+import { TxmlXmlParser } from '../../../src/adapter/TxmlXmlParser.js'
 import { XmlMerger } from '../../../src/merger/XmlMerger.js'
 import { defaultConfig } from '../../utils/testConfig.js'
 
@@ -16,7 +16,7 @@ const BOM = '﻿'
 describe('BOM + CRLF edge cases', () => {
   describe('given a UTF-8 BOM prefixing the XML', () => {
     it('when parsed then the content is unaffected by the BOM', async () => {
-      const parser = new StreamingXmlParser()
+      const parser = new TxmlXmlParser()
       const withBom = `${BOM}<?xml version="1.0"?><Root><v>x</v></Root>`
       const withoutBom = `<?xml version="1.0"?><Root><v>x</v></Root>`
       const a = await parser.parseStream(Readable.from([withBom]))
