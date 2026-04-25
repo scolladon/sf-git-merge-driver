@@ -247,8 +247,9 @@ describe('XmlStreamWriter', () => {
   })
 
   describe('given a throttled Writable that always signals backpressure', () => {
-    it('when serialized then writer awaits drain and the full document is emitted', async () => {
-      const written: string[] = []
+    const buildThrottled = (
+      written: string[]
+    ): InstanceType<typeof Writable> => {
       const throttled = new Writable({
         write(chunk: Buffer, _enc: string, cb: (e?: Error | null) => void) {
           written.push(chunk.toString('utf8'))
@@ -265,8 +266,24 @@ describe('XmlStreamWriter', () => {
         setImmediate(() => throttled.emit('drain'))
         return false
       }) as typeof throttled.write
+      return throttled
+    }
+
+    it('when serialized then writer awaits drain and the full document is emitted', async () => {
+      const written: string[] = []
+      const throttled = buildThrottled(written)
       const writer = new XmlStreamWriter(defaultConfig)
       await writer.writeTo(throttled, [{ Root: [{ v: '1' }] }], {})
+      expect(written.join('')).toBe(`${DECL}\n<Root>\n    <v>1</v>\n</Root>`)
+    })
+
+    it('when serialized with hasConflict=false then the single-write fast path also awaits drain', async () => {
+      // Covers the no-conflict path's `await once(out, "drain")` branch
+      // — distinct from the conflict-path drain inside the slice loop.
+      const written: string[] = []
+      const throttled = buildThrottled(written)
+      const writer = new XmlStreamWriter(defaultConfig)
+      await writer.writeTo(throttled, [{ Root: [{ v: '1' }] }], {}, '\n', false)
       expect(written.join('')).toBe(`${DECL}\n<Root>\n    <v>1</v>\n</Root>`)
     })
   })

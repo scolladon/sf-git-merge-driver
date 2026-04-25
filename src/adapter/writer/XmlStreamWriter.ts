@@ -127,20 +127,18 @@ const writeConflictContent = (
   content: JsonArray,
   markers: ConflictMarkers
 ): void => {
+  // Empty side: emit the EOL placeholder so the marker pair stays on
+  // its own line, matching the byte layout of the previous pipeline.
   if (content.length === 0) {
     writeText(st, SALESFORCE_EOL)
     return
   }
-  for (let i = 0; i < content.length; i++) {
-    const item = content[i] as JsonValue
-    if (writeNonObjectItem(st, item, markers)) continue
-    const obj = item as JsonObject
-    const keys = Object.keys(obj).sort()
-    for (let j = 0; j < keys.length; j++) {
-      const tagName = keys[j]!
-      writeElement(st, tagName, obj[tagName] as JsonValue, EMPTY_ATTRS, markers)
-    }
-  }
+  // Non-empty: iteration is identical to writeChildren (sorted-key
+  // recursion into writeElement). Delegate instead of inlining the same
+  // loop — the two paths produced byte-equivalent output, only the
+  // single-key fast-path branch differed which is a sort-skip
+  // optimisation that's a no-op when keys.length === 1.
+  writeChildren(st, content, markers)
 }
 
 const writeConflict = (
@@ -368,12 +366,11 @@ class ConflictLineFilter {
   }
 
   push(chunk: string): string {
-    // Fast path: most chunks contain no newlines (open tags, close
-    // tags, text of leaf elements). Avoid the string[] allocation.
-    if (chunk.indexOf('\n') < 0) {
-      this.buf += chunk
-      return ''
-    }
+    // Always called from writeTo with FLUSH_BYTES (16 KiB) slices of the
+    // serialized document, which contain at least one newline in any
+    // realistic XML output (indent newlines come at every element). The
+    // previous "no-newline fast path" went dead once the per-chunk
+    // generator pipeline was replaced by buffered serialization.
     const out: string[] = []
     let working = chunk
     while (true) {
@@ -488,10 +485,10 @@ export class XmlStreamWriter implements XmlSerializer {
       }
     }
     for (let i = 0; i < st.buf.length; i += FLUSH_BYTES) {
-      const slice = st.buf.slice(i, i + FLUSH_BYTES)
-      const filtered = filter.push(slice)
-      if (filtered.length === 0) continue
-      batch += filtered
+      // Empty-filter-output is permitted (a slice that became all-blank
+      // after pass-2 drops returns ''); appending '' is a cheap no-op
+      // and keeps the loop branch-free.
+      batch += filter.push(st.buf.slice(i, i + FLUSH_BYTES))
       if (batch.length >= FLUSH_BYTES) await flush()
     }
     batch += filter.end()
