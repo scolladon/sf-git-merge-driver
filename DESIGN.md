@@ -209,7 +209,7 @@ flowchart TD
     end
 
     subgraph Runtime["Runtime (per file, thousands per rebase)"]
-        Binary["bin/merge-driver.cjs<br/>(esbuild-bundled, ~108 KB)"]
+        Binary["bin/merge-driver.cjs<br/>(esbuild-bundled, ~34 KB)"]
         ArgvParser["argv parser<br/>(no oclif, no SF core)"]
         MD["MergeDriver.mergeFiles"]
     end
@@ -245,7 +245,7 @@ Deprecation is encoded natively via oclif's command-level deprecation API
 The binary is produced by esbuild from the compiled TypeScript:
 
 ```
-src/**/*.ts → tsc → lib/**/*.js → esbuild (minify, treeshake, cjs) → bin/merge-driver.cjs (~108 KB, mode 755)
+src/**/*.ts → tsc → lib/**/*.js → esbuild (minify, treeshake, cjs) → bin/merge-driver.cjs (~34 KB, mode 755)
 ```
 
 Key build choices:
