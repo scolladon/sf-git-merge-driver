@@ -203,6 +203,37 @@ describe('XmlStreamWriter', () => {
     })
   })
 
+  describe('given hasConflict=false on text the filter would otherwise mangle', () => {
+    // The merger sets hasConflict=false when no ConflictBlock was
+    // produced; writeTo then skips the ConflictLineFilter. Assert by
+    // feeding text the filter would visibly transform (indented marker
+    // line stripped, whitespace-only line dropped) and checking it
+    // round-trips byte-for-byte.
+    const tree = [{ Root: [{ '#text': `\n    ${sepMk}\n   \n` }] }]
+
+    const collect = async (hasConflict: boolean): Promise<string> => {
+      const sink = new PassThrough()
+      const chunks: Buffer[] = []
+      sink.on('data', (c: Buffer) => chunks.push(c))
+      await sut.writeTo(sink, tree, {}, '\n', hasConflict)
+      return Buffer.concat(chunks).toString('utf8')
+    }
+
+    it('when serialized then the indented marker and blank line are preserved verbatim', async () => {
+      const out = await collect(false)
+      expect(out).toBe(`${DECL}\n<Root>\n    ${sepMk}\n   \n</Root>`)
+    })
+
+    it('when hasConflict=true then the filter actively rewrites the same input (proves the bypass is what skipped the rewrite)', async () => {
+      const filtered = await collect(true)
+      // Filter strips leading whitespace before the marker and drops
+      // the whitespace-only line — output must differ from the bypass.
+      expect(filtered).not.toBe(`${DECL}\n<Root>\n    ${sepMk}\n   \n</Root>`)
+      expect(filtered).toContain(`\n${sepMk}\n`)
+      expect(filtered).not.toContain('   \n')
+    })
+  })
+
   describe('given a CRLF target EOL', () => {
     it('when serialized then every LF is rewritten to CRLF', async () => {
       const writer = new XmlStreamWriter(defaultConfig)

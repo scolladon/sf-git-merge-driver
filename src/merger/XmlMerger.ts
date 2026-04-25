@@ -59,7 +59,13 @@ export class XmlMerger {
     )
 
     if (mergedResult.output.length) {
-      await this.writer.writeTo(out, mergedResult.output, namespaces, eol)
+      await this.writer.writeTo(
+        out,
+        mergedResult.output,
+        namespaces,
+        eol,
+        mergedResult.hasConflict
+      )
     }
 
     return { hasConflict: mergedResult.hasConflict }

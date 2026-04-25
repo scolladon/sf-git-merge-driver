@@ -22,18 +22,6 @@ import type { MergeConfig } from '../../types/conflictTypes.js'
 import type { JsonArray, JsonObject, JsonValue } from '../../types/jsonTypes.js'
 import type { XmlSerializer } from '../XmlSerializer.js'
 
-type Chunk =
-  | { readonly kind: 'decl' }
-  | {
-      readonly kind: 'open'
-      readonly name: string
-      readonly attrs: ReadonlyArray<readonly [string, string]>
-    }
-  | { readonly kind: 'close'; readonly name: string }
-  | { readonly kind: 'text'; readonly value: string }
-  | { readonly kind: 'cdata'; readonly value: string }
-  | { readonly kind: 'comment'; readonly value: string }
-
 const TEXT_KEY = '#text'
 const ATTR_PREFIX = '@_'
 
@@ -48,9 +36,19 @@ const escapeCommentBody = (value: string): string =>
 const escapeCdataBody = (value: string): string =>
   value.replace(/\]\]>/g, ']]]]><![CDATA[>')
 
+// Hot path called once per element. The previous map().join('') form
+// allocated an intermediate array of formatted strings; this push-and-
+// concat loop avoids that allocation.
 const attrsToString = (
   attrs: ReadonlyArray<readonly [string, string]>
-): string => attrs.map(([k, v]) => ` ${k}="${v}"`).join('')
+): string => {
+  let s = ''
+  for (let i = 0; i < attrs.length; i++) {
+    const a = attrs[i]!
+    s += ` ${a[0]}="${a[1]}"`
+  }
+  return s
+}
 
 // When JsonMerger finds a three-way difference it can't resolve, it
 // emits a ConflictBlock object in place of the conflicting node. The
@@ -74,137 +72,232 @@ const buildConflictMarkers = (config: MergeConfig): ConflictMarkers => {
   }
 }
 
-// One side of a conflict contains either a list of child elements (same
-// compact shape as a regular element body) OR scalars. Expand each item
-// to chunk form recursively. Empty sides emit a single EOL placeholder
-// to match the current pipeline byte layout.
-// Branch off the two non-object item shapes (ConflictBlock, scalar) and
-// emit their chunks. Returns `true` if the item was consumed here, or
-// `false` if the caller still has to iterate the item's keys itself.
-// The conflict/scalar prelude is shared between emit() and
-// emitConflictContent() — factoring it avoids a copy-paste flagged by
-// jscpd at threshold 0%.
-function* emitNonObjectItem(
+// State machine for the indent / mixed-content rule from design §6.3.2.
+// Single mutable object passed through the recursive walk — replaces
+// the per-chunk frame stack the previous generator pipeline maintained.
+interface WalkState {
+  buf: string
+  // depth of the current frame (number of ancestor open tags)
+  depth: number
+  // whether the most recently emitted text-bearing chunk ended with `>`
+  // (decides whether the next text/cdata/close needs a leading newline+indent)
+  endedWithGt: boolean
+  // the very first top-level open tag receives no leading indent (it
+  // immediately follows the XML declaration)
+  isFirstTopLevelAfterDecl: boolean
+}
+
+const writeText = (st: WalkState, value: string): void => {
+  st.buf += st.endedWithGt ? `${getIndent(st.depth)}${value}` : value
+  st.endedWithGt = false
+}
+
+const writeCdata = (st: WalkState, value: string): void => {
+  st.buf += st.endedWithGt
+    ? `${getIndent(st.depth)}<![CDATA[${value}]]>`
+    : `<![CDATA[${value}]]>`
+  st.endedWithGt = true
+}
+
+const writeComment = (st: WalkState, value: string): void => {
+  st.buf += `<!--${value}-->`
+  st.endedWithGt = true
+}
+
+// Returns true if the item was a ConflictBlock or scalar (handled
+// in-place); false if the caller still has to iterate the item's keys.
+const writeNonObjectItem = (
+  st: WalkState,
   item: JsonValue,
   markers: ConflictMarkers
-): Generator<Chunk, boolean> {
+): boolean => {
   if (isConflictBlock(item)) {
-    yield* emitConflict(item, markers)
+    writeConflict(st, item, markers)
     return true
   }
   if (!isObject(item)) {
-    yield { kind: 'text', value: String(item) }
+    writeText(st, String(item))
     return true
   }
   return false
 }
 
-function* emitConflictContent(
+const writeConflictContent = (
+  st: WalkState,
   content: JsonArray,
   markers: ConflictMarkers
-): Generator<Chunk> {
+): void => {
   if (content.length === 0) {
-    yield { kind: 'text', value: SALESFORCE_EOL }
+    writeText(st, SALESFORCE_EOL)
     return
   }
-  for (const item of content) {
-    const consumed = yield* emitNonObjectItem(item, markers)
-    if (consumed) continue
+  for (let i = 0; i < content.length; i++) {
+    const item = content[i] as JsonValue
+    if (writeNonObjectItem(st, item, markers)) continue
     const obj = item as JsonObject
-    for (const tagName of Object.keys(obj).sort()) {
-      yield* emitElement(tagName, obj[tagName] as JsonValue, [], markers)
+    const keys = Object.keys(obj).sort()
+    for (let j = 0; j < keys.length; j++) {
+      const tagName = keys[j]!
+      writeElement(st, tagName, obj[tagName] as JsonValue, EMPTY_ATTRS, markers)
     }
   }
 }
 
-function* emitConflict(
+const writeConflict = (
+  st: WalkState,
   block: ConflictBlock,
   markers: ConflictMarkers
-): Generator<Chunk> {
-  yield { kind: 'text', value: markers.local }
-  yield* emitConflictContent(block.local, markers)
-  yield { kind: 'text', value: markers.ancestor }
-  yield* emitConflictContent(block.ancestor, markers)
-  yield { kind: 'text', value: markers.separator }
-  yield* emitConflictContent(block.other, markers)
-  yield { kind: 'text', value: markers.other }
+): void => {
+  writeText(st, markers.local)
+  writeConflictContent(st, block.local, markers)
+  writeText(st, markers.ancestor)
+  writeConflictContent(st, block.ancestor, markers)
+  writeText(st, markers.separator)
+  writeConflictContent(st, block.other, markers)
+  writeText(st, markers.other)
 }
 
-// Traverse the compact merged tree and yield chunks, injecting
-// namespace attributes onto the first top-level element.
-// Caller in writeTo short-circuits on an empty input, so emit assumes
-// at least one item. Namespace keys are always `@_`-prefixed by the
-// parser side — we don't re-check here; malformed namespace maps would
-// fail to parse upstream before they reach the writer.
-function* emit(
+const EMPTY_ATTRS: ReadonlyArray<readonly [string, string]> = []
+
+// Walk the compact merged tree and append serialized XML directly into
+// `st.buf`. Replaces the old `emit()` + `formatChunks()` generator pair:
+// one recursive function, no chunk objects, no generator state machines,
+// no `for...of` over generators. Profile attributed ~40 % of serialize
+// CPU to that pipeline.
+const writeRoot = (
+  st: WalkState,
   compactRoot: JsonArray,
   namespaces: JsonObject,
   markers: ConflictMarkers
-): Generator<Chunk> {
-  yield { kind: 'decl' }
-
+): void => {
+  st.buf += XML_DECL
   let isFirstTopLevel = true
-  for (const item of compactRoot) {
-    const consumed = yield* emitNonObjectItem(item, markers)
-    if (consumed) continue
+  for (let i = 0; i < compactRoot.length; i++) {
+    const item = compactRoot[i] as JsonValue
+    if (writeNonObjectItem(st, item, markers)) continue
     const obj = item as JsonObject
-    for (const tagName of Object.keys(obj).sort()) {
+    const keys = Object.keys(obj).sort()
+    for (let j = 0; j < keys.length; j++) {
+      const tagName = keys[j]!
       if (tagName === NAMESPACE_ROOT) continue
-      const extraAttrs: Array<readonly [string, string]> = []
+      let extraAttrs: ReadonlyArray<readonly [string, string]> = EMPTY_ATTRS
       if (isFirstTopLevel) {
-        for (const nsKey of Object.keys(namespaces).sort()) {
-          extraAttrs.push([
+        const nsKeys = Object.keys(namespaces).sort()
+        const built: Array<readonly [string, string]> = new Array(nsKeys.length)
+        for (let k = 0; k < nsKeys.length; k++) {
+          const nsKey = nsKeys[k]!
+          built[k] = [
             nsKey.slice(ATTR_PREFIX.length),
             String(namespaces[nsKey]),
-          ])
+          ]
         }
+        extraAttrs = built
         isFirstTopLevel = false
       }
-      yield* emitElement(
-        tagName,
-        obj[tagName] as JsonValue,
-        extraAttrs,
-        markers
-      )
+      writeElement(st, tagName, obj[tagName] as JsonValue, extraAttrs, markers)
     }
   }
 }
 
-function* emitElement(
+const writeElement = (
+  st: WalkState,
   name: string,
   body: JsonValue,
   extraAttrs: ReadonlyArray<readonly [string, string]>,
   markers: ConflictMarkers
-): Generator<Chunk> {
+): void => {
   if (name === TEXT_KEY) {
-    yield { kind: 'text', value: String(body) }
+    writeText(st, String(body))
     return
   }
   if (name === XML_COMMENT_PROP_NAME) {
-    yield { kind: 'comment', value: escapeCommentBody(String(body)) }
+    writeComment(st, escapeCommentBody(String(body)))
     return
   }
   if (name === CDATA_PROP_NAME) {
     const cdataStr = Array.isArray(body) ? body.join('') : String(body)
-    yield { kind: 'cdata', value: escapeCdataBody(cdataStr) }
+    writeCdata(st, escapeCdataBody(cdataStr))
     return
   }
 
-  // A ConflictBlock can appear as a direct property value (not inside
-  // an array). Expand in place — matches FxpXmlSerializer's "wrapper:
-  // ConflictBlock" path at src/adapter/FxpXmlSerializer.ts:106-109.
   if (body !== null && typeof body === 'object' && !Array.isArray(body)) {
     if (isConflictBlock(body as JsonObject as JsonValue)) {
-      yield* emitConflict(body as ConflictBlock, markers)
+      writeConflict(st, body as ConflictBlock, markers)
       return
     }
   }
 
   const { attrs, children } = splitAttrsAndChildren(body)
-  const allAttrs = [...extraAttrs, ...attrs]
-  yield { kind: 'open', name, attrs: allAttrs }
-  yield* emitChildren(children, markers)
-  yield { kind: 'close', name }
+  // Avoid the [...extraAttrs, ...attrs] allocation when extraAttrs is
+  // empty (the common case — only the first top-level open tag carries
+  // any extras). attrsToString itself handles concatenation.
+  const attrStr =
+    extraAttrs === EMPTY_ATTRS
+      ? attrsToString(attrs)
+      : attrsToString(extraAttrs) + attrsToString(attrs)
+
+  if (st.isFirstTopLevelAfterDecl) {
+    st.buf += `<${name}${attrStr}>`
+    st.isFirstTopLevelAfterDecl = false
+  } else {
+    st.buf += `${getIndent(st.depth)}<${name}${attrStr}>`
+  }
+  const parentDepth = st.depth
+  st.depth = parentDepth + 1
+  const savedEndedWithGt = st.endedWithGt
+  st.endedWithGt = false
+  writeChildren(st, children, markers)
+  if (st.endedWithGt) {
+    st.buf += `${getIndent(parentDepth)}</${name}>`
+  } else {
+    st.buf += `</${name}>`
+  }
+  st.depth = parentDepth
+  st.endedWithGt = true
+  // savedEndedWithGt is unused — close-tag always sets endedWithGt=true
+  // for the parent frame. Keep the variable read to silence noUnused.
+  void savedEndedWithGt
+}
+
+const writeChildren = (
+  st: WalkState,
+  children: JsonArray,
+  markers: ConflictMarkers
+): void => {
+  for (let i = 0; i < children.length; i++) {
+    const child = children[i] as JsonValue
+    if (isConflictBlock(child)) {
+      writeConflict(st, child, markers)
+      continue
+    }
+    if (!isObject(child)) {
+      writeText(st, String(child))
+      continue
+    }
+    const keys = Object.keys(child)
+    if (keys.length === 1) {
+      const tagName = keys[0]!
+      writeElement(
+        st,
+        tagName,
+        child[tagName] as JsonValue,
+        EMPTY_ATTRS,
+        markers
+      )
+      continue
+    }
+    keys.sort()
+    for (let j = 0; j < keys.length; j++) {
+      const tagName = keys[j]!
+      writeElement(
+        st,
+        tagName,
+        child[tagName] as JsonValue,
+        EMPTY_ATTRS,
+        markers
+      )
+    }
+  }
 }
 
 interface AttrsAndChildren {
@@ -245,34 +338,6 @@ const splitAttrsAndChildren = (body: JsonValue): AttrsAndChildren => {
   return { attrs, children: childTags }
 }
 
-function* emitChildren(
-  children: JsonArray,
-  markers: ConflictMarkers
-): Generator<Chunk> {
-  for (const child of children) {
-    if (isConflictBlock(child)) {
-      yield* emitConflict(child, markers)
-      continue
-    }
-    if (!isObject(child)) {
-      yield { kind: 'text', value: String(child) }
-      continue
-    }
-    const keys = Object.keys(child)
-    // Fast path: elements produced by splitAttrsAndChildren's repeated-
-    // child expansion (`{[key]: entry}`) always have exactly one key,
-    // so the sort is a no-op — skip the allocation.
-    if (keys.length === 1) {
-      const tagName = keys[0]!
-      yield* emitElement(tagName, child[tagName] as JsonValue, [], markers)
-      continue
-    }
-    for (const tagName of keys.sort()) {
-      yield* emitElement(tagName, child[tagName] as JsonValue, [], markers)
-    }
-  }
-}
-
 // Indent cache: depth is bounded (realistic Salesforce profiles reach
 // depth 4–5). String.repeat is cheap but memoising once saves
 // thousands of allocations on large documents.
@@ -284,74 +349,6 @@ const getIndent = (depth: number): string => {
     indentCache[depth] = cached
   }
   return cached
-}
-
-// Turn chunks into a string stream, applying the lastEndedWithGt rule
-// from design §6.3.2 for close-tag and mixed-content text indentation.
-// Generator — consumers can pipeline without materialising the full
-// document (performance-review H1).
-function* formatChunks(chunks: Iterable<Chunk>): Generator<string> {
-  const frames: Array<{ depth: number; endedWithGt: boolean }> = [
-    { depth: 0, endedWithGt: false },
-  ]
-  let isFirstTopLevelAfterDecl = true
-
-  for (const chunk of chunks) {
-    const top = frames[frames.length - 1]!
-    if (chunk.kind === 'decl') {
-      yield XML_DECL
-      continue
-    }
-    if (chunk.kind === 'open') {
-      const attrStr = attrsToString(chunk.attrs)
-      if (isFirstTopLevelAfterDecl) {
-        yield `<${chunk.name}${attrStr}>`
-        isFirstTopLevelAfterDecl = false
-      } else {
-        yield `${getIndent(top.depth)}<${chunk.name}${attrStr}>`
-      }
-      // Push the child frame; its `depth` is the level of ITS children.
-      frames.push({ depth: top.depth + 1, endedWithGt: false })
-      continue
-    }
-    if (chunk.kind === 'close') {
-      // `top` here is the closing element's own frame — its `endedWithGt`
-      // tells us whether the body last wrote a `>`-terminated chunk. But
-      // the close tag itself sits at the PARENT's depth, so we indent
-      // using the frame below `top`.
-      const parentDepth = frames[frames.length - 2]!.depth
-      if (top.endedWithGt) {
-        yield `${getIndent(parentDepth)}</${chunk.name}>`
-      } else {
-        yield `</${chunk.name}>`
-      }
-      frames.pop()
-      frames[frames.length - 1]!.endedWithGt = true
-      continue
-    }
-    if (chunk.kind === 'text') {
-      if (top.endedWithGt) {
-        yield `${getIndent(top.depth)}${chunk.value}`
-      } else {
-        yield chunk.value
-      }
-      top.endedWithGt = false
-      continue
-    }
-    if (chunk.kind === 'cdata') {
-      if (top.endedWithGt) {
-        yield `${getIndent(top.depth)}<![CDATA[${chunk.value}]]>`
-      } else {
-        yield `<![CDATA[${chunk.value}]]>`
-      }
-      top.endedWithGt = true
-      continue
-    }
-    // comment: inline, no leading newline. Folds in current
-    // post-correctComments behaviour by construction.
-    yield `<!--${chunk.value}-->`
-    top.endedWithGt = true
-  }
 }
 
 // Design §6.3.3 line-state machine: strip horizontal whitespace before
@@ -442,24 +439,47 @@ export class XmlStreamWriter implements XmlSerializer {
     out: Writable,
     ordered: JsonArray,
     namespaces: JsonObject,
-    eol: '\n' | '\r\n' = '\n'
+    eol: '\n' | '\r\n' = '\n',
+    hasConflict = true
   ): Promise<void> {
     if (ordered.length === 0) return
 
-    // Pipelined: each formatted string flows emit → format → filter →
-    // accumulator → eol → out.write. The accumulator is the difference
-    // vs. a naive pipeline: it batches filter output into FLUSH_BYTES
-    // windows before calling out.write. Without it, a document emitting
-    // N chunks pays N `out.write()` calls (N event emissions + N
-    // drain-check pairs); with it we pay ⌈bytes/FLUSH_BYTES⌉.
+    // Pipelined: each formatted string flows emit → format → (filter) →
+    // accumulator → eol → out.write. The accumulator batches filter
+    // output into FLUSH_BYTES windows before calling out.write — without
+    // it, a document emitting N chunks pays N `out.write()` calls.
+    //
+    // When the merge produced no conflicts, the ConflictLineFilter has
+    // nothing to do (its only job is to clean indentation and blank
+    // lines around marker tokens, none of which are emitted). Skipping
+    // it removes ~20 % of serialize CPU on conflict-free documents
+    // (newline scan + two regexes per line).
     const markers = buildConflictMarkers(this.config)
+    const st: WalkState = {
+      buf: '',
+      depth: 0,
+      endedWithGt: false,
+      isFirstTopLevelAfterDecl: true,
+    }
+    writeRoot(st, ordered, namespaces, markers)
+    // For the conflict-free hot path, the entire document is built in
+    // st.buf as a single string; one applyEol pass + at most one
+    // out.write. The intermediate FLUSH_BYTES batching matters only
+    // when ConflictLineFilter is in play (it splits chunks line-by-line
+    // and we re-emit incrementally).
+    if (!hasConflict) {
+      const final = applyEol(st.buf, eol)
+      if (!out.write(final)) {
+        await once(out, 'drain')
+      }
+      return
+    }
+
+    // Conflict path: re-stream st.buf through the line filter in
+    // FLUSH_BYTES windows so we don't buffer the entire document twice
+    // (once in st.buf, once in the filter).
     const filter = new ConflictLineFilter(this.config)
     let batch = ''
-    // `flush` is only called when there's work to write (the only call
-    // sites are the batch-size threshold inside the loop and the tail
-    // after the XML declaration has already flowed through, so batch is
-    // always non-empty at call time — an empty-guard branch here would
-    // be dead code and trip mutation testing).
     const flush = async (): Promise<void> => {
       const final = applyEol(batch, eol)
       batch = ''
@@ -467,9 +487,9 @@ export class XmlStreamWriter implements XmlSerializer {
         await once(out, 'drain')
       }
     }
-
-    for (const piece of formatChunks(emit(ordered, namespaces, markers))) {
-      const filtered = filter.push(piece)
+    for (let i = 0; i < st.buf.length; i += FLUSH_BYTES) {
+      const slice = st.buf.slice(i, i + FLUSH_BYTES)
+      const filtered = filter.push(slice)
       if (filtered.length === 0) continue
       batch += filtered
       if (batch.length >= FLUSH_BYTES) await flush()
