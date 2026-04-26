@@ -1,4 +1,4 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { simpleGit } from 'simple-git'
@@ -248,6 +248,10 @@ export class InstallService {
     const after = serialise(next)
     const wroteAttributes = after !== raw
     if (wroteAttributes) {
+      // Apple Git's `git init` doesn't create `.git/info/`, so writeFile
+      // would ENOENT on a freshly-initialised repo. Ensure the parent
+      // exists before write.
+      await mkdir(dirname(gitAttributesPath), { recursive: true })
       await writeFile(gitAttributesPath, after)
     }
 
