@@ -1,0 +1,12 @@
+{
+  "ordered": [
+    {
+      "Root": [
+        { "#xml__comment": "first" },
+        { "#xml__comment": "second" },
+        { "val": "x" }
+      ]
+    }
+  ],
+  "namespaces": {}
+}

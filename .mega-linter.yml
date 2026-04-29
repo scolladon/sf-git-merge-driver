@@ -14,6 +14,10 @@ DISABLE_LINTERS:
   - SPELL_MISSPELL
   - TYPESCRIPT_PRETTIER
   - TYPESCRIPT_STANDARD
+# Byte-exact XML golden fixtures include conflict-marker payloads that
+# are intentionally not well-formed XML (they represent the output of a
+# merge with unresolved conflicts). Skip xmllint on that tree.
+XML_XMLLINT_FILTER_REGEX_EXCLUDE: "test/fixtures/"
 SHOW_ELAPSED_TIME: true
 FILEIO_REPORTER: false
 # DISABLE_ERRORS: true # Uncomment if you want MegaLinter to detect errors but not block CI to pass

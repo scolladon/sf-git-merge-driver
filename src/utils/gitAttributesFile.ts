@@ -17,17 +17,17 @@ import { EOL } from 'node:os'
  * against the plugin's known pattern set.
  */
 
-export type AttrValue = string | true | false
+type AttrValue = string | true | false
 
-export type BlankLine = { readonly kind: 'blank'; readonly raw: string }
-export type CommentLine = { readonly kind: 'comment'; readonly raw: string }
+type BlankLine = { readonly kind: 'blank'; readonly raw: string }
+type CommentLine = { readonly kind: 'comment'; readonly raw: string }
 export type RuleLine = {
   readonly kind: 'rule'
   readonly pattern: string
   readonly attrs: ReadonlyMap<string, AttrValue>
   readonly raw: string
 }
-export type MalformedLine = { readonly kind: 'malformed'; readonly raw: string }
+type MalformedLine = { readonly kind: 'malformed'; readonly raw: string }
 
 export type Line = BlankLine | CommentLine | RuleLine | MalformedLine
 

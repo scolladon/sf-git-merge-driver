@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Root>
+<<<<<<< ours
+<<<<<<< ours
+    <deep>dL</deep>
+||||||| base
+    <deep>dA</deep>
+=======
+    <deep>dO</deep>
+>>>>>>> theirs||||||| base
+    <shallow>base</shallow>
+=======
+    <shallow>theirs</shallow>
+>>>>>>> theirs</Root>

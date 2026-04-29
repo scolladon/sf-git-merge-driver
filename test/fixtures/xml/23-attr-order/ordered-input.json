@@ -1,0 +1,17 @@
+{
+  "ordered": [
+    {
+      "Root": [
+        {
+          "tag": {
+            "@_zulu": "z",
+            "@_alpha": "a",
+            "@_mike": "m",
+            "#text": "body"
+          }
+        }
+      ]
+    }
+  ],
+  "namespaces": {}
+}

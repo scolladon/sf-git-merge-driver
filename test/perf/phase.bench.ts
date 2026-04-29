@@ -1,6 +1,7 @@
+import { PassThrough } from 'node:stream'
 import { bench, describe } from 'vitest'
-import { FlxXmlParser } from '../../src/adapter/FlxXmlParser.js'
-import { FxpXmlSerializer } from '../../src/adapter/FxpXmlSerializer.js'
+import { TxmlXmlParser } from '../../src/adapter/TxmlXmlParser.js'
+import { XmlStreamWriter } from '../../src/adapter/writer/XmlStreamWriter.js'
 import {
   DEFAULT_ANCESTOR_CONFLICT_TAG,
   DEFAULT_CONFLICT_MARKER_SIZE,
@@ -26,11 +27,12 @@ const sizes = ['small', 'medium', 'large'] as const
 
 for (const size of sizes) {
   const fixtures = generateProfileFixtures(size)
+  const parser = new TxmlXmlParser()
 
-  const parser = new FlxXmlParser()
-  const ancestor = parser.parse(fixtures.ancestor)
-  const local = parser.parse(fixtures.local)
-  const other = parser.parse(fixtures.other)
+  // Pre-warm: parse once outside the bench to set up merged tree + ns.
+  const ancestor = parser.parseString(fixtures.ancestor)
+  const local = parser.parseString(fixtures.local)
+  const other = parser.parseString(fixtures.other)
 
   const namespaces = mergeNamespaces(
     ancestor.namespaces,
@@ -45,15 +47,12 @@ for (const size of sizes) {
     other.content
   )
 
-  const serializer = new FxpXmlSerializer(config)
-  const _rawXml = serializer.serialize(mergedResult.output, namespaces)
-
   describe(`phase-parse-${size}`, () => {
     bench(`parse-${size}`, () => {
-      const p = new FlxXmlParser()
-      p.parse(fixtures.ancestor)
-      p.parse(fixtures.local)
-      p.parse(fixtures.other)
+      const p = new TxmlXmlParser()
+      p.parseString(fixtures.ancestor)
+      p.parseString(fixtures.local)
+      p.parseString(fixtures.other)
     })
   })
 
@@ -65,9 +64,12 @@ for (const size of sizes) {
   })
 
   describe(`phase-serialize-${size}`, () => {
-    bench(`serialize-${size}`, () => {
-      const s = new FxpXmlSerializer(config)
-      s.serialize(mergedResult.output, namespaces)
+    bench(`serialize-${size}`, async () => {
+      const w = new XmlStreamWriter(config)
+      const sink = new PassThrough()
+      sink.resume()
+      await w.writeTo(sink, mergedResult.output, namespaces)
+      sink.end()
     })
   })
 }

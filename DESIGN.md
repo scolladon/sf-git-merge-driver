@@ -4,7 +4,7 @@ This document describes the software architecture of the Salesforce Git Merge Dr
 
 ## Overview
 
-The merge driver implements a three-way merge algorithm specifically designed for Salesforce metadata XML files. It parses XML into JSON, performs intelligent merging based on metadata structure, and outputs the merged result back to XML.
+The merge driver implements a three-way merge algorithm specifically designed for Salesforce metadata XML files. XML is parsed by a streaming reader into a compact JSON representation, the merge runs over that representation, and a recursive writer walks the merged tree into a single growable string buffer that is then written to the output sink. The writer is intentionally buffered rather than per-chunk streaming — at SF metadata sizes this is 30-45 % faster on serialize benches than the previous chunk-streaming approach (V8's cons-string optimisation + one final encode is cheaper than many small encoded writes).
 
 ## Design Patterns
 
@@ -142,7 +142,7 @@ interface ConflictBlock {
 }
 ```
 
-The serializer adapter expands these into zdiff3-style conflict markers in the XML output:
+The writer expands these into zdiff3-style conflict markers in the XML output:
 
 ```xml
 <<<<<<< ours
@@ -154,40 +154,42 @@ The serializer adapter expands these into zdiff3-style conflict markers in the X
 >>>>>>> theirs
 ```
 
-`ConflictMarkerFormatter` handles post-processing (entity escaping, indentation correction).
+Marker expansion happens inline as the writer walker visits each `ConflictBlock` — no separate post-processing pass. A two-pass `ConflictLineFilter` (strip horizontal whitespace before a marker, drop whitespace-only lines) keeps the byte layout identical to git's conventions; the filter runs only when the merger reports `hasConflict=true`.
 
 ### Ports & Adapters (Hexagonal Architecture)
 
-The XML parsing and serialization are isolated behind port interfaces, keeping the merge domain free from library-specific format details.
+The XML parsing and serialization are isolated behind port interfaces, keeping the merge domain free from library-specific format details. The parser reads from a `Readable`; the writer builds the serialized output into a single growable string buffer in one recursive walk, then emits it through `Writable.write` in one call (no-conflict path) or replays it through the conflict-line filter in 16 KiB windows (conflict path). The buffered approach is intentional — for SF metadata sizes (KB-MB) it beats per-chunk streaming by 30-45 % thanks to V8's cons-string optimisation.
 
 ```mermaid
 classDiagram
     class XmlParser {
         <<interface>>
-        +parse(xml) ParsedXml
+        +parseStream(input) Promise~NormalisedParseResult~
+        +parseString(xml) NormalisedParseResult
     }
 
     class XmlSerializer {
         <<interface>>
-        +serialize(output, namespaces) string
+        +writeTo(out, ordered, namespaces, eol, hasConflict) Promise~void~
     }
 
-    class FlxXmlParser {
-        +parse(xml) ParsedXml
+    class TxmlXmlParser {
+        +parseStream(input) Promise~NormalisedParseResult~
+        +parseString(xml) NormalisedParseResult
     }
 
-    class FxpXmlSerializer {
-        +serialize(output, namespaces) string
+    class XmlStreamWriter {
+        +writeTo(out, ordered, namespaces, eol, hasConflict) Promise~void~
     }
 
-    XmlParser <|.. FlxXmlParser
-    XmlSerializer <|.. FxpXmlSerializer
+    XmlParser <|.. TxmlXmlParser
+    XmlSerializer <|.. XmlStreamWriter
 ```
 
-- **`XmlParser` port** — Parses XML, extracts namespace attributes, returns clean compact content
-- **`XmlSerializer` port** — Converts compact merge output + `ConflictBlock` objects to ordered XML builder format, inserts namespaces, formats output
-- **`FlxXmlParser`** — Adapter using `@nodable/flexible-xml-parser` (3-5x faster parsing)
-- **`FxpXmlSerializer`** — Adapter using `fast-xml-builder` `XMLBuilder`
+- **`XmlParser` port** — Reads XML from a `Readable` (or a string), returns `NormalisedParseResult = { content, namespaces }`.
+- **`XmlSerializer` port** — Writes the serialized document to a `Writable`: XML declaration, elements (open/close/cdata/comment), namespaces on the first top-level element, and inline conflict-block expansion. The optional `hasConflict` parameter (defaults to `true`) lets callers skip the conflict-line filter when the merge produced no `ConflictBlock` — the common case.
+- **`TxmlXmlParser`** — Adapter wrapping the `txml` library (1.5 KiB gzipped, zero deps after our preprocess). Pre-processes `<![CDATA[…]]>` regions into a sentinel element before parsing (txml flattens CDATA into text, losing the boundary the writer needs to preserve). After parsing, walks tXml's `TNode { tagName, attributes, children }` tree once, converting it to the compact JsonObject shape the merger and writer expect: collapses repeated same-name siblings into arrays, prefixes attributes with `@_`, extracts root `xmlns*` into the namespaces bucket, decodes the CDATA sentinel back into `__cdata` keys, and runs a tag-balance check to throw on malformed input (txml itself is permissive). The conversion is benchmark-measured 62-67 % faster end-to-end than the previous `@nodable/flexible-xml-parser` adapter, with a -70 % bundle-size reduction (110 KiB → 33.5 KiB). See `docs/plans/2026-04-25-parser-spike-txml-vs-sax.md` for the spike that justified the swap.
+- **`XmlStreamWriter`** — Single recursive walker (`writeRoot` → `writeElement` → `writeChildren`) that appends serialized XML directly to a mutable `WalkState.buf` string. No generators, no per-chunk object allocations, no `for...of` over generators. `getIndent` memoises the per-depth `\n + N×indent` prefix. The walker is sync; only `writeTo` is async, awaiting `out.write`'s drain signal once at the end (no-conflict path) or per 16 KiB filter window (conflict path).
 
 ## Binary Entry Point
 
@@ -207,7 +209,7 @@ flowchart TD
     end
 
     subgraph Runtime["Runtime (per file, thousands per rebase)"]
-        Binary["bin/merge-driver.cjs<br/>(esbuild-bundled, ~118 KB)"]
+        Binary["bin/merge-driver.cjs<br/>(esbuild-bundled, ~34 KB)"]
         ArgvParser["argv parser<br/>(no oclif, no SF core)"]
         MD["MergeDriver.mergeFiles"]
     end
@@ -243,7 +245,7 @@ Deprecation is encoded natively via oclif's command-level deprecation API
 The binary is produced by esbuild from the compiled TypeScript:
 
 ```
-src/**/*.ts → tsc → lib/**/*.js → esbuild (minify, treeshake, cjs) → bin/merge-driver.cjs (~118 KB, mode 755)
+src/**/*.ts → tsc → lib/**/*.js → esbuild (minify, treeshake, cjs) → bin/merge-driver.cjs (~34 KB, mode 755)
 ```
 
 Key build choices:
@@ -272,16 +274,17 @@ Element comparison uses a custom iterative `jsonEqual` ([jsonEqual.ts](src/utils
 
 ## Data Flow
 
+`MergeDriver.mergeFiles` opens three `Readable`s on ancestor/ours/theirs, parses them in parallel, merges in memory, then streams the result through `XmlStreamWriter` into a temp file that is atomically renamed over `ours` on success.
+
 ```mermaid
 flowchart TD
     subgraph Input
-        XML["XML Input (3 files)"]
+        XML["3 Readables (ancestor / ours / theirs)"]
     end
 
-    subgraph "Parser Adapter"
-        Parse["FlxXmlParser.parse()"]
-        Normalize["normalizeParsed: strip @_version/@_encoding + empty #text next to CDATA (single recursive pass)"]
-        Extract["Extract namespaces (@_)"]
+    subgraph "Parser Adapter (txml + adapter)"
+        Parse["TxmlXmlParser.parseString"]
+        Normalise["TNode → compact JsonObject: extract root xmlns into namespaces bucket, decode CDATA sentinel, collapse repeated siblings into arrays"]
     end
 
     subgraph "Domain (format-agnostic)"
@@ -291,26 +294,23 @@ flowchart TD
         Conflict["ConflictBlock"]
     end
 
-    subgraph "Serializer Adapter"
-        Convert["Compact → Ordered"]
-        Expand["Expand ConflictBlocks"]
-        Build["XMLBuilder"]
-        Format["ConflictMarkerFormatter"]
+    subgraph "Writer Adapter (buffered then flushed)"
+        Walk["writeRoot/writeElement: recursive walker into WalkState.buf"]
+        Filter["ConflictLineFilter (only when hasConflict=true): strip leading ws / drop blank lines"]
+        Eol["applyEol: LF → CRLF if target demands"]
     end
 
     subgraph Output
-        Result["XML Output (merged file)"]
+        Result["Writable sink (tmp file → atomic rename)"]
     end
 
-    XML --> Parse --> Normalize --> Extract --> Orchestrator
+    XML --> Parse --> Normalise --> Orchestrator
     Orchestrator --> Strategy
     Strategy --> Nodes
     Strategy --> Conflict
-    Nodes --> Convert
-    Conflict --> Expand
-    Convert --> Build
-    Expand --> Build
-    Build --> Format --> Result
+    Nodes --> Walk
+    Conflict --> Walk
+    Walk --> Filter --> Eol --> Result
 ```
 
 ## Key Design Decisions
@@ -320,8 +320,8 @@ flowchart TD
 XML is converted to a compact JSON format for easier manipulation. The domain operates on plain JSON objects without knowledge of any XML parser library's conventions:
 - Scalars are plain values: `{ field: "value" }`
 - Nested elements are child objects: `{ parent: { child: "value" } }`
-- Namespace attributes are extracted by the parser adapter
-- The serializer adapter handles conversion to the XML builder's ordered format (`{ tag: [{ "#text": value }] }`) and expansion of `ConflictBlock` objects into text markers
+- Namespace attributes are extracted by the parser adapter into a dedicated bucket, not left on the root element
+- The writer adapter walks the compact tree directly — splitting attributes (`@_`-prefixed keys) from children, expanding `ConflictBlock` objects inline into text markers, and appending bytes to a single growable buffer without materialising an intermediate ordered representation or generator chunk objects
 
 ### 2. Key-Based Array Merging
 

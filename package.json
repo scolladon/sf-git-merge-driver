@@ -13,30 +13,28 @@
     "url": "git+https://github.com/scolladon/sf-git-merge-driver.git"
   },
   "dependencies": {
-    "@nodable/flexible-xml-parser": "1.1.1",
-    "@oclif/core": "^4.10.5",
-    "@salesforce/core": "^8.28.3",
-    "@salesforce/sf-plugins-core": "^12.2.6",
-    "fast-xml-builder": "^1.1.5",
-    "simple-git": "^3.36.0"
+    "@oclif/core": "^4.10.6",
+    "@salesforce/core": "^8.28.4",
+    "@salesforce/sf-plugins-core": "^12.2.10",
+    "simple-git": "^3.36.0",
+    "txml": "^5.2.1"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.4.12",
+    "@biomejs/biome": "2.4.13",
     "@commitlint/config-conventional": "^20.5.0",
-    "@oclif/plugin-help": "^6.2.44",
-    "@salesforce/cli-plugins-testkit": "^5.3.53",
+    "@oclif/plugin-help": "^6.2.45",
+    "@salesforce/cli-plugins-testkit": "^5.3.54",
     "@salesforce/dev-config": "^4.3.3",
     "@stryker-mutator/core": "^9.6.1",
     "@stryker-mutator/typescript-checker": "^9.6.1",
     "@stryker-mutator/vitest-runner": "^9.6.1",
     "@types/chai": "^5.2.3",
     "@types/mocha": "^10.0.10",
-    "@vitest/coverage-v8": "^4.1.4",
+    "@vitest/coverage-v8": "^4.1.5",
     "chai": "^6.2.2",
     "esbuild": "^0.28.0",
-    "fast-xml-parser": "^5.7.1",
     "husky": "^9.1.7",
-    "knip": "^6.6.0",
+    "knip": "^6.8.0",
     "mocha": "^11.7.5",
     "nyc": "^18.0.0",
     "oclif": "^4.23.0",
@@ -44,7 +42,7 @@
     "ts-node": "^10.9.2",
     "tslib": "^2.8.1",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.4",
+    "vitest": "^4.1.5",
     "wireit": "^0.14.12"
   },
   "engines": {
@@ -98,6 +96,7 @@
     "prepublishOnly": "npm shrinkwrap",
     "test:build": "wireit",
     "test:integration": "wireit",
+    "test:functional": "wireit",
     "test:typecheck": "wireit",
     "test:mutation": "wireit",
     "test:mutation:incremental": "wireit",
@@ -275,8 +274,9 @@
       "dependencies": [
         "build",
         "lint",
-        "test:integration",
         "test:unit",
+        "test:integration",
+        "test:functional",
         "test:nut"
       ]
     },
@@ -285,6 +285,22 @@
       "dependencies": [
         "clean",
         "clean:package-manager"
+      ]
+    },
+    "test:functional": {
+      "command": "vitest run test/functional",
+      "files": [
+        "src/**/*.ts",
+        "test/functional/**/*.test.ts",
+        "test/utils/**/*.ts",
+        "test/fixtures/**",
+        "**/tsconfig.json",
+        "vitest.config.ts"
+      ],
+      "output": [],
+      "dependencies": [
+        "lint",
+        "test:typecheck"
       ]
     },
     "test:integration": {

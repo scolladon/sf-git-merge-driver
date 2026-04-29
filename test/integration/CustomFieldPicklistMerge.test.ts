@@ -1,10 +1,16 @@
-import { XMLParser } from 'fast-xml-parser'
 import { describe, expect, it } from 'vitest'
+import { TxmlXmlParser } from '../../src/adapter/TxmlXmlParser.js'
 import { XmlMerger } from '../../src/merger/XmlMerger.js'
+import { mergeXmlStrings } from '../utils/mergeXmlStrings.js'
 import { defaultConfig } from '../utils/testConfig.js'
 
-const parseXml = (xml: string) =>
-  new XMLParser({ ignoreAttributes: false }).parse(xml)
+// Use the same parser the production pipeline uses for assertions
+// over the merge output. The shape is compact JsonObject — repeated
+// children collapse into arrays, attributes are `@_`-prefixed, and
+// scalar values stay as strings (no number/boolean coercion).
+const parser = new TxmlXmlParser()
+const parseXml = (xml: string): Record<string, unknown> =>
+  parser.parseString(xml).content as Record<string, unknown>
 
 describe('CustomField picklist merge (issue #174)', () => {
   describe('given a CustomField with inline picklist valueSet', () => {
@@ -123,34 +129,48 @@ describe('CustomField picklist merge (issue #174)', () => {
     </valueSet>
 </CustomField>`
 
-      it('should merge without conflict', () => {
+      it('should merge without conflict', async () => {
         // Arrange
         const merger = new XmlMerger(defaultConfig)
 
         // Act
-        const result = merger.mergeThreeWay(ancestor, local, other)
+        const result = await mergeXmlStrings(merger, ancestor, local, other)
 
         // Assert
         expect(result.hasConflict).toBe(false)
       })
 
-      it('should produce well-formed XML matching other version structure', () => {
+      it('should produce well-formed XML matching other version structure', async () => {
         // Arrange
         const merger = new XmlMerger(defaultConfig)
 
         // Act
-        const result = merger.mergeThreeWay(ancestor, local, other)
+        const result = await mergeXmlStrings(merger, ancestor, local, other)
         const parsed = parseXml(result.output)
-        const field = parsed.CustomField
+        // Shape under test: CustomField → valueSet → valueSetDefinition →
+        // value[]. TxmlXmlParser returns the merged tree as JsonObject
+        // (compact form); cast to navigate without spreading `as` casts
+        // through every property access.
+        type ValueSet = {
+          restricted: string
+          valueSetDefinition: {
+            sorted: string
+            value: { fullName: string }[]
+          }
+        }
+        const field = parsed['CustomField'] as { valueSet: ValueSet }
         const valueSet = field.valueSet
         const definition = valueSet.valueSetDefinition
-        const values: { fullName: string }[] = definition.value
+        const values = definition.value
 
         // Assert
         expect(valueSet).toBeDefined()
-        expect(valueSet.restricted).toBe(true)
+        // TxmlXmlParser keeps scalars as strings (no implicit
+        // boolean/number coercion); the previous assertion against
+        // `true`/`false` relied on fast-xml-parser's default coercion.
+        expect(valueSet.restricted).toBe('true')
         expect(definition).toBeDefined()
-        expect(definition.sorted).toBe(false)
+        expect(definition.sorted).toBe('false')
         expect(values).toHaveLength(5)
         expect(values.map(v => v.fullName)).toEqual([
           'Date de facture',
@@ -161,13 +181,16 @@ describe('CustomField picklist merge (issue #174)', () => {
         ])
       })
 
-      it('should not leak valueSet children to CustomField level', () => {
+      it('should not leak valueSet children to CustomField level', async () => {
         // Arrange
         const merger = new XmlMerger(defaultConfig)
 
         // Act
-        const result = merger.mergeThreeWay(ancestor, local, other)
-        const field = parseXml(result.output).CustomField
+        const result = await mergeXmlStrings(merger, ancestor, local, other)
+        const field = parseXml(result.output)['CustomField'] as Record<
+          string,
+          unknown
+        >
 
         // Assert
         expect(field).not.toHaveProperty('restricted')

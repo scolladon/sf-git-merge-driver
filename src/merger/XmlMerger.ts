@@ -1,7 +1,7 @@
-import { FlxXmlParser } from '../adapter/FlxXmlParser.js'
-import { FxpXmlSerializer } from '../adapter/FxpXmlSerializer.js'
+import type { Readable, Writable } from 'node:stream'
+import { TxmlXmlParser } from '../adapter/TxmlXmlParser.js'
+import { XmlStreamWriter } from '../adapter/writer/XmlStreamWriter.js'
 import type { XmlParser } from '../adapter/XmlParser.js'
-import type { XmlSerializer } from '../adapter/XmlSerializer.js'
 import type { MergeConfig } from '../types/conflictTypes.js'
 import type { JsonObject } from '../types/jsonTypes.js'
 import { log } from '../utils/LoggingDecorator.js'
@@ -12,42 +12,63 @@ const mergeNamespaces = (...maps: JsonObject[]): JsonObject =>
 
 export class XmlMerger {
   private readonly parser: XmlParser
-  private readonly serializer: XmlSerializer
+  private readonly writer: XmlStreamWriter
   private readonly jsonMerger: JsonMerger
 
   constructor(config: MergeConfig) {
-    this.parser = new FlxXmlParser()
-    this.serializer = new FxpXmlSerializer(config)
+    this.parser = new TxmlXmlParser()
+    this.writer = new XmlStreamWriter(config)
     this.jsonMerger = new JsonMerger(config)
   }
 
   @log('XmlMerger')
-  mergeThreeWay(
-    ancestorContent: string,
-    ourContent: string,
-    theirContent: string
-  ): { output: string; hasConflict: boolean } {
-    const ancestor = this.parser.parse(ancestorContent)
-    const local = this.parser.parse(ourContent)
-    const other = this.parser.parse(theirContent)
+  async mergeThreeWay(
+    ancestor: Readable,
+    ours: Readable,
+    theirs: Readable,
+    out: Writable,
+    eol: '\n' | '\r\n' = '\n'
+  ): Promise<{ hasConflict: boolean }> {
+    // allSettled guarantees every parseStream promise terminates (by
+    // success OR failure) before we rethrow. Matches the fd-release
+    // pattern documented in MergeDriver.ts and protects Windows from
+    // ENOTEMPTY on still-open handles.
+    const results = await Promise.allSettled([
+      this.parser.parseStream(ancestor),
+      this.parser.parseStream(ours),
+      this.parser.parseStream(theirs),
+    ])
+    const failure = results.find(r => r.status === 'rejected')
+    if (failure) throw (failure as PromiseRejectedResult).reason
+    const [anc, local, other] = (
+      results as PromiseFulfilledResult<{
+        content: JsonObject
+        namespaces: JsonObject
+      }>[]
+    ).map(r => r.value)
 
     const namespaces = mergeNamespaces(
-      ancestor.namespaces,
-      local.namespaces,
-      other.namespaces
+      anc!.namespaces,
+      local!.namespaces,
+      other!.namespaces
     )
 
     const mergedResult = this.jsonMerger.mergeThreeWay(
-      ancestor.content,
-      local.content,
-      other.content
+      anc!.content,
+      local!.content,
+      other!.content
     )
 
-    return {
-      output: mergedResult.output.length
-        ? this.serializer.serialize(mergedResult.output, namespaces)
-        : '',
-      hasConflict: mergedResult.hasConflict,
+    if (mergedResult.output.length) {
+      await this.writer.writeTo(
+        out,
+        mergedResult.output,
+        namespaces,
+        eol,
+        mergedResult.hasConflict
+      )
     }
+
+    return { hasConflict: mergedResult.hasConflict }
   }
 }

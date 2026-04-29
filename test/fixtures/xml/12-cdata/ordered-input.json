@@ -1,0 +1,6 @@
+{
+  "ordered": [
+    { "Root": [{ "v": { "__cdata": "if (a < b) {}" } }] }
+  ],
+  "namespaces": {}
+}

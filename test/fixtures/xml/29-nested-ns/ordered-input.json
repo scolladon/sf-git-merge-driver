@@ -1,0 +1,15 @@
+{
+  "ordered": [
+    {
+      "Root": [
+        {
+          "inner": {
+            "@_xmlns": "http://inner",
+            "#text": "v"
+          }
+        }
+      ]
+    }
+  ],
+  "namespaces": { "@_xmlns": "http://outer" }
+}

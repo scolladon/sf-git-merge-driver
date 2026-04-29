@@ -38,25 +38,33 @@ Rebuild every time you made a change in the source and you need to test locally
 
 ## Testing
 
-### Unit Testing sgd
+### Unit Testing
 
-When developing, use [jest](https://jestjs.io/en/) unit testing to provide test coverage for new functionality. To run the jest tests use the following command from the root directory:
+When developing, use [vitest](https://vitest.dev/) unit testing to provide test coverage for new functionality. Coverage thresholds are enforced at 100% for branches / functions / lines / statements (see `vitest.config.ts`).
 
 ```bash
 # just run test
 npm run test:unit
 ```
 
-To execute a particular test, use the following command:
+To execute a particular test file, use the following command:
 
 ```bash
-npm run test:unit -- <path_to_test>
-
+npx vitest run <path_to_test>
 ```
 
-### NUT Testing sgd
+### Mutation Testing
 
-When developing, use mocha testing to provide NUT functional test. To run the mocha tests use the following command from the root directory:
+Run Stryker to validate that tests actually catch mutations:
+
+```bash
+npm run test:mutation             # full run
+npm run test:mutation:incremental # faster re-runs
+```
+
+### NUT Testing
+
+When developing, use mocha testing to provide NUT (Not Unit Test) functional coverage for the CLI surface. To run the mocha tests use the following command from the root directory:
 
 ```bash
 # run test

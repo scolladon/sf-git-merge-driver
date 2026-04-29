@@ -1,0 +1,17 @@
+{
+  "ordered": [
+    {
+      "Root": [
+        {
+          "wrapper": {
+            "__conflict": true,
+            "local": [{ "inner": "L" }],
+            "ancestor": [{ "inner": "A" }],
+            "other": [{ "inner": "O" }]
+          }
+        }
+      ]
+    }
+  ],
+  "namespaces": {}
+}

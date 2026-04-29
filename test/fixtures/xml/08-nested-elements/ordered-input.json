@@ -1,0 +1,10 @@
+{
+  "ordered": [
+    {
+      "Root": [
+        { "parent": [{ "child": "nested-value" }] }
+      ]
+    }
+  ],
+  "namespaces": {}
+}
