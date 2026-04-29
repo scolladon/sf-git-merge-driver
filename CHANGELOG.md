@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0](https://github.com/scolladon/sf-git-merge-driver/compare/v1.7.0...v1.8.0) (2026-04-29)
+
+
+### Features
+
+* **pipeline:** streaming XML (parse + write) ([#189](https://github.com/scolladon/sf-git-merge-driver/issues/189)) ([5ddb63f](https://github.com/scolladon/sf-git-merge-driver/commit/5ddb63fed21d0da03bc68dff3e31073837ce7f8d))
+
 ## [1.7.0](https://github.com/scolladon/sf-git-merge-driver/compare/v1.6.1...v1.7.0) (2026-04-21)
 
 
