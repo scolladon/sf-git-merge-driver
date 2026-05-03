@@ -147,6 +147,60 @@ describe('MergeDriver (integration — real filesystem, no mocks)', () => {
     expect(restored).toBe(badXml)
   })
 
+  it('Given one branch adds a new package.xml <types> with multiple <members> (issue #191), When running mergeFiles, Then each <members> emits as a distinct sibling element under a single <types> block', async () => {
+    // Arrange — reproduces the user-reported regression in 1.8.0 where
+    // brand-new wrapper-array entries containing parser-shape arrays
+    // (e.g. members:["MyClass","OtherClass"]) had their array values
+    // collapsed into a single tag with concatenated text.
+    const baseXml = `<?xml version="1.0" encoding="UTF-8"?>
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+    <types>
+        <members>Account</members>
+        <name>CustomObject</name>
+    </types>
+    <version>59.0</version>
+</Package>`
+    const localXml = `<?xml version="1.0" encoding="UTF-8"?>
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+    <types>
+        <members>Account</members>
+        <name>CustomObject</name>
+    </types>
+    <types>
+        <members>MyClass</members>
+        <members>OtherClass</members>
+        <name>ApexClass</name>
+    </types>
+    <version>59.0</version>
+</Package>`
+    const otherXml = baseXml
+    const ancestor = writeFixture('package-base.xml', baseXml)
+    const local = writeFixture('package-local.xml', localXml)
+    const other = writeFixture('package-other.xml', otherXml)
+    const sut = new MergeDriver(defaultConfig)
+
+    // Act
+    const hasConflict = await sut.mergeFiles(ancestor, local, other)
+
+    // Assert — no conflict, both members preserved as distinct siblings
+    // inside a single <types><name>ApexClass</name>...</types> block.
+    expect(hasConflict).toBe(false)
+    const merged = readFileSync(local, 'utf8')
+    expect(merged).toContain('<members>MyClass</members>')
+    expect(merged).toContain('<members>OtherClass</members>')
+    // Hard guard against the regression: the buggy output put both
+    // members into a single tag (`<members>MyClassOtherClass</members>`).
+    expect(merged).not.toMatch(/<members>MyClassOtherClass<\/members>/)
+    // And both members must live inside the same <types> block (not split
+    // across separate <types> elements either).
+    const apexTypesBlock = merged.match(
+      /<types>[^<]*(?:<members>[A-Za-z]+<\/members>[^<]*)+<name>ApexClass<\/name>[^<]*<\/types>/
+    )
+    expect(apexTypesBlock).not.toBeNull()
+    expect(apexTypesBlock![0]).toContain('<members>MyClass</members>')
+    expect(apexTypesBlock![0]).toContain('<members>OtherClass</members>')
+  })
+
   it('Given a missing ancestor file, When running mergeFiles, Then rejects with ENOENT (bin classifies as usage error, exit 2)', async () => {
     // Input-not-found is a caller contract violation (git passed us a
     // bad path). The driver rethrows ENOENT so the bin can exit 2;
