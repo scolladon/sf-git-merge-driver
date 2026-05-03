@@ -688,5 +688,24 @@ describe('XmlStreamWriter', () => {
       // somewhere in the flushed batches.
       expect(joined).not.toContain('Stryker was here')
     })
+
+    it('when serialized then a long no-newline text body still emits no Stryker sentinel from empty filter slices', async () => {
+      // Pins `return out.join('')` in ConflictLineFilter.push. The
+      // previous test always has newlines in every FLUSH_BYTES slice
+      // (indented elements between tags), so push() never returns the
+      // empty string — meaning a `'Stryker was here!'` mutation on the
+      // join is silently ignored. A single >16 KiB text body without
+      // any internal newlines forces at least one slice through push()
+      // that produces no flushed lines, exercising the empty-out path.
+      const writes: string[] = []
+      const sink = new PassThrough()
+      sink.on('data', (c: Buffer) => writes.push(c.toString('utf8')))
+      const longText = 'A'.repeat(40 * 1024)
+      await sut.writeTo(sink, [{ Root: longText }], {})
+      sink.end()
+      const joined = writes.join('')
+      expect(joined).toContain(longText)
+      expect(joined).not.toContain('Stryker was here')
+    })
   })
 })
