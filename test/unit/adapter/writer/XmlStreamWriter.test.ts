@@ -113,6 +113,46 @@ describe('XmlStreamWriter', () => {
     })
   })
 
+  describe('given a top-level scalar with hasConflict=false (filter bypassed)', () => {
+    it('when serialized then writeText emits the scalar inline without a leading newline (initial endedWithGt=false)', async () => {
+      // Pins `endedWithGt: false` in WalkState init. With the filter
+      // bypassed, the bare buffer reaches the sink — so a mutation
+      // flipping the initial state to true would surface as an extra
+      // `\n` in front of the scalar (which the filter would otherwise
+      // mask by dropping the blank line).
+      const sink = new PassThrough()
+      const chunks: Buffer[] = []
+      sink.on('data', (c: Buffer) => chunks.push(c))
+      await sut.writeTo(
+        sink,
+        ['raw' as unknown as never, { Root: [{ v: '1' }] }],
+        {},
+        '\n',
+        false
+      )
+      const out = Buffer.concat(chunks).toString('utf8')
+      expect(out).toBe(`${DECL}\nraw<Root>\n    <v>1</v>\n</Root>`)
+      expect(out).not.toContain('\n\nraw')
+    })
+  })
+
+  describe('given an object body whose comment-keyed value is an array (parser shape)', () => {
+    it('when serialized then splitAttrsAndChildren keeps the comment array as ONE comment element', async () => {
+      // Pins `key !== XML_COMMENT_PROP_NAME` in splitAttrsAndChildren
+      // (distinct from the writeUnfoldedChild guard already covered
+      // above). Without it, the array unfolds inside the object body
+      // into per-segment wrappers and the writer emits `<!--c1--><!--c2-->`
+      // instead of one combined comment.
+      const out = await serializeToString(
+        sut,
+        [{ Root: [{ p: { '#xml__comment': ['c1', 'c2'], name: 'X' } }] }],
+        {}
+      )
+      expect(out).not.toContain('<!--c1--><!--c2-->')
+      expect(out).toContain('<!--c1,c2-->')
+    })
+  })
+
   describe('given an empty output array', () => {
     it('when serialized then returns empty string', async () => {
       const out = await serializeToString(sut, [], {})
