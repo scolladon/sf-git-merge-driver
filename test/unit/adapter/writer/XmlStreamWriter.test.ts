@@ -135,6 +135,61 @@ describe('XmlStreamWriter', () => {
     })
   })
 
+  describe('given a wrapper-array child whose object holds an array-valued key (issue #191)', () => {
+    it('when serialized then the inner array of scalars expands to repeated elements (not concatenated text)', async () => {
+      // Repro of issue #191: when the merger preserves a parser-shape
+      // subtree (e.g. an unmatched KeyedArray entry from one branch) the
+      // wrapper iteration in writeChildren must perform the same
+      // array-unfolding that splitAttrsAndChildren applies on object
+      // bodies. Without it, `members: ['A','B']` collapsed into
+      // `<members>AB</members>` instead of two separate elements.
+      const out = await serializeToString(
+        sut,
+        [
+          {
+            Package: [
+              { types: [{ members: ['Account', 'Contact'], name: 'Obj' }] },
+            ],
+          },
+        ],
+        {}
+      )
+      expect(out).toBe(
+        `${DECL}\n<Package>\n    <types>\n        <members>Account</members>\n        <members>Contact</members>\n        <name>Obj</name>\n    </types>\n</Package>`
+      )
+    })
+
+    it('when serialized then nested wrapper arrays of objects also expand correctly', async () => {
+      // Same root cause but the inner array contains objects (not scalars).
+      // Mirrors `<recipients>` repeated under `<alerts>` after a brand-new
+      // alert is added on one branch only.
+      const out = await serializeToString(
+        sut,
+        [
+          {
+            Workflow: [
+              {
+                alerts: [
+                  {
+                    fullName: 'NewAlert',
+                    recipients: [
+                      { recipient: 'A', type: 'user' },
+                      { recipient: 'B', type: 'user' },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        {}
+      )
+      expect(out).toBe(
+        `${DECL}\n<Workflow>\n    <alerts>\n        <fullName>NewAlert</fullName>\n        <recipients>\n            <recipient>A</recipient>\n            <type>user</type>\n        </recipients>\n        <recipients>\n            <recipient>B</recipient>\n            <type>user</type>\n        </recipients>\n    </alerts>\n</Workflow>`
+      )
+    })
+  })
+
   describe('given an element with both attributes and children', () => {
     it('when serialized then attributes emit on the open tag', async () => {
       const out = await serializeToString(
