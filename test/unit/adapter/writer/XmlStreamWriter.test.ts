@@ -188,6 +188,61 @@ describe('XmlStreamWriter', () => {
         `${DECL}\n<Workflow>\n    <alerts>\n        <fullName>NewAlert</fullName>\n        <recipients>\n            <recipient>A</recipient>\n            <type>user</type>\n        </recipients>\n        <recipients>\n            <recipient>B</recipient>\n            <type>user</type>\n        </recipients>\n    </alerts>\n</Workflow>`
       )
     })
+
+    it('when an empty array sits beside a sibling key then a single empty element is emitted', async () => {
+      // Pins the `value.length > 0` guard in writeUnfoldedChild: removing
+      // it would emit zero `<members>` children, breaking the
+      // AncestorOnlyStrategy `{ name: [] }` contract for empty elements.
+      const out = await serializeToString(
+        sut,
+        [{ Root: [{ types: [{ members: [], name: 'Obj' }] }] }],
+        {}
+      )
+      expect(out).toBe(
+        `${DECL}\n<Root>\n    <types>\n        <members></members>\n        <name>Obj</name>\n    </types>\n</Root>`
+      )
+    })
+
+    it('when a CDATA-keyed array sits beside a sibling key then segments concatenate inside one CDATA element', async () => {
+      // Pins the `tagName !== CDATA_PROP_NAME` guard in writeUnfoldedChild:
+      // CDATA arrays carry segments to be re-joined with the `]]>` escape,
+      // not repeated `<__cdata>` siblings. Without the guard the segments
+      // would emit as two separate CDATA blocks.
+      const out = await serializeToString(
+        sut,
+        [{ Root: [{ note: { __cdata: ['a ]]', '> b'], name: 'X' } }] }],
+        {}
+      )
+      expect(out).toBe(
+        `${DECL}\n<Root>\n    <note><![CDATA[a ]]]]><![CDATA[> b]]>\n        <name>X</name>\n    </note>\n</Root>`
+      )
+    })
+
+    it('when a comment-keyed array sits beside a sibling key then a single comment is emitted (not two)', async () => {
+      // Pins the `tagName !== XML_COMMENT_PROP_NAME` guard in
+      // writeUnfoldedChild: comment arrays must NOT be unfolded into
+      // separate `<!--…-->` siblings. Without the guard the array would
+      // emit as `<!--c1--><!--c2-->` instead of being passed straight
+      // to writeElement, which delegates to writeComment with the
+      // String(array) join already pinned by other tests.
+      const out = await serializeToString(
+        sut,
+        [
+          {
+            Root: [
+              {
+                p: { '#xml__comment': ['c1', 'c2'], name: 'X' },
+              },
+            ],
+          },
+        ],
+        {}
+      )
+      expect(out).not.toContain('<!--c1--><!--c2-->')
+      expect(out).toBe(
+        `${DECL}\n<Root>\n    <p><!--c1,c2-->\n        <name>X</name>\n    </p>\n</Root>`
+      )
+    })
   })
 
   describe('given an element with both attributes and children', () => {

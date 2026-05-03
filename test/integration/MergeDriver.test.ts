@@ -194,7 +194,7 @@ describe('MergeDriver (integration — real filesystem, no mocks)', () => {
     // And both members must live inside the same <types> block (not split
     // across separate <types> elements either).
     const apexTypesBlock = merged.match(
-      /<types>[^<]*(?:<members>[A-Za-z]+<\/members>[^<]*)+<name>ApexClass<\/name>[^<]*<\/types>/
+      /<types>[^<]*(?:<members>[^<]+<\/members>[^<]*)+<name>ApexClass<\/name>[^<]*<\/types>/
     )
     expect(apexTypesBlock).not.toBeNull()
     expect(apexTypesBlock![0]).toContain('<members>MyClass</members>')
