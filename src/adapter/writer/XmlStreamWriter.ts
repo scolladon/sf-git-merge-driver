@@ -242,7 +242,6 @@ const writeElement = (
   }
   const parentDepth = st.depth
   st.depth = parentDepth + 1
-  const savedEndedWithGt = st.endedWithGt
   st.endedWithGt = false
   writeChildren(st, children, markers)
   if (st.endedWithGt) {
@@ -251,10 +250,10 @@ const writeElement = (
     st.buf += `</${name}>`
   }
   st.depth = parentDepth
+  // Close-tag emission always leaves endedWithGt=true for the parent
+  // frame regardless of the body's terminating chunk, so there is no
+  // need to capture-and-restore the caller's value here.
   st.endedWithGt = true
-  // savedEndedWithGt is unused — close-tag always sets endedWithGt=true
-  // for the parent frame. Keep the variable read to silence noUnused.
-  void savedEndedWithGt
 }
 
 // Emit a (key, value) pair from a multi-key wrapper child by applying the
