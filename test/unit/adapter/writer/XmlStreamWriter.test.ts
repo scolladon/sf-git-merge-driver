@@ -85,6 +85,32 @@ describe('XmlStreamWriter', () => {
         `${DECL}\n<Root xmlns="http://x">\n    <v>1</v>\n</Root>`
       )
     })
+
+    it('when several namespaces are passed in non-alphabetical insertion order then attributes emit alphabetically', async () => {
+      // Pins `Object.keys(namespaces).sort()` in writeRoot — without the
+      // sort, output would track insertion order, leaking input ordering
+      // into the wire format.
+      const out = await serializeToString(sut, [{ Root: [{ v: '1' }] }], {
+        '@_xmlns:zb': 'http://z',
+        '@_xmlns:ab': 'http://a',
+      })
+      expect(out.indexOf('xmlns:ab')).toBeLessThan(out.indexOf('xmlns:zb'))
+    })
+  })
+
+  describe('given a multi-key compactRoot wrapper with non-alphabetical insertion order', () => {
+    it('when serialized then top-level elements emit alphabetically (writeRoot sorts)', async () => {
+      // Pins `Object.keys(obj).sort()` in writeRoot — without the sort,
+      // top-level emission would track input order. Multi-key root
+      // wrappers are unusual but the sort is still load-bearing for
+      // determinism across merge replays.
+      const out = await serializeToString(
+        sut,
+        [{ Zeta: 'z', Alpha: 'a' } as never],
+        {}
+      )
+      expect(out.indexOf('<Alpha>')).toBeLessThan(out.indexOf('<Zeta>'))
+    })
   })
 
   describe('given an empty output array', () => {
@@ -474,6 +500,16 @@ describe('XmlStreamWriter', () => {
       expect(out).toContain('<v>L</v>')
       expect(out).toContain('<v>A</v>')
       expect(out).toContain('<v>O</v>')
+      // Pin that the conflict is consumed in-place by writeNonObjectItem
+      // (returning true short-circuits the caller's key-iteration). If
+      // the early-return is removed, the caller would treat the block as
+      // a regular object and emit `<__conflict>`, `<local>`, `<ancestor>`,
+      // `<other>` element wrappers AFTER the markers. Catching this kills
+      // the L116 `return true` → `return false` mutant.
+      expect(out).not.toContain('<__conflict>')
+      expect(out).not.toContain('<local>')
+      expect(out).not.toContain('<ancestor>')
+      expect(out).not.toContain('<other>')
     })
   })
 
