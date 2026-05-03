@@ -203,44 +203,49 @@ describe('XmlStreamWriter', () => {
       )
     })
 
-    it('when a CDATA-keyed array sits beside a sibling key then segments concatenate inside one CDATA element', async () => {
-      // Pins the `tagName !== CDATA_PROP_NAME` guard in writeUnfoldedChild:
-      // CDATA arrays carry segments to be re-joined with the `]]>` escape,
-      // not repeated `<__cdata>` siblings. Without the guard the segments
-      // would emit as two separate CDATA blocks.
+    it('when a multi-key wrapper carries a CDATA-keyed array sibling then segments stay inside ONE CDATA element', async () => {
+      // Pins the `tagName !== CDATA_PROP_NAME` guard inside
+      // writeUnfoldedChild. The wrapper-array shape forces the
+      // multi-key iteration path (writeChildren → writeUnfoldedChild).
+      // Without the guard, `__cdata: ['seg1','seg2']` would unfold into
+      // two `<![CDATA[seg1]]><![CDATA[seg2]]>` blocks instead of being
+      // passed straight to writeElement which joins them.
       const out = await serializeToString(
         sut,
-        [{ Root: [{ note: { __cdata: ['a ]]', '> b'], name: 'X' } }] }],
+        [{ Root: [{ __cdata: ['seg1', 'seg2'], name: 'X' }] }],
         {}
       )
+      expect(out).not.toContain('<![CDATA[seg1]]><![CDATA[seg2]]>')
       expect(out).toBe(
-        `${DECL}\n<Root>\n    <note><![CDATA[a ]]]]><![CDATA[> b]]>\n        <name>X</name>\n    </note>\n</Root>`
+        `${DECL}\n<Root><![CDATA[seg1seg2]]>\n    <name>X</name>\n</Root>`
       )
     })
 
-    it('when a comment-keyed array sits beside a sibling key then a single comment is emitted (not two)', async () => {
-      // Pins the `tagName !== XML_COMMENT_PROP_NAME` guard in
-      // writeUnfoldedChild: comment arrays must NOT be unfolded into
-      // separate `<!--…-->` siblings. Without the guard the array would
-      // emit as `<!--c1--><!--c2-->` instead of being passed straight
-      // to writeElement, which delegates to writeComment with the
-      // String(array) join already pinned by other tests.
+    it('when a multi-key wrapper carries a comment-keyed array sibling then ONE comment is emitted (not unfolded into two)', async () => {
+      // Pins the `tagName !== XML_COMMENT_PROP_NAME` guard inside
+      // writeUnfoldedChild — same reasoning as the CDATA case.
       const out = await serializeToString(
         sut,
-        [
-          {
-            Root: [
-              {
-                p: { '#xml__comment': ['c1', 'c2'], name: 'X' },
-              },
-            ],
-          },
-        ],
+        [{ Root: [{ '#xml__comment': ['c1', 'c2'], name: 'X' }] }],
         {}
       )
       expect(out).not.toContain('<!--c1--><!--c2-->')
       expect(out).toBe(
-        `${DECL}\n<Root>\n    <p><!--c1,c2-->\n        <name>X</name>\n    </p>\n</Root>`
+        `${DECL}\n<Root><!--c1,c2-->\n    <name>X</name>\n</Root>`
+      )
+    })
+
+    it('when a multi-key wrapper has keys in non-alphabetical insertion order then output sorts them', async () => {
+      // Pins the `keys.sort()` call in writeChildren's multi-key branch.
+      // Removing the sort would emit children in insertion order, leaking
+      // input ordering into the wire format and breaking determinism.
+      const out = await serializeToString(
+        sut,
+        [{ Root: [{ zeta: '1', alpha: '2', mu: '3' }] }],
+        {}
+      )
+      expect(out).toBe(
+        `${DECL}\n<Root>\n    <alpha>2</alpha>\n    <mu>3</mu>\n    <zeta>1</zeta>\n</Root>`
       )
     })
   })
