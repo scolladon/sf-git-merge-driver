@@ -673,6 +673,20 @@ describe('XmlStreamWriter', () => {
       expect(joined.endsWith('</Root>')).toBe(true)
       // Sanity: length crosses the 16 KiB threshold.
       expect(joined.length).toBeGreaterThan(16 * 1024)
+      // Invariant 3: each item appears exactly once. Pins the
+      // `st.buf.slice(i, i + FLUSH_BYTES)` argument in the conflict
+      // batching loop — replacing the slice with the whole buffer
+      // would push the full document on every iteration, leaving each
+      // item duplicated N times in the output.
+      const matches0000 = joined.match(/value-0000/g) ?? []
+      expect(matches0000.length).toBe(1)
+      const matches0399 = joined.match(/value-0399/g) ?? []
+      expect(matches0399.length).toBe(1)
+      // Invariant 4: no Stryker sentinel string survives. Pins the
+      // `out.join('')` and `batch = ''` literals — mutating either to
+      // a non-empty marker string would inject "Stryker was here!"
+      // somewhere in the flushed batches.
+      expect(joined).not.toContain('Stryker was here')
     })
   })
 })
