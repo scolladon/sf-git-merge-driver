@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777468561096,
+  "lastUpdate": 1777891548189,
   "repoUrl": "https://github.com/scolladon/sf-git-merge-driver",
   "entries": {
     "Binary Size Benchmark": [
@@ -86,6 +86,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "bin/merge-driver.cjs",
             "value": 34811,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "colladonsebastien@gmail.com",
+            "name": "Sebastien",
+            "username": "scolladon"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "eb2f1acffa46dae4e3402969195732ce701fc0b6",
+          "message": "fix(writer): unfold parser-shape arrays in multi-key wrappers (#192)",
+          "timestamp": "2026-05-04T12:43:12+02:00",
+          "tree_id": "c02c57a8096eaa36201581f69c2c559669126e72",
+          "url": "https://github.com/scolladon/sf-git-merge-driver/commit/eb2f1acffa46dae4e3402969195732ce701fc0b6"
+        },
+        "date": 1777891548144,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "bin/merge-driver.cjs",
+            "value": 34914,
             "unit": "bytes"
           }
         ]
