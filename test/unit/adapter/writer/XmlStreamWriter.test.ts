@@ -201,14 +201,14 @@ describe('XmlStreamWriter', () => {
     })
   })
 
-  describe('given a wrapper-array child whose object holds an array-valued key (issue #191)', () => {
+  describe('given a wrapper-array child whose object holds an array-valued key', () => {
     it('when serialized then the inner array of scalars expands to repeated elements (not concatenated text)', async () => {
-      // Repro of issue #191: when the merger preserves a parser-shape
-      // subtree (e.g. an unmatched KeyedArray entry from one branch) the
-      // wrapper iteration in writeChildren must perform the same
-      // array-unfolding that splitAttrsAndChildren applies on object
-      // bodies. Without it, `members: ['A','B']` collapsed into
-      // `<members>AB</members>` instead of two separate elements.
+      // When the merger preserves a parser-shape subtree (e.g. an
+      // unmatched KeyedArray entry from one branch) the wrapper iteration
+      // in writeChildren must perform the same array-unfolding that
+      // splitAttrsAndChildren applies on object bodies. Without it,
+      // `members: ['A','B']` collapses into `<members>AB</members>`
+      // instead of two separate elements.
       const out = await serializeToString(
         sut,
         [

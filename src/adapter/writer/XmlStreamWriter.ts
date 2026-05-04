@@ -262,9 +262,9 @@ const writeElement = (
 // one per entry. Required because canonical merger output uses single-key
 // wrappers, so a multi-key wrapper in writeChildren is always a
 // parser-shape leak from a pass-through path (e.g. KeyedArrayMergeNode
-// unmatched entries — see issue #191). Without this unfold the writer
-// would invoke writeElement once with the array body, collapsing repeats
-// into a single element with concatenated text content.
+// unmatched entries). Without this unfold the writer would invoke
+// writeElement once with the array body, collapsing repeats into a
+// single element with concatenated text content.
 //
 // Empty arrays still emit one empty element (matches the AncestorOnlyStrategy
 // `{name: []}` contract for "empty `<name></name>`").

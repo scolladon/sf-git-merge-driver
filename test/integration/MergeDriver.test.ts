@@ -147,11 +147,10 @@ describe('MergeDriver (integration — real filesystem, no mocks)', () => {
     expect(restored).toBe(badXml)
   })
 
-  it('Given one branch adds a new package.xml <types> with multiple <members> (issue #191), When running mergeFiles, Then each <members> emits as a distinct sibling element under a single <types> block', async () => {
-    // Arrange — reproduces the user-reported regression in 1.8.0 where
-    // brand-new wrapper-array entries containing parser-shape arrays
-    // (e.g. members:["MyClass","OtherClass"]) had their array values
-    // collapsed into a single tag with concatenated text.
+  it('Given one branch adds a new package.xml <types> with multiple <members>, When running mergeFiles, Then each <members> emits as a distinct sibling element under a single <types> block', async () => {
+    // Arrange — brand-new wrapper-array entries containing parser-shape
+    // arrays (e.g. members:["MyClass","OtherClass"]) must not have their
+    // array values collapsed into a single tag with concatenated text.
     const baseXml = `<?xml version="1.0" encoding="UTF-8"?>
 <Package xmlns="http://soap.sforce.com/2006/04/metadata">
     <types>
