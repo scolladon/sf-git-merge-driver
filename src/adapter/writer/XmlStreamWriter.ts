@@ -242,7 +242,6 @@ const writeElement = (
   }
   const parentDepth = st.depth
   st.depth = parentDepth + 1
-  const savedEndedWithGt = st.endedWithGt
   st.endedWithGt = false
   writeChildren(st, children, markers)
   if (st.endedWithGt) {
@@ -251,10 +250,42 @@ const writeElement = (
     st.buf += `</${name}>`
   }
   st.depth = parentDepth
+  // Close-tag emission always leaves endedWithGt=true for the parent
+  // frame regardless of the body's terminating chunk, so there is no
+  // need to capture-and-restore the caller's value here.
   st.endedWithGt = true
-  // savedEndedWithGt is unused — close-tag always sets endedWithGt=true
-  // for the parent frame. Keep the variable read to silence noUnused.
-  void savedEndedWithGt
+}
+
+// Emit a (key, value) pair from a multi-key wrapper child by applying the
+// parser-shape array-unfolding that splitAttrsAndChildren already applies
+// on object bodies: an array value means N repeated `<tagName>` siblings,
+// one per entry. Required because canonical merger output uses single-key
+// wrappers, so a multi-key wrapper in writeChildren is always a
+// parser-shape leak from a pass-through path (e.g. KeyedArrayMergeNode
+// unmatched entries). Without this unfold the writer would invoke
+// writeElement once with the array body, collapsing repeats into a
+// single element with concatenated text content.
+//
+// Empty arrays still emit one empty element (matches the AncestorOnlyStrategy
+// `{name: []}` contract for "empty `<name></name>`").
+const writeUnfoldedChild = (
+  st: WalkState,
+  tagName: string,
+  value: JsonValue,
+  markers: ConflictMarkers
+): void => {
+  if (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    tagName !== CDATA_PROP_NAME &&
+    tagName !== XML_COMMENT_PROP_NAME
+  ) {
+    for (let i = 0; i < value.length; i++) {
+      writeElement(st, tagName, value[i] as JsonValue, EMPTY_ATTRS, markers)
+    }
+    return
+  }
+  writeElement(st, tagName, value, EMPTY_ATTRS, markers)
 }
 
 const writeChildren = (
@@ -274,6 +305,11 @@ const writeChildren = (
     }
     const keys = Object.keys(child)
     if (keys.length === 1) {
+      // Canonical merger output: single-key wrapper. Treat the value as
+      // the body of one `<tagName>` element (writer semantic). An inner
+      // parser-shape multi-key object is handled by the next recursion
+      // into writeChildren via splitAttrsAndChildren / the multi-key
+      // branch below.
       const tagName = keys[0]!
       writeElement(
         st,
@@ -287,13 +323,7 @@ const writeChildren = (
     keys.sort()
     for (let j = 0; j < keys.length; j++) {
       const tagName = keys[j]!
-      writeElement(
-        st,
-        tagName,
-        child[tagName] as JsonValue,
-        EMPTY_ATTRS,
-        markers
-      )
+      writeUnfoldedChild(st, tagName, child[tagName] as JsonValue, markers)
     }
   }
 }
