@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.1](https://github.com/scolladon/sf-git-merge-driver/compare/v1.8.0...v1.8.1) (2026-05-04)
+
+
+### Bug Fixes
+
+* **writer:** unfold parser-shape arrays in multi-key wrappers ([#192](https://github.com/scolladon/sf-git-merge-driver/issues/192)) ([eb2f1ac](https://github.com/scolladon/sf-git-merge-driver/commit/eb2f1acffa46dae4e3402969195732ce701fc0b6))
+
 ## [1.8.0](https://github.com/scolladon/sf-git-merge-driver/compare/v1.7.0...v1.8.0) (2026-04-29)
 
 
