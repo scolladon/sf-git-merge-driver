@@ -559,10 +559,22 @@ describe('MetadataService', () => {
           expected: 'TestField',
         },
         {
-          name: 'handles picklistValues with masterLabel',
+          name: 'handles picklistValues with masterLabel (CustomObjectTranslation)',
           metadataType: 'picklistValues',
           testObject: { masterLabel: 'TestPicklistValue' },
           expected: 'TestPicklistValue',
+        },
+        {
+          name: 'handles picklistValues with picklist fallback (RecordType)',
+          metadataType: 'picklistValues',
+          testObject: { picklist: 'StageName', values: [] },
+          expected: 'StageName',
+        },
+        {
+          name: 'prefers masterLabel over picklist when both are present',
+          metadataType: 'picklistValues',
+          testObject: { masterLabel: 'Pref', picklist: 'Other' },
+          expected: 'Pref',
         },
         {
           name: 'handles layouts with layout',

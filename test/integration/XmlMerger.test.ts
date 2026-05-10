@@ -100,6 +100,62 @@ describe('XmlMerger integration', () => {
     })
   })
 
+  describe('RecordType picklistValues', () => {
+    // Regression: the picklistValues key extractor used `masterLabel`
+    // (the CustomObjectTranslation schema), which collapsed every
+    // RecordType `<picklistValues>` block to a single Map entry under
+    // the literal key `"undefined"` (since RecordType.picklistValues is
+    // keyed by `picklist`, not `masterLabel`). Only the last block
+    // survived the merge.
+    const recordType = (extras: { stageExtra?: string } = {}) =>
+      `<?xml version="1.0" encoding="UTF-8"?>
+<RecordType xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Agency_Development</fullName>
+    <active>true</active>
+    <label>Agency Development</label>
+    <picklistValues>
+        <picklist>StageName</picklist>
+        <values><fullName>Prospecting</fullName><default>false</default></values>
+        <values><fullName>Qualification</fullName><default>false</default></values>${extras.stageExtra ?? ''}
+    </picklistValues>
+    <picklistValues>
+        <picklist>LeadSource</picklist>
+        <values><fullName>Web</fullName><default>false</default></values>
+        <values><fullName>Phone</fullName><default>false</default></values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>Vacant_Properties__c</picklist>
+        <values><fullName>Yes</fullName><default>false</default></values>
+        <values><fullName>No</fullName><default>true</default></values>
+    </picklistValues>
+</RecordType>`
+
+    it('preserves all picklistValues blocks when one side adds a value', async () => {
+      const ancestor = recordType()
+      const ours = recordType()
+      const theirs = recordType({
+        stageExtra:
+          '\n        <values><fullName>Negotiation</fullName><default>false</default></values>',
+      })
+      const result = await mergeXmlStrings(sut, ancestor, ours, theirs)
+      expect(result.hasConflict).toBe(false)
+      expect((result.output.match(/<picklistValues>/g) ?? []).length).toBe(3)
+      expect(result.output).toContain('<picklist>StageName</picklist>')
+      expect(result.output).toContain('<picklist>LeadSource</picklist>')
+      expect(result.output).toContain(
+        '<picklist>Vacant_Properties__c</picklist>'
+      )
+      expect(result.output).toContain('Negotiation')
+    })
+
+    it('preserves all picklistValues blocks on equal-subtree round-trip', async () => {
+      const xml = recordType()
+      const result = await mergeXmlStrings(sut, xml, xml, xml)
+      expect(result.hasConflict).toBe(false)
+      expect((result.output.match(/<picklistValues>/g) ?? []).length).toBe(3)
+    })
+  })
+
   describe('real three-way merge', () => {
     it('given local adds field when merging then output contains new field', async () => {
       const ancestor = `<?xml version="1.0" encoding="UTF-8"?>
