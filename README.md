@@ -215,6 +215,8 @@ The plugin will add content in the file `$GIT_DIR/info/attributes` to enable the
 This files need to be present for the plugin to be installed.
 Ensure the repository is properly cloned / checked out in CI/CD context before installing the plugin.
 
+> **Note (macOS / Apple Git ≥ 2.50):** Apple's bundled `git init` does not create the `.git/info/` directory on a fresh repository. The installer auto-creates it on first install, so no manual action is required — but if you are diffing `.git/` after `sf git merge driver install`, this is where the new directory comes from.
+
 ## Advanced: direct binary invocation (for scripts)
 
 Most users never invoke the driver directly — git does. But for scripted recovery

@@ -238,6 +238,50 @@ CI validates prettifying, linting and tests
 We use [Conventional Comments](https://conventionalcomments.org/) to ensure every comment expresses the intention and is easy to understand.
 Pull Request comments are not enforced, it is more a way to help the reviewers and contributors to collaborate on the pull request.
 
+## Adding a new metadata key extractor
+
+The merge driver matches array elements across `ancestor` / `local` / `other` versions by extracting a stable key from each element. Key extractors live in the `METADATA_KEY_EXTRACTORS` table in `src/service/MetadataService.ts`.
+
+### Where to add it
+
+1. Add the entry to `METADATA_KEY_EXTRACTORS` keyed by the XML element name.
+2. The value is a function `(el: JsonValue) => string` returning a stable key. Trailing comment should list the parent schema(s) the element belongs to (matching the existing convention).
+
+### Single-key extractor
+
+```typescript
+foo: (el: JsonValue) => getPropertyValue(el, 'name'), // SomeMetadataType
+```
+
+### Composite-key extractor (multiple fields joined)
+
+When the key is a composite of multiple fields, use the `String(undefined)` sentinel idiom to filter out missing properties — see `getFilterItemKey`, `getCaseValuesKey`, etc. for canonical examples.
+
+### Element name reused across schemas (prefer-then-fallback)
+
+If the XML element name already exists in the table for a different parent schema with a different key field, **do not overwrite** — extract a named helper that prefers one key and falls back to the other. See `getPicklistValuesKey` for the canonical example, and the "Shared element names across schemas" subsection of [DESIGN.md](./DESIGN.md) for the list of currently-known cases.
+
+> **Why this matters:** if both schemas hit the single-key path with different field names, every block in the wrong-schema document will key to the literal string `"undefined"` and `buildKeyedMap` will silently retain only the last entry — a silent data-loss bug class.
+
+### Required test layering
+
+Every new extractor must ship with:
+
+1. **Unit test** in `test/unit/service/MetadataService.test.ts` — at least one case per key path (including each fallback branch when applicable).
+2. **Integration test** in `test/integration/XmlMerger.test.ts` — at least one end-to-end three-way merge that would regress to data loss if the extractor returned `"undefined"`.
+
+### Mutation testing
+
+After adding an extractor, run Stryker scoped to the file to verify the new tests actually kill the obvious mutants:
+
+```bash
+./node_modules/.bin/stryker run --incremental \
+  --incrementalFile reports/mutation/stryker-incremental.json \
+  --mutate "src/service/MetadataService.ts"
+```
+
+The PR-touched lines should reach 100% mutation score before submitting.
+
 ## CLI parameters convention
 
 The plugins uses [sf cli parameters convention](https://github.com/salesforcecli/cli/wiki/Design-Guidelines-Flags) to define parameters for the CLI.
