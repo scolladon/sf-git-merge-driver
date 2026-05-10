@@ -130,7 +130,7 @@ describe('XmlMerger integration', () => {
     </picklistValues>
 </RecordType>`
 
-    it('preserves all picklistValues blocks when one side adds a value', async () => {
+    it('given RecordType with three picklistValues when one side adds a value then all blocks preserved', async () => {
       const ancestor = recordType()
       const ours = recordType()
       const theirs = recordType({
@@ -148,7 +148,7 @@ describe('XmlMerger integration', () => {
       expect(result.output).toContain('Negotiation')
     })
 
-    it('preserves all picklistValues blocks on equal-subtree round-trip', async () => {
+    it('given RecordType with three picklistValues when merging equal subtrees then all blocks preserved', async () => {
       const xml = recordType()
       const result = await mergeXmlStrings(sut, xml, xml, xml)
       expect(result.hasConflict).toBe(false)
