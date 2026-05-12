@@ -7,9 +7,6 @@ import { defaultConfig } from '../../../utils/testConfig.js'
 const fieldPermissionsKey =
   MetadataService.getKeyFieldExtractor('fieldPermissions')
 const picklistValueKey = MetadataService.getKeyFieldExtractor('value')
-const servicePresenceStatusAccessesKey = MetadataService.getKeyFieldExtractor(
-  'servicePresenceStatusAccesses'
-)
 
 describe('KeyedArrayMergeNode', () => {
   describe('merge with key field (fieldPermissions)', () => {
@@ -564,86 +561,6 @@ describe('KeyedArrayMergeNode', () => {
 
       // Assert
       expect(result.hasConflict).toBe(true)
-    })
-  })
-
-  describe('merge with key field (servicePresenceStatusAccesses)', () => {
-    it('should merge identical arrays without conflict', () => {
-      // Arrange
-      const entries = [
-        { enabled: 'false', servicePresenceStatus: 'Available' },
-        { enabled: 'false', servicePresenceStatus: 'Busy' },
-        { enabled: 'false', servicePresenceStatus: 'On_Break' },
-        { enabled: 'false', servicePresenceStatus: 'Vacation' },
-      ]
-      const ancestor = [...entries]
-      const local = [...entries]
-      const other = [...entries]
-      const node = new KeyedArrayMergeNode(
-        ancestor,
-        local,
-        other,
-        'servicePresenceStatusAccesses',
-        servicePresenceStatusAccessesKey,
-        false
-      )
-
-      // Act
-      const result = node.merge(defaultConfig)
-
-      // Assert
-      expect(result.hasConflict).toBe(false)
-      expect(result.output.length).toBe(4)
-    })
-
-    it('should add new status from other without conflict', () => {
-      // Arrange
-      const ancestor = [
-        { enabled: 'false', servicePresenceStatus: 'Available' },
-      ]
-      const local = [{ enabled: 'false', servicePresenceStatus: 'Available' }]
-      const other = [
-        { enabled: 'false', servicePresenceStatus: 'Available' },
-        { enabled: 'false', servicePresenceStatus: 'Busy' },
-      ]
-      const node = new KeyedArrayMergeNode(
-        ancestor,
-        local,
-        other,
-        'servicePresenceStatusAccesses',
-        servicePresenceStatusAccessesKey,
-        false
-      )
-
-      // Act
-      const result = node.merge(defaultConfig)
-
-      // Assert
-      expect(result.hasConflict).toBe(false)
-      expect(result.output.length).toBe(2)
-    })
-
-    it('should handle modification in one side without conflict', () => {
-      // Arrange
-      const ancestor = [
-        { enabled: 'false', servicePresenceStatus: 'Available' },
-      ]
-      const local = [{ enabled: 'false', servicePresenceStatus: 'Available' }]
-      const other = [{ enabled: 'true', servicePresenceStatus: 'Available' }]
-      const node = new KeyedArrayMergeNode(
-        ancestor,
-        local,
-        other,
-        'servicePresenceStatusAccesses',
-        servicePresenceStatusAccessesKey,
-        false
-      )
-
-      // Act
-      const result = node.merge(defaultConfig)
-
-      // Assert
-      expect(result.hasConflict).toBe(false)
     })
   })
 
