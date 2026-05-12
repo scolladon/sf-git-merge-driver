@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.0](https://github.com/scolladon/sf-git-merge-driver/compare/v1.8.2...v1.9.0) (2026-05-12)
+
+
+### Features
+
+* add tabSettings and servicePresenceStatusAccesses key extractors ([#196](https://github.com/scolladon/sf-git-merge-driver/issues/196)) ([8c56c28](https://github.com/scolladon/sf-git-merge-driver/commit/8c56c28efe73ad139ce5d85656b1c9e3a2ecec27))
+
 ## [1.8.2](https://github.com/scolladon/sf-git-merge-driver/compare/v1.8.1...v1.8.2) (2026-05-12)
 
 
