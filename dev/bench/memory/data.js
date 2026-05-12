@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777891546983,
+  "lastUpdate": 1778572319460,
   "repoUrl": "https://github.com/scolladon/sf-git-merge-driver",
   "entries": {
     "Memory Benchmark": [
@@ -1063,6 +1063,138 @@ window.BENCHMARK_DATA = {
             "name": "serialize-large",
             "value": 5.8938,
             "range": "±2.31%",
+            "unit": "ms"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "agiuliano@gmail.com",
+            "name": "anthogiu",
+            "username": "anthonygiuliano"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9b23755c77e6966406b80a1c4f310ffc9294d48b",
+          "message": "fix: correct key extractor for RecordType.picklistValues (#194)\n\nCo-authored-by: Sébastien Colladon <colladonsebastien@gmail.com>",
+          "timestamp": "2026-05-12T09:49:03+02:00",
+          "tree_id": "8b17a28c2afbb41715afd0bea88b69b71747a0ef",
+          "url": "https://github.com/scolladon/sf-git-merge-driver/commit/9b23755c77e6966406b80a1c4f310ffc9294d48b"
+        },
+        "date": 1778572319391,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "node bin/merge-driver.cjs --version",
+            "value": 29.4353,
+            "range": "±1.96%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-small-no-conflict",
+            "value": 1.297,
+            "range": "±2.27%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-small-with-conflict",
+            "value": 1.1562,
+            "range": "±1.90%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-medium-no-conflict",
+            "value": 8.8374,
+            "range": "±2.47%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-medium-with-conflict",
+            "value": 8.3838,
+            "range": "±1.26%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-large-no-conflict",
+            "value": 37.0905,
+            "range": "±4.43%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-large-with-conflict",
+            "value": 36.1367,
+            "range": "±5.79%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-ordered-globalvalueset",
+            "value": 1.1326,
+            "range": "±1.61%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-picklist-customfield",
+            "value": 0.7684,
+            "range": "±1.97%",
+            "unit": "ms"
+          },
+          {
+            "name": "parse-small",
+            "value": 0.5636,
+            "range": "±0.73%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-small",
+            "value": 0.1971,
+            "range": "±2.28%",
+            "unit": "ms"
+          },
+          {
+            "name": "serialize-small",
+            "value": 0.1751,
+            "range": "±1.39%",
+            "unit": "ms"
+          },
+          {
+            "name": "parse-medium",
+            "value": 4.9603,
+            "range": "±2.96%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-medium",
+            "value": 1.8391,
+            "range": "±3.01%",
+            "unit": "ms"
+          },
+          {
+            "name": "serialize-medium",
+            "value": 1.4157,
+            "range": "±3.35%",
+            "unit": "ms"
+          },
+          {
+            "name": "parse-large",
+            "value": 20.7767,
+            "range": "±0.31%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-large",
+            "value": 7.7892,
+            "range": "±3.28%",
+            "unit": "ms"
+          },
+          {
+            "name": "serialize-large",
+            "value": 6.0177,
+            "range": "±5.23%",
             "unit": "ms"
           }
         ]
