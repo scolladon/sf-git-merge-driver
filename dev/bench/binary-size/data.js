@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777891548189,
+  "lastUpdate": 1778572320849,
   "repoUrl": "https://github.com/scolladon/sf-git-merge-driver",
   "entries": {
     "Binary Size Benchmark": [
@@ -115,6 +115,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "bin/merge-driver.cjs",
             "value": 34914,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "agiuliano@gmail.com",
+            "name": "anthogiu",
+            "username": "anthonygiuliano"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9b23755c77e6966406b80a1c4f310ffc9294d48b",
+          "message": "fix: correct key extractor for RecordType.picklistValues (#194)\n\nCo-authored-by: Sébastien Colladon <colladonsebastien@gmail.com>",
+          "timestamp": "2026-05-12T09:49:03+02:00",
+          "tree_id": "8b17a28c2afbb41715afd0bea88b69b71747a0ef",
+          "url": "https://github.com/scolladon/sf-git-merge-driver/commit/9b23755c77e6966406b80a1c4f310ffc9294d48b"
+        },
+        "date": 1778572320768,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "bin/merge-driver.cjs",
+            "value": 36128,
             "unit": "bytes"
           }
         ]
