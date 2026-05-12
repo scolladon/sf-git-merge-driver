@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778572320849,
+  "lastUpdate": 1778618872722,
   "repoUrl": "https://github.com/scolladon/sf-git-merge-driver",
   "entries": {
     "Binary Size Benchmark": [
@@ -144,6 +144,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "bin/merge-driver.cjs",
             "value": 36128,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "agiuliano@gmail.com",
+            "name": "anthogiu",
+            "username": "anthonygiuliano"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8c56c28efe73ad139ce5d85656b1c9e3a2ecec27",
+          "message": "feat: add tabSettings and servicePresenceStatusAccesses key extractors (#196)\n\nCo-authored-by: Sébastien Colladon <colladonsebastien@gmail.com>",
+          "timestamp": "2026-05-12T22:45:21+02:00",
+          "tree_id": "a4d2f59743cec4a0fe01676eb4f75343389be3f0",
+          "url": "https://github.com/scolladon/sf-git-merge-driver/commit/8c56c28efe73ad139ce5d85656b1c9e3a2ecec27"
+        },
+        "date": 1778618872658,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "bin/merge-driver.cjs",
+            "value": 36216,
             "unit": "bytes"
           }
         ]
