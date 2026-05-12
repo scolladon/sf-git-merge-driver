@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778572318202,
+  "lastUpdate": 1778618870334,
   "repoUrl": "https://github.com/scolladon/sf-git-merge-driver",
   "entries": {
     "Runtime Benchmark": [
@@ -1337,6 +1337,138 @@ window.BENCHMARK_DATA = {
             "name": "serialize-large",
             "value": 166,
             "range": "±5.23%",
+            "unit": "ops/sec"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "agiuliano@gmail.com",
+            "name": "anthogiu",
+            "username": "anthonygiuliano"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8c56c28efe73ad139ce5d85656b1c9e3a2ecec27",
+          "message": "feat: add tabSettings and servicePresenceStatusAccesses key extractors (#196)\n\nCo-authored-by: Sébastien Colladon <colladonsebastien@gmail.com>",
+          "timestamp": "2026-05-12T22:45:21+02:00",
+          "tree_id": "a4d2f59743cec4a0fe01676eb4f75343389be3f0",
+          "url": "https://github.com/scolladon/sf-git-merge-driver/commit/8c56c28efe73ad139ce5d85656b1c9e3a2ecec27"
+        },
+        "date": 1778618869949,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "node bin/merge-driver.cjs --version",
+            "value": 36,
+            "range": "±1.69%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-small-no-conflict",
+            "value": 706,
+            "range": "±2.82%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-small-with-conflict",
+            "value": 807,
+            "range": "±1.95%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-medium-no-conflict",
+            "value": 108,
+            "range": "±1.44%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-medium-with-conflict",
+            "value": 105,
+            "range": "±5.00%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-large-no-conflict",
+            "value": 24,
+            "range": "±12.55%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-large-with-conflict",
+            "value": 26,
+            "range": "±6.29%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-ordered-globalvalueset",
+            "value": 798,
+            "range": "±1.88%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-picklist-customfield",
+            "value": 1191,
+            "range": "±1.99%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "parse-small",
+            "value": 1605,
+            "range": "±0.95%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-small",
+            "value": 4944,
+            "range": "±2.12%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "serialize-small",
+            "value": 4955,
+            "range": "±1.27%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "parse-medium",
+            "value": 192,
+            "range": "±2.80%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-medium",
+            "value": 536,
+            "range": "±2.45%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "serialize-medium",
+            "value": 603,
+            "range": "±3.00%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "parse-large",
+            "value": 44,
+            "range": "±1.33%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-large",
+            "value": 134,
+            "range": "±2.65%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "serialize-large",
+            "value": 157,
+            "range": "±3.15%",
             "unit": "ops/sec"
           }
         ]
