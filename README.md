@@ -211,9 +211,19 @@ grep "merge=salesforce-source" .git/info/attributes
 
 ## Specificities in CI/CD context
 
-The plugin will add content in the file `$GIT_DIR/info/attributes` to enable the merge driver.
-This files need to be present for the plugin to be installed.
-Ensure the repository is properly cloned / checked out in CI/CD context before installing the plugin.
+The plugin writes to `$GIT_COMMON_DIR/info/attributes`. The installer creates the `info/` directory and the `attributes` file on demand if either is missing (some `git init` implementations — notably Apple Git ≥ 2.50 — do not create `info/` on a fresh repository), so the only precondition is a real git repository: ensure the repository is cloned / checked out / `git init`'d in your CI/CD context before running install.
+
+### Repository layout compatibility
+
+The installer resolves the attributes file via `git rev-parse --git-common-dir`, so a single install applies correctly across all of these layouts:
+
+| Layout | Where attributes are written | Notes |
+|---|---|---|
+| **Standard repo** | `.git/info/attributes` | Default case. |
+| **Linked worktrees** (`git worktree add`) | `<main>/.git/info/attributes` | Single install applies to **every** worktree of the repository — install once, no need to re-run in each worktree. |
+| **Submodules** | `<super>/.git/modules/<sub>/info/attributes` | Run install from inside the submodule; it registers the driver against that submodule's git dir. |
+| **Bare repos** | `<bare-repo>/info/attributes` | Works without a working tree (useful for server-side merges or scripted recovery). |
+| **Custom `GIT_DIR`** (env var) | `$GIT_DIR/info/attributes` | Honoured. Path is canonicalised, so traversal components like `GIT_DIR=../..` cannot escape the repository. |
 
 ## Advanced: direct binary invocation (for scripts)
 

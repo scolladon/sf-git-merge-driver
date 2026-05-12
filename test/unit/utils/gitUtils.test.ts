@@ -17,14 +17,16 @@ describe('gitUtils.getGitAttributesPath', () => {
   })
 
   it('Given git returns path with trailing whitespace, When getGitAttributesPath, Then it returns an absolute canonicalised path ending with info/attributes', async () => {
-    // Arrange — relative path with trailing newline, the canonical result from `git rev-parse --git-dir`
+    // Arrange — relative path with trailing newline, the canonical result from `git rev-parse --git-common-dir`
     mockRevparse.mockResolvedValue('.git\n')
 
     // Act
     const result = await getGitAttributesPath()
 
-    // Assert
-    expect(mockRevparse).toHaveBeenCalledWith(['--git-dir'])
+    // Assert — `--git-common-dir` (not `--git-dir`) so install lands in
+    // the *main* repo's .git for linked worktrees, applying to all
+    // worktrees of the repository.
+    expect(mockRevparse).toHaveBeenCalledWith(['--git-common-dir'])
     expect(isAbsolute(result)).toBe(true)
     expect(result).toBe(resolve('.git') + `${sep}info${sep}attributes`)
   })

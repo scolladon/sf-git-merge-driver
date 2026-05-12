@@ -1,14 +1,10 @@
 import type { Readable } from 'node:stream'
-// txml has no first-party types — declare a narrow ambient signature
-// here instead of casting the import to `any`. The cast at the call
-// site (line "const top = parsedToTNodes(...)") then narrows from
-// `unknown`, not from `any`, so a future txml release that changes
-// the return shape surfaces as a tsc error rather than silent runtime
-// breakage. The @ts-expect-error covers only the missing-types
-// resolution; the runtime contract is asserted in `parsedToTNodes`.
-// @ts-expect-error: txml ships no .d.ts, declare-module is not picked
-// up across .mjs subpath imports under our nodenext module resolution.
-import { parse as txmlParseUntyped } from 'txml/dist/txml.mjs'
+// txml@6 exposes types via its `./txml` export. The cast at the call
+// site (line "const top = parsedToTNodes(...)") narrows the parser's
+// permissive return shape from `unknown`, so a future txml release
+// that changes the return shape surfaces as a tsc error rather than
+// silent runtime breakage.
+import { parse as txmlParseUntyped } from 'txml/txml'
 import {
   CDATA_PROP_NAME,
   XML_COMMENT_PROP_NAME,

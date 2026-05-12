@@ -327,6 +327,19 @@ XML is converted to a compact JSON format for easier manipulation. The domain op
 
 Salesforce metadata arrays (like `fieldPermissions`) use semantic keys rather than position-based merging. The driver identifies key fields from metadata configuration to match elements across versions.
 
+#### Shared element names across schemas
+
+Salesforce reuses the same XML element name across unrelated parent schemas with **different key fields**. The `picklistValues` extractor in `MetadataService.ts` is the canonical example — it must support both schemas with a prefer-then-fallback pattern:
+
+| Element | Parent schema | Key field |
+|---|---|---|
+| `picklistValues` | `CustomObjectTranslation.fields[]` | `masterLabel` |
+| `picklistValues` | `RecordType` | `picklist` |
+| `sections` | `Translations` | `name` |
+| `sections` | `CustomObjectTranslation` | `section` |
+
+The convention for resolving the ambiguity is to read each candidate property via `getPropertyValue` (which returns the literal string `"undefined"` when absent — see `String(undefined)` sentinel idiom) and pick the first non-sentinel value. **Failing to do this causes silent data loss**: every block under the wrong-schema document keys to the same `"undefined"` string and `buildKeyedMap` retains only the last entry. New extractors that share an element name with an existing schema must follow the same prefer-then-fallback shape.
+
 ### 3. Early Termination Optimization
 
 When all three inputs are deeply equal, the merge returns immediately without traversing the structure. This significantly improves performance for unchanged files.

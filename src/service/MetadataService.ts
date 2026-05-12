@@ -38,6 +38,21 @@ const getFilterItemKey = (el: JsonValue) => {
     .join('.')
 }
 
+// The `picklistValues` element name is reused across two metadata
+// schemas with different key fields:
+//   - CustomObjectTranslation.fields[].picklistValues → keyed by `masterLabel`
+//   - RecordType.picklistValues                       → keyed by `picklist`
+// Without the fallback, every RecordType `<picklistValues>` block
+// keys to the literal string `"undefined"` (since `masterLabel`
+// doesn't exist on that schema), `buildKeyedMap` retains only the
+// last block, and the merge silently drops the rest.
+const getPicklistValuesKey = (el: JsonValue) => {
+  const masterLabel = getPropertyValue(el, 'masterLabel')
+  return masterLabel !== String(undefined)
+    ? masterLabel
+    : getPropertyValue(el, 'picklist')
+}
+
 const METADATA_KEY_EXTRACTORS = {
   labels: (el: JsonValue) => getPropertyValue(el, 'fullName'), // CustomLabels
   applicationVisibilities: (el: JsonValue) =>
@@ -160,7 +175,7 @@ const METADATA_KEY_EXTRACTORS = {
   }, // CustomObjectTranslation
   fieldSets: (el: JsonValue) => getPropertyValue(el, 'name'), // CustomObjectTranslation
   fields: (el: JsonValue) => getPropertyValue(el, 'name'), // CustomObjectTranslation
-  picklistValues: (el: JsonValue) => getPropertyValue(el, 'masterLabel'), // CustomObjectTranslation
+  picklistValues: getPicklistValuesKey, // CustomObjectTranslation (masterLabel) | RecordType (picklist)
   values: (el: JsonValue) => getPropertyValue(el, 'fullName'), // RecordType
   value: (el: JsonValue) => getPropertyValue(el, 'fullName'), // CustomField
   layouts: (el: JsonValue) => getPropertyValue(el, 'layout'), // CustomObjectTranslation

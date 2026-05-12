@@ -1,4 +1,4 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import simpleGit from 'simple-git'
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest'
 import { DRIVER_NAME } from '../../../src/constant/driverConstant.js'
@@ -32,6 +32,7 @@ simpleGitMock.mockReturnValue({
 const getGitAttributesPathMocked = getGitAttributesPath as Mock
 const readFileMocked = vi.mocked(readFile) as Mock
 const writeFileMocked = vi.mocked(writeFile)
+const mkdirMocked = vi.mocked(mkdir)
 
 // Shape the driver line must match. The absolute path is resolved at
 // InstallService module load via import.meta.url; we assert its suffix and
@@ -52,6 +53,7 @@ describe('InstallService', () => {
     mockedAddConfig.mockReset()
     readFileMocked.mockReset()
     writeFileMocked.mockReset()
+    mkdirMocked.mockReset()
     getGitAttributesPathMocked.mockResolvedValue(GIT_ATTRIBUTES_PATH)
     readFileMocked.mockRejectedValue(ENOENT)
   })
@@ -179,6 +181,27 @@ describe('InstallService', () => {
       for (const pattern of MANIFEST_PATTERNS) {
         expect(content).toContain(`${pattern} merge=${DRIVER_NAME}`)
       }
+    })
+
+    it('Given the attributes file does not exist, When installing, Then mkdir is called with the parent directory before writeFile', async () => {
+      // Regression: Apple Git's `git init` doesn't create `.git/info/`,
+      // so writeFile would ENOENT on a freshly-initialised repo. The
+      // installer must mkdir the parent first.
+      // Arrange — readFile already rejects with ENOENT by default
+      // Act
+      await sut.installMergeDriver()
+
+      // Assert — exact options object (kills `recursive: false`
+      // mutants), parent dir not the file path itself (kills
+      // `dirname(p) → p` mutants).
+      expect(mkdirMocked).toHaveBeenCalledWith('.git/info', {
+        recursive: true,
+      })
+
+      // Ordering — mkdir must precede writeFile, otherwise ENOENT.
+      const mkdirOrder = mkdirMocked.mock.invocationCallOrder[0]
+      const writeFileOrder = writeFileMocked.mock.invocationCallOrder[0]
+      expect(mkdirOrder).toBeLessThan(writeFileOrder)
     })
 
     it('Given an empty attributes file, When installing, Then writeFile is called with populated content', async () => {
