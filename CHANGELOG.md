@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.2](https://github.com/scolladon/sf-git-merge-driver/compare/v1.8.1...v1.8.2) (2026-05-12)
+
+
+### Bug Fixes
+
+* correct key extractor for RecordType.picklistValues ([#194](https://github.com/scolladon/sf-git-merge-driver/issues/194)) ([9b23755](https://github.com/scolladon/sf-git-merge-driver/commit/9b23755c77e6966406b80a1c4f310ffc9294d48b))
+
 ## [1.8.1](https://github.com/scolladon/sf-git-merge-driver/compare/v1.8.0...v1.8.1) (2026-05-04)
 
 
