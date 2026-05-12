@@ -84,12 +84,15 @@ const METADATA_KEY_EXTRACTORS = {
   pageAccesses: (el: JsonValue) => getPropertyValue(el, 'apexPage'), // Profile // PermissionSet
   profileActionOverrides: (el: JsonValue) => getPropertyValue(el, 'actionName'), // Profile
   recordTypeVisibilities: (el: JsonValue) => getPropertyValue(el, 'recordType'), // Profile // PermissionSet
+  servicePresenceStatusAccesses: (el: JsonValue) =>
+    getPropertyValue(el, 'servicePresenceStatus'), // Profile // PermissionSet
   tabVisibilities: (el: JsonValue) => getPropertyValue(el, 'tab'), // Profile // PermissionSet
   userPermissions: (el: JsonValue) => getPropertyValue(el, 'name'), // Profile // PermissionSet
   dataspaceScopes: (el: JsonValue) => getPropertyValue(el, 'dataspaceScope'), // PermissionSet
   emailRoutingAddressAccesses: (el: JsonValue) => getPropertyValue(el, 'name'), // PermissionSet
   externalCredentialPrincipalAccesses: (el: JsonValue) =>
     getPropertyValue(el, 'externalCredentialPrincipal'), // PermissionSet
+  tabSettings: (el: JsonValue) => getPropertyValue(el, 'tab'), // PermissionSet
   sharingCriteriaRules: (el: JsonValue) => getPropertyValue(el, 'fullName'), // SharingRules
   sharingGuestRules: (el: JsonValue) => getPropertyValue(el, 'fullName'), // SharingRules
   sharingOwnerRules: (el: JsonValue) => getPropertyValue(el, 'fullName'), // SharingRules

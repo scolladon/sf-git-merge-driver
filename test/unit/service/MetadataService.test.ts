@@ -232,6 +232,18 @@ describe('MetadataService', () => {
           expected: 'TestRecordType',
         },
         {
+          name: 'handles servicePresenceStatusAccesses with servicePresenceStatus',
+          metadataType: 'servicePresenceStatusAccesses',
+          testObject: { servicePresenceStatus: 'Available' },
+          expected: 'Available',
+        },
+        {
+          name: 'handles tabSettings with tab',
+          metadataType: 'tabSettings',
+          testObject: { tab: 'TestTab' },
+          expected: 'TestTab',
+        },
+        {
           name: 'handles tabVisibilities with tab',
           metadataType: 'tabVisibilities',
           testObject: { tab: 'TestTab' },
