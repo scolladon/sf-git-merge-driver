@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { getUniqueSortedProps } from '../../../src/merger/mergePropertyKeys.js'
+import { getUniqueProps } from '../../../src/merger/mergePropertyKeys.js'
 
 describe('mergePropertyKeys', () => {
-  describe('getUniqueSortedProps', () => {
-    it('given multiple objects and arrays when getUniqueSortedProps then returns unique sorted keys', () => {
+  describe('getUniqueProps', () => {
+    it('given multiple objects and arrays when getUniqueProps then returns unique keys in first-seen order', () => {
       // Arrange
       const a = { b: 1, a: 2 }
       const b = { c: 3, a: 4 }
@@ -12,7 +12,7 @@ describe('mergePropertyKeys', () => {
       const e = undefined
 
       // Act
-      const sut = getUniqueSortedProps(
+      const sut = getUniqueProps(
         a as never,
         b as never,
         c as never,
@@ -21,38 +21,50 @@ describe('mergePropertyKeys', () => {
       )
 
       // Assert
-      expect(sut).toEqual(['0', '1', 'a', 'b', 'c'])
+      expect(sut).toEqual(['b', 'a', 'c', '0', '1'])
     })
 
-    it('given empty objects when getUniqueSortedProps then returns empty array', () => {
+    it('given empty objects when getUniqueProps then returns empty array', () => {
       // Arrange & Act
-      const sut = getUniqueSortedProps({}, {}, {})
+      const sut = getUniqueProps({}, {}, {})
 
       // Assert
       expect(sut).toEqual([])
     })
 
-    it('given single object when getUniqueSortedProps then returns sorted keys', () => {
+    it('given single object when getUniqueProps then returns keys in first-seen order', () => {
       // Arrange
       const obj = { z: 1, a: 2, m: 3 }
 
       // Act
-      const sut = getUniqueSortedProps(obj)
+      const sut = getUniqueProps(obj)
 
       // Assert
-      expect(sut).toEqual(['a', 'm', 'z'])
+      expect(sut).toEqual(['z', 'a', 'm'])
     })
 
-    it('given objects with duplicate keys when getUniqueSortedProps then returns unique keys', () => {
+    it('given objects with duplicate keys when getUniqueProps then dedups preserving first-seen order', () => {
       // Arrange
       const a = { x: 1, y: 2 }
       const b = { x: 3, z: 4 }
 
       // Act
-      const sut = getUniqueSortedProps(a, b)
+      const sut = getUniqueProps(a, b)
 
       // Assert
       expect(sut).toEqual(['x', 'y', 'z'])
+    })
+
+    it('given objects whose first-seen order is non-alphabetical when getUniqueProps then preserves first-seen across objects with dedup', () => {
+      // Arrange
+      const a = { b: 1, a: 2 }
+      const b = { c: 3, a: 4 }
+
+      // Act
+      const sut = getUniqueProps(a, b)
+
+      // Assert
+      expect(sut).toEqual(['b', 'a', 'c'])
     })
   })
 })

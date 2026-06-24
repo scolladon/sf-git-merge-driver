@@ -1,6 +1,6 @@
 import type { JsonArray, JsonObject } from '../types/jsonTypes.js'
 
-export const getUniqueSortedProps = (
+export const getUniqueProps = (
   ...objects: (JsonObject | JsonArray)[]
 ): string[] => {
   const keys = new Set<string>()
@@ -9,5 +9,5 @@ export const getUniqueSortedProps = (
       for (const key of Object.keys(obj)) keys.add(key)
     }
   }
-  return [...keys].sort()
+  return [...keys]
 }
