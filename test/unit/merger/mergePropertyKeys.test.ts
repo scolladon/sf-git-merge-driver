@@ -55,16 +55,23 @@ describe('mergePropertyKeys', () => {
       expect(sut).toEqual(['x', 'y', 'z'])
     })
 
-    it('given objects whose first-seen order is non-alphabetical when getUniqueProps then preserves first-seen across objects with dedup', () => {
+    it('given three sides whose first-seen order is non-alphabetical when getUniqueProps then preserves first-seen across sides with dedup', () => {
       // Arrange
-      const a = { b: 1, a: 2 }
-      const b = { c: 3, a: 4 }
+      const ancestor = { fullName: 1, name: 2, label: 3 }
+      const local = { name: 4, active: 5 }
+      const other = { label: 6, description: 7 }
 
       // Act
-      const sut = getUniqueProps(a, b)
+      const sut = getUniqueProps(ancestor, local, other)
 
       // Assert
-      expect(sut).toEqual(['b', 'a', 'c'])
+      expect(sut).toEqual([
+        'fullName',
+        'name',
+        'label',
+        'active',
+        'description',
+      ])
     })
   })
 })
