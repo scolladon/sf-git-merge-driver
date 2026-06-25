@@ -18,6 +18,7 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v6
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Setup node
@@ -33,6 +34,7 @@ jobs:
       - name: Checkout gh-pages baseline data
         uses: actions/checkout@v6
         with:
+          persist-credentials: false
           ref: gh-pages
           path: gh-pages-data
 
