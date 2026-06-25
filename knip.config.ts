@@ -13,5 +13,4 @@ export default {
   project: ['**/*.{ts,js}'],
   ignoreDependencies: ['@commitlint/config-conventional'],
   ignore: ['vitest.config.perf.ts'],
-  ignoreBinaries: ['commitlint', 'jscpd', 'npm-check-updates'],
 }
