@@ -110,7 +110,8 @@
       "diff": "8.0.4",
       "serialize-javascript": "7.0.5"
     },
-    "qs": "6.15.2"
+    "qs": "6.15.2",
+    "js-yaml@^3": "4.2.0"
   },
   "publishConfig": {
     "access": "public"
