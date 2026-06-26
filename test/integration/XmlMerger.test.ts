@@ -224,6 +224,15 @@ describe('XmlMerger integration', () => {
       )
     })
 
+    it('given both sides delete a previously-empty root when merging then the deletion stands (no resurrection)', async () => {
+      // An empty root present ONLY in the ancestor must not be resurrected
+      // when ours and theirs both removed the file.
+      const ancestor = `<?xml version="1.0" encoding="UTF-8"?>\n<SharingRules xmlns="${NS}"></SharingRules>`
+      const result = await mergeXmlStrings(sut, ancestor, '', '')
+      expect(result.output).toBe('')
+      expect(result.hasConflict).toBe(false)
+    })
+
     it('given a truly empty document (no root element) when merging then emits nothing', async () => {
       // The other-extreme: with no root key in any side there is nothing to
       // preserve, so the output stays byte-empty (writer short-circuit).

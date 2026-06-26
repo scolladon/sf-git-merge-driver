@@ -10,20 +10,23 @@ import { JsonMerger } from './JsonMerger.js'
 const mergeNamespaces = (...maps: JsonObject[]): JsonObject =>
   Object.assign({}, ...maps)
 
-// When the JSON merge yields no output but the inputs carried a root
-// element with an empty body (e.g. <SharingRules xmlns="..."/> parses to
-// { SharingRules: '' }, which the merge collapses to nothing), rebuild
-// that root so the writer emits an empty element (<Root></Root>) instead
-// of a blank file — a blank file is never valid Salesforce metadata. The
-// parser guarantees each content object holds at most the single root
-// key, so the first key found across the three sides is the root tag;
-// truly empty inputs (no root) yield no key and still produce no output.
-const preserveEmptyRoot = (...contents: JsonObject[]): JsonArray => {
-  for (const content of contents) {
-    const [rootKey] = Object.keys(content)
-    if (rootKey !== undefined) return [{ [rootKey]: '' }]
-  }
-  return []
+// When the JSON merge yields no output but BOTH live sides (ours and theirs)
+// still carry the root element, rebuild it as an empty element
+// (<Root></Root>) so an empty-bodied root round-trips instead of blanking the
+// file — a blank file is never valid Salesforce metadata (e.g. an identity
+// merge of <SharingRules xmlns="..."/>, which parses to { SharingRules: '' }
+// and collapses to no output). Requiring the root on BOTH live sides is
+// deliberate: if either side dropped the file entirely (empty document, no
+// root key) the deletion stands and nothing is emitted — the driver must
+// never resurrect a file a side deleted, nor invent a root from the side
+// that left it untouched. The parser guarantees each content object holds at
+// most the single root key, so the two live sides' root tags match.
+const preserveEmptyRoot = (local: JsonObject, other: JsonObject): JsonArray => {
+  const [localRoot] = Object.keys(local)
+  const [otherRoot] = Object.keys(other)
+  return localRoot !== undefined && otherRoot !== undefined
+    ? [{ [localRoot]: '' }]
+    : []
 }
 
 export class XmlMerger {
@@ -78,17 +81,17 @@ export class XmlMerger {
     const output =
       mergedResult.output.length > 0
         ? mergedResult.output
-        : preserveEmptyRoot(anc!.content, local!.content, other!.content)
+        : preserveEmptyRoot(local!.content, other!.content)
 
-    if (output.length) {
-      await this.writer.writeTo(
-        out,
-        output,
-        namespaces,
-        eol,
-        mergedResult.hasConflict
-      )
-    }
+    // writeTo short-circuits on an empty array, so no guard is needed here:
+    // an empty merge result emits zero bytes either way.
+    await this.writer.writeTo(
+      out,
+      output,
+      namespaces,
+      eol,
+      mergedResult.hasConflict
+    )
 
     return { hasConflict: mergedResult.hasConflict }
   }
