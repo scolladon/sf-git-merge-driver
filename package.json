@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@oclif/core": "^4.11.11",
-    "@salesforce/core": "^8.31.3",
+    "@salesforce/core": "^8.31.4",
     "@salesforce/sf-plugins-core": "^12.2.24",
     "simple-git": "^3.36.0",
     "txml": "^6.0.0"
@@ -34,7 +34,7 @@
     "chai": "^6.2.2",
     "esbuild": "^0.28.1",
     "husky": "^9.1.7",
-    "knip": "^6.20.0",
+    "knip": "^6.21.0",
     "mocha": "^11.7.6",
     "nyc": "^18.0.0",
     "oclif": "^4.23.21",
