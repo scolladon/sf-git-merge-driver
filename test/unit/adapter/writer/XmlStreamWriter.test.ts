@@ -80,6 +80,39 @@ describe('XmlStreamWriter', () => {
       expect(out.endsWith('</Root>\r\n')).toBe(true)
     })
 
+    it('when serialized with a conflict and CRLF target then the trailing newline is also CRLF', async () => {
+      // Pins that the conflict path routes its appended trailing newline
+      // through applyEol too (a raw LF would survive a CRLF target otherwise).
+      const sink = new PassThrough()
+      const chunks: Buffer[] = []
+      sink.on('data', (c: Buffer) => chunks.push(c))
+      await sut.writeTo(
+        sink,
+        [
+          {
+            Root: [
+              {
+                v: {
+                  __conflict: true,
+                  local: ['L'],
+                  ancestor: [],
+                  other: ['O'],
+                },
+              },
+            ],
+          },
+        ],
+        {},
+        '\r\n',
+        true
+      )
+      sink.end()
+      const out = Buffer.concat(chunks).toString('utf8')
+      expect(out.endsWith('\r\n')).toBe(true)
+      expect(out.endsWith('\n\n')).toBe(false)
+      expect(/[^\r]\n$/.test(out)).toBe(false)
+    })
+
     it('when the document is empty then no trailing newline is emitted', async () => {
       // The `ordered.length === 0` short-circuit runs before the newline
       // append, so an empty document stays byte-empty (no stray newline).

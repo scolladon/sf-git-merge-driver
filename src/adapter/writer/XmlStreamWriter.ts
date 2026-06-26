@@ -458,6 +458,11 @@ const applyEol = (piece: string, eol: '\n' | '\r\n'): string =>
 // `write` cheap AND preserves streaming semantics.
 const FLUSH_BYTES = 16 * 1024
 
+// Single trailing newline appended to every non-empty document so the merge
+// driver's byte output matches `sf project retrieve` (metadata XML ends in a
+// newline). applyEol rewrites it to the target EOL.
+const TRAILING_NEWLINE = '\n'
+
 export class XmlStreamWriter implements XmlSerializer {
   constructor(private readonly config: MergeConfig) {}
 
@@ -490,11 +495,11 @@ export class XmlStreamWriter implements XmlSerializer {
     writeRoot(st, ordered, namespaces, markers)
     // Trailing newline: `sf project retrieve` (via source-deploy-retrieve)
     // writes metadata XML ending in a newline, so we converge to that byte
-    // shape. Appended to the finished document AFTER the conflict filter has
-    // flushed the closing tag (the filter still ends mid-line, as before),
-    // and applyEol rewrites it to the target EOL. The `ordered.length === 0`
-    // short-circuit above means an empty document still emits nothing.
-    const TRAILING_NEWLINE = '\n'
+    // shape (see TRAILING_NEWLINE). Appended to the finished document AFTER
+    // the conflict filter has flushed the closing tag (the filter still ends
+    // mid-line, as before), and applyEol rewrites it to the target EOL. The
+    // `ordered.length === 0` short-circuit above means an empty document
+    // still emits nothing.
     // For the conflict-free hot path, the entire document is built in
     // st.buf as a single string; one applyEol pass + at most one
     // out.write. The intermediate FLUSH_BYTES batching matters only
