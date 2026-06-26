@@ -1,0 +1,9 @@
+# zizmor configuration.
+# We intentionally pin GitHub Actions to version tags (e.g. @v6), not commit
+# SHAs, and rely on Dependabot to keep those tags current. Relax the
+# unpinned-uses audit so tag pins are accepted instead of requiring hashes.
+rules:
+  unpinned-uses:
+    config:
+      policies:
+        "*": ref-pin

@@ -8,14 +8,13 @@ on:
     paths-ignore:
       - "**.md"
 
+# Least-privilege default; jobs that need more escalate explicitly.
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   build:
     uses: ./.github/workflows/reusable-build.yml
-    secrets: inherit
 
   prepare-release:
     needs: [build]
@@ -36,7 +35,9 @@ jobs:
   perf:
     needs: [prepare-release]
     if: ${{ needs.prepare-release.outputs.release_created != 'true' }}
+    permissions:
+      contents: write
+      pull-requests: write
     uses: ./.github/workflows/reusable-perf.yml
-    secrets: inherit
     with:
       auto-push: true

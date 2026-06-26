@@ -8,9 +8,9 @@ on:
     paths-ignore:
       - "**.md"
 
+# Least-privilege default; jobs that need more escalate explicitly.
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 # Manage concurrency to stop running jobs and start new ones in case of new commit pushed
 concurrency:
@@ -44,6 +44,8 @@ jobs:
 
   pull-request-lint:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
     steps:
       - name: Lint PR
         uses: amannn/action-semantic-pull-request@v5
@@ -114,7 +116,6 @@ jobs:
     with:
       os: ${{ matrix.os }}
       node-version: ${{ matrix.node-version }}
-    secrets: inherit
 
   mutation-testing:
     runs-on: ubuntu-latest
@@ -164,5 +165,7 @@ jobs:
 
   perf:
     needs: [build]
+    permissions:
+      contents: read
+      pull-requests: write
     uses: ./.github/workflows/reusable-perf.yml
-    secrets: inherit
