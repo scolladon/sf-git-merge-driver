@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <GlobalValueSetTranslation xmlns="http://soap.sforce.com/2006/04/metadata">
     <valueTranslation>
+        <masterLabel>Cherry</masterLabel>
+        <translation>Cerise</translation>
+    </valueTranslation>
+    <valueTranslation>
         <masterLabel>Apple</masterLabel>
         <translation>Pomme</translation>
     </valueTranslation>
     <valueTranslation>
         <masterLabel>Banana</masterLabel>
         <translation>Banane</translation>
-    </valueTranslation>
-    <valueTranslation>
-        <masterLabel>Cherry</masterLabel>
-        <translation>Cerise</translation>
     </valueTranslation>
 </GlobalValueSetTranslation>
