@@ -232,4 +232,28 @@ describe('XmlMerger integration', () => {
       expect(result.hasConflict).toBe(false)
     })
   })
+
+  describe('comment positioning (known limitation, documented in DESIGN.md)', () => {
+    const NS = 'http://soap.sforce.com/2006/04/metadata'
+    // SF strips comments on retrieve, so these only affect hand-added
+    // comments in a working copy. A robust position-preserving fix is a
+    // breaking change deferred to a future version bump; these tests pin
+    // the CURRENT behavior so any change to it is deliberate.
+    it('given a comment between distinct-tag siblings when merging then its position is preserved', async () => {
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<Root xmlns="${NS}"><a>1</a><!--mid--><b>2</b></Root>`
+      const { output } = await mergeXmlStrings(sut, xml, xml, xml)
+      // comment stays between <a> and <b>
+      expect(output.indexOf('mid')).toBeGreaterThan(output.indexOf('<a>1</a>'))
+      expect(output.indexOf('mid')).toBeLessThan(output.indexOf('<b>2</b>'))
+    })
+
+    it('given a comment between same-tag siblings when merging then it relocates after both (known limitation)', async () => {
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<Root xmlns="${NS}"><a>1</a><!--mid--><a>2</a></Root>`
+      const { output } = await mergeXmlStrings(sut, xml, xml, xml)
+      // the compact tree collapses <a>1</a> and <a>2</a> into one array and
+      // cannot hold the comment between them, so it re-emits after both
+      const secondA = output.lastIndexOf('<a>2</a>')
+      expect(output.indexOf('mid')).toBeGreaterThan(secondA)
+    })
+  })
 })

@@ -559,3 +559,11 @@ Ordered merging applies to metadata with position-significant arrays:
 - `StandardValueSet` → `standardValue` (key: `fullName`)
 - `CustomField` → `valueSet.customValue` (key: `fullName`)
 - `RecordType` → `picklistValues.values` (key: `fullName`)
+
+## Known Limitations
+
+### XML Comment Positioning
+
+XML comments are not guaranteed to keep their exact position relative to sibling elements through a merge. The compact intermediate representation groups child elements by tag name (`classifyChildren` uses a `Map` keyed by tag), and comments are stored under a single `#xml__comment` key. This representation can express a comment's position **between distinct-tag siblings** (Map insertion order is preserved) but **not between same-tag siblings**: `<a>1</a><!--c--><a>2</a>` collapses to `{ a: ['1','2'], #xml__comment: 'c' }`, which loses the comment's position between the two `<a>` entries — the comment re-emits after both.
+
+This is **cosmetic and low-impact in practice**: `sf project retrieve` strips comments from retrieved metadata, so the only comments affected are hand-added ones in a working copy. Preserving comment position in all cases would require re-representing the compact tree as an order-preserving list (touching the parser, writer, and every merge node) and would change byte output broadly — a breaking change deliberately deferred to a future release with a version bump (see also `test/fixtures/xml/19-btb-comments`). The current behavior is pinned by `test/fixtures/xml/45-comment-positioning` and the `comment positioning` regression tests in `test/integration/XmlMerger.test.ts` so any future change is deliberate.
