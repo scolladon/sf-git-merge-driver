@@ -488,13 +488,20 @@ export class XmlStreamWriter implements XmlSerializer {
       isFirstTopLevelAfterDecl: true,
     }
     writeRoot(st, ordered, namespaces, markers)
+    // Trailing newline: `sf project retrieve` (via source-deploy-retrieve)
+    // writes metadata XML ending in a newline, so we converge to that byte
+    // shape. Appended to the finished document AFTER the conflict filter has
+    // flushed the closing tag (the filter still ends mid-line, as before),
+    // and applyEol rewrites it to the target EOL. The `ordered.length === 0`
+    // short-circuit above means an empty document still emits nothing.
+    const TRAILING_NEWLINE = '\n'
     // For the conflict-free hot path, the entire document is built in
     // st.buf as a single string; one applyEol pass + at most one
     // out.write. The intermediate FLUSH_BYTES batching matters only
     // when ConflictLineFilter is in play (it splits chunks line-by-line
     // and we re-emit incrementally).
     if (!hasConflict) {
-      const final = applyEol(st.buf, eol)
+      const final = applyEol(`${st.buf}${TRAILING_NEWLINE}`, eol)
       if (!out.write(final)) {
         await once(out, 'drain')
       }
@@ -521,6 +528,7 @@ export class XmlStreamWriter implements XmlSerializer {
       if (batch.length >= FLUSH_BYTES) await flush()
     }
     batch += filter.end()
+    batch += TRAILING_NEWLINE
     await flush()
   }
 }
