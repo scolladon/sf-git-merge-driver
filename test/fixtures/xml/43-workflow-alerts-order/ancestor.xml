@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Workflow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <alerts>
+        <fullName>Alert_Alpha</fullName>
+        <description>Alpha</description>
+        <protected>false</protected>
+        <recipients>
+            <type>user</type>
+        </recipients>
+        <senderType>CurrentUser</senderType>
+        <template>tpl/Alpha</template>
+    </alerts>
+    <alerts>
+        <fullName>Alert_Beta</fullName>
+        <description>Beta</description>
+        <protected>false</protected>
+        <recipients>
+            <type>user</type>
+        </recipients>
+        <senderType>CurrentUser</senderType>
+        <template>tpl/Beta</template>
+    </alerts>
+</Workflow>
