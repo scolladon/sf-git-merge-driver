@@ -10,12 +10,16 @@
     "noConfigSearch": true,
     "version": "0.2",
     "words": [
+        "alphabetised",
         "amannn",
         "apexskier",
         "autoupdate",
+        "Banane",
         "behaviour",
+        "canonicalisation",
         "canonicalised",
         "brqh",
+        "categorygroupvisibilities",
         "codeowners",
         "colladon",
         "commandsstop",
@@ -34,6 +38,7 @@
         "materialising",
         "mjyhjbm",
         "mocharc",
+        "modifiee",
         "movetag",
         "mutingpermissionset",
         "nbsp",
@@ -48,6 +53,7 @@
         "permissionset",
         "permissionsetgroup",
         "picklist",
+        "Pomme",
         "readables",
         "recognises",
         "renormalises",
@@ -62,12 +68,14 @@
         "Txml",
         "unkeyed",
         "valuesets",
+        "valuetranslation",
         "wagoid",
         "wireit",
         "withconflict",
         "worktree",
         "worktrees",
         "yohanim",
-        "zdiff"
+        "zdiff",
+        "zizmor"
     ]
 }
