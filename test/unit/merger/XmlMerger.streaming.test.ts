@@ -127,12 +127,34 @@ describe('XmlMerger.mergeThreeWay', () => {
     })
   })
 
-  describe('given all three sides are empty-body documents', () => {
-    it('when merged then sink receives empty output (no element survives the merger)', async () => {
-      // JsonMerger on three empty-content roots produces an empty
-      // output array — the writer therefore writes nothing.
+  describe('given all three sides are empty-body root documents (residual #3)', () => {
+    it('when merged then the empty root is preserved as <Root></Root>, not blanked', async () => {
+      // JsonMerger on three empty-content roots produces an empty output
+      // array; XmlMerger.preserveEmptyRoot rebuilds the root so the file
+      // is not blanked (a blank file is never valid Salesforce metadata).
       const doc = `<?xml version="1.0"?><Root></Root>`
       const result = await runMergeStreams(sut, doc, doc, doc)
+      expect(result.hasConflict).toBe(false)
+      expect(result.output).toBe(
+        `<?xml version="1.0" encoding="UTF-8"?>\n<Root></Root>\n`
+      )
+    })
+
+    it('when the first side has no root but a later side does then the root is still preserved', async () => {
+      // Covers preserveEmptyRoot scanning past a keyless (truly empty)
+      // side to find the root tag on ours/theirs.
+      const empty = ''
+      const root = `<?xml version="1.0"?><Root></Root>`
+      const result = await runMergeStreams(sut, empty, root, root)
+      expect(result.output).toBe(
+        `<?xml version="1.0" encoding="UTF-8"?>\n<Root></Root>\n`
+      )
+    })
+
+    it('when no side has a root element then sink receives empty output', async () => {
+      // The other extreme: with no root key on any side there is nothing
+      // to preserve, so the writer short-circuit emits zero bytes.
+      const result = await runMergeStreams(sut, '', '', '')
       expect(result.hasConflict).toBe(false)
       expect(result.output).toBe('')
     })

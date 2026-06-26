@@ -3,12 +3,28 @@ import { TxmlXmlParser } from '../adapter/TxmlXmlParser.js'
 import { XmlStreamWriter } from '../adapter/writer/XmlStreamWriter.js'
 import type { XmlParser } from '../adapter/XmlParser.js'
 import type { MergeConfig } from '../types/conflictTypes.js'
-import type { JsonObject } from '../types/jsonTypes.js'
+import type { JsonArray, JsonObject } from '../types/jsonTypes.js'
 import { log } from '../utils/LoggingDecorator.js'
 import { JsonMerger } from './JsonMerger.js'
 
 const mergeNamespaces = (...maps: JsonObject[]): JsonObject =>
   Object.assign({}, ...maps)
+
+// When the JSON merge yields no output but the inputs carried a root
+// element with an empty body (e.g. <SharingRules xmlns="..."/> parses to
+// { SharingRules: '' }, which the merge collapses to nothing), rebuild
+// that root so the writer emits an empty element (<Root></Root>) instead
+// of a blank file — a blank file is never valid Salesforce metadata. The
+// parser guarantees each content object holds at most the single root
+// key, so the first key found across the three sides is the root tag;
+// truly empty inputs (no root) yield no key and still produce no output.
+const preserveEmptyRoot = (...contents: JsonObject[]): JsonArray => {
+  for (const content of contents) {
+    const [rootKey] = Object.keys(content)
+    if (rootKey !== undefined) return [{ [rootKey]: '' }]
+  }
+  return []
+}
 
 export class XmlMerger {
   private readonly parser: XmlParser
@@ -59,10 +75,15 @@ export class XmlMerger {
       other!.content
     )
 
-    if (mergedResult.output.length) {
+    const output =
+      mergedResult.output.length > 0
+        ? mergedResult.output
+        : preserveEmptyRoot(anc!.content, local!.content, other!.content)
+
+    if (output.length) {
       await this.writer.writeTo(
         out,
-        mergedResult.output,
+        output,
         namespaces,
         eol,
         mergedResult.hasConflict

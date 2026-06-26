@@ -183,4 +183,53 @@ describe('XmlMerger integration', () => {
       expect(result.output).toContain('Account.Name')
     })
   })
+
+  describe('empty root preservation (residual #3)', () => {
+    const NS = 'http://soap.sforce.com/2006/04/metadata'
+
+    it('given an empty self-closing root when identity-merging then preserves the root as an empty element (not a blank file)', async () => {
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<SharingRules xmlns="${NS}"/>`
+      const result = await mergeXmlStrings(sut, xml, xml, xml)
+      expect(result.hasConflict).toBe(false)
+      expect(result.output).toBe(
+        `<?xml version="1.0" encoding="UTF-8"?>\n<SharingRules xmlns="${NS}"></SharingRules>\n`
+      )
+    })
+
+    it('given an empty open/close root when identity-merging then preserves the root identically', async () => {
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<SharingRules xmlns="${NS}"></SharingRules>`
+      const result = await mergeXmlStrings(sut, xml, xml, xml)
+      expect(result.output).toBe(
+        `<?xml version="1.0" encoding="UTF-8"?>\n<SharingRules xmlns="${NS}"></SharingRules>\n`
+      )
+    })
+
+    it('given both sides emptied a populated root when merging then emits the empty root, not a blank file', async () => {
+      const ancestor = `<?xml version="1.0" encoding="UTF-8"?>\n<SharingRules xmlns="${NS}"><x>1</x></SharingRules>`
+      const emptied = `<?xml version="1.0" encoding="UTF-8"?>\n<SharingRules xmlns="${NS}"></SharingRules>`
+      const result = await mergeXmlStrings(sut, ancestor, emptied, emptied)
+      expect(result.output).toBe(
+        `<?xml version="1.0" encoding="UTF-8"?>\n<SharingRules xmlns="${NS}"></SharingRules>\n`
+      )
+    })
+
+    it('given an empty ancestor file but both sides add the same empty root then preserves the root (scans past the keyless side)', async () => {
+      // ancestor parses to {} (no root); ours/theirs each add an empty
+      // SharingRules. preserveEmptyRoot must scan past the keyless ancestor
+      // to find the root on a later side.
+      const root = `<?xml version="1.0" encoding="UTF-8"?>\n<SharingRules xmlns="${NS}"/>`
+      const result = await mergeXmlStrings(sut, '', root, root)
+      expect(result.output).toBe(
+        `<?xml version="1.0" encoding="UTF-8"?>\n<SharingRules xmlns="${NS}"></SharingRules>\n`
+      )
+    })
+
+    it('given a truly empty document (no root element) when merging then emits nothing', async () => {
+      // The other-extreme: with no root key in any side there is nothing to
+      // preserve, so the output stays byte-empty (writer short-circuit).
+      const result = await mergeXmlStrings(sut, '', '', '')
+      expect(result.output).toBe('')
+      expect(result.hasConflict).toBe(false)
+    })
+  })
 })
