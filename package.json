@@ -352,7 +352,7 @@
       ]
     },
     "test:nut": {
-      "command": "nyc mocha -r ts-node/register **/*.nut.ts",
+      "command": "nyc mocha -r ts-node/register 'test/**/*.nut.ts'",
       "files": [
         "src/**/*.ts",
         "test/**/*.ts",
