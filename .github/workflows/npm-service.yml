@@ -71,9 +71,8 @@ jobs:
       # zizmor's heuristic flags setup-node in any publishing workflow.
       - uses: actions/setup-node@v6 # zizmor: ignore[cache-poisoning]
         with:
-          # Build/pack the dev tarball on Node 22: prepack runs oclif, which
-          # loads undici@8.5 (requires Node >=22.19) and throws
-          # `markAsUncloneable is not a function` on Node 20. This is a build
+          # Build/pack the dev tarball on Node 22: prepack pulls undici 8.5
+          # (which needs Node >=22.19) and throws on Node 20. This is a build
           # step, not a runtime-compat test — Node 20 support is unchanged
           # (engines stays >=20; the e2e matrix still exercises Node 20).
           node-version: 22
