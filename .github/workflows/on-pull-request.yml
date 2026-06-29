@@ -69,7 +69,12 @@ jobs:
         uses: ./.github/actions/install
 
       - name: Check outdated dependencies
-        run: npm outdated
+        # The @salesforce/* stack and @jsforce/jsforce-node are intentionally
+        # held at their last Node-20-compatible versions; newer releases need
+        # Node >=22 (undici 8.5). Still fail on any other outdated dependency.
+        run: |
+          stale=$(npm outdated --json | jq -r 'del(.["@jsforce/jsforce-node"], .["@salesforce/core"], .["@salesforce/sf-plugins-core"]) | keys[]' || true)
+          [ -z "$stale" ] || { echo "Outdated dependencies: $stale"; exit 1; }
 
       - name: Check unused dependencies
         run: npm run lint:dependencies
