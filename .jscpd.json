@@ -7,7 +7,10 @@
       ".git/**",
       ".github/**",
       "**/*.md",
-      "node_modules/**",
+      "**/node_modules/**",
+      "**/package-lock.json",
+      "**/bin/**",
+      "report/**",
       "reports/**",
       "src/commands/**",
       "test/**"
