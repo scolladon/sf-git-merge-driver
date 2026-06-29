@@ -111,7 +111,8 @@
       "serialize-javascript": "7.0.5"
     },
     "qs": "6.15.2",
-    "js-yaml@^3": "4.2.0"
+    "js-yaml@^3": "4.2.0",
+    "@jsforce/jsforce-node": "3.10.16"
   },
   "publishConfig": {
     "access": "public"
