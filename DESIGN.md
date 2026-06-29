@@ -344,6 +344,8 @@ The convention for resolving the ambiguity is to read each candidate property vi
 
 When all three inputs are deeply equal, the merge returns immediately without traversing the structure. This significantly improves performance for unchanged files.
 
+The early result returns the raw parsed value rather than the per-element wrapper shape the rest of the pipeline emits. The parser groups repeated siblings under one key (`{tag: [entry1, entry2]}`), so `buildEarlyResult` (`src/types/mergeResult.ts`) expands a single such grouped key into one wrapper per entry (`[{tag: entry1}, {tag: entry2}]`). Without this the writer would treat the array as a single element's body and collapse the repeats into one element — the failure mode for an element whose only child is a repeated keyed array (e.g. `CustomLabels` → `<labels>`), pinned by fixture `46-noop-single-keyed-array`.
+
 ### 4. Immutable Context
 
 The `MergeContext` is immutable, ensuring strategies cannot accidentally modify shared state.

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomLabels xmlns="http://soap.sforce.com/2006/04/metadata">
+    <labels>
+        <fullName>Alpha</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Alpha</shortDescription>
+        <value>Alpha value</value>
+    </labels>
+    <labels>
+        <fullName>Beta</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Beta</shortDescription>
+        <value>Beta value</value>
+    </labels>
+</CustomLabels>
