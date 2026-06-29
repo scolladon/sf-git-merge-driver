@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778618872722,
+  "lastUpdate": 1782720929608,
   "repoUrl": "https://github.com/scolladon/sf-git-merge-driver",
   "entries": {
     "Binary Size Benchmark": [
@@ -173,6 +173,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "bin/merge-driver.cjs",
             "value": 36216,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "colladonsebastien@gmail.com",
+            "name": "Sebastien",
+            "username": "scolladon"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "34ddd43e3534c2c058cbe15a374e54a2efd270aa",
+          "message": "fix: emit XML tags in canonical (first-seen) order instead of alphabetical (#200)",
+          "timestamp": "2026-06-29T10:13:02+02:00",
+          "tree_id": "99b75268b1b83f189470d2db21bec053bfbf3940",
+          "url": "https://github.com/scolladon/sf-git-merge-driver/commit/34ddd43e3534c2c058cbe15a374e54a2efd270aa"
+        },
+        "date": 1782720929543,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "bin/merge-driver.cjs",
+            "value": 36195,
             "unit": "bytes"
           }
         ]
