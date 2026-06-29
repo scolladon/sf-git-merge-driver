@@ -25,6 +25,7 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v6
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Setup node
@@ -54,6 +55,8 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Setup node
         uses: actions/setup-node@v6
@@ -78,6 +81,8 @@ jobs:
       # Git Checkout
       - name: Checkout Code
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       # MegaLinter
       - name: MegaLinter
@@ -119,6 +124,7 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v6
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Setup node

@@ -86,30 +86,29 @@ describe('XmlStreamWriter', () => {
       )
     })
 
-    it('when several namespaces are passed in non-alphabetical insertion order then attributes emit alphabetically', async () => {
-      // Pins `Object.keys(namespaces).sort()` in writeRoot — without the
-      // sort, output would track insertion order, leaking input ordering
-      // into the wire format.
+    it('when several namespaces are passed in non-alphabetical insertion order then attributes emit in source/insertion order', async () => {
+      // Pins first-seen namespace order in writeRoot — the writer must
+      // preserve the insertion order of Object.keys(namespaces) so that
+      // the source order from the parser round-trips unchanged.
       const out = await serializeToString(sut, [{ Root: [{ v: '1' }] }], {
         '@_xmlns:zb': 'http://z',
         '@_xmlns:ab': 'http://a',
       })
-      expect(out.indexOf('xmlns:ab')).toBeLessThan(out.indexOf('xmlns:zb'))
+      expect(out.indexOf('xmlns:zb')).toBeLessThan(out.indexOf('xmlns:ab'))
     })
   })
 
   describe('given a multi-key compactRoot wrapper with non-alphabetical insertion order', () => {
-    it('when serialized then top-level elements emit alphabetically (writeRoot sorts)', async () => {
-      // Pins `Object.keys(obj).sort()` in writeRoot — without the sort,
-      // top-level emission would track input order. Multi-key root
-      // wrappers are unusual but the sort is still load-bearing for
-      // determinism across merge replays.
+    it('when serialized then top-level elements emit in first-seen insertion order', async () => {
+      // Pins first-seen key order in writeRoot — the writer must preserve
+      // Object.keys(obj) insertion order so the parser-emitted order
+      // round-trips to the wire format without resorting.
       const out = await serializeToString(
         sut,
         [{ Zeta: 'z', Alpha: 'a' } as never],
         {}
       )
-      expect(out.indexOf('<Alpha>')).toBeLessThan(out.indexOf('<Zeta>'))
+      expect(out.indexOf('<Zeta>')).toBeLessThan(out.indexOf('<Alpha>'))
     })
   })
 
@@ -301,17 +300,37 @@ describe('XmlStreamWriter', () => {
       )
     })
 
-    it('when a multi-key wrapper has keys in non-alphabetical insertion order then output sorts them', async () => {
-      // Pins the `keys.sort()` call in writeChildren's multi-key branch.
-      // Removing the sort would emit children in insertion order, leaking
-      // input ordering into the wire format and breaking determinism.
+    it('when a multi-key wrapper has keys in non-alphabetical insertion order then output preserves first-seen order', async () => {
+      // Pins first-seen key order in writeChildren's multi-key branch —
+      // the writer must emit children in parser/insertion order without
+      // resorting so the canonical tag order round-trips unchanged.
       const out = await serializeToString(
         sut,
         [{ Root: [{ zeta: '1', alpha: '2', mu: '3' }] }],
         {}
       )
       expect(out).toBe(
-        `${DECL}\n<Root>\n    <alpha>2</alpha>\n    <mu>3</mu>\n    <zeta>1</zeta>\n</Root>`
+        `${DECL}\n<Root>\n    <zeta>1</zeta>\n    <alpha>2</alpha>\n    <mu>3</mu>\n</Root>`
+      )
+    })
+
+    it('when a multi-key object body has attrs and children in non-alphabetical insertion order then splitAttrsAndChildren preserves first-seen order', async () => {
+      // Pins first-seen order in splitAttrsAndChildren (the :348 site) —
+      // attrs must appear before children (as before) but WITHIN each
+      // bucket the insertion order must be preserved, not alphabetised.
+      const out = await serializeToString(
+        sut,
+        [
+          {
+            Root: [
+              { tag: { '@_zb': 'z', '@_ab': 'a', zeta: '1', alpha: '2' } },
+            ],
+          },
+        ],
+        {}
+      )
+      expect(out).toBe(
+        `${DECL}\n<Root>\n    <tag zb="z" ab="a">\n        <zeta>1</zeta>\n        <alpha>2</alpha>\n    </tag>\n</Root>`
       )
     })
   })

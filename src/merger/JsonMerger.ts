@@ -8,7 +8,7 @@ import type { MergeResult } from '../types/mergeResult.js'
 import { combineResults } from '../types/mergeResult.js'
 import { log } from '../utils/LoggingDecorator.js'
 import { MergeOrchestrator } from './MergeOrchestrator.js'
-import { getUniqueSortedProps } from './mergePropertyKeys.js'
+import { getUniqueProps } from './mergePropertyKeys.js'
 import { defaultNodeFactory } from './nodes/MergeNodeFactory.js'
 
 export class JsonMerger {
@@ -32,7 +32,7 @@ export class JsonMerger {
     const otherObj = toJsonObjectOrEmpty(other)
 
     const results: MergeResult[] = []
-    const props = getUniqueSortedProps(ancestor, local, other)
+    const props = getUniqueProps(ancestor, local, other)
 
     for (const key of props) {
       const result = this.orchestrator.merge(

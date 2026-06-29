@@ -133,11 +133,11 @@ const writeConflictContent = (
     writeText(st, SALESFORCE_EOL)
     return
   }
-  // Non-empty: iteration is identical to writeChildren (sorted-key
-  // recursion into writeElement). Delegate instead of inlining the same
-  // loop — the two paths produced byte-equivalent output, only the
-  // single-key fast-path branch differed which is a sort-skip
-  // optimisation that's a no-op when keys.length === 1.
+  // Non-empty: iteration is identical to writeChildren (first-seen /
+  // insertion-order recursion into writeElement). Delegate instead of
+  // inlining the same loop — the two paths produce byte-equivalent
+  // output; the conflict path inherits first-seen order through the
+  // shared writeChildren.
   writeChildren(st, content, markers)
 }
 
@@ -174,13 +174,13 @@ const writeRoot = (
     const item = compactRoot[i] as JsonValue
     if (writeNonObjectItem(st, item, markers)) continue
     const obj = item as JsonObject
-    const keys = Object.keys(obj).sort()
+    const keys = Object.keys(obj)
     for (let j = 0; j < keys.length; j++) {
       const tagName = keys[j]!
       if (tagName === NAMESPACE_ROOT) continue
       let extraAttrs: ReadonlyArray<readonly [string, string]> = EMPTY_ATTRS
       if (isFirstTopLevel) {
-        const nsKeys = Object.keys(namespaces).sort()
+        const nsKeys = Object.keys(namespaces)
         const built: Array<readonly [string, string]> = new Array(nsKeys.length)
         for (let k = 0; k < nsKeys.length; k++) {
           const nsKey = nsKeys[k]!
@@ -320,7 +320,6 @@ const writeChildren = (
       )
       continue
     }
-    keys.sort()
     for (let j = 0; j < keys.length; j++) {
       const tagName = keys[j]!
       writeUnfoldedChild(st, tagName, child[tagName] as JsonValue, markers)
@@ -345,7 +344,7 @@ const splitAttrsAndChildren = (body: JsonValue): AttrsAndChildren => {
   }
   const attrs: Array<readonly [string, string]> = []
   const childTags: JsonArray = []
-  for (const key of Object.keys(body).sort()) {
+  for (const key of Object.keys(body)) {
     const value = body[key]
     if (key.startsWith(ATTR_PREFIX)) {
       attrs.push([key.slice(ATTR_PREFIX.length), String(value)])

@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Root>
-    <tag alpha="a" mike="m" zulu="z">body</tag>
+    <tag zulu="z" alpha="a" mike="m">body</tag>
 </Root>

@@ -16,7 +16,7 @@ import { jsonEqual } from '../../utils/jsonEqual.js'
 import { buildConflictMarkers } from '../ConflictMarkerBuilder.js'
 import type { MergeContext, RootKeyInfo } from '../MergeContext.js'
 import { MergeOrchestrator } from '../MergeOrchestrator.js'
-import { getUniqueSortedProps } from '../mergePropertyKeys.js'
+import { getUniqueProps } from '../mergePropertyKeys.js'
 
 // ============================================================================
 // Strategy Interface
@@ -47,7 +47,7 @@ abstract class AbstractMergeStrategy implements ScenarioStrategy {
     const ancestorObj =
       ancestor === undefined ? undefined : toJsonObjectOrEmpty(ancestor)
 
-    const props = getUniqueSortedProps(ancestor ?? {}, local, other)
+    const props = getUniqueProps(ancestor ?? {}, local, other)
     const results: MergeResult[] = []
 
     for (const key of props) {

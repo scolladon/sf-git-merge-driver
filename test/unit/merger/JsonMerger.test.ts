@@ -76,8 +76,8 @@ describe('JsonMerger', () => {
           Profile: [
             {
               fieldPermissions: [
-                { editable: 'true' },
                 { field: 'Account.AllAndAncestorAndOther' },
+                { editable: 'true' },
                 { readable: 'true' },
               ],
             },
@@ -101,15 +101,15 @@ describe('JsonMerger', () => {
             },
             {
               fieldPermissions: [
-                { editable: 'true' },
                 { field: 'Account.Name' },
+                { editable: 'true' },
                 { readable: 'true' },
               ],
             },
             {
               fieldPermissions: [
-                { editable: 'false' },
                 { field: 'Account.Type' },
+                { editable: 'false' },
                 { readable: 'false' },
               ],
             },
@@ -154,8 +154,8 @@ describe('JsonMerger', () => {
           Profile: [
             {
               fieldPermissions: [
-                { editable: 'true' },
                 { field: 'Account.Name' },
+                { editable: 'true' },
                 { readable: 'false' },
               ],
             },
@@ -201,8 +201,8 @@ describe('JsonMerger', () => {
           Profile: [
             {
               fieldPermissions: [
-                { editable: 'true' },
                 { field: 'Account.Name' },
+                { editable: 'true' },
                 { readable: 'true' },
               ],
             },
@@ -266,8 +266,8 @@ describe('JsonMerger', () => {
             },
             {
               fieldPermissions: [
-                { editable: 'true' },
                 { field: 'Account.Name' },
+                { editable: 'true' },
                 { readable: 'false' },
               ],
             },
@@ -383,7 +383,6 @@ describe('JsonMerger', () => {
       expect(result.output).toEqual([
         {
           Profile: [
-            { description: 'Their description' },
             {
               fieldPermissions: [
                 {
@@ -395,13 +394,13 @@ describe('JsonMerger', () => {
             },
             {
               fieldPermissions: [
+                { field: 'Account.Name' },
                 {
                   __conflict: true,
                   ancestor: [{}],
                   local: [{ editable: 'true' }],
                   other: [{ editable: 'false' }],
                 },
-                { field: 'Account.Name' },
                 {
                   __conflict: true,
                   ancestor: [{}],
@@ -419,6 +418,7 @@ describe('JsonMerger', () => {
                 },
               ],
             },
+            { description: 'Their description' },
           ],
         },
       ])
@@ -456,13 +456,13 @@ describe('JsonMerger', () => {
           Profile: [
             {
               fieldPermissions: [
+                { field: 'Account.Name' },
                 {
                   __conflict: true,
                   ancestor: [{}],
                   local: [{ editable: 'true' }],
                   other: [{ editable: 'false' }],
                 },
-                { field: 'Account.Name' },
                 { readable: 'true' },
               ],
             },
@@ -1255,7 +1255,7 @@ describe('JsonMerger', () => {
               loginHours: [{ fridayEnd: 400, fridayStart: 300 }],
             },
             {
-              loginHours: [{ mondayEnd: 400 }, { mondayStart: 200 }],
+              loginHours: [{ mondayStart: 200 }, { mondayEnd: 400 }],
             },
             {
               loginHours: [{ thursdayEnd: 400, thursdayStart: 300 }],
@@ -1264,7 +1264,7 @@ describe('JsonMerger', () => {
               loginHours: [{ tuesdayEnd: 400, tuesdayStart: 300 }],
             },
             {
-              loginHours: [{ wednesdayEnd: 500 }, { wednesdayStart: 300 }],
+              loginHours: [{ wednesdayStart: 300 }, { wednesdayEnd: 500 }],
             },
           ],
         },
@@ -1437,7 +1437,7 @@ describe('JsonMerger', () => {
               loginHours: [{ fridayEnd: 400, fridayStart: 300 }],
             },
             {
-              loginHours: [{ mondayEnd: 500 }, { mondayStart: 300 }],
+              loginHours: [{ mondayStart: 300 }, { mondayEnd: 500 }],
             },
             {
               loginHours: [{ thursdayEnd: 400, thursdayStart: 300 }],

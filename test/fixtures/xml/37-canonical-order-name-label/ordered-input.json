@@ -1,0 +1,6 @@
+{
+  "ordered": [
+    { "Translations": [ { "labels": [ { "name": "MyLabel" }, { "label": "Mon étiquette" } ] } ] }
+  ],
+  "namespaces": { "@_xmlns": "http://soap.sforce.com/2006/04/metadata" }
+}
