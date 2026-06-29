@@ -122,15 +122,31 @@ describe('XmlStreamWriter', () => {
   })
 
   describe('given an empty element', () => {
-    it('when serialized then emits <tag></tag> (not self-closing)', async () => {
+    it('when serialized then self-closes as <tag/> to match sf project retrieve', async () => {
       const out = await serializeToString(
         sut,
         [{ Root: [{ empty: [] }, { filled: 'v' }] }],
         {}
       )
       expect(out).toBe(
-        `${DECL}\n<Root>\n    <empty></empty>\n    <filled>v</filled>\n</Root>\n`
+        `${DECL}\n<Root>\n    <empty/>\n    <filled>v</filled>\n</Root>\n`
       )
+    })
+
+    it('when the body is an empty string then it self-closes as <tag/>', async () => {
+      // `<value/>` and `<value></value>` both parse to a `''` body, which
+      // splitAttrsAndChildren normalises to a single empty-text child.
+      const out = await serializeToString(sut, [{ Root: [{ v: '' }] }], {})
+      expect(out).toBe(`${DECL}\n<Root>\n    <v/>\n</Root>\n`)
+    })
+
+    it('when an attr-only element has an empty body then attrs stay on the self-closed tag', async () => {
+      const out = await serializeToString(
+        sut,
+        [{ Root: [{ v: { '@_a': 'x', '#text': '' } }] }],
+        {}
+      )
+      expect(out).toBe(`${DECL}\n<Root>\n    <v a="x"/>\n</Root>\n`)
     })
   })
 
@@ -263,9 +279,9 @@ describe('XmlStreamWriter', () => {
   })
 
   describe('given a compact tree where an element body is null', () => {
-    it('when serialized then element emits as <tag></tag>', async () => {
+    it('when serialized then element self-closes as <tag/>', async () => {
       const out = await serializeToString(sut, [{ Root: [{ n: null }] }], {})
-      expect(out).toBe(`${DECL}\n<Root>\n    <n></n>\n</Root>\n`)
+      expect(out).toBe(`${DECL}\n<Root>\n    <n/>\n</Root>\n`)
     })
   })
 
@@ -356,7 +372,7 @@ describe('XmlStreamWriter', () => {
         {}
       )
       expect(out).toBe(
-        `${DECL}\n<Root>\n    <types>\n        <members></members>\n        <name>Obj</name>\n    </types>\n</Root>\n`
+        `${DECL}\n<Root>\n    <types>\n        <members/>\n        <name>Obj</name>\n    </types>\n</Root>\n`
       )
     })
 

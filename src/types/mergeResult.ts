@@ -58,7 +58,8 @@ export const wrapWithRootKey = (
 // body and collapses the repeats into a single element (e.g. CustomLabels whose
 // only child is a repeated `<labels>`). Expand it to one wrapper per entry so
 // every sibling survives — the writer handles each entry's own body unchanged.
-// An empty array is the "empty `<tag></tag>`" shape and is left intact.
+// An empty array is the empty-element shape (self-closed `<tag/>` on
+// output) and is left intact.
 const expandGroupedRepeats = (value: JsonValue): JsonArray => {
   const keys = Object.keys(value as JsonObject)
   if (keys.length !== 1) {

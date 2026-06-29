@@ -12,7 +12,7 @@ const mergeNamespaces = (...maps: JsonObject[]): JsonObject =>
 
 // When the JSON merge yields no output but BOTH live sides (ours and theirs)
 // still carry the root element, rebuild it as an empty element
-// (<Root></Root>) so an empty-bodied root round-trips instead of blanking the
+// (<Root/>) so an empty-bodied root round-trips instead of blanking the
 // file — a blank file is never valid Salesforce metadata (e.g. an identity
 // merge of <SharingRules xmlns="..."/>, which parses to { SharingRules: '' }
 // and collapses to no output). Requiring the root on BOTH live sides is

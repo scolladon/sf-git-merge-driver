@@ -197,6 +197,15 @@ const writeRoot = (
   }
 }
 
+// An element renders empty when every child produces no output. The only
+// such child is empty text (`{ '#text': '' }`) — the shape a `''` or
+// attr-only body collapses to in splitAttrsAndChildren, and what both
+// `<tag/>` and `<tag></tag>` parse to via TxmlXmlParser. An element with no
+// children is empty too (`[].every` is vacuously true). `sf project retrieve`
+// self-closes every empty element, so the writer matches that wire form.
+const isEmptyElementBody = (children: JsonArray): boolean =>
+  children.every(child => isObject(child) && child[TEXT_KEY] === '')
+
 const writeElement = (
   st: WalkState,
   name: string,
@@ -234,12 +243,20 @@ const writeElement = (
       ? attrsToString(attrs)
       : attrsToString(extraAttrs) + attrsToString(attrs)
 
-  if (st.isFirstTopLevelAfterDecl) {
-    st.buf += `<${name}${attrStr}>`
-    st.isFirstTopLevelAfterDecl = false
-  } else {
-    st.buf += `${getIndent(st.depth)}<${name}${attrStr}>`
+  const indent = st.isFirstTopLevelAfterDecl ? '' : getIndent(st.depth)
+  st.isFirstTopLevelAfterDecl = false
+
+  // Empty elements self-close (`<tag/>`): `sf project retrieve` never emits
+  // the expanded `<tag></tag>` form, so the merge output converges to its
+  // byte shape. The trailing `>` leaves endedWithGt=true for the parent,
+  // identical to the close-tag path below.
+  if (isEmptyElementBody(children)) {
+    st.buf += `${indent}<${name}${attrStr}/>`
+    st.endedWithGt = true
+    return
   }
+
+  st.buf += `${indent}<${name}${attrStr}>`
   const parentDepth = st.depth
   st.depth = parentDepth + 1
   st.endedWithGt = false
@@ -267,7 +284,7 @@ const writeElement = (
 // single element with concatenated text content.
 //
 // Empty arrays still emit one empty element (matches the AncestorOnlyStrategy
-// `{name: []}` contract for "empty `<name></name>`").
+// `{name: []}` contract); writeElement self-closes it as `<name/>`.
 const writeUnfoldedChild = (
   st: WalkState,
   tagName: string,

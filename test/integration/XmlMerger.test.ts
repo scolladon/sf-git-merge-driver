@@ -192,15 +192,15 @@ describe('XmlMerger integration', () => {
       const result = await mergeXmlStrings(sut, xml, xml, xml)
       expect(result.hasConflict).toBe(false)
       expect(result.output).toBe(
-        `<?xml version="1.0" encoding="UTF-8"?>\n<SharingRules xmlns="${NS}"></SharingRules>\n`
+        `<?xml version="1.0" encoding="UTF-8"?>\n<SharingRules xmlns="${NS}"/>\n`
       )
     })
 
-    it('given an empty open/close root when identity-merging then preserves the root identically', async () => {
+    it('given an empty open/close root when identity-merging then preserves the root, canonicalized to a self-closing element', async () => {
       const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<SharingRules xmlns="${NS}"></SharingRules>`
       const result = await mergeXmlStrings(sut, xml, xml, xml)
       expect(result.output).toBe(
-        `<?xml version="1.0" encoding="UTF-8"?>\n<SharingRules xmlns="${NS}"></SharingRules>\n`
+        `<?xml version="1.0" encoding="UTF-8"?>\n<SharingRules xmlns="${NS}"/>\n`
       )
     })
 
@@ -209,7 +209,7 @@ describe('XmlMerger integration', () => {
       const emptied = `<?xml version="1.0" encoding="UTF-8"?>\n<SharingRules xmlns="${NS}"></SharingRules>`
       const result = await mergeXmlStrings(sut, ancestor, emptied, emptied)
       expect(result.output).toBe(
-        `<?xml version="1.0" encoding="UTF-8"?>\n<SharingRules xmlns="${NS}"></SharingRules>\n`
+        `<?xml version="1.0" encoding="UTF-8"?>\n<SharingRules xmlns="${NS}"/>\n`
       )
     })
 
@@ -220,7 +220,7 @@ describe('XmlMerger integration', () => {
       const root = `<?xml version="1.0" encoding="UTF-8"?>\n<SharingRules xmlns="${NS}"/>`
       const result = await mergeXmlStrings(sut, '', root, root)
       expect(result.output).toBe(
-        `<?xml version="1.0" encoding="UTF-8"?>\n<SharingRules xmlns="${NS}"></SharingRules>\n`
+        `<?xml version="1.0" encoding="UTF-8"?>\n<SharingRules xmlns="${NS}"/>\n`
       )
     })
 

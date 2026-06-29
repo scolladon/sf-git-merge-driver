@@ -129,9 +129,9 @@ describe('XmlMerger.mergeThreeWay', () => {
 
   describe('given an empty-bodied root on both live sides (residual #3)', () => {
     const ROOT = `<?xml version="1.0"?><Root></Root>`
-    const PRESERVED = `<?xml version="1.0" encoding="UTF-8"?>\n<Root></Root>\n`
+    const PRESERVED = `<?xml version="1.0" encoding="UTF-8"?>\n<Root/>\n`
 
-    it('when all three sides are the empty root then it is preserved as <Root></Root>, not blanked', async () => {
+    it('when all three sides are the empty root then it is preserved as <Root/>, not blanked', async () => {
       // JsonMerger on three empty-content roots produces an empty output
       // array; preserveEmptyRoot rebuilds the root because BOTH live sides
       // carry it (a blank file is never valid Salesforce metadata).
