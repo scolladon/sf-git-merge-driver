@@ -39,11 +39,7 @@ jobs:
           git config --local user.name "github-actions[bot]"
 
       - name: Install cli
-        # sf CLI >=2.142 pins undici@8.5 (Node >=22.19) via jsforce-node@3.10.17,
-        # breaking its own engines>=18 contract. Pin Node 20 to the last honest release.
-        env:
-          CLI_SPEC: ${{ matrix.node == 20 && '@salesforce/cli@2.141.6' || '@salesforce/cli' }}
-        run: npm install -g "$CLI_SPEC"
+        run: npm install -g @salesforce/cli
 
       - name: Install new plugin version
         env:
