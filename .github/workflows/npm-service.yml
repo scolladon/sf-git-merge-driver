@@ -80,7 +80,11 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           npm run build
-          TARBALL=$(npm pack 2>/dev/null | tail -1)
+          npm pack
+          # Derive the tarball name from package.json rather than parsing
+          # `npm pack` stdout: newer npm prints the filename to stderr, so
+          # `npm pack 2>/dev/null | tail -1` silently yields an empty string.
+          TARBALL=$(node -p "const p=require('./package.json'); p.name.replace('@','').replace('/','-')+'-'+p.version+'.tgz'")
           FIXED_NAME="sf-git-merge-driver-dev-pr-${PR_NUMBER}.tgz"
           mv "$TARBALL" "$FIXED_NAME"
           echo "tarball=$FIXED_NAME" >> "$GITHUB_OUTPUT"
