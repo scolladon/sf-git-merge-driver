@@ -165,7 +165,9 @@ jobs:
 
   perf:
     needs: [build]
+    # reusable-perf.yml pushes benchmark data to gh-pages, so it needs
+    # contents: write; a reusable workflow cannot exceed the caller's grant.
     permissions:
-      contents: read
+      contents: write
       pull-requests: write
     uses: ./.github/workflows/reusable-perf.yml
