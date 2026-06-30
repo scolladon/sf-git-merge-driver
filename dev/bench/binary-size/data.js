@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1782720929608,
+  "lastUpdate": 1782805703651,
   "repoUrl": "https://github.com/scolladon/sf-git-merge-driver",
   "entries": {
     "Binary Size Benchmark": [
@@ -202,6 +202,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "bin/merge-driver.cjs",
             "value": 36195,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "colladonsebastien@gmail.com",
+            "name": "Sebastien",
+            "username": "scolladon"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "88516bf68fe745745b90f3df4a5e237a1c4780e5",
+          "message": "fix: resolve PR #200 QA residuals (empty root, trailing newline) + megalinter (#201)",
+          "timestamp": "2026-06-30T09:45:42+02:00",
+          "tree_id": "637458c6f4214fbcd2788e98d1bba02cef944567",
+          "url": "https://github.com/scolladon/sf-git-merge-driver/commit/88516bf68fe745745b90f3df4a5e237a1c4780e5"
+        },
+        "date": 1782805703583,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "bin/merge-driver.cjs",
+            "value": 36588,
             "unit": "bytes"
           }
         ]
