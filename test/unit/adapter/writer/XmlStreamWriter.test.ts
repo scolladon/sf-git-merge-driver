@@ -25,20 +25,128 @@ describe('XmlStreamWriter', () => {
         [{ Root: [{ leaf: 'text' }] }],
         {}
       )
-      expect(out).toBe(`${DECL}\n<Root>\n    <leaf>text</leaf>\n</Root>`)
+      expect(out).toBe(`${DECL}\n<Root>\n    <leaf>text</leaf>\n</Root>\n`)
+    })
+  })
+
+  describe('given any non-empty document (trailing newline contract)', () => {
+    it('when serialized conflict-free then output ends with exactly one trailing newline', async () => {
+      // `sf project retrieve` writes metadata XML ending in a newline;
+      // the writer converges to that byte shape. Pins `st.buf += '\n'`.
+      const out = await serializeToString(sut, [{ Root: [{ v: '1' }] }], {})
+      expect(out.endsWith('</Root>\n')).toBe(true)
+      expect(out.endsWith('</Root>\n\n')).toBe(false)
+    })
+
+    it('when serialized with a conflict then output still ends with a trailing newline', async () => {
+      // Exercises the conflict path (ConflictLineFilter), distinct from
+      // the conflict-free fast path — the trailing newline must survive
+      // both branches.
+      const sink = new PassThrough()
+      const chunks: Buffer[] = []
+      sink.on('data', (c: Buffer) => chunks.push(c))
+      await sut.writeTo(
+        sink,
+        [
+          {
+            Root: [
+              {
+                v: {
+                  __conflict: true,
+                  local: ['L'],
+                  ancestor: [],
+                  other: ['O'],
+                },
+              },
+            ],
+          },
+        ],
+        {},
+        '\n',
+        true
+      )
+      sink.end()
+      const out = Buffer.concat(chunks).toString('utf8')
+      expect(out.endsWith('\n')).toBe(true)
+    })
+
+    it('when serialized with CRLF target then output ends with a CRLF', async () => {
+      const sink = new PassThrough()
+      const chunks: Buffer[] = []
+      sink.on('data', (c: Buffer) => chunks.push(c))
+      await sut.writeTo(sink, [{ Root: [{ v: '1' }] }], {}, '\r\n', false)
+      sink.end()
+      const out = Buffer.concat(chunks).toString('utf8')
+      expect(out.endsWith('</Root>\r\n')).toBe(true)
+    })
+
+    it('when serialized with a conflict and CRLF target then the trailing newline is also CRLF', async () => {
+      // Pins that the conflict path routes its appended trailing newline
+      // through applyEol too (a raw LF would survive a CRLF target otherwise).
+      const sink = new PassThrough()
+      const chunks: Buffer[] = []
+      sink.on('data', (c: Buffer) => chunks.push(c))
+      await sut.writeTo(
+        sink,
+        [
+          {
+            Root: [
+              {
+                v: {
+                  __conflict: true,
+                  local: ['L'],
+                  ancestor: [],
+                  other: ['O'],
+                },
+              },
+            ],
+          },
+        ],
+        {},
+        '\r\n',
+        true
+      )
+      sink.end()
+      const out = Buffer.concat(chunks).toString('utf8')
+      expect(out.endsWith('\r\n')).toBe(true)
+      expect(out.endsWith('\n\n')).toBe(false)
+      expect(/[^\r]\n$/.test(out)).toBe(false)
+    })
+
+    it('when the document is empty then no trailing newline is emitted', async () => {
+      // The `ordered.length === 0` short-circuit runs before the newline
+      // append, so an empty document stays byte-empty (no stray newline).
+      const out = await serializeToString(sut, [], { '@_xmlns': 'http://x' })
+      expect(out).toBe('')
     })
   })
 
   describe('given an empty element', () => {
-    it('when serialized then emits <tag></tag> (not self-closing)', async () => {
+    it('when serialized then self-closes as <tag/> to match sf project retrieve', async () => {
       const out = await serializeToString(
         sut,
         [{ Root: [{ empty: [] }, { filled: 'v' }] }],
         {}
       )
       expect(out).toBe(
-        `${DECL}\n<Root>\n    <empty></empty>\n    <filled>v</filled>\n</Root>`
+        `${DECL}\n<Root>\n    <empty/>\n    <filled>v</filled>\n</Root>\n`
       )
+    })
+
+    it('when the body is an empty string then it self-closes as <tag/>', async () => {
+      // `<value/>` and `<value></value>` both parse to a `''` body, which
+      // splitAttrsAndChildren normalises to a single empty-text child.
+      const out = await serializeToString(sut, [{ Root: [{ v: '' }] }], {})
+      expect(out).toBe(`${DECL}\n<Root>\n    <v/>\n</Root>\n`)
+    })
+
+    it('when an attr-only element has an empty body then attrs stay on the self-closed tag', async () => {
+      const out = await serializeToString(
+        sut,
+        [{ Root: [{ v: { '@_a': 'x', '#text': '' } }] }],
+        {}
+      )
+      expect(out).toBe(`${DECL}\n<Root>\n    <v a="x"/>\n</Root>\n`)
     })
   })
 
@@ -50,7 +158,7 @@ describe('XmlStreamWriter', () => {
         {}
       )
       expect(out).toBe(
-        `${DECL}\n<Root>\n    <v><![CDATA[a ]]]]><![CDATA[> b]]>\n    </v>\n</Root>`
+        `${DECL}\n<Root>\n    <v><![CDATA[a ]]]]><![CDATA[> b]]>\n    </v>\n</Root>\n`
       )
     })
   })
@@ -71,7 +179,7 @@ describe('XmlStreamWriter', () => {
         {}
       )
       expect(out).toBe(
-        `${DECL}\n<Root><!--first--><!--second-->\n    <val>x</val>\n</Root>`
+        `${DECL}\n<Root><!--first--><!--second-->\n    <val>x</val>\n</Root>\n`
       )
     })
   })
@@ -82,7 +190,7 @@ describe('XmlStreamWriter', () => {
         '@_xmlns': 'http://x',
       })
       expect(out).toBe(
-        `${DECL}\n<Root xmlns="http://x">\n    <v>1</v>\n</Root>`
+        `${DECL}\n<Root xmlns="http://x">\n    <v>1</v>\n</Root>\n`
       )
     })
 
@@ -130,7 +238,7 @@ describe('XmlStreamWriter', () => {
         false
       )
       const out = Buffer.concat(chunks).toString('utf8')
-      expect(out).toBe(`${DECL}\nraw<Root>\n    <v>1</v>\n</Root>`)
+      expect(out).toBe(`${DECL}\nraw<Root>\n    <v>1</v>\n</Root>\n`)
       expect(out).not.toContain('\n\nraw')
     })
   })
@@ -166,21 +274,21 @@ describe('XmlStreamWriter', () => {
         ['raw' as unknown as never, { Root: [{ v: '1' }] }],
         {}
       )
-      expect(out).toBe(`${DECL}\nraw<Root>\n    <v>1</v>\n</Root>`)
+      expect(out).toBe(`${DECL}\nraw<Root>\n    <v>1</v>\n</Root>\n`)
     })
   })
 
   describe('given a compact tree where an element body is null', () => {
-    it('when serialized then element emits as <tag></tag>', async () => {
+    it('when serialized then element self-closes as <tag/>', async () => {
       const out = await serializeToString(sut, [{ Root: [{ n: null }] }], {})
-      expect(out).toBe(`${DECL}\n<Root>\n    <n></n>\n</Root>`)
+      expect(out).toBe(`${DECL}\n<Root>\n    <n/>\n</Root>\n`)
     })
   })
 
   describe('given a compact tree where an element body is a scalar', () => {
     it('when serialized then scalar wraps as inline text', async () => {
       const out = await serializeToString(sut, [{ Root: [{ v: 42 }] }], {})
-      expect(out).toBe(`${DECL}\n<Root>\n    <v>42</v>\n</Root>`)
+      expect(out).toBe(`${DECL}\n<Root>\n    <v>42</v>\n</Root>\n`)
     })
   })
 
@@ -195,7 +303,7 @@ describe('XmlStreamWriter', () => {
       // `<child>` elements, one per entry — matches the "repeated child
       // element" pattern in the compact merged tree.
       expect(out).toBe(
-        `${DECL}\n<Root>\n    <child>\n        <a>1</a>\n    </child>\n    <child>\n        <a>2</a>\n    </child>\n</Root>`
+        `${DECL}\n<Root>\n    <child>\n        <a>1</a>\n    </child>\n    <child>\n        <a>2</a>\n    </child>\n</Root>\n`
       )
     })
   })
@@ -220,7 +328,7 @@ describe('XmlStreamWriter', () => {
         {}
       )
       expect(out).toBe(
-        `${DECL}\n<Package>\n    <types>\n        <members>Account</members>\n        <members>Contact</members>\n        <name>Obj</name>\n    </types>\n</Package>`
+        `${DECL}\n<Package>\n    <types>\n        <members>Account</members>\n        <members>Contact</members>\n        <name>Obj</name>\n    </types>\n</Package>\n`
       )
     })
 
@@ -250,7 +358,7 @@ describe('XmlStreamWriter', () => {
         {}
       )
       expect(out).toBe(
-        `${DECL}\n<Workflow>\n    <alerts>\n        <fullName>NewAlert</fullName>\n        <recipients>\n            <recipient>A</recipient>\n            <type>user</type>\n        </recipients>\n        <recipients>\n            <recipient>B</recipient>\n            <type>user</type>\n        </recipients>\n    </alerts>\n</Workflow>`
+        `${DECL}\n<Workflow>\n    <alerts>\n        <fullName>NewAlert</fullName>\n        <recipients>\n            <recipient>A</recipient>\n            <type>user</type>\n        </recipients>\n        <recipients>\n            <recipient>B</recipient>\n            <type>user</type>\n        </recipients>\n    </alerts>\n</Workflow>\n`
       )
     })
 
@@ -264,7 +372,7 @@ describe('XmlStreamWriter', () => {
         {}
       )
       expect(out).toBe(
-        `${DECL}\n<Root>\n    <types>\n        <members></members>\n        <name>Obj</name>\n    </types>\n</Root>`
+        `${DECL}\n<Root>\n    <types>\n        <members/>\n        <name>Obj</name>\n    </types>\n</Root>\n`
       )
     })
 
@@ -282,7 +390,7 @@ describe('XmlStreamWriter', () => {
       )
       expect(out).not.toContain('<![CDATA[seg1]]><![CDATA[seg2]]>')
       expect(out).toBe(
-        `${DECL}\n<Root><![CDATA[seg1seg2]]>\n    <name>X</name>\n</Root>`
+        `${DECL}\n<Root><![CDATA[seg1seg2]]>\n    <name>X</name>\n</Root>\n`
       )
     })
 
@@ -296,7 +404,7 @@ describe('XmlStreamWriter', () => {
       )
       expect(out).not.toContain('<!--c1--><!--c2-->')
       expect(out).toBe(
-        `${DECL}\n<Root><!--c1,c2-->\n    <name>X</name>\n</Root>`
+        `${DECL}\n<Root><!--c1,c2-->\n    <name>X</name>\n</Root>\n`
       )
     })
 
@@ -310,7 +418,7 @@ describe('XmlStreamWriter', () => {
         {}
       )
       expect(out).toBe(
-        `${DECL}\n<Root>\n    <zeta>1</zeta>\n    <alpha>2</alpha>\n    <mu>3</mu>\n</Root>`
+        `${DECL}\n<Root>\n    <zeta>1</zeta>\n    <alpha>2</alpha>\n    <mu>3</mu>\n</Root>\n`
       )
     })
 
@@ -330,7 +438,7 @@ describe('XmlStreamWriter', () => {
         {}
       )
       expect(out).toBe(
-        `${DECL}\n<Root>\n    <tag zb="z" ab="a">\n        <zeta>1</zeta>\n        <alpha>2</alpha>\n    </tag>\n</Root>`
+        `${DECL}\n<Root>\n    <tag zb="z" ab="a">\n        <zeta>1</zeta>\n        <alpha>2</alpha>\n    </tag>\n</Root>\n`
       )
     })
   })
@@ -342,7 +450,7 @@ describe('XmlStreamWriter', () => {
         [{ Root: [{ v: { '@_id': '7', '#text': 'hi' } }] }],
         {}
       )
-      expect(out).toBe(`${DECL}\n<Root>\n    <v id="7">hi</v>\n</Root>`)
+      expect(out).toBe(`${DECL}\n<Root>\n    <v id="7">hi</v>\n</Root>\n`)
     })
   })
 
@@ -354,7 +462,7 @@ describe('XmlStreamWriter', () => {
         {}
       )
       expect(out).toBe(
-        `${DECL}\n<Root>\n    <v>before\n        <inner>x</inner>\n    </v>\n</Root>`
+        `${DECL}\n<Root>\n    <v>before\n        <inner>x</inner>\n    </v>\n</Root>\n`
       )
     })
   })
@@ -367,7 +475,7 @@ describe('XmlStreamWriter', () => {
         {}
       )
       expect(out).not.toContain('ignored')
-      expect(out).toBe(`${DECL}\n<Root>\n    <v>1</v>\n</Root>`)
+      expect(out).toBe(`${DECL}\n<Root>\n    <v>1</v>\n</Root>\n`)
     })
   })
 
@@ -399,7 +507,7 @@ describe('XmlStreamWriter', () => {
         [{ Root: [{ '#text': 'a\n   \nb' }] }],
         {}
       )
-      expect(out).toBe(`${DECL}\n<Root>a\nb</Root>`)
+      expect(out).toBe(`${DECL}\n<Root>a\nb</Root>\n`)
     })
   })
 
@@ -421,14 +529,14 @@ describe('XmlStreamWriter', () => {
 
     it('when serialized then the indented marker and blank line are preserved verbatim', async () => {
       const out = await collect(false)
-      expect(out).toBe(`${DECL}\n<Root>\n    ${sepMk}\n   \n</Root>`)
+      expect(out).toBe(`${DECL}\n<Root>\n    ${sepMk}\n   \n</Root>\n`)
     })
 
     it('when hasConflict=true then the filter actively rewrites the same input (proves the bypass is what skipped the rewrite)', async () => {
       const filtered = await collect(true)
       // Filter strips leading whitespace before the marker and drops
       // the whitespace-only line — output must differ from the bypass.
-      expect(filtered).not.toBe(`${DECL}\n<Root>\n    ${sepMk}\n   \n</Root>`)
+      expect(filtered).not.toBe(`${DECL}\n<Root>\n    ${sepMk}\n   \n</Root>\n`)
       expect(filtered).toContain(`\n${sepMk}\n`)
       expect(filtered).not.toContain('   \n')
     })
@@ -442,7 +550,7 @@ describe('XmlStreamWriter', () => {
       sink.on('data', (c: Buffer) => chunks.push(c))
       await writer.writeTo(sink, [{ Root: [{ v: '1' }] }], {}, '\r\n')
       const out = Buffer.concat(chunks).toString('utf8')
-      expect(out).toBe(`${DECL}\r\n<Root>\r\n    <v>1</v>\r\n</Root>`)
+      expect(out).toBe(`${DECL}\r\n<Root>\r\n    <v>1</v>\r\n</Root>\r\n`)
     })
   })
 
@@ -474,7 +582,7 @@ describe('XmlStreamWriter', () => {
       const throttled = buildThrottled(written)
       const writer = new XmlStreamWriter(defaultConfig)
       await writer.writeTo(throttled, [{ Root: [{ v: '1' }] }], {})
-      expect(written.join('')).toBe(`${DECL}\n<Root>\n    <v>1</v>\n</Root>`)
+      expect(written.join('')).toBe(`${DECL}\n<Root>\n    <v>1</v>\n</Root>\n`)
     })
 
     it('when serialized with hasConflict=false then the single-write fast path also awaits drain', async () => {
@@ -484,7 +592,7 @@ describe('XmlStreamWriter', () => {
       const throttled = buildThrottled(written)
       const writer = new XmlStreamWriter(defaultConfig)
       await writer.writeTo(throttled, [{ Root: [{ v: '1' }] }], {}, '\n', false)
-      expect(written.join('')).toBe(`${DECL}\n<Root>\n    <v>1</v>\n</Root>`)
+      expect(written.join('')).toBe(`${DECL}\n<Root>\n    <v>1</v>\n</Root>\n`)
     })
   })
 
@@ -496,7 +604,7 @@ describe('XmlStreamWriter', () => {
         {}
       )
       expect(out).toBe(
-        `${DECL}\n<Root>\n    <a>1</a>\n    <![CDATA[boom]]>\n</Root>`
+        `${DECL}\n<Root>\n    <a>1</a>\n    <![CDATA[boom]]>\n</Root>\n`
       )
     })
   })
@@ -509,7 +617,7 @@ describe('XmlStreamWriter', () => {
         {}
       )
       expect(out).toBe(
-        `${DECL}\n<Root>\n    <v><![CDATA[a ]]]]><![CDATA[> b]]>\n    </v>\n</Root>`
+        `${DECL}\n<Root>\n    <v><![CDATA[a ]]]]><![CDATA[> b]]>\n    </v>\n</Root>\n`
       )
     })
   })
@@ -522,7 +630,7 @@ describe('XmlStreamWriter', () => {
         {}
       )
       expect(out).toBe(
-        `${DECL}\n<Root>\n    <v>\n        <a>1</a>\n        trailing</v>\n</Root>`
+        `${DECL}\n<Root>\n    <v>\n        <a>1</a>\n        trailing</v>\n</Root>\n`
       )
     })
   })
@@ -532,7 +640,7 @@ describe('XmlStreamWriter', () => {
       const out = await serializeToString(sut, [{ A: 'x' }, { B: 'y' }], {
         '@_xmlns': 'http://a',
       })
-      expect(out).toBe(`${DECL}\n<A xmlns="http://a">x</A>\n<B>y</B>`)
+      expect(out).toBe(`${DECL}\n<A xmlns="http://a">x</A>\n<B>y</B>\n`)
     })
   })
 
@@ -688,8 +796,8 @@ describe('XmlStreamWriter', () => {
       // reorder or drop content.
       expect(joined).toContain('<item>value-0000</item>')
       expect(joined).toContain('<item>value-0399</item>')
-      expect(joined.startsWith(`${DECL}\n<Root>`)).toBe(true)
-      expect(joined.endsWith('</Root>')).toBe(true)
+      expect(joined.startsWith(`${DECL}\n<Root>\n`)).toBe(true)
+      expect(joined.endsWith('</Root>\n')).toBe(true)
       // Sanity: length crosses the 16 KiB threshold.
       expect(joined.length).toBeGreaterThan(16 * 1024)
       // Invariant 3: each item appears exactly once. Pins the

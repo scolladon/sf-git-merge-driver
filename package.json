@@ -13,9 +13,10 @@
     "url": "git+https://github.com/scolladon/sf-git-merge-driver.git"
   },
   "dependencies": {
+    "@jsforce/jsforce-node": "3.10.16",
     "@oclif/core": "^4.11.11",
-    "@salesforce/core": "^8.31.3",
-    "@salesforce/sf-plugins-core": "^12.2.24",
+    "@salesforce/core": "8.31.3",
+    "@salesforce/sf-plugins-core": "12.2.24",
     "simple-git": "^3.36.0",
     "txml": "^6.0.0"
   },
@@ -110,7 +111,9 @@
       "diff": "8.0.4",
       "serialize-javascript": "7.0.5"
     },
-    "qs": "6.15.2"
+    "qs": "6.15.2",
+    "js-yaml@^3": "4.2.0",
+    "@jsforce/jsforce-node": "3.10.16"
   },
   "publishConfig": {
     "access": "public"

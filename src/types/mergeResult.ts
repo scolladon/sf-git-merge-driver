@@ -1,5 +1,5 @@
 import { pushAll } from '../utils/arrayUtils.js'
-import type { JsonArray, JsonValue } from './jsonTypes.js'
+import type { JsonArray, JsonObject, JsonValue } from './jsonTypes.js'
 
 export interface MergeResult {
   readonly output: JsonArray
@@ -51,6 +51,28 @@ export const wrapWithRootKey = (
   return noConflict([{ [rootKeyName]: [] }])
 }
 
+// The merge pipeline emits one single-key wrapper per element, but the parser
+// groups repeated siblings under one key as `{tag: [entry1, entry2]}`. An early
+// (no-op / single-side) result returns that raw shape verbatim; when the body
+// is a single such grouped key the writer treats the array as one element's
+// body and collapses the repeats into a single element (e.g. CustomLabels whose
+// only child is a repeated `<labels>`). Expand it to one wrapper per entry so
+// every sibling survives — the writer handles each entry's own body unchanged.
+// An empty array is the empty-element shape (self-closed `<tag/>` on
+// output) and is left intact.
+const expandGroupedRepeats = (value: JsonValue): JsonArray => {
+  const keys = Object.keys(value as JsonObject)
+  if (keys.length !== 1) {
+    return [value] as JsonArray
+  }
+  const key = keys[0]!
+  const inner = (value as JsonObject)[key]
+  if (!Array.isArray(inner) || inner.length === 0) {
+    return [value] as JsonArray
+  }
+  return inner.map(entry => ({ [key]: entry })) as JsonArray
+}
+
 export const buildEarlyResult = (
   value: JsonValue | undefined,
   rootKeyName?: string
@@ -60,7 +82,7 @@ export const buildEarlyResult = (
       ? []
       : Array.isArray(value)
         ? (value as JsonArray)
-        : ([value] as JsonArray)
+        : expandGroupedRepeats(value)
   if (rootKeyName) {
     return noConflict([{ [rootKeyName]: content }])
   }

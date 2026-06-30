@@ -15,6 +15,9 @@ jobs:
         os: [macos-latest, windows-latest, ubuntu-latest]
         node: [20, 22, 24]
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Checkout sources
         uses: actions/checkout@v6
@@ -39,7 +42,9 @@ jobs:
         run: npm install -g @salesforce/cli
 
       - name: Install new plugin version
-        run: echo y | sf plugins install ${{ inputs.channel }}
+        env:
+          CHANNEL: ${{ inputs.channel }}
+        run: echo y | sf plugins install "$CHANNEL"
 
       - name: Test new plugin version installation
         run: sf git merge driver --help

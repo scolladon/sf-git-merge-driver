@@ -10,9 +10,10 @@ on:
     paths-ignore:
       - "**.md"
 
+# Least-privilege default; jobs that need more escalate explicitly
+# (publish → id-token, dev-release/cleanup → contents/pull-requests).
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
   group: ${{ github.ref }}-${{ github.workflow }}
@@ -31,7 +32,11 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v6
+      # No `cache:` input is set, so setup-node restores no cache here; the
+      # published artifact's integrity is independently attested by npm
+      # provenance (`npm publish --provenance`). zizmor's heuristic flags
+      # setup-node in any publishing workflow regardless of caching.
+      - uses: actions/setup-node@v6 # zizmor: ignore[cache-poisoning]
         with:
           node-version: 20
           registry-url: "https://registry.npmjs.org"
@@ -61,9 +66,16 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v6
+      # No `cache:` input is set, so setup-node restores no cache here; this
+      # PR-triggered dev build publishes only a draft prerelease asset.
+      # zizmor's heuristic flags setup-node in any publishing workflow.
+      - uses: actions/setup-node@v6 # zizmor: ignore[cache-poisoning]
         with:
-          node-version: 20
+          # Build/pack the dev tarball on Node 22: prepack pulls undici 8.5
+          # (which needs Node >=22.19) and throws on Node 20. This is a build
+          # step, not a runtime-compat test — Node 20 support is unchanged
+          # (engines stays >=20; the e2e matrix still exercises Node 20).
+          node-version: 22
       - uses: ./.github/actions/install
 
       - name: Build and pack
@@ -72,7 +84,11 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           npm run build
-          TARBALL=$(npm pack 2>/dev/null | tail -1)
+          npm pack
+          # Derive the tarball name from package.json rather than parsing
+          # `npm pack` stdout: newer npm prints the filename to stderr, so
+          # `npm pack 2>/dev/null | tail -1` silently yields an empty string.
+          TARBALL=$(node -p "const p=require('./package.json'); p.name.replace('@','').replace('/','-')+'-'+p.version+'.tgz'")
           FIXED_NAME="sf-git-merge-driver-dev-pr-${PR_NUMBER}.tgz"
           mv "$TARBALL" "$FIXED_NAME"
           echo "tarball=$FIXED_NAME" >> "$GITHUB_OUTPUT"

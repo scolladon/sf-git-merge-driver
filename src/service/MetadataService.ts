@@ -24,6 +24,8 @@ const ORDERED_ATTRIBUTES = new Set([
   'filterItems', // CustomField
   'summaryFilterItems', // CustomField
   'criteriaItems', // SharingRules, Workflow, AssignmentRules, AutoResponseRules, EscalationRules
+  'prompts', // Translations
+  'promptVersions', // Translations
 ])
 
 const getPropertyValue = (el: JsonValue, property: string) =>

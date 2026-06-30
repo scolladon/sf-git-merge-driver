@@ -231,6 +231,63 @@ describe('mergeResult', () => {
       expect(result.output).toEqual([{ root: [] }])
       expect(result.hasConflict).toBe(false)
     })
+
+    it('given a single-key grouped-repeats object when building then expands to one wrapper per entry', () => {
+      // Arrange
+      const sut = { labels: [{ fullName: 'a' }, { fullName: 'b' }] }
+
+      // Act
+      const result = buildEarlyResult(sut, 'CustomLabels')
+
+      // Assert
+      expect(result.output).toEqual([
+        {
+          CustomLabels: [
+            { labels: { fullName: 'a' } },
+            { labels: { fullName: 'b' } },
+          ],
+        },
+      ])
+      expect(result.hasConflict).toBe(false)
+    })
+
+    it('given a single-key empty-array object when building then preserves the empty-element shape', () => {
+      // Arrange
+      const sut = { name: [] }
+
+      // Act
+      const result = buildEarlyResult(sut)
+
+      // Assert
+      expect(result.output).toEqual([{ name: [] }])
+      expect(result.hasConflict).toBe(false)
+    })
+
+    it('given a single-key object whose value is not an array when building then keeps it as one child', () => {
+      // Arrange
+      const sut = { labels: { fullName: 'only' } }
+
+      // Act
+      const result = buildEarlyResult(sut)
+
+      // Assert
+      expect(result.output).toEqual([{ labels: { fullName: 'only' } }])
+      expect(result.hasConflict).toBe(false)
+    })
+
+    it('given a multi-key object when building then keeps it as a single child wrapper', () => {
+      // Arrange
+      const sut = { actionOverrides: [{ a: 1 }], sharingModel: 'Private' }
+
+      // Act
+      const result = buildEarlyResult(sut)
+
+      // Assert
+      expect(result.output).toEqual([
+        { actionOverrides: [{ a: 1 }], sharingModel: 'Private' },
+      ])
+      expect(result.hasConflict).toBe(false)
+    })
   })
 
   describe('isNonEmpty', () => {

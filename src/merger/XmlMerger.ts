@@ -3,12 +3,31 @@ import { TxmlXmlParser } from '../adapter/TxmlXmlParser.js'
 import { XmlStreamWriter } from '../adapter/writer/XmlStreamWriter.js'
 import type { XmlParser } from '../adapter/XmlParser.js'
 import type { MergeConfig } from '../types/conflictTypes.js'
-import type { JsonObject } from '../types/jsonTypes.js'
+import type { JsonArray, JsonObject } from '../types/jsonTypes.js'
 import { log } from '../utils/LoggingDecorator.js'
 import { JsonMerger } from './JsonMerger.js'
 
 const mergeNamespaces = (...maps: JsonObject[]): JsonObject =>
   Object.assign({}, ...maps)
+
+// When the JSON merge yields no output but BOTH live sides (ours and theirs)
+// still carry the root element, rebuild it as an empty element
+// (<Root/>) so an empty-bodied root round-trips instead of blanking the
+// file — a blank file is never valid Salesforce metadata (e.g. an identity
+// merge of <SharingRules xmlns="..."/>, which parses to { SharingRules: '' }
+// and collapses to no output). Requiring the root on BOTH live sides is
+// deliberate: if either side dropped the file entirely (empty document, no
+// root key) the deletion stands and nothing is emitted — the driver must
+// never resurrect a file a side deleted, nor invent a root from the side
+// that left it untouched. The parser guarantees each content object holds at
+// most the single root key, so the two live sides' root tags match.
+const preserveEmptyRoot = (local: JsonObject, other: JsonObject): JsonArray => {
+  const [localRoot] = Object.keys(local)
+  const [otherRoot] = Object.keys(other)
+  return localRoot !== undefined && otherRoot !== undefined
+    ? [{ [localRoot]: '' }]
+    : []
+}
 
 export class XmlMerger {
   private readonly parser: XmlParser
@@ -59,15 +78,20 @@ export class XmlMerger {
       other!.content
     )
 
-    if (mergedResult.output.length) {
-      await this.writer.writeTo(
-        out,
-        mergedResult.output,
-        namespaces,
-        eol,
-        mergedResult.hasConflict
-      )
-    }
+    const output =
+      mergedResult.output.length > 0
+        ? mergedResult.output
+        : preserveEmptyRoot(local!.content, other!.content)
+
+    // writeTo short-circuits on an empty array, so no guard is needed here:
+    // an empty merge result emits zero bytes either way.
+    await this.writer.writeTo(
+      out,
+      output,
+      namespaces,
+      eol,
+      mergedResult.hasConflict
+    )
 
     return { hasConflict: mergedResult.hasConflict }
   }

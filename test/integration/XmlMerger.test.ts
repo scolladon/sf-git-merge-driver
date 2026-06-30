@@ -183,4 +183,86 @@ describe('XmlMerger integration', () => {
       expect(result.output).toContain('Account.Name')
     })
   })
+
+  describe('empty root preservation (residual #3)', () => {
+    const NS = 'http://soap.sforce.com/2006/04/metadata'
+
+    it('given an empty self-closing root when identity-merging then preserves the root as an empty element (not a blank file)', async () => {
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<SharingRules xmlns="${NS}"/>`
+      const result = await mergeXmlStrings(sut, xml, xml, xml)
+      expect(result.hasConflict).toBe(false)
+      expect(result.output).toBe(
+        `<?xml version="1.0" encoding="UTF-8"?>\n<SharingRules xmlns="${NS}"/>\n`
+      )
+    })
+
+    it('given an empty open/close root when identity-merging then preserves the root, canonicalized to a self-closing element', async () => {
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<SharingRules xmlns="${NS}"></SharingRules>`
+      const result = await mergeXmlStrings(sut, xml, xml, xml)
+      expect(result.output).toBe(
+        `<?xml version="1.0" encoding="UTF-8"?>\n<SharingRules xmlns="${NS}"/>\n`
+      )
+    })
+
+    it('given both sides emptied a populated root when merging then emits the empty root, not a blank file', async () => {
+      const ancestor = `<?xml version="1.0" encoding="UTF-8"?>\n<SharingRules xmlns="${NS}"><x>1</x></SharingRules>`
+      const emptied = `<?xml version="1.0" encoding="UTF-8"?>\n<SharingRules xmlns="${NS}"></SharingRules>`
+      const result = await mergeXmlStrings(sut, ancestor, emptied, emptied)
+      expect(result.output).toBe(
+        `<?xml version="1.0" encoding="UTF-8"?>\n<SharingRules xmlns="${NS}"/>\n`
+      )
+    })
+
+    it('given an empty ancestor file but both sides add the same empty root then preserves the root (scans past the keyless side)', async () => {
+      // ancestor parses to {} (no root); ours/theirs each add an empty
+      // SharingRules. preserveEmptyRoot must scan past the keyless ancestor
+      // to find the root on a later side.
+      const root = `<?xml version="1.0" encoding="UTF-8"?>\n<SharingRules xmlns="${NS}"/>`
+      const result = await mergeXmlStrings(sut, '', root, root)
+      expect(result.output).toBe(
+        `<?xml version="1.0" encoding="UTF-8"?>\n<SharingRules xmlns="${NS}"/>\n`
+      )
+    })
+
+    it('given both sides delete a previously-empty root when merging then the deletion stands (no resurrection)', async () => {
+      // An empty root present ONLY in the ancestor must not be resurrected
+      // when ours and theirs both removed the file.
+      const ancestor = `<?xml version="1.0" encoding="UTF-8"?>\n<SharingRules xmlns="${NS}"></SharingRules>`
+      const result = await mergeXmlStrings(sut, ancestor, '', '')
+      expect(result.output).toBe('')
+      expect(result.hasConflict).toBe(false)
+    })
+
+    it('given a truly empty document (no root element) when merging then emits nothing', async () => {
+      // The other-extreme: with no root key in any side there is nothing to
+      // preserve, so the output stays byte-empty (writer short-circuit).
+      const result = await mergeXmlStrings(sut, '', '', '')
+      expect(result.output).toBe('')
+      expect(result.hasConflict).toBe(false)
+    })
+  })
+
+  describe('comment positioning (known limitation, documented in DESIGN.md)', () => {
+    const NS = 'http://soap.sforce.com/2006/04/metadata'
+    // SF strips comments on retrieve, so these only affect hand-added
+    // comments in a working copy. A robust position-preserving fix is a
+    // breaking change deferred to a future version bump; these tests pin
+    // the CURRENT behavior so any change to it is deliberate.
+    it('given a comment between distinct-tag siblings when merging then its position is preserved', async () => {
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<Root xmlns="${NS}"><a>1</a><!--mid--><b>2</b></Root>`
+      const { output } = await mergeXmlStrings(sut, xml, xml, xml)
+      // comment stays between <a> and <b>
+      expect(output.indexOf('mid')).toBeGreaterThan(output.indexOf('<a>1</a>'))
+      expect(output.indexOf('mid')).toBeLessThan(output.indexOf('<b>2</b>'))
+    })
+
+    it('given a comment between same-tag siblings when merging then it relocates after both (known limitation)', async () => {
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<Root xmlns="${NS}"><a>1</a><!--mid--><a>2</a></Root>`
+      const { output } = await mergeXmlStrings(sut, xml, xml, xml)
+      // the compact tree collapses <a>1</a> and <a>2</a> into one array and
+      // cannot hold the comment between them, so it re-emits after both
+      const secondA = output.lastIndexOf('<a>2</a>')
+      expect(output.indexOf('mid')).toBeGreaterThan(secondA)
+    })
+  })
 })

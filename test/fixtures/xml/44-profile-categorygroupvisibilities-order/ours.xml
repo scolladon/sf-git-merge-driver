@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Profile xmlns="http://soap.sforce.com/2006/04/metadata">
+    <categoryGroupVisibilities>
+        <dataCategoryGroup>Group_Gamma</dataCategoryGroup>
+        <visibility>ALL</visibility>
+    </categoryGroupVisibilities>
+    <categoryGroupVisibilities>
+        <dataCategoryGroup>Group_Alpha</dataCategoryGroup>
+        <visibility>ALL</visibility>
+    </categoryGroupVisibilities>
+    <categoryGroupVisibilities>
+        <dataCategoryGroup>Group_Beta</dataCategoryGroup>
+        <visibility>ALL</visibility>
+    </categoryGroupVisibilities>
+</Profile>

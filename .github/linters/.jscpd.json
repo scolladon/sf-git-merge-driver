@@ -8,6 +8,9 @@
     "**/.github/**",
     "**/report/**",
     "**/img/**",
-    "**/test/**"
+    "**/test/**",
+    "**/*.md",
+    "**/package-lock.json",
+    "**/bin/**"
   ]
 }
