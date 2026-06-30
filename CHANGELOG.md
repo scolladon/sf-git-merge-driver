@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.9.1](https://github.com/scolladon/sf-git-merge-driver/compare/v1.9.0...v1.9.1) (2026-06-30)
+
+
+### Bug Fixes
+
+* emit XML tags in canonical (first-seen) order instead of alphabetical ([#200](https://github.com/scolladon/sf-git-merge-driver/issues/200)) ([34ddd43](https://github.com/scolladon/sf-git-merge-driver/commit/34ddd43e3534c2c058cbe15a374e54a2efd270aa))
+* resolve PR [#200](https://github.com/scolladon/sf-git-merge-driver/issues/200) QA residuals (empty root, trailing newline) + megalinter ([#201](https://github.com/scolladon/sf-git-merge-driver/issues/201)) ([88516bf](https://github.com/scolladon/sf-git-merge-driver/commit/88516bf68fe745745b90f3df4a5e237a1c4780e5))
+
 ## [1.9.0](https://github.com/scolladon/sf-git-merge-driver/compare/v1.8.2...v1.9.0) (2026-05-12)
 
 
