@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1782720928543,
+  "lastUpdate": 1782805702356,
   "repoUrl": "https://github.com/scolladon/sf-git-merge-driver",
   "entries": {
     "Memory Benchmark": [
@@ -1459,6 +1459,138 @@ window.BENCHMARK_DATA = {
             "name": "serialize-large",
             "value": 5.6241,
             "range": "±5.33%",
+            "unit": "ms"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "colladonsebastien@gmail.com",
+            "name": "Sebastien",
+            "username": "scolladon"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "88516bf68fe745745b90f3df4a5e237a1c4780e5",
+          "message": "fix: resolve PR #200 QA residuals (empty root, trailing newline) + megalinter (#201)",
+          "timestamp": "2026-06-30T09:45:42+02:00",
+          "tree_id": "637458c6f4214fbcd2788e98d1bba02cef944567",
+          "url": "https://github.com/scolladon/sf-git-merge-driver/commit/88516bf68fe745745b90f3df4a5e237a1c4780e5"
+        },
+        "date": 1782805702289,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "node bin/merge-driver.cjs --version",
+            "value": 28.7764,
+            "range": "±2.93%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-small-no-conflict",
+            "value": 1.3349,
+            "range": "±2.69%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-small-with-conflict",
+            "value": 1.1906,
+            "range": "±2.09%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-medium-no-conflict",
+            "value": 8.6564,
+            "range": "±1.00%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-medium-with-conflict",
+            "value": 8.4817,
+            "range": "±1.25%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-large-no-conflict",
+            "value": 37.4684,
+            "range": "±6.22%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-large-with-conflict",
+            "value": 37.7808,
+            "range": "±12.05%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-ordered-globalvalueset",
+            "value": 1.1227,
+            "range": "±1.95%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-picklist-customfield",
+            "value": 0.7666,
+            "range": "±2.08%",
+            "unit": "ms"
+          },
+          {
+            "name": "parse-small",
+            "value": 0.568,
+            "range": "±0.92%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-small",
+            "value": 0.1907,
+            "range": "±2.32%",
+            "unit": "ms"
+          },
+          {
+            "name": "serialize-small",
+            "value": 0.1762,
+            "range": "±1.66%",
+            "unit": "ms"
+          },
+          {
+            "name": "parse-medium",
+            "value": 4.7868,
+            "range": "±2.62%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-medium",
+            "value": 1.7089,
+            "range": "±3.11%",
+            "unit": "ms"
+          },
+          {
+            "name": "serialize-medium",
+            "value": 1.4089,
+            "range": "±2.31%",
+            "unit": "ms"
+          },
+          {
+            "name": "parse-large",
+            "value": 21.8356,
+            "range": "±4.13%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-large",
+            "value": 6.9589,
+            "range": "±2.43%",
+            "unit": "ms"
+          },
+          {
+            "name": "serialize-large",
+            "value": 6.1059,
+            "range": "±3.50%",
             "unit": "ms"
           }
         ]
