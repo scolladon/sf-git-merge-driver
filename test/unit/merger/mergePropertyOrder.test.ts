@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { getUniqueProps } from '../../../src/merger/mergePropertyKeys.js'
+import { mergePropertyOrder } from '../../../src/merger/mergePropertyOrder.js'
 
-describe('mergePropertyKeys', () => {
-  describe('getUniqueProps', () => {
-    it('given multiple objects and arrays when getUniqueProps then returns unique keys in first-seen order', () => {
+describe('mergePropertyOrder', () => {
+  describe('mergePropertyOrder', () => {
+    it('given multiple objects and arrays when mergePropertyOrder then returns unique keys in first-seen order', () => {
       // Arrange
       const a = { b: 1, a: 2 }
       const b = { c: 3, a: 4 }
@@ -12,7 +12,7 @@ describe('mergePropertyKeys', () => {
       const e = undefined
 
       // Act
-      const sut = getUniqueProps(
+      const sut = mergePropertyOrder(
         a as never,
         b as never,
         c as never,
@@ -24,45 +24,45 @@ describe('mergePropertyKeys', () => {
       expect(sut).toEqual(['b', 'a', 'c', '0', '1'])
     })
 
-    it('given empty objects when getUniqueProps then returns empty array', () => {
+    it('given empty objects when mergePropertyOrder then returns empty array', () => {
       // Arrange & Act
-      const sut = getUniqueProps({}, {}, {})
+      const sut = mergePropertyOrder({}, {}, {})
 
       // Assert
       expect(sut).toEqual([])
     })
 
-    it('given single object when getUniqueProps then returns keys in first-seen order', () => {
+    it('given single object when mergePropertyOrder then returns keys in first-seen order', () => {
       // Arrange
       const obj = { z: 1, a: 2, m: 3 }
 
       // Act
-      const sut = getUniqueProps(obj)
+      const sut = mergePropertyOrder(obj)
 
       // Assert
       expect(sut).toEqual(['z', 'a', 'm'])
     })
 
-    it('given objects with duplicate keys when getUniqueProps then dedups preserving first-seen order', () => {
+    it('given objects with duplicate keys when mergePropertyOrder then dedups preserving first-seen order', () => {
       // Arrange
       const a = { x: 1, y: 2 }
       const b = { x: 3, z: 4 }
 
       // Act
-      const sut = getUniqueProps(a, b)
+      const sut = mergePropertyOrder(a, b)
 
       // Assert
       expect(sut).toEqual(['x', 'y', 'z'])
     })
 
-    it('given three sides whose first-seen order is non-alphabetical when getUniqueProps then preserves first-seen across sides with dedup', () => {
+    it('given three sides whose first-seen order is non-alphabetical when mergePropertyOrder then preserves first-seen across sides with dedup', () => {
       // Arrange
       const ancestor = { fullName: 1, name: 2, label: 3 }
       const local = { name: 4, active: 5 }
       const other = { label: 6, description: 7 }
 
       // Act
-      const sut = getUniqueProps(ancestor, local, other)
+      const sut = mergePropertyOrder(ancestor, local, other)
 
       // Assert
       expect(sut).toEqual([

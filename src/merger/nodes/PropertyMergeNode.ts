@@ -10,7 +10,7 @@ import {
   noConflict,
   wrapWithRootKey,
 } from '../../types/mergeResult.js'
-import { getUniqueProps } from '../mergePropertyKeys.js'
+import { mergePropertyOrder } from '../mergePropertyOrder.js'
 import type { MergeNode } from './MergeNode.js'
 import { defaultNodeFactory } from './MergeNodeFactory.js'
 
@@ -31,7 +31,7 @@ export class PropertyMergeNode implements MergeNode {
     const ancestorObj = toJsonObjectOrEmpty(this.ancestor)
     const localObj = toJsonObjectOrEmpty(this.local)
     const otherObj = toJsonObjectOrEmpty(this.other)
-    const props = getUniqueProps(this.ancestor, this.local, this.other)
+    const props = mergePropertyOrder(this.ancestor, this.local, this.other)
     const results: MergeResult[] = []
 
     for (const key of props) {

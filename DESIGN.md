@@ -358,7 +358,7 @@ Conflict marker size and labels are configurable via Git's standard parameters (
 
 Within every serialized node, child element tags and `xmlns*` attributes are emitted in **first-seen input order** — the order they appeared in the source XML — not alphabetical order. This is established at two points in the pipeline:
 
-- **Merge-time**: `getUniqueProps` (`src/merger/mergePropertyKeys.ts`) builds a `Set` from `ancestor → local → other` keys in that fixed argument order and returns them in `Set` insertion order (no `.sort()`). The merger walks that sequence and pushes single-key wrapper objects into the output array, so the write order mirrors the first-seen order across the three inputs.
+- **Merge-time**: `mergePropertyOrder` (`src/merger/mergePropertyOrder.ts`) builds a `Set` from `ancestor → local → other` keys in that fixed argument order and returns them in `Set` insertion order (no `.sort()`). The merger walks that sequence and pushes single-key wrapper objects into the output array, so the write order mirrors the first-seen order across the three inputs.
 - **Write-time**: all three sort sites in `XmlStreamWriter` (`writeRoot`, `writeChildren`, `splitAttrsAndChildren`) preserve object key insertion order as returned by `Object.keys`, rather than calling `.sort()`.
 
 Because `TxmlXmlParser` preserves the source tag order (`classifyChildren` uses a `Map` keyed by tagName in insertion order; `toCompact` emits keys as `[attrs…, grouped tags in first-seen order…, #text last]`), and `sf project retrieve` writes files in the Metadata API XSD `xs:sequence` order, "emit first-seen key order" equals "emit XSD sequence order" for retrieve-sourced files — with no schema table to maintain.

@@ -1,6 +1,6 @@
 import type { JsonArray, JsonObject } from '../types/jsonTypes.js'
 
-export const getUniqueProps = (
+export const mergePropertyOrder = (
   ...objects: (JsonObject | JsonArray)[]
 ): string[] => {
   const keys = new Set<string>()
