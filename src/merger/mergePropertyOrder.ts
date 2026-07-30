@@ -4,8 +4,9 @@ import {
   toJsonObjectOrEmpty,
 } from '../types/jsonTypes.js'
 
-const keysOf = (value: JsonObject | JsonArray | undefined): string[] =>
-  value === undefined ? [] : Object.keys(toJsonObjectOrEmpty(value))
+export const keysOf = (
+  value: JsonObject | JsonArray | null | undefined
+): string[] => (value == null ? [] : Object.keys(toJsonObjectOrEmpty(value)))
 
 const sameSequence = (left: string[], right: string[]): boolean => {
   if (left.length !== right.length) return false
@@ -55,18 +56,22 @@ const buildEdges = (
   return { indegree, successors }
 }
 
+// When no unemitted key has indegree 0 (a cycle), the repair must not
+// reach past the cycle into keys every side already agreed on: it picks
+// among unemitted keys with the lowest residual indegree, tie-broken by
+// rank (lowest index) via the ascending scan order.
 const nextIndex = (
   size: number,
   emitted: Uint8Array,
   indegree: Int32Array
 ): number => {
-  let fallback = -1
+  let best = -1
   for (let i = 0; i < size; i++) {
     if (emitted[i]) continue
-    if (fallback === -1) fallback = i
     if (indegree[i] === 0) return i
+    if (best === -1 || indegree[i] < indegree[best]) best = i
   }
-  return fallback
+  return best
 }
 
 const topologicalOrder = (

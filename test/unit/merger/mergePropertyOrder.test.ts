@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { mergePropertyOrder } from '../../../src/merger/mergePropertyOrder.js'
+import {
+  keysOf,
+  mergePropertyOrder,
+} from '../../../src/merger/mergePropertyOrder.js'
 import type { JsonObject } from '../../../src/types/jsonTypes.js'
 
 // mergePropertyOrder resolves the *order* in which sibling XML tags are
@@ -7,20 +10,20 @@ import type { JsonObject } from '../../../src/types/jsonTypes.js'
 // that stays with the node/strategy layer — only where each surviving key
 // lands relative to its neighbours.
 //
-// Row 18 (`#text` residual): for A=[b], L=[b,z], O=[b,#text] the result is
-// [b, #text, z] — `#text` is emitted before `z`. This is a KNOWN BOUNDED
-// LIMITATION, not a bug: (1) what — a tag introduced on one side can land
-// ahead of a `#text` that already existed on the ancestor's neighbour;
-// (2) why bounded — it only surfaces when `#text` participates in a rank
-// tie, and `#text`'s own UTF-16 rank (`#` = U+0023) makes it win that tie;
-// (3) why not a regression — the shipped concat-dedup driver already
-// placed `#text` asymmetrically depending on merge direction, so this
-// trades one inconsistency for a different, deterministic one; (4) why not
-// fixed here — real Salesforce metadata never mixes text content with
-// child elements, and the parser has already collapsed and relocated any
-// text runs into a single trailing `#text` key before this function ever
-// runs, so the input shape this residual depends on does not occur in
-// practice.
+// The '#text accepted residual' case below: for A=[b], L=[b,z], O=[b,#text]
+// the result is [b, #text, z] — `#text` is emitted before `z`. This is a
+// KNOWN BOUNDED LIMITATION, not a bug: (1) what — a tag introduced on one
+// side can land ahead of a `#text` that already existed on the ancestor's
+// neighbour; (2) why bounded — it only surfaces when `#text` participates
+// in a rank tie, and `#text`'s own UTF-16 rank (`#` = U+0023) makes it win
+// that tie; (3) why not a regression — the shipped concat-dedup driver
+// already placed `#text` asymmetrically depending on merge direction, so
+// this trades one inconsistency for a different, deterministic one; (4)
+// why not fixed here — real Salesforce metadata never mixes text content
+// with child elements, and the parser has already collapsed and relocated
+// any text runs into a single trailing `#text` key before this function
+// ever runs, so the input shape this residual depends on does not occur
+// in practice.
 
 const LCG_MULTIPLIER = 1664525
 const LCG_INCREMENT = 1013904223
@@ -68,6 +71,58 @@ const randomKeyList = (rng: () => number): string[] => {
 
 const toObject = (keys: string[]): JsonObject =>
   Object.fromEntries(keys.map(key => [key, key]))
+
+// Reproduces a property-test failure from the CI log alone, without
+// re-running the seeded generator locally.
+const describeCase = (
+  i: number,
+  ancestorKeys: string[],
+  localKeys: string[],
+  otherKeys: string[]
+): string =>
+  `iteration ${i}: ancestor=${JSON.stringify(ancestorKeys)} ` +
+  `local=${JSON.stringify(localKeys)} other=${JSON.stringify(otherKeys)}`
+
+// Independent oracle for the 4th property: derives the same kind of
+// precedence edges mergePropertyOrder derives (consecutive pairs per
+// side), then Kahn's-algorithm cycle detection decides whether the
+// "every edge respected" check below applies to a given random case.
+const collectEdges = (lists: string[][]): [string, string][] => {
+  const edges: [string, string][] = []
+  for (const list of lists) {
+    for (let i = 1; i < list.length; i++) edges.push([list[i - 1], list[i]])
+  }
+  return edges
+}
+
+const buildAdjacency = (edges: [string, string][]): Map<string, string[]> => {
+  const adjacency = new Map<string, string[]>()
+  for (const [from, to] of edges) {
+    const successors = adjacency.get(from) ?? []
+    successors.push(to)
+    adjacency.set(from, successors)
+  }
+  return adjacency
+}
+
+const isAcyclic = (nodes: string[], edges: [string, string][]): boolean => {
+  const adjacency = buildAdjacency(edges)
+  const indegree = new Map(nodes.map(node => [node, 0]))
+  for (const [, to] of edges) indegree.set(to, (indegree.get(to) ?? 0) + 1)
+
+  const ready = nodes.filter(node => indegree.get(node) === 0)
+  let removed = 0
+  while (ready.length > 0) {
+    const node = ready.pop()!
+    removed++
+    for (const successor of adjacency.get(node) ?? []) {
+      const next = indegree.get(successor)! - 1
+      indegree.set(successor, next)
+      if (next === 0) ready.push(successor)
+    }
+  }
+  return removed === nodes.length
+}
 
 describe('mergePropertyOrder', () => {
   describe('fast path', () => {
@@ -284,6 +339,50 @@ describe('mergePropertyOrder', () => {
     })
   })
 
+  describe('general path — cycle repair confined to the cycle', () => {
+    it('given a rank-tied cycle followed by a key every side agrees on when mergePropertyOrder then the agreed key is not displaced by the cycle', () => {
+      // Arrange
+      const ancestor = { description: 1, label: 2 }
+      const local = {
+        description: 1,
+        tabSettings: 2,
+        userPermissions: 3,
+        label: 4,
+      }
+      const other = {
+        description: 1,
+        userPermissions: 2,
+        tabSettings: 3,
+        label: 4,
+      }
+
+      // Act
+      const sut = mergePropertyOrder(ancestor, local, other)
+
+      // Assert — tabSettings/userPermissions form the cycle; label is
+      // downstream of it and every side agrees it comes last
+      expect(sut).toEqual([
+        'description',
+        'tabSettings',
+        'userPermissions',
+        'label',
+      ])
+    })
+
+    it('given the entire key set forms a single precedence cycle when mergePropertyOrder then resolves order by indegree then rank alone', () => {
+      // Arrange
+      const ancestor = {}
+      const local = { b: 1, a: 2, c: 3 }
+      const other = { c: 1, a: 2, b: 3 }
+
+      // Act
+      const sut = mergePropertyOrder(ancestor, local, other)
+
+      // Assert
+      expect(sut).toEqual(['b', 'a', 'c'])
+    })
+  })
+
   describe('general path — totality', () => {
     it('given a key dropped by both local and other when mergePropertyOrder then still emits every surviving key exactly once', () => {
       // Arrange
@@ -307,16 +406,32 @@ describe('mergePropertyOrder', () => {
 
   describe('general path — pure rank (fully disjoint sides)', () => {
     it('given ancestor, local and other with no keys in common when mergePropertyOrder then orders by rank subject only to each side own edges', () => {
-      // Arrange
-      const ancestor = { x: 1 }
-      const local = { l1: 1, l2: 2 }
-      const other = { o1: 1, o2: 2 }
+      // Arrange — key names deliberately chosen so lexicographic rank
+      // disagrees with a local-then-other-then-ancestor concatenation
+      // (which would yield ['m1','m2','a1','a2','z']); no side-concat
+      // rule can produce this exact result
+      const ancestor = { z: 1 }
+      const local = { m1: 1, m2: 2 }
+      const other = { a1: 1, a2: 2 }
 
       // Act
       const sut = mergePropertyOrder(ancestor, local, other)
 
       // Assert
-      expect(sut).toEqual(['l1', 'l2', 'o1', 'o2', 'x'])
+      expect(sut).toEqual(['a1', 'a2', 'm1', 'm2', 'z'])
+    })
+  })
+
+  describe('keysOf', () => {
+    it('given a null value when keysOf then returns an empty array', () => {
+      // Arrange
+      const value = null
+
+      // Act
+      const sut = keysOf(value)
+
+      // Assert
+      expect(sut).toEqual([])
     })
   })
 
@@ -397,6 +512,7 @@ describe('mergePropertyOrder', () => {
 
   describe('property lens', () => {
     const RANDOM_CASE_COUNT = 500
+    const ACYCLIC_PROPERTY_CASE_COUNT = 3000
 
     it('given randomised key sequences when mergePropertyOrder then the result is a permutation of the key union', () => {
       // Arrange
@@ -416,7 +532,8 @@ describe('mergePropertyOrder', () => {
 
         // Assert
         const union = new Set([...ancestorKeys, ...localKeys, ...otherKeys])
-        expect([...sut].sort()).toEqual([...union].sort())
+        const message = describeCase(i, ancestorKeys, localKeys, otherKeys)
+        expect([...sut].sort(), message).toEqual([...union].sort())
       }
     })
 
@@ -425,16 +542,20 @@ describe('mergePropertyOrder', () => {
       const rng = createLcg(2)
 
       for (let i = 0; i < RANDOM_CASE_COUNT; i++) {
-        const ancestor = toObject(randomKeyList(rng))
-        const local = toObject(randomKeyList(rng))
-        const other = toObject(randomKeyList(rng))
+        const ancestorKeys = randomKeyList(rng)
+        const localKeys = randomKeyList(rng)
+        const otherKeys = randomKeyList(rng)
+        const ancestor = toObject(ancestorKeys)
+        const local = toObject(localKeys)
+        const other = toObject(otherKeys)
 
         // Act
         const first = mergePropertyOrder(ancestor, local, other)
         const second = mergePropertyOrder(ancestor, local, other)
 
         // Assert
-        expect(second).toEqual(first)
+        const message = describeCase(i, ancestorKeys, localKeys, otherKeys)
+        expect(second, message).toEqual(first)
       }
     })
 
@@ -443,17 +564,59 @@ describe('mergePropertyOrder', () => {
       const rng = createLcg(3)
 
       for (let i = 0; i < RANDOM_CASE_COUNT; i++) {
-        const ancestor = toObject(randomKeyList(rng))
-        const local = toObject(randomKeyList(rng))
-        const other = toObject(randomKeyList(rng))
+        const ancestorKeys = randomKeyList(rng)
+        const localKeys = randomKeyList(rng)
+        const otherKeys = randomKeyList(rng)
+        const ancestor = toObject(ancestorKeys)
+        const local = toObject(localKeys)
+        const other = toObject(otherKeys)
 
         // Act
         const forward = mergePropertyOrder(ancestor, local, other)
         const swapped = mergePropertyOrder(ancestor, other, local)
 
         // Assert
-        expect(swapped).toEqual(forward)
+        const message = describeCase(i, ancestorKeys, localKeys, otherKeys)
+        expect(swapped, message).toEqual(forward)
       }
+    })
+
+    it('given randomised acyclic key sequences when mergePropertyOrder then the result is a valid topological order of the union precedence graph', () => {
+      // Arrange — restricted to acyclic graphs: a cycle repair emission
+      // can cascade past a downstream acyclic edge, so "every edge
+      // respected" is not an invariant of cyclic inputs even for a
+      // correct implementation
+      const rng = createLcg(4)
+      let acyclicCases = 0
+
+      for (let i = 0; i < ACYCLIC_PROPERTY_CASE_COUNT; i++) {
+        const ancestorKeys = randomKeyList(rng)
+        const localKeys = randomKeyList(rng)
+        const otherKeys = randomKeyList(rng)
+        const lists = [ancestorKeys, localKeys, otherKeys]
+        const nodes = [...new Set(lists.flat())]
+        const edges = collectEdges(lists)
+
+        if (!isAcyclic(nodes, edges)) continue
+        acyclicCases++
+
+        // Act
+        const sut = mergePropertyOrder(
+          toObject(ancestorKeys),
+          toObject(localKeys),
+          toObject(otherKeys)
+        )
+
+        // Assert — every node in `edges` is guaranteed present in `sut`
+        // by the permutation property above, so the lookups are total
+        const position = new Map(sut.map((key, index) => [key, index]))
+        const message = describeCase(i, ancestorKeys, localKeys, otherKeys)
+        for (const [from, to] of edges) {
+          expect(position.get(from)!, message).toBeLessThan(position.get(to)!)
+        }
+      }
+
+      expect(acyclicCases).toBeGreaterThan(0)
     })
   })
 })
