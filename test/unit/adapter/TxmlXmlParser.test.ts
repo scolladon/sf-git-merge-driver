@@ -6,6 +6,7 @@ import {
   type TNode,
   TxmlXmlParser,
 } from '../../../src/adapter/TxmlXmlParser.js'
+import type { JsonObject } from '../../../src/types/jsonTypes.js'
 
 describe('TxmlXmlParser', () => {
   const sut = new TxmlXmlParser()
@@ -362,6 +363,38 @@ describe('TxmlXmlParser', () => {
       // above happens to balance out (one bad open + one normal close
       // = depth 0) so it does NOT exercise this branch.
       expect(() => sut.parseString(`<r><v attr='a>b'/></r>`)).not.toThrow()
+    })
+  })
+
+  describe('given a __proto__-named element (prototype-pollution guard)', () => {
+    it('when parseString then it round-trips as an ordinary own property visible in Object.keys', () => {
+      const result = sut.parseString(`<r><__proto__><v>1</v></__proto__></r>`)
+      const rNode = (result.content as JsonObject)['r'] as JsonObject
+
+      expect(Object.keys(rNode)).toContain('__proto__')
+      expect(rNode['__proto__']).toEqual({ v: '1' })
+      // Pins the chosen remedy: the compact node is built on a
+      // null-prototype object, so there is no inherited __proto__
+      // accessor left to intercept the assignment in the first place.
+      expect(Object.getPrototypeOf(rNode)).toBeNull()
+    })
+  })
+
+  describe('given elements named after other Object.prototype members (regression guard)', () => {
+    // These names are plain data properties on Object.prototype, so
+    // assigning them was already safe pre-fix (the assignment shadows
+    // them with an own property) — pin that it stays true post-fix.
+    it.each([
+      'constructor',
+      'toString',
+      'hasOwnProperty',
+      'valueOf',
+    ])('when parseString then %s round-trips as an ordinary own property', name => {
+      const result = sut.parseString(`<r><${name}>1</${name}></r>`)
+      const rNode = (result.content as JsonObject)['r'] as JsonObject
+
+      expect(Object.keys(rNode)).toContain(name)
+      expect(rNode[name]).toBe('1')
     })
   })
 })

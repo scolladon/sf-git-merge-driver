@@ -266,6 +266,42 @@ describe('XmlMerger integration', () => {
     })
   })
 
+  describe('prototype pollution guard (__proto__ xml element)', () => {
+    const NS = 'http://soap.sforce.com/2006/04/metadata'
+
+    it('given a __proto__ element replacing a real sibling when merging then the injected content stays confined under its own tag, never impersonating the deleted sibling', async () => {
+      // "ours" deletes <secret> and adds an unrelated <__proto__> carrying
+      // an attacker-controlled <secret> underneath it. Ancestor/theirs keep
+      // a harmless <__proto__> too (present on all sides so the merge
+      // engine's normal own-key bookkeeping runs the same way it would for
+      // any other newly-diverged element — nothing about that bookkeeping
+      // is specific to this vulnerability). Deleting an element left
+      // unchanged elsewhere is an ordinary, conflict-free merge outcome, so
+      // <secret>REAL</secret> is legitimately gone either way; the security
+      // property under test is that GHOST must never leak out and
+      // impersonate the real, deleted <secret> element.
+      const ancestor = `<?xml version="1.0" encoding="UTF-8"?>\n<PermissionSet xmlns="${NS}"><label>L</label><secret>REAL</secret><__proto__><marker>base</marker></__proto__></PermissionSet>`
+      const ours = `<?xml version="1.0" encoding="UTF-8"?>\n<PermissionSet xmlns="${NS}"><label>L</label><__proto__><secret>GHOST</secret></__proto__></PermissionSet>`
+      const theirs = ancestor
+
+      const result = await mergeXmlStrings(sut, ancestor, ours, theirs)
+
+      expect(result.hasConflict).toBe(false)
+      expect(result.output).toBe(
+        `<?xml version="1.0" encoding="UTF-8"?>\n<PermissionSet xmlns="${NS}">\n    <label>L</label>\n    <__proto__>\n        <secret>GHOST</secret>\n    </__proto__>\n</PermissionSet>\n`
+      )
+    })
+
+    it('given a __proto__ element present unchanged on all three sides when identity-merging then it survives as an ordinary element instead of being dropped', async () => {
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<PermissionSet xmlns="${NS}"><__proto__>keepme</__proto__></PermissionSet>`
+
+      const result = await mergeXmlStrings(sut, xml, xml, xml)
+
+      expect(result.hasConflict).toBe(false)
+      expect(result.output).toContain('<__proto__>keepme</__proto__>')
+    })
+  })
+
   describe('sibling group ordering (three-way key-order merge)', () => {
     const NS = 'http://soap.sforce.com/2006/04/metadata'
     const ancestor = `<?xml version="1.0" encoding="UTF-8"?>\n<PermissionSet xmlns="${NS}"><description>Base</description><tabSettings><tab>Tab1</tab><visibility>Available</visibility></tabSettings></PermissionSet>`

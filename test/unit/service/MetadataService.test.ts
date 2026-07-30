@@ -678,6 +678,19 @@ describe('MetadataService', () => {
         expect(extractor).toBeUndefined()
       })
     })
+
+    describe('given the reserved __proto__ metadata type (prototype-pollution guard)', () => {
+      it('should return undefined, not the inherited Object.prototype accessor', () => {
+        // Arrange
+        const metadataType = '__proto__'
+
+        // Act
+        const extractor = MetadataService.getKeyFieldExtractor(metadataType)
+
+        // Assert
+        expect(extractor).toBeUndefined()
+      })
+    })
   })
 
   describe('isOrderedAttribute', () => {

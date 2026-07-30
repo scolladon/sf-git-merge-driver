@@ -4,7 +4,11 @@ export class MetadataService {
   public static getKeyFieldExtractor(
     metadataType: string
   ): ((el: JsonValue) => string) | undefined {
-    return metadataType in METADATA_KEY_EXTRACTORS
+    // `in` walks the prototype chain, so `'__proto__' in {}` is true —
+    // metadataType is an untrusted XML tag name, and `__proto__` would
+    // resolve to the inherited Object.prototype accessor instead of
+    // undefined. Object.hasOwn checks own properties only.
+    return Object.hasOwn(METADATA_KEY_EXTRACTORS, metadataType)
       ? METADATA_KEY_EXTRACTORS[
           metadataType as keyof typeof METADATA_KEY_EXTRACTORS
         ]
