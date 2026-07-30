@@ -90,12 +90,9 @@ describe('InstallService', () => {
         "/a/\\$b\\`c\\\"d'\\''e",
         'all five shell-meta escapes compose',
       ],
-    ])(
-      'Given path %j, When escaping, Then result is %j (%s)',
-      (input, expected, _reason) => {
-        expect(escapeBinaryPath(input)).toBe(expected)
-      }
-    )
+    ])('Given path %j, When escaping, Then result is %j (%s)', (input, expected, _reason) => {
+      expect(escapeBinaryPath(input)).toBe(expected)
+    })
   })
 
   describe('module-level DRIVER_COMMAND', () => {

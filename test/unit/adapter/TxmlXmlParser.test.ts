@@ -401,16 +401,18 @@ describe('TxmlXmlParser', () => {
     // These names are plain data properties on Object.prototype, so
     // assigning them was already safe pre-fix (the assignment shadows
     // them with an own property) — pin that it stays true post-fix.
-    it.each(['constructor', 'toString', 'hasOwnProperty', 'valueOf'])(
-      'when parseString then %s round-trips as an ordinary own property',
-      name => {
-        const result = sut.parseString(`<r><${name}>1</${name}></r>`)
-        const rNode = (result.content as JsonObject)['r'] as JsonObject
+    it.each([
+      'constructor',
+      'toString',
+      'hasOwnProperty',
+      'valueOf',
+    ])('when parseString then %s round-trips as an ordinary own property', name => {
+      const result = sut.parseString(`<r><${name}>1</${name}></r>`)
+      const rNode = (result.content as JsonObject)['r'] as JsonObject
 
-        expect(Object.keys(rNode)).toContain(name)
-        expect(rNode[name]).toBe('1')
-      }
-    )
+      expect(Object.keys(rNode)).toContain(name)
+      expect(rNode[name]).toBe('1')
+    })
   })
 })
 
