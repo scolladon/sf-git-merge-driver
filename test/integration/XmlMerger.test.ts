@@ -265,4 +265,60 @@ describe('XmlMerger integration', () => {
       expect(output.indexOf('mid')).toBeGreaterThan(secondA)
     })
   })
+
+  describe('sibling group ordering (three-way key-order merge)', () => {
+    const NS = 'http://soap.sforce.com/2006/04/metadata'
+    const ancestor = `<?xml version="1.0" encoding="UTF-8"?>\n<PermissionSet xmlns="${NS}"><description>Base</description><tabSettings><tab>Tab1</tab><visibility>Available</visibility></tabSettings></PermissionSet>`
+    // introduces a new sibling (classAccesses) between the two ancestor keys
+    const introducesClassAccesses = `<?xml version="1.0" encoding="UTF-8"?>\n<PermissionSet xmlns="${NS}"><description>Base</description><classAccesses><apexClass>MyClass</apexClass><enabled>true</enabled></classAccesses><tabSettings><tab>Tab1</tab><visibility>Available</visibility></tabSettings></PermissionSet>`
+    // adds an unrelated second tabSettings entry, independent of the above
+    const addsSecondTabSetting = `<?xml version="1.0" encoding="UTF-8"?>\n<PermissionSet xmlns="${NS}"><description>Base</description><tabSettings><tab>Tab1</tab><visibility>Available</visibility></tabSettings><tabSettings><tab>Tab2</tab><visibility>Hidden</visibility></tabSettings></PermissionSet>`
+
+    const assertClassAccessesBetweenDescriptionAndTabSettings = (
+      output: string
+    ): void => {
+      const classAccessesIndex = output.indexOf('<classAccesses>')
+      const descriptionIndex = output.indexOf('<description>')
+      const tabSettingsIndex = output.indexOf('<tabSettings>')
+      expect(classAccessesIndex).toBeGreaterThan(descriptionIndex)
+      expect(classAccessesIndex).toBeLessThan(tabSettingsIndex)
+    }
+
+    it('given ours introducing a new sibling group between two ancestor keys when merging then keeps it between them instead of pushing it past the ancestor tail', async () => {
+      // Arrange & Act
+      const result = await mergeXmlStrings(
+        sut,
+        ancestor,
+        introducesClassAccesses,
+        addsSecondTabSetting
+      )
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      assertClassAccessesBetweenDescriptionAndTabSettings(result.output)
+    })
+
+    it('given the same merge with ours and theirs swapped when merging then produces the byte-identical output (role symmetry)', async () => {
+      // Arrange
+      const caseA = await mergeXmlStrings(
+        sut,
+        ancestor,
+        introducesClassAccesses,
+        addsSecondTabSetting
+      )
+
+      // Act
+      const caseB = await mergeXmlStrings(
+        sut,
+        ancestor,
+        addsSecondTabSetting,
+        introducesClassAccesses
+      )
+
+      // Assert
+      expect(caseB.hasConflict).toBe(false)
+      assertClassAccessesBetweenDescriptionAndTabSettings(caseB.output)
+      expect(caseB.output).toBe(caseA.output)
+    })
+  })
 })

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { JsonMerger } from '../../../src/merger/JsonMerger.js'
-import { JsonValue } from '../../../src/types/jsonTypes.js'
+import { JsonObject, JsonValue } from '../../../src/types/jsonTypes.js'
 import { defaultConfig } from '../../utils/testConfig.js'
 
 describe('JsonMerger', () => {
@@ -1779,6 +1779,35 @@ describe('JsonMerger', () => {
           ],
         },
       ])
+    })
+  })
+
+  describe('given a key inserted between two ancestor keys (three-way key-order merge)', () => {
+    it('should keep the inserted key between them instead of pushing it past the ancestor tail', () => {
+      // Arrange
+      const ancestor: JsonValue = {
+        Profile: { description: 'base', userLicense: 'Salesforce' },
+      }
+      const local: JsonValue = {
+        Profile: {
+          description: 'base',
+          custom: 'true',
+          userLicense: 'Salesforce',
+        },
+      }
+      const other: JsonValue = {
+        Profile: { description: 'base', userLicense: 'Salesforce' },
+      }
+
+      // Act
+      const result = sut.mergeThreeWay(ancestor, local, other)
+
+      // Assert
+      const profile = (result.output[0] as JsonObject)[
+        'Profile'
+      ] as JsonObject[]
+      const keys = profile.map(entry => Object.keys(entry)[0])
+      expect(keys).toEqual(['description', 'custom', 'userLicense'])
     })
   })
 })

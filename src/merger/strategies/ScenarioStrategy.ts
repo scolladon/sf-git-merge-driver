@@ -47,7 +47,7 @@ abstract class AbstractMergeStrategy implements ScenarioStrategy {
     const ancestorObj =
       ancestor === undefined ? undefined : toJsonObjectOrEmpty(ancestor)
 
-    const props = mergePropertyOrder(ancestor ?? {}, local, other)
+    const props = mergePropertyOrder(ancestor, local, other)
     const results: MergeResult[] = []
 
     for (const key of props) {
