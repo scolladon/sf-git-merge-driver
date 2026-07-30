@@ -1782,6 +1782,23 @@ describe('JsonMerger', () => {
     })
   })
 
+  describe('given a root key name colliding with Object.prototype (in-operator prototype-chain guard)', () => {
+    it('should not resurrect content deleted by the other side just because the key name is inherited', () => {
+      // Arrange - 'constructor' is not an own property of {}, but `in`
+      // walks the prototype chain and would misreport it as present
+      const ancestor: JsonValue = { constructor: { a: '1' } }
+      const local: JsonValue = { constructor: { a: '1' } }
+      const other: JsonValue = {}
+
+      // Act
+      const result = sut.mergeThreeWay(ancestor, local, other)
+
+      // Assert
+      expect(result.output).toEqual([])
+      expect(result.hasConflict).toBe(false)
+    })
+  })
+
   describe('given a key inserted between two ancestor keys (three-way key-order merge)', () => {
     it('should keep the inserted key between them instead of pushing it past the ancestor tail', () => {
       // Arrange

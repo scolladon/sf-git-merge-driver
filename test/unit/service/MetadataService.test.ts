@@ -691,6 +691,46 @@ describe('MetadataService', () => {
         expect(extractor).toBeUndefined()
       })
     })
+
+    describe('given a key field whose value is a null-prototype object (parser output shape)', () => {
+      it('should treat it as absent instead of throwing on String coercion', () => {
+        // Arrange - txml builds compact nodes on Object.create(null), so a
+        // key field with attributes/children (object-shaped) has no
+        // inherited toString
+        const nullProtoApexClass = Object.assign(Object.create(null), {
+          '@_a': '1',
+          '#text': '',
+        })
+        const testObject = { apexClass: nullProtoApexClass, enabled: 'true' }
+        const extractor = MetadataService.getKeyFieldExtractor('classAccesses')
+
+        // Act
+        const result = extractor!(testObject as unknown as JsonValue)
+
+        // Assert
+        expect(result).toBe(String(undefined))
+      })
+    })
+
+    describe('given the picklistValues prefer-then-fallback extractor with an object-shaped masterLabel', () => {
+      it('should fall back to picklist instead of throwing on String coercion', () => {
+        // Arrange - the object-shaped sentinel must be indistinguishable
+        // from "absent" so the existing `!== String(undefined)` fallback
+        // in getPicklistValuesKey still selects the picklist field
+        const nullProtoMasterLabel = Object.create(null)
+        const testObject = {
+          masterLabel: nullProtoMasterLabel,
+          picklist: 'StageName',
+        }
+        const extractor = MetadataService.getKeyFieldExtractor('picklistValues')
+
+        // Act
+        const result = extractor!(testObject as unknown as JsonValue)
+
+        // Assert
+        expect(result).toBe('StageName')
+      })
+    })
   })
 
   describe('isOrderedAttribute', () => {

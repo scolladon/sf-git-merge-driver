@@ -32,8 +32,17 @@ const ORDERED_ATTRIBUTES = new Set([
   'promptVersions', // Translations
 ])
 
-const getPropertyValue = (el: JsonValue, property: string) =>
-  String((el as Record<string, unknown>)[property])
+// An object-shaped key field (element with attributes/children, built on
+// Object.create(null) by the parser) has no inherited toString and would
+// throw on String(). Every extractor already treats String(undefined) as
+// "absent" — yield that same sentinel here so an unusable key field is
+// filtered out instead of crashing.
+const getPropertyValue = (el: JsonValue, property: string) => {
+  const value = (el as Record<string, unknown>)[property]
+  return typeof value === 'object' && value !== null
+    ? String(undefined)
+    : String(value)
+}
 
 const getFilterItemKey = (el: JsonValue) => {
   const field = getPropertyValue(el, 'field')

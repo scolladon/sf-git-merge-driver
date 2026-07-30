@@ -33,6 +33,9 @@ describe('LoggingService', () => {
   const freshLazy = async () =>
     (await import('../../../src/utils/LoggingService.js')).lazy
 
+  const freshIsLevelEnabled = async () =>
+    (await import('../../../src/utils/LoggingService.js')).isLevelEnabled
+
   describe('lazy template tag', () => {
     it('Given a static expression, When evaluating, Then returns the interpolated string', async () => {
       const lazy = await freshLazy()
@@ -137,6 +140,14 @@ describe('LoggingService', () => {
       Logger.info('i')
       Logger.warn('w')
       expect(mockAppendFileSync).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('SF_LOG_LEVEL=__proto__ (prototype-chain guard)', () => {
+    it('Given SF_LOG_LEVEL=__proto__, When checking isLevelEnabled at fatal, Then the default level applies instead of the inherited Object.prototype', async () => {
+      vi.stubEnv('SF_LOG_LEVEL', '__proto__')
+      const isLevelEnabled = await freshIsLevelEnabled()
+      expect(isLevelEnabled(60)).toBe(true)
     })
   })
 

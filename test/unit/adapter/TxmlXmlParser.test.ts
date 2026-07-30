@@ -285,6 +285,15 @@ describe('TxmlXmlParser', () => {
     })
   })
 
+  describe('given a valueless attribute on the root element', () => {
+    it('when parseString then it round-trips without throwing', () => {
+      // txml emits `null` (not a string) for a valueless attribute —
+      // pins that splitRootAttrs tolerates that shape without throwing
+      const result = sut.parseString(`<r foo><v>1</v></r>`)
+      expect(result.content).toEqual({ r: { '@_foo': null, v: '1' } })
+    })
+  })
+
   describe('given a comment that precedes the root element', () => {
     it('when parseString then the comment is skipped and the root is still found', () => {
       const result = sut.parseString(`<!-- preamble --><r><v>1</v></r>`)
