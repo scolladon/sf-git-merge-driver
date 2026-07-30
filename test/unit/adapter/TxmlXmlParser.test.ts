@@ -382,9 +382,17 @@ describe('TxmlXmlParser', () => {
 
       expect(Object.keys(rNode)).toContain('__proto__')
       expect(rNode['__proto__']).toEqual({ v: '1' })
-      // Pins the chosen remedy: the compact node is built on a
-      // null-prototype object, so there is no inherited __proto__
-      // accessor left to intercept the assignment in the first place.
+    })
+
+    // Separate from the observable contract above because it pins the
+    // remedy rather than the behaviour, and a weaker remedy that keeps a
+    // normal prototype would still satisfy the assertions above while
+    // leaving `node['__proto__']` resolving to Object.prototype on nodes
+    // that lack the key — which misclassifies the merge scenario.
+    it('when parseString then the compact node carries no prototype chain', () => {
+      const result = sut.parseString(`<r><__proto__><v>1</v></__proto__></r>`)
+      const rNode = (result.content as JsonObject)['r'] as JsonObject
+
       expect(Object.getPrototypeOf(rNode)).toBeNull()
     })
   })

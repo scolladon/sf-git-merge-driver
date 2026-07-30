@@ -679,10 +679,20 @@ describe('MetadataService', () => {
       })
     })
 
-    describe('given the reserved __proto__ metadata type (prototype-pollution guard)', () => {
-      it('should return undefined, not the inherited Object.prototype accessor', () => {
+    describe('given a metadata type named after an Object.prototype member', () => {
+      // A bare `in` check answers true for every one of these, so the
+      // lookup used to hand back an inherited member — an accessor for
+      // __proto__, a callable for the rest, which the node factory would
+      // then invoke as though it were a key extractor.
+      it.each([
+        '__proto__',
+        'constructor',
+        'toString',
+        'valueOf',
+        'hasOwnProperty',
+      ])('should return undefined for %s, not the inherited member', name => {
         // Arrange
-        const metadataType = '__proto__'
+        const metadataType = name
 
         // Act
         const extractor = MetadataService.getKeyFieldExtractor(metadataType)

@@ -251,17 +251,23 @@ const toCompact = (node: TNode): JsonValue => {
   // Attributes first matches the previous parser's emission order,
   // which the writer relies on for stable byte output.
   //
-  // A null-prototype object is deliberate: `tag` (and attribute names)
-  // come straight from untrusted XML element/attribute names, and
-  // `__proto__` is a syntactically valid one. On a normal `{}`,
-  // `out[tag] = value` for tag === '__proto__' would invoke the
-  // inherited `Object.prototype.__proto__` setter instead of creating
-  // an own property — silently rewriting this node's prototype chain
-  // (and, downstream, poisoning `key in obj` / property-read checks
-  // that merge scenario classification relies on) rather than storing
-  // an ordinary `__proto__`-named child. `Object.create(null)` makes
-  // every dynamic-key assignment below a plain own-property write.
-  const out: JsonObject = Object.create(null) as JsonObject
+  // A null-prototype object is deliberate: `tag` comes straight from an
+  // untrusted XML element name, and `__proto__` is a syntactically valid
+  // one. On a normal `{}`, `out[tag] = value` for tag === '__proto__'
+  // would invoke the inherited `Object.prototype.__proto__` setter
+  // instead of creating an own property — silently rewriting this node's
+  // prototype chain (and, downstream, poisoning `key in obj` /
+  // property-read checks that merge scenario classification relies on)
+  // rather than storing an ordinary `__proto__`-named child. Attribute
+  // names cannot reach that setter: they are written `@_`-prefixed below.
+  // `Object.create(null)` makes every dynamic-key assignment below a
+  // plain own-property write.
+  //
+  // Consequence every consumer of a parsed node must respect: `key in
+  // node` is an own-key test, and `String(node)` THROWS rather than
+  // coercing — see the coercion helpers in MetadataService and
+  // TextArrayMergeNode.
+  const out: JsonObject = Object.create(null)
   for (const [k, v] of Object.entries(node.attributes)) {
     out[`${ATTR_PREFIX}${k}`] = v
   }

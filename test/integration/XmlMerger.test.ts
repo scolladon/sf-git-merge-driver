@@ -272,14 +272,16 @@ describe('XmlMerger integration', () => {
     it('given a __proto__ element replacing a real sibling when merging then the injected content stays confined under its own tag, never impersonating the deleted sibling', async () => {
       // "ours" deletes <secret> and adds an unrelated <__proto__> carrying
       // an attacker-controlled <secret> underneath it. Ancestor/theirs keep
-      // a harmless <__proto__> too (present on all sides so the merge
-      // engine's normal own-key bookkeeping runs the same way it would for
-      // any other newly-diverged element — nothing about that bookkeeping
-      // is specific to this vulnerability). Deleting an element left
-      // unchanged elsewhere is an ordinary, conflict-free merge outcome, so
-      // <secret>REAL</secret> is legitimately gone either way; the security
-      // property under test is that GHOST must never leak out and
-      // impersonate the real, deleted <secret> element.
+      // a harmless <__proto__> too, and that is not incidental: the
+      // realistic one-sided shape (only the attacker's branch introduces
+      // <__proto__>) cannot be expressed today, because an object-shaped
+      // element added by exactly one side hits a separate pre-existing
+      // crash — for any tag name, not just this one. Present-on-all-sides
+      // is therefore the only shape that currently reaches the injection
+      // path. Deleting an element left unchanged elsewhere is an ordinary,
+      // conflict-free merge outcome, so <secret>REAL</secret> is
+      // legitimately gone either way; the property under test is that
+      // GHOST must never leak out and impersonate the deleted <secret>.
       const ancestor = `<?xml version="1.0" encoding="UTF-8"?>\n<PermissionSet xmlns="${NS}"><label>L</label><secret>REAL</secret><__proto__><marker>base</marker></__proto__></PermissionSet>`
       const ours = `<?xml version="1.0" encoding="UTF-8"?>\n<PermissionSet xmlns="${NS}"><label>L</label><__proto__><secret>GHOST</secret></__proto__></PermissionSet>`
       const theirs = ancestor
