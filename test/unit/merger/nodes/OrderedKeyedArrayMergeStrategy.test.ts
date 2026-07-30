@@ -160,23 +160,24 @@ describe('OrderedKeyedArrayMergeStrategy', () => {
   ]
 
   describe('Graceful Merges', () => {
-    it.each(
-      gracefulMergeScenarios
-    )('%s', (_name, ancestor, local, other, expectedOutput) => {
-      // Arrange
-      const strategy = createStrategy(
-        toElements(ancestor),
-        toElements(local),
-        toElements(other)
-      )
+    it.each(gracefulMergeScenarios)(
+      '%s',
+      (_name, ancestor, local, other, expectedOutput) => {
+        // Arrange
+        const strategy = createStrategy(
+          toElements(ancestor),
+          toElements(local),
+          toElements(other)
+        )
 
-      // Act
-      const result = strategy.merge(defaultConfig)
+        // Act
+        const result = strategy.merge(defaultConfig)
 
-      // Assert
-      expect(result.hasConflict).toBe(false)
-      expect(extractLabels(result.output)).toEqual(expectedOutput)
-    })
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(extractLabels(result.output)).toEqual(expectedOutput)
+      }
+    )
   })
 
   const conflict = (
@@ -411,43 +412,45 @@ describe('OrderedKeyedArrayMergeStrategy', () => {
   ]
 
   describe('Additional Graceful Merges', () => {
-    it.each(
-      additionalGracefulScenarios
-    )('%s', (_name, ancestor, local, other, expectedOutput) => {
-      // Arrange
-      const strategy = createStrategy(
-        toElements(ancestor),
-        toElements(local),
-        toElements(other)
-      )
+    it.each(additionalGracefulScenarios)(
+      '%s',
+      (_name, ancestor, local, other, expectedOutput) => {
+        // Arrange
+        const strategy = createStrategy(
+          toElements(ancestor),
+          toElements(local),
+          toElements(other)
+        )
 
-      // Act
-      const result = strategy.merge(defaultConfig)
+        // Act
+        const result = strategy.merge(defaultConfig)
 
-      // Assert
-      expect(result.hasConflict).toBe(false)
-      expect(extractLabels(result.output)).toEqual(expectedOutput)
-    })
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(extractLabels(result.output)).toEqual(expectedOutput)
+      }
+    )
   })
 
   describe('Conflicts', () => {
-    it.each(
-      conflictScenarios
-    )('%s', (_name, ancestor, local, other, expectedOutput) => {
-      // Arrange
-      const strategy = createStrategy(
-        toElements(ancestor),
-        toElements(local),
-        toElements(other)
-      )
+    it.each(conflictScenarios)(
+      '%s',
+      (_name, ancestor, local, other, expectedOutput) => {
+        // Arrange
+        const strategy = createStrategy(
+          toElements(ancestor),
+          toElements(local),
+          toElements(other)
+        )
 
-      // Act
-      const result = strategy.merge(defaultConfig)
+        // Act
+        const result = strategy.merge(defaultConfig)
 
-      // Assert
-      expect(result.hasConflict).toBe(true)
-      expect(extractConflictStructure(result.output)).toEqual(expectedOutput)
-    })
+        // Assert
+        expect(result.hasConflict).toBe(true)
+        expect(extractConflictStructure(result.output)).toEqual(expectedOutput)
+      }
+    )
   })
 
   describe('processKeyOrder with deleted elements', () => {

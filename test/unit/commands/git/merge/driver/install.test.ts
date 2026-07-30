@@ -15,9 +15,12 @@ describe('install command — parsePromptAnswer', () => {
       ['SKIP', 'skip'],
       ['Skip', 'skip'],
       ['  skip  ', 'skip'], // whitespace tolerance
-    ] as const)('Given answer %s, When parsing, Then returns %s', (input, expected) => {
-      expect(parsePromptAnswer(input)).toBe(expected)
-    })
+    ] as const)(
+      'Given answer %s, When parsing, Then returns %s',
+      (input, expected) => {
+        expect(parsePromptAnswer(input)).toBe(expected)
+      }
+    )
   })
 
   describe('overwrite', () => {
@@ -28,9 +31,12 @@ describe('install command — parsePromptAnswer', () => {
       ['OVERWRITE', 'overwrite'],
       ['Overwrite', 'overwrite'],
       ['  overwrite  ', 'overwrite'],
-    ] as const)('Given answer %s, When parsing, Then returns %s', (input, expected) => {
-      expect(parsePromptAnswer(input)).toBe(expected)
-    })
+    ] as const)(
+      'Given answer %s, When parsing, Then returns %s',
+      (input, expected) => {
+        expect(parsePromptAnswer(input)).toBe(expected)
+      }
+    )
   })
 
   describe('abort (default)', () => {
@@ -44,8 +50,11 @@ describe('install command — parsePromptAnswer', () => {
       'o\tsomething', // tab-prefixed or extra content
       'sx', // starts-with variants should NOT match
       'os',
-    ])('Given ambiguous or unrecognised answer %s, When parsing, Then defaults to abort', input => {
-      expect(parsePromptAnswer(input)).toBe('abort')
-    })
+    ])(
+      'Given ambiguous or unrecognised answer %s, When parsing, Then defaults to abort',
+      input => {
+        expect(parsePromptAnswer(input)).toBe('abort')
+      }
+    )
   })
 })
