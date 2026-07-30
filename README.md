@@ -81,6 +81,19 @@ For metadata types where **element order matters** (like picklist values), the m
 
 This ensures picklist value ordering in your org matches what you expect after a merge.
 
+### Tag order within an element
+
+Separately from the ordered *element* types above, the driver also merges the order of the **tags inside a node**. The rule:
+
+> Wherever any side's file constrains the order of two tags, that constraint wins. A tag introduced by one branch keeps the position that branch gave it.
+
+So a permission set where your branch adds `<classAccesses>` between `<description>` and `<tabSettings>` keeps it there, rather than having it relocated to the end of the file. The result is also independent of direction — a `git merge` and the `git rebase` that swaps the same two branches produce identical output.
+
+One case has no answer in the data: when **both** branches introduce *different* new tags at the *same* position, no file says which of the two comes first. There the driver falls back to alphabetical order. Two consequences worth knowing:
+
+- The metadata still deploys identically — the Metadata API does not enforce sibling order.
+- For `Profile` and `PermissionSet` the canonical order of top-level groups is itself alphabetical, so the fallback agrees with it. For types whose canonical order is not alphabetical (`<fullName>` first, for instance), a later `sf project retrieve` may re-emit those two tags in the other order, producing a small diff.
+
 ## Installation (30 seconds)
 
 ### With Salesforce CLI
