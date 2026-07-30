@@ -4,9 +4,8 @@ import {
   toJsonObjectOrEmpty,
 } from '../types/jsonTypes.js'
 
-export const keysOf = (
-  value: JsonObject | JsonArray | null | undefined
-): string[] => (value == null ? [] : Object.keys(toJsonObjectOrEmpty(value)))
+const keysOf = (value: JsonObject | JsonArray | null | undefined): string[] =>
+  value == null ? [] : Object.keys(toJsonObjectOrEmpty(value))
 
 const sameSequence = (left: string[], right: string[]): boolean => {
   if (left.length !== right.length) return false
@@ -92,7 +91,7 @@ const topologicalOrder = (
 }
 
 export const mergePropertyOrder = (
-  ancestor: JsonObject | JsonArray | undefined,
+  ancestor: JsonObject | JsonArray | null | undefined,
   local: JsonObject | JsonArray,
   other: JsonObject | JsonArray
 ): string[] => {

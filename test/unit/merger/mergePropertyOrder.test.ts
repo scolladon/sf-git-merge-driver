@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  keysOf,
-  mergePropertyOrder,
-} from '../../../src/merger/mergePropertyOrder.js'
+import { mergePropertyOrder } from '../../../src/merger/mergePropertyOrder.js'
 import type { JsonObject } from '../../../src/types/jsonTypes.js'
 
 // mergePropertyOrder resolves the *order* in which sibling XML tags are
@@ -422,16 +419,17 @@ describe('mergePropertyOrder', () => {
     })
   })
 
-  describe('keysOf', () => {
-    it('given a null value when keysOf then returns an empty array', () => {
+  describe('absent ancestor', () => {
+    it('given a null ancestor when mergePropertyOrder then contributes no keys', () => {
       // Arrange
-      const value = null
+      const local = { b: 1, a: 1 }
+      const other = { b: 1, a: 1 }
 
       // Act
-      const sut = keysOf(value)
+      const sut = mergePropertyOrder(null, local, other)
 
       // Assert
-      expect(sut).toEqual([])
+      expect(sut).toEqual(['b', 'a'])
     })
   })
 
