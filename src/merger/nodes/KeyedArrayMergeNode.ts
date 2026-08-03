@@ -1,7 +1,12 @@
 import type { MergeConfig } from '../../types/conflictTypes.js'
 import type { JsonArray } from '../../types/jsonTypes.js'
 import type { MergeResult } from '../../types/mergeResult.js'
-import { combineResults, withConflict } from '../../types/mergeResult.js'
+import {
+  combineResults,
+  noConflict,
+  withConflict,
+} from '../../types/mergeResult.js'
+import { jsonEqual } from '../../utils/jsonEqual.js'
 import { buildConflictMarkers } from '../ConflictMarkerBuilder.js'
 import { MergeOrchestrator } from '../MergeOrchestrator.js'
 import type { KeyExtractor } from './KeyedArrayIndex.js'
@@ -15,6 +20,12 @@ import { OrderedKeyedArrayMergeStrategy } from './OrderedKeyedArrayMergeStrategy
 // Unkeyed Conflict Strategy
 // ============================================================================
 
+// No key extractor means individual elements can't be matched across
+// versions, so a genuine divergence still falls back to a whole-array
+// conflict (documented in the README). But without a same-as-every-other-
+// node-type equality check first, this used to conflict unconditionally —
+// including when the array itself never changed and only forced a
+// recursive walk because an unrelated sibling property differed.
 class UnkeyedConflictStrategy implements KeyedArrayMergeStrategy {
   constructor(
     private readonly ancestor: JsonArray,
@@ -24,6 +35,22 @@ class UnkeyedConflictStrategy implements KeyedArrayMergeStrategy {
   ) {}
 
   merge(_config: MergeConfig): MergeResult {
+    if (
+      jsonEqual(this.ancestor, this.local) &&
+      jsonEqual(this.local, this.other)
+    ) {
+      return this.resolved(this.local)
+    }
+    if (jsonEqual(this.ancestor, this.local)) {
+      return this.resolved(this.other)
+    }
+    if (jsonEqual(this.ancestor, this.other)) {
+      return this.resolved(this.local)
+    }
+    if (jsonEqual(this.local, this.other)) {
+      return this.resolved(this.local)
+    }
+
     return withConflict([
       buildConflictMarkers(
         { [this.attribute]: this.local },
@@ -31,6 +58,10 @@ class UnkeyedConflictStrategy implements KeyedArrayMergeStrategy {
         { [this.attribute]: this.other }
       ),
     ])
+  }
+
+  private resolved(value: JsonArray): MergeResult {
+    return noConflict(value.map(item => ({ [this.attribute]: item })))
   }
 }
 
