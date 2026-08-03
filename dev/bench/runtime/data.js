@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785761594552,
+  "lastUpdate": 1785765086186,
   "repoUrl": "https://github.com/scolladon/sf-git-merge-driver",
   "entries": {
     "Runtime Benchmark": [
@@ -1865,6 +1865,138 @@ window.BENCHMARK_DATA = {
             "name": "serialize-large",
             "value": 137,
             "range": "±3.46%",
+            "unit": "ops/sec"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "colladonsebastien@gmail.com",
+            "name": "Sebastien",
+            "username": "scolladon"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d4ccaee163ec7d628361fb0e70a3b2cd992291ff",
+          "message": "feat!: require Node.js >= 22.19 and upgrade dependencies to latest (#206)",
+          "timestamp": "2026-08-03T15:48:44+02:00",
+          "tree_id": "2ecc46be34f9a05c48e9649aa2c19babe44636f6",
+          "url": "https://github.com/scolladon/sf-git-merge-driver/commit/d4ccaee163ec7d628361fb0e70a3b2cd992291ff"
+        },
+        "date": 1785765085822,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "node bin/merge-driver.cjs --version",
+            "value": 35,
+            "range": "±2.21%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-small-no-conflict",
+            "value": 503,
+            "range": "±3.72%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-small-with-conflict",
+            "value": 673,
+            "range": "±1.75%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-medium-no-conflict",
+            "value": 90,
+            "range": "±1.83%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-medium-with-conflict",
+            "value": 90,
+            "range": "±1.44%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-large-no-conflict",
+            "value": 21,
+            "range": "±7.22%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-large-with-conflict",
+            "value": 21,
+            "range": "±7.56%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-ordered-globalvalueset",
+            "value": 742,
+            "range": "±1.93%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-picklist-customfield",
+            "value": 1097,
+            "range": "±1.89%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "parse-small",
+            "value": 1332,
+            "range": "±0.91%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-small",
+            "value": 3890,
+            "range": "±1.74%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "serialize-small",
+            "value": 4936,
+            "range": "±1.43%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "parse-medium",
+            "value": 160,
+            "range": "±0.96%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-medium",
+            "value": 425,
+            "range": "±3.89%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "serialize-medium",
+            "value": 670,
+            "range": "±2.07%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "parse-large",
+            "value": 37,
+            "range": "±0.48%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-large",
+            "value": 110,
+            "range": "±2.61%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "serialize-large",
+            "value": 161,
+            "range": "±2.68%",
             "unit": "ops/sec"
           }
         ]
