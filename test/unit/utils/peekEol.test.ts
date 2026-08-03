@@ -60,7 +60,7 @@ describe('peekEol', () => {
     it('when complete then the returned file handle is closed (no fd leak)', async () => {
       // Regression guard for the `finally { await handle.close() }`
       // path. `process.getActiveResourcesInfo()` ships in Node 17+;
-      // this project requires Node ≥ 20 (asserted at binary entry),
+      // this project requires Node ≥ 22 (asserted at binary entry),
       // so the API is always available.
       const path = await write('fd-leak.xml', 'abc\ndef\n')
       // Warm up once so any lazy-init resources register.

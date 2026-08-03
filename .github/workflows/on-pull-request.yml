@@ -23,15 +23,15 @@ jobs:
     if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
           fetch-depth: 0
 
       - name: Setup node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Setup dependencies, cache and install
         uses: ./.github/actions/install
@@ -48,7 +48,7 @@ jobs:
       pull-requests: read
     steps:
       - name: Lint PR
-        uses: amannn/action-semantic-pull-request@v5
+        uses: amannn/action-semantic-pull-request@v6
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
@@ -56,12 +56,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
       - name: Setup node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: 22
 
@@ -69,12 +69,7 @@ jobs:
         uses: ./.github/actions/install
 
       - name: Check outdated dependencies
-        # The @salesforce/* stack and @jsforce/jsforce-node are intentionally
-        # held at their last Node-20-compatible versions; newer releases need
-        # Node >=22 (undici 8.5). Still fail on any other outdated dependency.
-        run: |
-          stale=$(npm outdated --json | jq -r 'del(.["@jsforce/jsforce-node"], .["@salesforce/core"], .["@salesforce/sf-plugins-core"]) | keys[]' || true)
-          [ -z "$stale" ] || { echo "Outdated dependencies: $stale"; exit 1; }
+        run: npm outdated
 
       - name: Check unused dependencies
         run: npm run lint:dependencies
@@ -87,7 +82,7 @@ jobs:
     steps:
       # Git Checkout
       - name: Checkout Code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -103,7 +98,7 @@ jobs:
           VALIDATE_ALL_CODEBASE: true
           # ADD CUSTOM ENV VARIABLES HERE TO OVERRIDE VALUES OF .mega-linter.yml AT THE ROOT OF YOUR REPOSITORY
 
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: megalinter-reports
@@ -116,7 +111,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        node-version: ["20", "22", "24"]
+        node-version: ["22", "24", "26"]
     uses: ./.github/workflows/reusable-build.yml
     with:
       os: ${{ matrix.os }}
@@ -128,15 +123,15 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'mutation-testing')
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
           fetch-depth: 0
 
       - name: Setup node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
 
       - uses: google/wireit@setup-github-actions-caching/v2
 
@@ -144,7 +139,7 @@ jobs:
         uses: ./.github/actions/install
 
       - name: Restore incremental report
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: reports/mutation/stryker-incremental.json
           key: stryker-incremental-${{ github.base_ref }}
@@ -155,14 +150,14 @@ jobs:
         run: npm run test:mutation:incremental
 
       - name: Save incremental report
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@v6
         if: always()
         with:
           path: reports/mutation/stryker-incremental.json
           key: stryker-incremental-${{ github.base_ref }}-${{ github.sha }}
 
       - name: Upload mutation report
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: mutation-report

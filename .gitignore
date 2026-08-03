@@ -4,7 +4,6 @@
 *-debug.log
 *-error.log
 *.tgz
-/.nyc_output
 /lib
 /node_modules
 /reports

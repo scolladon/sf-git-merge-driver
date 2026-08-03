@@ -10,19 +10,19 @@ on:
       node-version:
         description: Node.js major version to install
         type: string
-        default: "20"
+        default: "22"
 
 jobs:
   source:
     runs-on: ${{ inputs.os }}
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
       - name: Setup node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ inputs.node-version }}
 
@@ -33,6 +33,9 @@ jobs:
 
       - name: Lint plugin
         run: npm run lint
+
+      - name: Lint engines
+        run: npm run lint:engines
 
       - name: Build plugin
         run: npm pack
@@ -52,8 +55,8 @@ jobs:
       - name: Nut test
         run: npm run test:nut
 
-      - uses: actions/upload-artifact@v6
-        if: inputs.os == 'ubuntu-latest' && inputs.node-version == '20'
+      - uses: actions/upload-artifact@v7
+        if: inputs.os == 'ubuntu-latest' && inputs.node-version == '22'
         with:
           name: coverage-test-report
           path: reports/coverage
