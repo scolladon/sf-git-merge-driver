@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1782805703651,
+  "lastUpdate": 1785761598206,
   "repoUrl": "https://github.com/scolladon/sf-git-merge-driver",
   "entries": {
     "Binary Size Benchmark": [
@@ -231,6 +231,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "bin/merge-driver.cjs",
             "value": 36588,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "colladonsebastien@gmail.com",
+            "name": "Sebastien",
+            "username": "scolladon"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "de5b0aaa388a2e427eddc9a391299ac1b67d1f5d",
+          "message": "fix: merge xml tag order three-way so new element groups keep their position (#204)",
+          "timestamp": "2026-08-03T14:49:57+02:00",
+          "tree_id": "a5334f400c951f874ebf2ba0d63a73733779f7fd",
+          "url": "https://github.com/scolladon/sf-git-merge-driver/commit/de5b0aaa388a2e427eddc9a391299ac1b67d1f5d"
+        },
+        "date": 1785761598139,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "bin/merge-driver.cjs",
+            "value": 37708,
             "unit": "bytes"
           }
         ]
