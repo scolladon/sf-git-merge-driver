@@ -3,12 +3,66 @@ import { TxmlXmlParser } from '../adapter/TxmlXmlParser.js'
 import { XmlStreamWriter } from '../adapter/writer/XmlStreamWriter.js'
 import type { XmlParser } from '../adapter/XmlParser.js'
 import type { MergeConfig } from '../types/conflictTypes.js'
-import type { JsonArray, JsonObject } from '../types/jsonTypes.js'
+import type { JsonArray, JsonObject, JsonValue } from '../types/jsonTypes.js'
 import { log } from '../utils/LoggingDecorator.js'
+import { Logger } from '../utils/LoggingService.js'
 import { JsonMerger } from './JsonMerger.js'
 
-const mergeNamespaces = (...maps: JsonObject[]): JsonObject =>
-  Object.assign({}, ...maps)
+// Root xmlns* attributes live in a bucket parsed separately from `content`
+// (see TxmlXmlParser.splitRootAttrs) and never reach MergeOrchestrator, so
+// they need their own three-way resolution instead of inheriting one for
+// free. Per key: unchanged-on-one-side defers to whatever the other side
+// did (add, change or remove); both sides agreeing (including both
+// removing it) keeps that agreement. A namespace value has no way to carry
+// zdiff3 markers without producing invalid XML (`xmlns="<<<<<<< ours..."`),
+// so a genuine three-way divergence — all three different, no pair
+// agreeing — can't become a real conflict; it keeps `local` (protects the
+// developer's own change from being silently overwritten by `other`,
+// unlike the previous `Object.assign({}, ancestor, local, other)` which
+// always let `other` win even when only `local` had changed) and logs so
+// the discarded alternative isn't completely invisible.
+const resolveNamespaceValue = (
+  key: string,
+  ancestor: JsonValue | undefined,
+  local: JsonValue | undefined,
+  other: JsonValue | undefined
+): JsonValue | undefined => {
+  if (ancestor === local) return other // only other changed (added/edited/removed)
+  if (ancestor === other) return local // only local changed
+  if (local === other) return local // both changed to the same value
+  // Genuine three-way divergence, no pair agreeing: keep local and log —
+  // see the function-level comment for why this can't become a real
+  // conflict.
+  Logger.warn(`xmlns divergence on ${key}; keeping local`, {
+    ancestor,
+    local,
+    other,
+  })
+  return local
+}
+
+const mergeNamespaces = (
+  ancestor: JsonObject,
+  local: JsonObject,
+  other: JsonObject
+): JsonObject => {
+  const keys = new Set([
+    ...Object.keys(ancestor),
+    ...Object.keys(local),
+    ...Object.keys(other),
+  ])
+  const result: JsonObject = {}
+  for (const key of keys) {
+    const resolved = resolveNamespaceValue(
+      key,
+      ancestor[key],
+      local[key],
+      other[key]
+    )
+    if (resolved !== undefined) result[key] = resolved
+  }
+  return result
+}
 
 // When the JSON merge yields no output but BOTH live sides (ours and theirs)
 // still carry the root element, rebuild it as an empty element
