@@ -6,6 +6,7 @@ import {
   type TNode,
   TxmlXmlParser,
 } from '../../../src/adapter/TxmlXmlParser.js'
+import type { JsonObject } from '../../../src/types/jsonTypes.js'
 
 describe('TxmlXmlParser', () => {
   const sut = new TxmlXmlParser()
@@ -284,6 +285,15 @@ describe('TxmlXmlParser', () => {
     })
   })
 
+  describe('given a valueless attribute on the root element', () => {
+    it('when parseString then it round-trips without throwing', () => {
+      // txml emits `null` (not a string) for a valueless attribute —
+      // pins that splitRootAttrs tolerates that shape without throwing
+      const result = sut.parseString(`<r foo><v>1</v></r>`)
+      expect(result.content).toEqual({ r: { '@_foo': null, v: '1' } })
+    })
+  })
+
   describe('given a comment that precedes the root element', () => {
     it('when parseString then the comment is skipped and the root is still found', () => {
       const result = sut.parseString(`<!-- preamble --><r><v>1</v></r>`)
@@ -362,6 +372,46 @@ describe('TxmlXmlParser', () => {
       // above happens to balance out (one bad open + one normal close
       // = depth 0) so it does NOT exercise this branch.
       expect(() => sut.parseString(`<r><v attr='a>b'/></r>`)).not.toThrow()
+    })
+  })
+
+  describe('given a __proto__-named element (prototype-pollution guard)', () => {
+    it('when parseString then it round-trips as an ordinary own property visible in Object.keys', () => {
+      const result = sut.parseString(`<r><__proto__><v>1</v></__proto__></r>`)
+      const rNode = (result.content as JsonObject)['r'] as JsonObject
+
+      expect(Object.keys(rNode)).toContain('__proto__')
+      expect(rNode['__proto__']).toEqual({ v: '1' })
+    })
+
+    // Separate from the observable contract above because it pins the
+    // remedy rather than the behaviour, and a weaker remedy that keeps a
+    // normal prototype would still satisfy the assertions above while
+    // leaving `node['__proto__']` resolving to Object.prototype on nodes
+    // that lack the key — which misclassifies the merge scenario.
+    it('when parseString then the compact node carries no prototype chain', () => {
+      const result = sut.parseString(`<r><__proto__><v>1</v></__proto__></r>`)
+      const rNode = (result.content as JsonObject)['r'] as JsonObject
+
+      expect(Object.getPrototypeOf(rNode)).toBeNull()
+    })
+  })
+
+  describe('given elements named after other Object.prototype members (regression guard)', () => {
+    // These names are plain data properties on Object.prototype, so
+    // assigning them was already safe pre-fix (the assignment shadows
+    // them with an own property) — pin that it stays true post-fix.
+    it.each([
+      'constructor',
+      'toString',
+      'hasOwnProperty',
+      'valueOf',
+    ])('when parseString then %s round-trips as an ordinary own property', name => {
+      const result = sut.parseString(`<r><${name}>1</${name}></r>`)
+      const rNode = (result.content as JsonObject)['r'] as JsonObject
+
+      expect(Object.keys(rNode)).toContain(name)
+      expect(rNode[name]).toBe('1')
     })
   })
 })

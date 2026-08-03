@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { TextArrayMergeNode } from '../../../../src/merger/nodes/TextArrayMergeNode.js'
+import type { JsonArray, JsonValue } from '../../../../src/types/jsonTypes.js'
 import { defaultConfig } from '../../../utils/testConfig.js'
 
 describe('TextArrayMergeNode', () => {
@@ -380,6 +381,27 @@ describe('TextArrayMergeNode', () => {
 
       // Assert - both added since they're different values (different references)
       expect(result.output).toHaveLength(2)
+    })
+
+    it('should sort a null-prototype object item instead of throwing (parser output shape)', () => {
+      // Arrange - txml builds compact nodes on Object.create(null), so a
+      // sibling that collapsed to a single object on one side (while this
+      // side is an all-strings array) must not rely on the inherited
+      // Object.prototype.toString to compare
+      const nullProtoItem = Object.assign(Object.create(null), {
+        application: 'A',
+      }) as JsonValue
+      const ancestor: JsonArray = ['a']
+      const local: JsonArray = ['a', 'b']
+      const other: JsonArray = ['a', nullProtoItem]
+      const node = new TextArrayMergeNode(ancestor, local, other, 'items')
+
+      // Act
+      const result = node.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      expect(result.output).toContainEqual({ items: nullProtoItem })
     })
   })
 })

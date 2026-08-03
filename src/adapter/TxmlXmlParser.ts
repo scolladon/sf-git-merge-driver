@@ -250,7 +250,24 @@ const toCompact = (node: TNode): JsonValue => {
 
   // Attributes first matches the previous parser's emission order,
   // which the writer relies on for stable byte output.
-  const out: JsonObject = {}
+  //
+  // A null-prototype object is deliberate: `tag` comes straight from an
+  // untrusted XML element name, and `__proto__` is a syntactically valid
+  // one. On a normal `{}`, `out[tag] = value` for tag === '__proto__'
+  // would invoke the inherited `Object.prototype.__proto__` setter
+  // instead of creating an own property — silently rewriting this node's
+  // prototype chain (and, downstream, poisoning `key in obj` /
+  // property-read checks that merge scenario classification relies on)
+  // rather than storing an ordinary `__proto__`-named child. Attribute
+  // names cannot reach that setter: they are written `@_`-prefixed below.
+  // `Object.create(null)` makes every dynamic-key assignment below a
+  // plain own-property write.
+  //
+  // Consequence every consumer of a parsed node must respect: `key in
+  // node` is an own-key test, and `String(node)` THROWS rather than
+  // coercing — see the coercion helpers in MetadataService and
+  // TextArrayMergeNode.
+  const out: JsonObject = Object.create(null)
   for (const [k, v] of Object.entries(node.attributes)) {
     out[`${ATTR_PREFIX}${k}`] = v
   }
@@ -285,10 +302,17 @@ const findRootElement = (
 // Split root attributes into (xmlns* → namespaces bucket) and (rest →
 // stays on the element). Mirrors the previous parser's namespace
 // extraction.
+//
+// Null-prototype for the same reason as toCompact's `out`: `k` comes
+// straight from an untrusted XML attribute name. It cannot be
+// `__proto__` today only because txml's lexer starts an attribute name
+// on an ASCII letter, so `__proto__="x"` lexes as `proto__="x"` — a
+// third-party parsing quirk, not a guarantee. Object.create(null) makes
+// `rootAttrs[k] = v` safe independently of that quirk.
 const splitRootAttrs = (
   root: TNode
 ): { rootAttrs: Record<string, string>; namespaces: JsonObject } => {
-  const rootAttrs: Record<string, string> = {}
+  const rootAttrs: Record<string, string> = Object.create(null)
   const namespaces: JsonObject = {}
   for (const [k, v] of Object.entries(root.attributes)) {
     if (XMLNS_RE.test(k)) {

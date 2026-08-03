@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { JsonMerger } from '../../../src/merger/JsonMerger.js'
-import { JsonValue } from '../../../src/types/jsonTypes.js'
+import { JsonObject, JsonValue } from '../../../src/types/jsonTypes.js'
 import { defaultConfig } from '../../utils/testConfig.js'
 
 describe('JsonMerger', () => {
@@ -1779,6 +1779,52 @@ describe('JsonMerger', () => {
           ],
         },
       ])
+    })
+  })
+
+  describe('given a root key name colliding with Object.prototype (in-operator prototype-chain guard)', () => {
+    it('should not resurrect content deleted by the other side just because the key name is inherited', () => {
+      // Arrange - 'constructor' is not an own property of {}, but `in`
+      // walks the prototype chain and would misreport it as present
+      const ancestor: JsonValue = { constructor: { a: '1' } }
+      const local: JsonValue = { constructor: { a: '1' } }
+      const other: JsonValue = {}
+
+      // Act
+      const result = sut.mergeThreeWay(ancestor, local, other)
+
+      // Assert
+      expect(result.output).toEqual([])
+      expect(result.hasConflict).toBe(false)
+    })
+  })
+
+  describe('given a key inserted between two ancestor keys (three-way key-order merge)', () => {
+    it('should keep the inserted key between them instead of pushing it past the ancestor tail', () => {
+      // Arrange
+      const ancestor: JsonValue = {
+        Profile: { description: 'base', userLicense: 'Salesforce' },
+      }
+      const local: JsonValue = {
+        Profile: {
+          description: 'base',
+          custom: 'true',
+          userLicense: 'Salesforce',
+        },
+      }
+      const other: JsonValue = {
+        Profile: { description: 'base', userLicense: 'Salesforce' },
+      }
+
+      // Act
+      const result = sut.mergeThreeWay(ancestor, local, other)
+
+      // Assert
+      const profile = (result.output[0] as JsonObject)[
+        'Profile'
+      ] as JsonObject[]
+      const keys = profile.map(entry => Object.keys(entry)[0])
+      expect(keys).toEqual(['description', 'custom', 'userLicense'])
     })
   })
 })

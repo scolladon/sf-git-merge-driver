@@ -4,7 +4,11 @@ export class MetadataService {
   public static getKeyFieldExtractor(
     metadataType: string
   ): ((el: JsonValue) => string) | undefined {
-    return metadataType in METADATA_KEY_EXTRACTORS
+    // `in` walks the prototype chain, so `'__proto__' in {}` is true —
+    // metadataType is an untrusted XML tag name, and `__proto__` would
+    // resolve to the inherited Object.prototype accessor instead of
+    // undefined. Object.hasOwn checks own properties only.
+    return Object.hasOwn(METADATA_KEY_EXTRACTORS, metadataType)
       ? METADATA_KEY_EXTRACTORS[
           metadataType as keyof typeof METADATA_KEY_EXTRACTORS
         ]
@@ -28,8 +32,17 @@ const ORDERED_ATTRIBUTES = new Set([
   'promptVersions', // Translations
 ])
 
-const getPropertyValue = (el: JsonValue, property: string) =>
-  String((el as Record<string, unknown>)[property])
+// An object-shaped key field (element with attributes/children, built on
+// Object.create(null) by the parser) has no inherited toString and would
+// throw on String(). Every extractor already treats String(undefined) as
+// "absent" — yield that same sentinel here so an unusable key field is
+// filtered out instead of crashing.
+const getPropertyValue = (el: JsonValue, property: string) => {
+  const value = (el as Record<string, unknown>)[property]
+  return typeof value === 'object' && value !== null
+    ? String(undefined)
+    : String(value)
+}
 
 const getFilterItemKey = (el: JsonValue) => {
   const field = getPropertyValue(el, 'field')

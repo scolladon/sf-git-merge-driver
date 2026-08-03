@@ -4,8 +4,16 @@ import type { MergeResult } from '../../types/mergeResult.js'
 import { noConflict } from '../../types/mergeResult.js'
 import type { MergeNode } from './MergeNode.js'
 
+// Total coercion, independent of Object.prototype.toString: the parser
+// builds compact nodes on Object.create(null) (prototype-pollution guard),
+// so an object item reaching this comparator has no inherited toString —
+// String(obj) would throw. JSON.stringify needs no prototype method, and
+// agrees with String on null ("null"), so null needs no separate arm.
+const toComparable = (value: JsonValue): string =>
+  typeof value === 'object' ? JSON.stringify(value) : String(value)
+
 const compareItems = (a: JsonValue, b: JsonValue): number =>
-  String(a).localeCompare(String(b))
+  toComparable(a).localeCompare(toComparable(b))
 
 export class TextArrayMergeNode implements MergeNode {
   constructor(

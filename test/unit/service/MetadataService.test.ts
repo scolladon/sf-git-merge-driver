@@ -678,6 +678,69 @@ describe('MetadataService', () => {
         expect(extractor).toBeUndefined()
       })
     })
+
+    describe('given a metadata type named after an Object.prototype member', () => {
+      // A bare `in` check answers true for every one of these, so the
+      // lookup used to hand back an inherited member — an accessor for
+      // __proto__, a callable for the rest, which the node factory would
+      // then invoke as though it were a key extractor.
+      it.each([
+        '__proto__',
+        'constructor',
+        'toString',
+        'valueOf',
+        'hasOwnProperty',
+      ])('should return undefined for %s, not the inherited member', name => {
+        // Arrange
+        const metadataType = name
+
+        // Act
+        const extractor = MetadataService.getKeyFieldExtractor(metadataType)
+
+        // Assert
+        expect(extractor).toBeUndefined()
+      })
+    })
+
+    describe('given a key field whose value is a null-prototype object (parser output shape)', () => {
+      it('should treat it as absent instead of throwing on String coercion', () => {
+        // Arrange - txml builds compact nodes on Object.create(null), so a
+        // key field with attributes/children (object-shaped) has no
+        // inherited toString
+        const nullProtoApexClass = Object.assign(Object.create(null), {
+          '@_a': '1',
+          '#text': '',
+        })
+        const testObject = { apexClass: nullProtoApexClass, enabled: 'true' }
+        const extractor = MetadataService.getKeyFieldExtractor('classAccesses')
+
+        // Act
+        const result = extractor!(testObject as unknown as JsonValue)
+
+        // Assert
+        expect(result).toBe(String(undefined))
+      })
+    })
+
+    describe('given the picklistValues prefer-then-fallback extractor with an object-shaped masterLabel', () => {
+      it('should fall back to picklist instead of throwing on String coercion', () => {
+        // Arrange - the object-shaped sentinel must be indistinguishable
+        // from "absent" so the existing `!== String(undefined)` fallback
+        // in getPicklistValuesKey still selects the picklist field
+        const nullProtoMasterLabel = Object.create(null)
+        const testObject = {
+          masterLabel: nullProtoMasterLabel,
+          picklist: 'StageName',
+        }
+        const extractor = MetadataService.getKeyFieldExtractor('picklistValues')
+
+        // Act
+        const result = extractor!(testObject as unknown as JsonValue)
+
+        // Assert
+        expect(result).toBe('StageName')
+      })
+    })
   })
 
   describe('isOrderedAttribute', () => {

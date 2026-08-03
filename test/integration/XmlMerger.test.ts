@@ -265,4 +265,98 @@ describe('XmlMerger integration', () => {
       expect(output.indexOf('mid')).toBeGreaterThan(secondA)
     })
   })
+
+  describe('prototype pollution guard (__proto__ xml element)', () => {
+    const NS = 'http://soap.sforce.com/2006/04/metadata'
+
+    it('given a __proto__ element replacing a real sibling when merging then the injected content stays confined under its own tag, never impersonating the deleted sibling', async () => {
+      // "ours" deletes <secret> and adds an unrelated <__proto__> carrying
+      // an attacker-controlled <secret> underneath it. Ancestor/theirs keep
+      // a harmless <__proto__> too, and that is not incidental: the
+      // realistic one-sided shape (only the attacker's branch introduces
+      // <__proto__>) cannot be expressed today, because an object-shaped
+      // element added by exactly one side hits a separate pre-existing
+      // crash — for any tag name, not just this one. Present-on-all-sides
+      // is therefore the only shape that currently reaches the injection
+      // path. Deleting an element left unchanged elsewhere is an ordinary,
+      // conflict-free merge outcome, so <secret>REAL</secret> is
+      // legitimately gone either way; the property under test is that
+      // GHOST must never leak out and impersonate the deleted <secret>.
+      const ancestor = `<?xml version="1.0" encoding="UTF-8"?>\n<PermissionSet xmlns="${NS}"><label>L</label><secret>REAL</secret><__proto__><marker>base</marker></__proto__></PermissionSet>`
+      const ours = `<?xml version="1.0" encoding="UTF-8"?>\n<PermissionSet xmlns="${NS}"><label>L</label><__proto__><secret>GHOST</secret></__proto__></PermissionSet>`
+      const theirs = ancestor
+
+      const result = await mergeXmlStrings(sut, ancestor, ours, theirs)
+
+      expect(result.hasConflict).toBe(false)
+      expect(result.output).toBe(
+        `<?xml version="1.0" encoding="UTF-8"?>\n<PermissionSet xmlns="${NS}">\n    <label>L</label>\n    <__proto__>\n        <secret>GHOST</secret>\n    </__proto__>\n</PermissionSet>\n`
+      )
+    })
+
+    it('given a __proto__ element present unchanged on all three sides when identity-merging then it survives as an ordinary element instead of being dropped', async () => {
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<PermissionSet xmlns="${NS}"><__proto__>keepme</__proto__></PermissionSet>`
+
+      const result = await mergeXmlStrings(sut, xml, xml, xml)
+
+      expect(result.hasConflict).toBe(false)
+      expect(result.output).toContain('<__proto__>keepme</__proto__>')
+    })
+  })
+
+  describe('sibling group ordering (three-way key-order merge)', () => {
+    const NS = 'http://soap.sforce.com/2006/04/metadata'
+    const ancestor = `<?xml version="1.0" encoding="UTF-8"?>\n<PermissionSet xmlns="${NS}"><description>Base</description><tabSettings><tab>Tab1</tab><visibility>Available</visibility></tabSettings></PermissionSet>`
+    // introduces a new sibling (classAccesses) between the two ancestor keys
+    const introducesClassAccesses = `<?xml version="1.0" encoding="UTF-8"?>\n<PermissionSet xmlns="${NS}"><description>Base</description><classAccesses><apexClass>MyClass</apexClass><enabled>true</enabled></classAccesses><tabSettings><tab>Tab1</tab><visibility>Available</visibility></tabSettings></PermissionSet>`
+    // adds an unrelated second tabSettings entry, independent of the above
+    const addsSecondTabSetting = `<?xml version="1.0" encoding="UTF-8"?>\n<PermissionSet xmlns="${NS}"><description>Base</description><tabSettings><tab>Tab1</tab><visibility>Available</visibility></tabSettings><tabSettings><tab>Tab2</tab><visibility>Hidden</visibility></tabSettings></PermissionSet>`
+
+    const assertClassAccessesBetweenDescriptionAndTabSettings = (
+      output: string
+    ): void => {
+      const classAccessesIndex = output.indexOf('<classAccesses>')
+      const descriptionIndex = output.indexOf('<description>')
+      const tabSettingsIndex = output.indexOf('<tabSettings>')
+      expect(classAccessesIndex).toBeGreaterThan(descriptionIndex)
+      expect(classAccessesIndex).toBeLessThan(tabSettingsIndex)
+    }
+
+    it('given ours introducing a new sibling group between two ancestor keys when merging then keeps it between them instead of pushing it past the ancestor tail', async () => {
+      // Arrange & Act
+      const result = await mergeXmlStrings(
+        sut,
+        ancestor,
+        introducesClassAccesses,
+        addsSecondTabSetting
+      )
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      assertClassAccessesBetweenDescriptionAndTabSettings(result.output)
+    })
+
+    it('given the same merge with ours and theirs swapped when merging then produces the byte-identical output (role symmetry)', async () => {
+      // Arrange
+      const caseA = await mergeXmlStrings(
+        sut,
+        ancestor,
+        introducesClassAccesses,
+        addsSecondTabSetting
+      )
+
+      // Act
+      const caseB = await mergeXmlStrings(
+        sut,
+        ancestor,
+        addsSecondTabSetting,
+        introducesClassAccesses
+      )
+
+      // Assert
+      expect(caseB.hasConflict).toBe(false)
+      assertClassAccessesBetweenDescriptionAndTabSettings(caseB.output)
+      expect(caseB.output).toBe(caseA.output)
+    })
+  })
 })

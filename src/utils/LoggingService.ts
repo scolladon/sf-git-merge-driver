@@ -42,8 +42,11 @@ function parseLevel(raw: string | undefined): number {
   if (!raw) return DEFAULT_LEVEL
   const asNumber = Number(raw)
   if (Number.isInteger(asNumber) && asNumber >= 0) return asNumber
+  // `in` walks the prototype chain, so `'__proto__' in LEVELS` is true —
+  // raw comes from an untrusted env var, and Object.hasOwn checks own
+  // properties only.
   const key = raw.toLowerCase()
-  if (key in LEVELS) return LEVELS[key as keyof typeof LEVELS]
+  if (Object.hasOwn(LEVELS, key)) return LEVELS[key as keyof typeof LEVELS]
   return DEFAULT_LEVEL
 }
 
