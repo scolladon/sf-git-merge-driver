@@ -64,7 +64,7 @@ npm run test:mutation:incremental # faster re-runs
 
 ### NUT Testing
 
-When developing, use mocha testing to provide NUT (Not Unit Test) functional coverage for the CLI surface. TypeScript is loaded through [`tsx`](https://tsx.is) (wired via the `import=tsx` node option in `.mocharc.json`). To run the mocha tests use the following command from the root directory:
+When developing, use mocha testing to provide NUT (Not Unit Test) functional coverage for the CLI surface. TypeScript is loaded through [`tsx`](https://www.npmjs.com/package/tsx) (wired via the `import=tsx` node option in `.mocharc.json`). To run the mocha tests use the following command from the root directory:
 
 ```bash
 # run test
