@@ -1,5 +1,5 @@
 import { PassThrough, Readable, Writable } from 'node:stream'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MergeDriver } from '../../../src/driver/MergeDriver.js'
 import { defaultConfig } from '../../utils/testConfig.js'
 
@@ -67,6 +67,7 @@ const makeWritableSink = (): PassThrough => {
 
 describe('MergeDriver (unit — mock-required edge cases only)', () => {
   let sut: MergeDriver
+  let stderrSpy: ReturnType<typeof vi.spyOn>
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -77,6 +78,15 @@ describe('MergeDriver (unit — mock-required edge cases only)', () => {
     mockMergeThreeWay.mockResolvedValue({ hasConflict: false })
     mockRename.mockResolvedValue(undefined)
     mockUnlink.mockResolvedValue(undefined)
+    // Several edge-case tests below exercise the "leave ours unchanged"
+    // catch-all, which now also writes a diagnostic to stderr — spy on it
+    // once here so every test stays quiet by default, and the tests that
+    // care about the message can assert on this same spy.
+    stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+  })
+
+  afterEach(() => {
+    stderrSpy.mockRestore()
   })
 
   describe('given peekEol reports CRLF', () => {
@@ -114,6 +124,25 @@ describe('MergeDriver (unit — mock-required edge cases only)', () => {
       mockMergeThreeWay.mockRejectedValue(new Error('parse boom'))
       const result = await sut.mergeFiles('a', 'o', 't')
       expect(result).toBe(true)
+    })
+
+    it('when merged then a diagnostic is written to stderr (exit 1 alone cannot tell this apart from a real conflict)', async () => {
+      mockMergeThreeWay.mockRejectedValue(new Error('parse boom'))
+      await sut.mergeFiles('a', 'o', 't')
+      expect(stderrSpy).toHaveBeenCalledWith(
+        expect.stringContaining('parse boom')
+      )
+      expect(stderrSpy).toHaveBeenCalledWith(
+        expect.stringContaining('sf-git-merge-driver:')
+      )
+    })
+
+    it('when a non-Error value is rejected then stderr still gets a coerced message', async () => {
+      mockMergeThreeWay.mockRejectedValue('raw string failure')
+      await sut.mergeFiles('a', 'o', 't')
+      expect(stderrSpy).toHaveBeenCalledWith(
+        expect.stringContaining('raw string failure')
+      )
     })
   })
 

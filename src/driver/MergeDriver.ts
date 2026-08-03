@@ -92,6 +92,15 @@ export class MergeDriver {
         throw error
       }
       Logger.error('Merge failed; leaving ours unchanged', error)
+      // The exit code alone can't distinguish this from a real conflict
+      // (both return hasConflict=true → exit 1), and Logger only reaches
+      // stderr when SF_LOG_STDERR is set — so without this, a git merge
+      // hitting this path leaves `ours` untouched with zero markers and
+      // zero visible indication anything failed. Surface it unconditionally.
+      const message = error instanceof Error ? error.message : String(error)
+      process.stderr.write(
+        `sf-git-merge-driver: merge failed for ${oursPath}; left unchanged: ${message}\n`
+      )
       return true
     } finally {
       for (const r of readers) r.destroy()

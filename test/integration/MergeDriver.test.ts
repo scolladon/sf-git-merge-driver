@@ -1,7 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MergeDriver } from '../../src/driver/MergeDriver.js'
 import { defaultConfig } from '../utils/testConfig.js'
 
@@ -132,21 +132,31 @@ describe('MergeDriver (integration — real filesystem, no mocks)', () => {
     expect(merged).toBe(`${PROFILE_BASE}\n`)
   })
 
-  it('Given malformed XML on the local side, When running mergeFiles, Then restores original ourContent and returns hasConflict=true', async () => {
+  it('Given malformed XML on the local side, When running mergeFiles, Then restores original ourContent, returns hasConflict=true, and reports the failure on stderr', async () => {
     // Arrange — ancestor/other are valid, local is malformed (missing closing tag)
     const ancestor = writeFixture('base.xml', PROFILE_BASE)
     const badXml = '<?xml version="1.0"?><Profile><broken>'
     const local = writeFixture('local.xml', badXml)
     const other = writeFixture('other.xml', PROFILE_OTHER)
     const sut = new MergeDriver(defaultConfig)
+    const stderrSpy = vi
+      .spyOn(process.stderr, 'write')
+      .mockImplementation(() => true)
 
     // Act
     const hasConflict = await sut.mergeFiles(ancestor, local, other)
 
-    // Assert — merge failure is surfaced as a conflict, and local is restored
+    // Assert — merge failure is surfaced as a conflict, and local is restored.
+    // Exit code 1 alone is indistinguishable from a real conflict, and the
+    // restored file carries no marker of its own — the stderr line is the
+    // only observable difference, so it must actually be there.
     expect(hasConflict).toBe(true)
     const restored = readFileSync(local, 'utf8')
     expect(restored).toBe(badXml)
+    expect(stderrSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/^sf-git-merge-driver: merge failed for .*\n$/)
+    )
+    stderrSpy.mockRestore()
   })
 
   it('Given one branch adds a new package.xml <types> with multiple <members>, When running mergeFiles, Then each <members> emits as a distinct sibling element under a single <types> block', async () => {
