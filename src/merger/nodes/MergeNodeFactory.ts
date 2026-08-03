@@ -51,7 +51,10 @@ class DefaultMergeNodeFactory implements MergeNodeFactory {
     other: JsonValue | undefined,
     attribute: string
   ): MergeNode {
-    if (isStringArray(ancestor, local, other)) {
+    if (
+      isStringArray(ancestor, local, other) ||
+      MetadataService.isTextArrayAttribute(attribute)
+    ) {
       const [ancestorArr, localArr, otherArr] = [ancestor, local, other].map(
         toArray
       )

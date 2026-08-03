@@ -18,6 +18,18 @@ export class MetadataService {
   public static isOrderedAttribute(attribute: string): boolean {
     return ORDERED_ATTRIBUTES.has(attribute)
   }
+
+  // MergeNodeFactory's own array-shape check (isStringArray) only sees an
+  // attribute as a text array when the parser already produced 2+
+  // occurrences on at least one side; an attribute with exactly one
+  // occurrence on all three sides unboxes to a bare scalar and would
+  // otherwise fall back to strict TextMergeNode comparison. Tags listed
+  // here always get the set-union TextArrayMergeNode treatment regardless
+  // of incidental cardinality, so the same edit produces the same outcome
+  // whether the list currently has one entry or several.
+  public static isTextArrayAttribute(attribute: string): boolean {
+    return TEXT_ARRAY_ATTRIBUTES.has(attribute)
+  }
 }
 
 const ORDERED_ATTRIBUTES = new Set([
@@ -30,6 +42,10 @@ const ORDERED_ATTRIBUTES = new Set([
   'criteriaItems', // SharingRules, Workflow, AssignmentRules, AutoResponseRules, EscalationRules
   'prompts', // Translations
   'promptVersions', // Translations
+])
+
+const TEXT_ARRAY_ATTRIBUTES = new Set([
+  'members', // Package, DestructiveChanges — manifest member list
 ])
 
 // An object-shaped key field (element with attributes/children, built on
