@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785761598206,
+  "lastUpdate": 1785765088881,
   "repoUrl": "https://github.com/scolladon/sf-git-merge-driver",
   "entries": {
     "Binary Size Benchmark": [
@@ -260,6 +260,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "bin/merge-driver.cjs",
             "value": 37708,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "colladonsebastien@gmail.com",
+            "name": "Sebastien",
+            "username": "scolladon"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d4ccaee163ec7d628361fb0e70a3b2cd992291ff",
+          "message": "feat!: require Node.js >= 22.19 and upgrade dependencies to latest (#206)",
+          "timestamp": "2026-08-03T15:48:44+02:00",
+          "tree_id": "2ecc46be34f9a05c48e9649aa2c19babe44636f6",
+          "url": "https://github.com/scolladon/sf-git-merge-driver/commit/d4ccaee163ec7d628361fb0e70a3b2cd992291ff"
+        },
+        "date": 1785765088814,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "bin/merge-driver.cjs",
+            "value": 37717,
             "unit": "bytes"
           }
         ]
