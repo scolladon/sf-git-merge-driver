@@ -9,7 +9,7 @@ We encourage the developer community to contribute to this repository. This guid
 
 ## Requirements
 
-- [Node](https://nodejs.org/) >= 20
+- [Node](https://nodejs.org/) >= 22.19
 - [npm](https://www.npmjs.com/) >= 10.9.0
 
 ## Installation
@@ -64,7 +64,7 @@ npm run test:mutation:incremental # faster re-runs
 
 ### NUT Testing
 
-When developing, use mocha testing to provide NUT (Not Unit Test) functional coverage for the CLI surface. To run the mocha tests use the following command from the root directory:
+When developing, use mocha testing to provide NUT (Not Unit Test) functional coverage for the CLI surface. TypeScript is loaded through [`tsx`](https://tsx.is) (wired via the `import=tsx` node option in `.mocharc.json`). To run the mocha tests use the following command from the root directory:
 
 ```bash
 # run test
@@ -206,6 +206,18 @@ the plugin lint all those things :
 - plugin output
 - dependencies
 - dead code / configuration
+
+#### Check the supported engines
+
+```bash
+npm run lint:engines
+```
+
+This runs [`ls-engines`](https://www.npmjs.com/package/ls-engines) to verify that
+the `engines.node` range declared in `package.json` still matches what the
+production dependency graph actually supports. It runs in CI on every build job,
+and in the `pre-push` hook. If a dependency raises its own floor, this fails and
+tells you the range to adopt.
 
 Fixing all existing lint issues is a tedious task so please pitch in by fixing
 the ones related to the files you make changes to!

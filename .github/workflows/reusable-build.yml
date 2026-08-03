@@ -10,7 +10,7 @@ on:
       node-version:
         description: Node.js major version to install
         type: string
-        default: "20"
+        default: "22"
 
 jobs:
   source:
@@ -34,6 +34,9 @@ jobs:
       - name: Lint plugin
         run: npm run lint
 
+      - name: Lint engines
+        run: npm run lint:engines
+
       - name: Build plugin
         run: npm pack
 
@@ -53,7 +56,7 @@ jobs:
         run: npm run test:nut
 
       - uses: actions/upload-artifact@v7
-        if: inputs.os == 'ubuntu-latest' && inputs.node-version == '20'
+        if: inputs.os == 'ubuntu-latest' && inputs.node-version == '22'
         with:
           name: coverage-test-report
           path: reports/coverage

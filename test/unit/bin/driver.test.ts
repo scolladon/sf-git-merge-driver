@@ -26,19 +26,19 @@ describe('bin/driver', () => {
   })
 
   describe('assertNodeVersion', () => {
-    it('Given Node 20, When asserting, Then returns without throwing', () => {
-      expect(() => assertNodeVersion('20.5.0')).not.toThrow()
-    })
-
-    it('Given Node 20.0.0 exact boundary, When asserting, Then returns without throwing', () => {
-      expect(() => assertNodeVersion('20.0.0')).not.toThrow()
-    })
-
     it('Given Node 22, When asserting, Then returns without throwing', () => {
+      expect(() => assertNodeVersion('22.5.0')).not.toThrow()
+    })
+
+    it('Given Node 22.0.0 exact boundary, When asserting, Then returns without throwing', () => {
       expect(() => assertNodeVersion('22.0.0')).not.toThrow()
     })
 
-    it('Given Node 19, When asserting, Then writes to stderr and calls process.exit(2)', () => {
+    it('Given Node 24, When asserting, Then returns without throwing', () => {
+      expect(() => assertNodeVersion('24.0.0')).not.toThrow()
+    })
+
+    it('Given Node 20, When asserting, Then writes to stderr and calls process.exit(2)', () => {
       const stderr = vi
         .spyOn(process.stderr, 'write')
         .mockImplementation(() => true)
@@ -46,12 +46,12 @@ describe('bin/driver', () => {
         throw new Error('__exit__')
       }) as never)
 
-      expect(() => assertNodeVersion('19.0.0')).toThrow('__exit__')
+      expect(() => assertNodeVersion('20.0.0')).toThrow('__exit__')
       expect(exit).toHaveBeenCalledWith(2)
       expect(stderr).toHaveBeenCalled()
       const msg = stderr.mock.calls[0][0] as string
-      expect(msg).toContain('Node.js >= 20')
-      expect(msg).toContain('19.0.0')
+      expect(msg).toContain('Node.js >= 22')
+      expect(msg).toContain('20.0.0')
 
       stderr.mockRestore()
       exit.mockRestore()

@@ -31,7 +31,7 @@ jobs:
       - name: Setup node
         uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Setup dependencies, cache and install
         uses: ./.github/actions/install
@@ -69,12 +69,7 @@ jobs:
         uses: ./.github/actions/install
 
       - name: Check outdated dependencies
-        # The @salesforce/* stack and @jsforce/jsforce-node are intentionally
-        # held at their last Node-20-compatible versions; newer releases need
-        # Node >=22 (undici 8.5). Still fail on any other outdated dependency.
-        run: |
-          stale=$(npm outdated --json | jq -r 'del(.["@jsforce/jsforce-node"], .["@salesforce/core"], .["@salesforce/sf-plugins-core"]) | keys[]' || true)
-          [ -z "$stale" ] || { echo "Outdated dependencies: $stale"; exit 1; }
+        run: npm outdated
 
       - name: Check unused dependencies
         run: npm run lint:dependencies
@@ -116,7 +111,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        node-version: ["20", "22", "24"]
+        node-version: ["22", "24", "26"]
     uses: ./.github/workflows/reusable-build.yml
     with:
       os: ${{ matrix.os }}
@@ -136,7 +131,7 @@ jobs:
       - name: Setup node
         uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
 
       - uses: google/wireit@setup-github-actions-caching/v2
 

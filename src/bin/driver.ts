@@ -30,12 +30,14 @@ Flags:
 const USAGE_EXIT_CODE = 2
 const CONFLICT_EXIT_CODE = 1
 const SUCCESS_EXIT_CODE = 0
+/** Keep in sync with `engines.node` in package.json. */
+const MINIMUM_NODE_MAJOR = 22
 
 export function assertNodeVersion(versionString: string): void {
   const major = Number(versionString.split('.')[0])
-  if (major < 20) {
+  if (major < MINIMUM_NODE_MAJOR) {
     process.stderr.write(
-      `sf-git-merge-driver requires Node.js >= 20 (got ${versionString})\n`
+      `sf-git-merge-driver requires Node.js >= ${MINIMUM_NODE_MAJOR} (got ${versionString})\n`
     )
     process.exit(USAGE_EXIT_CODE)
   }

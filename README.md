@@ -96,6 +96,9 @@ One case has no answer in the data: when **both** branches introduce *different*
 
 ## Installation (30 seconds)
 
+> **Requires Node.js >= 22.19.** Node 18 and 20 are end-of-life and are no longer
+> supported by the Salesforce CLI ([forcedotcom/cli#3603](https://github.com/forcedotcom/cli/issues/3603)).
+
 ### With Salesforce CLI
 
 ```bash
