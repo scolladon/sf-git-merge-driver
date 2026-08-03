@@ -29,14 +29,14 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       # No `cache:` input is set, so setup-node restores no cache here; the
       # published artifact's integrity is independently attested by npm
       # provenance (`npm publish --provenance`). zizmor's heuristic flags
       # setup-node in any publishing workflow regardless of caching.
-      - uses: actions/setup-node@v6 # zizmor: ignore[cache-poisoning]
+      - uses: actions/setup-node@v7 # zizmor: ignore[cache-poisoning]
         with:
           node-version: 20
           registry-url: "https://registry.npmjs.org"
@@ -63,13 +63,13 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       # No `cache:` input is set, so setup-node restores no cache here; this
       # PR-triggered dev build publishes only a draft prerelease asset.
       # zizmor's heuristic flags setup-node in any publishing workflow.
-      - uses: actions/setup-node@v6 # zizmor: ignore[cache-poisoning]
+      - uses: actions/setup-node@v7 # zizmor: ignore[cache-poisoning]
         with:
           # Build/pack the dev tarball on Node 22: prepack pulls undici 8.5
           # (which needs Node >=22.19) and throws on Node 20. This is a build

@@ -17,12 +17,12 @@ jobs:
     runs-on: ${{ inputs.os }}
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
       - name: Setup node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ inputs.node-version }}
 
@@ -52,7 +52,7 @@ jobs:
       - name: Nut test
         run: npm run test:nut
 
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: inputs.os == 'ubuntu-latest' && inputs.node-version == '20'
         with:
           name: coverage-test-report
