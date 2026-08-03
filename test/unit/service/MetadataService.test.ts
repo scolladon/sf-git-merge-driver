@@ -791,18 +791,15 @@ describe('MetadataService', () => {
       expect(result).toBe(true)
     })
 
-    it.each([
-      'fullName',
-      'name',
-      'value',
-      'customValue',
-      'fieldPermissions',
-    ])('should return false for %s', attribute => {
-      // Act
-      const result = MetadataService.isTextArrayAttribute(attribute)
+    it.each(['fullName', 'name', 'value', 'customValue', 'fieldPermissions'])(
+      'should return false for %s',
+      attribute => {
+        // Act
+        const result = MetadataService.isTextArrayAttribute(attribute)
 
-      // Assert
-      expect(result).toBe(false)
-    })
+        // Assert
+        expect(result).toBe(false)
+      }
+    )
   })
 })
