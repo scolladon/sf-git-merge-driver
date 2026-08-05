@@ -169,16 +169,47 @@ describe('XmlMerger.mergeThreeWay', () => {
       const theirs = `<?xml version="1.0"?><PermissionSet xmlns="${METADATA_NS}"><label>Theirs</label></PermissionSet>`
       const result = await runMergeStreams(sut, ancestor, '', theirs)
       expect(countOccurrences(result.output, NS_ATTRIBUTE)).toBe(2)
+      // Placement matters as much as the count: each declaration must sit
+      // on a side's root open tag, not on a child the count would also hit.
+      expect(result.output).toBe(
+        `<?xml version="1.0" encoding="UTF-8"?>\n` +
+          `<<<<<<< ours\n` +
+          `||||||| base\n` +
+          `<PermissionSet xmlns="${METADATA_NS}">\n` +
+          `    <label>Base</label>\n` +
+          `</PermissionSet>\n` +
+          `=======\n` +
+          `<PermissionSet xmlns="${METADATA_NS}">\n` +
+          `    <label>Theirs</label>\n` +
+          `</PermissionSet>\n` +
+          `>>>>>>> theirs\n`
+      )
+      expect(result.hasConflict).toBe(true)
     })
   })
 
   describe('given theirs drops the whole file while ours edits it', () => {
     it('when merged then both conflict side roots keep the namespace theirs had no root to carry', async () => {
-      // Symmetry guard: the abstention applies to both live sides.
+      // Symmetry guard: the abstention applies to both live sides. No
+      // fixture covers this direction, so the bytes are pinned here.
       const ancestor = `<?xml version="1.0"?><PermissionSet xmlns="${METADATA_NS}"><label>Base</label></PermissionSet>`
       const ours = `<?xml version="1.0"?><PermissionSet xmlns="${METADATA_NS}"><label>Ours</label></PermissionSet>`
       const result = await runMergeStreams(sut, ancestor, ours, '')
       expect(countOccurrences(result.output, NS_ATTRIBUTE)).toBe(2)
+      expect(result.output).toBe(
+        `<?xml version="1.0" encoding="UTF-8"?>\n` +
+          `<<<<<<< ours\n` +
+          `<PermissionSet xmlns="${METADATA_NS}">\n` +
+          `    <label>Ours</label>\n` +
+          `</PermissionSet>\n` +
+          `||||||| base\n` +
+          `<PermissionSet xmlns="${METADATA_NS}">\n` +
+          `    <label>Base</label>\n` +
+          `</PermissionSet>\n` +
+          `=======\n` +
+          `>>>>>>> theirs\n`
+      )
+      expect(result.hasConflict).toBe(true)
     })
   })
 

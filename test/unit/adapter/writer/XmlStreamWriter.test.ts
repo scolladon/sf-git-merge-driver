@@ -1084,4 +1084,71 @@ describe('XmlStreamWriter', () => {
       expect(joined).not.toContain('Stryker was here')
     })
   })
+
+  describe('given an attribute value containing markup characters', () => {
+    it('when serialized then a double quote is escaped so it cannot close the attribute', async () => {
+      // A source attribute written with single quotes may legally hold a
+      // raw double quote. Emitted verbatim inside double quotes it would
+      // close the attribute and let the remainder be read as markup.
+      const result = await serializeToString(sut, [{ Root: 'x' }], {
+        '@_xmlns': 'a"><evil>boom</evil><q z="',
+      })
+
+      // Assert
+      expect(result).toContain('&quot;')
+      expect(result).not.toContain('<evil>')
+    })
+
+    it('when serialized then a less-than is escaped', async () => {
+      // Act
+      const result = await serializeToString(sut, [{ Root: 'x' }], {
+        '@_xmlns': 'a<b',
+      })
+
+      // Assert
+      expect(result).toContain('xmlns="a&lt;b"')
+    })
+
+    it('when serialized then an ampersand is left alone so already-encoded values round-trip', async () => {
+      // The parser never decodes entities on the way in, so re-encoding
+      // here would corrupt a value that already carries them.
+      const result = await serializeToString(sut, [{ Root: 'x' }], {
+        '@_xmlns': 'a&amp;b',
+      })
+
+      // Assert
+      expect(result).toContain('xmlns="a&amp;b"')
+    })
+
+    it('when the conflicting document is one block then every side escapes its root attribute', async () => {
+      // The whole-document conflict path writes the value once per
+      // non-blank side, so escaping must hold on each of them.
+      const block = conflictOf([{}], [{ R: 'A' }], [{ R: 'O' }])
+      const result = await serializeToString(sut, [block], {
+        '@_xmlns': 'a"b',
+      })
+
+      // Assert
+      expect(result).toContain(`<R xmlns="a&quot;b">A</R>`)
+      expect(result).toContain(`<R xmlns="a&quot;b">O</R>`)
+    })
+  })
+
+  describe('given a conflict side whose head is a multi-key wrapper', () => {
+    it('when serialized then the root namespaces are not silently dropped onto nothing', async () => {
+      // The fix relies on a conflict side's head always being a
+      // single-key wrapper. Nothing in the type system enforces that, so
+      // this pins what the writer does if the invariant ever breaks:
+      // the side still renders, rather than disappearing.
+      const block = conflictOf([{}], [{ A: '1', B: '2' }], [{ R: 'O' }])
+      const result = await serializeToString(sut, [block], {
+        '@_xmlns': 'http://x',
+      })
+
+      // Assert
+      expect(result).toContain('<A>1</A>')
+      expect(result).toContain('<B>2</B>')
+      expect(result).toContain(`<R xmlns="http://x">O</R>`)
+    })
+  })
 })

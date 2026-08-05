@@ -154,7 +154,7 @@ The writer expands these into zdiff3-style conflict markers in the XML output:
 >>>>>>> theirs
 ```
 
-Each conflict side's root element carries the merged root namespaces, so resolving the conflict by keeping either side yields a document whose root still declares them.
+Each conflict side's root element carries the merged root namespaces, so resolving the conflict by keeping either side yields a document whose root still declares them. All three sides receive the *merged* bucket, including `||||||| base` — the base side is rendered as a resolution source, not as a byte-faithful reproduction of the ancestor blob, so a namespace added or removed by a live side shows up there too.
 
 Marker expansion happens inline as the writer walker visits each `ConflictBlock` — no separate post-processing pass. A two-pass `ConflictLineFilter` (strip horizontal whitespace before a marker, drop whitespace-only lines) keeps the byte layout identical to git's conventions; the filter runs only when the merger reports `hasConflict=true`.
 

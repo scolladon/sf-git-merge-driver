@@ -1,7 +1,7 @@
 import type { Readable, Writable } from 'node:stream'
 import { TxmlXmlParser } from '../adapter/TxmlXmlParser.js'
 import { XmlStreamWriter } from '../adapter/writer/XmlStreamWriter.js'
-import type { XmlParser } from '../adapter/XmlParser.js'
+import type { NormalisedParseResult, XmlParser } from '../adapter/XmlParser.js'
 import type { MergeConfig } from '../types/conflictTypes.js'
 import type { JsonArray, JsonObject, JsonValue } from '../types/jsonTypes.js'
 import { log } from '../utils/LoggingDecorator.js'
@@ -64,20 +64,16 @@ const mergeNamespaces = (
   return result
 }
 
-interface ParsedDocument {
-  readonly content: JsonObject
-  readonly namespaces: JsonObject
-}
-
 // A side that dropped the whole file carries an empty namespaces bucket for
 // the trivial reason that it has no root element to carry them on — not
 // because it removed the xmlns. Reading that emptiness as a removal erases a
 // namespace the surviving side still declares. The ancestor is never
 // substituted: a rootless ancestor is the "file added on both sides" case,
 // where an empty bucket genuinely means the namespace did not exist before.
+// `content` is empty exactly when the document has no root element.
 const namespacesOf = (
-  side: ParsedDocument,
-  ancestor: ParsedDocument
+  side: NormalisedParseResult,
+  ancestor: NormalisedParseResult
 ): JsonObject =>
   Object.keys(side.content).length > 0 ? side.namespaces : ancestor.namespaces
 
@@ -131,7 +127,7 @@ export class XmlMerger {
     const failure = results.find(r => r.status === 'rejected')
     if (failure) throw (failure as PromiseRejectedResult).reason
     const [anc, local, other] = (
-      results as PromiseFulfilledResult<ParsedDocument>[]
+      results as PromiseFulfilledResult<NormalisedParseResult>[]
     ).map(r => r.value)
 
     const namespaces = mergeNamespaces(

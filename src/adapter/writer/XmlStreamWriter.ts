@@ -36,6 +36,17 @@ const escapeCommentBody = (value: string): string =>
 const escapeCdataBody = (value: string): string =>
   value.replace(/\]\]>/g, ']]]]><![CDATA[>')
 
+// Values are emitted inside double quotes. A source attribute written with
+// single quotes may legally hold a raw `"`, which would otherwise close the
+// quote and let the rest of the value be read as markup. `&` is deliberately
+// left alone: the parser never decodes entities on the way in, so re-encoding
+// it here would corrupt values that already carry them.
+// No "does it contain one?" fast path: skipping a replace that would not
+// have matched is behaviourally invisible, so the branch could never be
+// killed by a test.
+const escapeAttrValue = (value: string): string =>
+  value.replace(/"/g, '&quot;').replace(/</g, '&lt;')
+
 // Hot path called once per element. The previous map().join('') form
 // allocated an intermediate array of formatted strings; this push-and-
 // concat loop avoids that allocation.
@@ -45,7 +56,7 @@ const attrsToString = (
   let s = ''
   for (let i = 0; i < attrs.length; i++) {
     const a = attrs[i]!
-    s += ` ${a[0]}="${a[1]}"`
+    s += ` ${a[0]}="${escapeAttrValue(a[1])}"`
   }
   return s
 }
