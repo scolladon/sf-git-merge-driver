@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785941607293,
+  "lastUpdate": 1785941615078,
   "repoUrl": "https://github.com/scolladon/sf-git-merge-driver",
   "entries": {
     "Binary Size Benchmark": [
@@ -371,6 +371,35 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/scolladon/sf-git-merge-driver/commit/cb328c92b8e5c97d2d5ef9e9bf0554c8c1cbb9e7"
         },
         "date": 1785941607226,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "bin/merge-driver.cjs",
+            "value": 38352,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "colladonsebastien@gmail.com",
+            "name": "Sebastien",
+            "username": "scolladon"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7c99f4e81685319c16c7841764c23b472fdb78d6",
+          "message": "ci: group dependabot npm updates by dependency type (#211)",
+          "timestamp": "2026-08-05T16:51:02+02:00",
+          "tree_id": "df876acb83345cb24e1b59defea9845a5b297007",
+          "url": "https://github.com/scolladon/sf-git-merge-driver/commit/7c99f4e81685319c16c7841764c23b472fdb78d6"
+        },
+        "date": 1785941615004,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
