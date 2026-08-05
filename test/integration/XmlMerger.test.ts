@@ -386,4 +386,152 @@ describe('XmlMerger integration', () => {
       expect(caseB.output).toBe(caseA.output)
     })
   })
+
+  describe('unkeyed object absent on one or more sides', () => {
+    // `bogusThing` has no key extractor and carries children, so it routes
+    // to PropertyMergeNode. An unrelated `keep` sibling on every side stops
+    // the root from emptying, isolating the element's own presence.
+    const NS = 'http://soap.sforce.com/2006/04/metadata'
+    const withThing = (x: string) => `<?xml version="1.0" encoding="UTF-8"?>
+<Root xmlns="${NS}"><keep>k</keep><bogusThing><x>${x}</x></bogusThing></Root>`
+    const withoutThing = `<?xml version="1.0" encoding="UTF-8"?>
+<Root xmlns="${NS}"><keep>k</keep></Root>`
+
+    const withValueSet = `<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="${NS}"><fullName>F__c</fullName><valueSet><restricted>true</restricted></valueSet></CustomField>`
+    const withoutValueSet = `<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="${NS}"><fullName>F__c</fullName></CustomField>`
+
+    describe('when merging three ways', () => {
+      it('given the element only on theirs then keeps the addition without conflict', async () => {
+        // Arrange & Act
+        const result = await mergeXmlStrings(
+          sut,
+          withoutThing,
+          withoutThing,
+          withThing('1')
+        )
+
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(result.output).toContain('<bogusThing>')
+      })
+
+      it('given the element on ancestor and theirs then honours the deletion by ours', async () => {
+        // Arrange & Act
+        const result = await mergeXmlStrings(
+          sut,
+          withThing('1'),
+          withoutThing,
+          withThing('1')
+        )
+
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(result.output).not.toContain('<bogusThing>')
+      })
+
+      it('given the element only on ours then keeps the addition without conflict', async () => {
+        // Arrange & Act
+        const result = await mergeXmlStrings(
+          sut,
+          withoutThing,
+          withThing('1'),
+          withoutThing
+        )
+
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(result.output).toContain('<bogusThing>')
+      })
+
+      it('given the element only on the ancestor then honours the deletion by both sides', async () => {
+        // Arrange & Act
+        const result = await mergeXmlStrings(
+          sut,
+          withThing('1'),
+          withoutThing,
+          withoutThing
+        )
+
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(result.output).not.toContain('<bogusThing>')
+      })
+
+      it('given the element on ancestor and ours then honours the deletion by theirs', async () => {
+        // Arrange & Act
+        const result = await mergeXmlStrings(
+          sut,
+          withThing('1'),
+          withThing('1'),
+          withoutThing
+        )
+
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(result.output).not.toContain('<bogusThing>')
+      })
+
+      it('given the same element added by both sides then keeps exactly one copy', async () => {
+        // Arrange & Act
+        const result = await mergeXmlStrings(
+          sut,
+          withoutThing,
+          withThing('1'),
+          withThing('1')
+        )
+
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(result.output.match(/<bogusThing>/g)).toHaveLength(1)
+      })
+
+      it('given ours deletes the element while theirs modifies it then raises a conflict inside the element', async () => {
+        // Arrange & Act
+        const result = await mergeXmlStrings(
+          sut,
+          withThing('1'),
+          withoutThing,
+          withThing('2')
+        )
+
+        // Assert
+        expect(result.hasConflict).toBe(true)
+        expect(result.output).toContain('<bogusThing>')
+        expect(result.output).toContain('<<<<<<< ours')
+        expect(result.output).toContain('=======')
+        expect(result.output).toContain('>>>>>>> theirs')
+        expect(result.output).toContain('<x>2</x>')
+      })
+
+      it('given ours adds a valueSet while theirs leaves the field untouched then keeps the valueSet', async () => {
+        // Arrange & Act
+        const result = await mergeXmlStrings(
+          sut,
+          withoutValueSet,
+          withValueSet,
+          withoutValueSet
+        )
+
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(result.output).toContain('<valueSet>')
+      })
+
+      it('given ours drops the valueSet while theirs leaves the field untouched then drops the valueSet', async () => {
+        // Arrange & Act
+        const result = await mergeXmlStrings(
+          sut,
+          withValueSet,
+          withoutValueSet,
+          withValueSet
+        )
+
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(result.output).not.toContain('<valueSet>')
+      })
+    })
+  })
 })

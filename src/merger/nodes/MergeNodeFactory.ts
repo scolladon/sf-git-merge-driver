@@ -22,8 +22,11 @@ const isStringArray = (...values: (JsonValue | undefined | null)[]): boolean =>
       (value as unknown[]).every(el => typeof el === 'string')
   )
 
-const isPureObject = (val: JsonValue | undefined | null): boolean =>
+const isPureObject = (val: JsonValue | undefined | null): val is JsonObject =>
   isObject(val) && !Array.isArray(val)
+
+const toPropertyObject = (val: JsonValue | undefined): JsonObject =>
+  isPureObject(val) ? val : {}
 
 const isPureUnknown = (
   values: (JsonValue | undefined | null)[],
@@ -74,9 +77,9 @@ class DefaultMergeNodeFactory implements MergeNodeFactory {
 
     if (isPureUnknown([ancestor, local, other], keyField !== undefined)) {
       return new PropertyMergeNode(
-        ancestor as JsonObject,
-        local as JsonObject,
-        other as JsonObject,
+        toPropertyObject(ancestor),
+        toPropertyObject(local),
+        toPropertyObject(other),
         attribute
       )
     }

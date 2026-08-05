@@ -4,6 +4,7 @@ import { defaultNodeFactory } from '../../../../src/merger/nodes/MergeNodeFactor
 import { PropertyMergeNode } from '../../../../src/merger/nodes/PropertyMergeNode.js'
 import { TextArrayMergeNode } from '../../../../src/merger/nodes/TextArrayMergeNode.js'
 import { TextMergeNode } from '../../../../src/merger/nodes/TextMergeNode.js'
+import { defaultConfig } from '../../../utils/testConfig.js'
 
 describe('MergeNodeFactory', () => {
   describe('defaultNodeFactory', () => {
@@ -200,6 +201,81 @@ describe('MergeNodeFactory', () => {
 
         // Assert
         expect(node).toBeInstanceOf(KeyedArrayMergeNode)
+      })
+
+      describe('given a side where the element is absent or not a pure object', () => {
+        const sut = defaultNodeFactory
+
+        describe('when merging the node the factory creates', () => {
+          it('should treat a null ancestor and an undefined other as empty objects', () => {
+            // Arrange
+            const ancestor = null
+            const local = { a: 1 }
+            const other = undefined as never
+
+            // Act
+            const result = sut
+              .createNode(ancestor, local, other, 'attr')
+              .merge(defaultConfig)
+
+            // Assert
+            expect(result).toEqual({
+              output: [{ attr: [{ a: 1 }] }],
+              hasConflict: false,
+            })
+          })
+
+          it('should treat an undefined ancestor and an undefined local as empty objects', () => {
+            // Arrange
+            const ancestor = undefined as never
+            const local = undefined as never
+            const other = { a: 1 }
+
+            // Act
+            const result = sut
+              .createNode(ancestor, local, other, 'attr')
+              .merge(defaultConfig)
+
+            // Assert
+            expect(result).toEqual({
+              output: [{ attr: [{ a: 1 }] }],
+              hasConflict: false,
+            })
+          })
+
+          it('should propagate the deletion when both live sides dropped the element', () => {
+            // Arrange
+            const ancestor = { a: 1 }
+            const local = undefined as never
+            const other = undefined as never
+
+            // Act
+            const result = sut
+              .createNode(ancestor, local, other, 'attr')
+              .merge(defaultConfig)
+
+            // Assert
+            expect(result).toEqual({ output: [], hasConflict: false })
+          })
+
+          it('should let a scalar side contribute no keys at all', () => {
+            // Arrange
+            const ancestor = 'text'
+            const local = { a: 1 }
+            const other = undefined as never
+
+            // Act
+            const result = sut
+              .createNode(ancestor, local, other, 'attr')
+              .merge(defaultConfig)
+
+            // Assert
+            expect(result).toEqual({
+              output: [{ attr: [{ a: 1 }] }],
+              hasConflict: false,
+            })
+          })
+        })
       })
     })
   })

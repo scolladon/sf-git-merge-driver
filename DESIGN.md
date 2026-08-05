@@ -60,7 +60,7 @@ classDiagram
 - `TextMergeNode` - Handles scalar/primitive values
 - `TextArrayMergeNode` - Handles arrays of primitive values (e.g., `members` in package.xml)
 - `KeyedArrayMergeNode` - Handles arrays of objects with key fields (e.g., `fieldPermissions` with `field` key)
-- `PropertyMergeNode` - Handles pure objects without key extractor (property-by-property merge)
+- `PropertyMergeNode` - Handles pure objects without key extractor (property-by-property merge). A side where the element is absent (or is not a pure object) is normalised to the empty object at the factory before the node is constructed, so it contributes no properties and additions/deletions propagate instead of crashing
 
 ### Factory Pattern
 
