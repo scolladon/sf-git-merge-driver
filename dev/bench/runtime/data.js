@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785765086186,
+  "lastUpdate": 1785935140880,
   "repoUrl": "https://github.com/scolladon/sf-git-merge-driver",
   "entries": {
     "Runtime Benchmark": [
@@ -1997,6 +1997,138 @@ window.BENCHMARK_DATA = {
             "name": "serialize-large",
             "value": 161,
             "range": "±2.68%",
+            "unit": "ops/sec"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "kevin.gossent@gmail.com",
+            "name": "yohanim",
+            "username": "yohanim"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "062e2d602ba984ca98834d8420e8d70808faa8f5",
+          "message": "fix: correct five merge-engine edge cases found in a functional audit (#207)\n\nCo-authored-by: Sébastien Colladon <colladonsebastien@gmail.com>",
+          "timestamp": "2026-08-05T15:03:15+02:00",
+          "tree_id": "336386813dcab68f197664588f4f3088a4aa04af",
+          "url": "https://github.com/scolladon/sf-git-merge-driver/commit/062e2d602ba984ca98834d8420e8d70808faa8f5"
+        },
+        "date": 1785935140600,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "node bin/merge-driver.cjs --version",
+            "value": 31,
+            "range": "±2.33%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-small-no-conflict",
+            "value": 594,
+            "range": "±3.44%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-small-with-conflict",
+            "value": 688,
+            "range": "±2.20%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-medium-no-conflict",
+            "value": 94,
+            "range": "±1.93%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-medium-with-conflict",
+            "value": 95,
+            "range": "±0.82%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-large-no-conflict",
+            "value": 21,
+            "range": "±5.09%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-large-with-conflict",
+            "value": 21,
+            "range": "±6.42%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-ordered-globalvalueset",
+            "value": 743,
+            "range": "±2.41%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-picklist-customfield",
+            "value": 1144,
+            "range": "±2.00%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "parse-small",
+            "value": 1498,
+            "range": "±1.00%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-small",
+            "value": 3774,
+            "range": "±2.59%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "serialize-small",
+            "value": 5245,
+            "range": "±2.74%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "parse-medium",
+            "value": 167,
+            "range": "±2.40%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-medium",
+            "value": 433,
+            "range": "±3.06%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "serialize-medium",
+            "value": 734,
+            "range": "±1.67%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "parse-large",
+            "value": 38,
+            "range": "±0.85%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-large",
+            "value": 86,
+            "range": "±3.89%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "serialize-large",
+            "value": 147,
+            "range": "±3.49%",
             "unit": "ops/sec"
           }
         ]
