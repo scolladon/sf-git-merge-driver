@@ -4,8 +4,10 @@ import { XmlStreamWriter } from '../../../../src/adapter/writer/XmlStreamWriter.
 import {
   ANCESTOR_CONFLICT_MARKER,
   LOCAL_CONFLICT_MARKER,
+  OTHER_CONFLICT_MARKER,
   SEPARATOR,
 } from '../../../../src/constant/conflictConstant.js'
+import type { JsonArray, JsonValue } from '../../../../src/types/jsonTypes.js'
 import { serializeToString } from '../../../utils/serializeToString.js'
 import { defaultConfig } from '../../../utils/testConfig.js'
 
@@ -14,6 +16,17 @@ const size = defaultConfig.conflictMarkerSize
 const localMk = LOCAL_CONFLICT_MARKER.repeat(size)
 const ancMk = ANCESTOR_CONFLICT_MARKER.repeat(size)
 const sepMk = SEPARATOR.repeat(size)
+const otherMk = OTHER_CONFLICT_MARKER.repeat(size)
+
+const localLine = `${localMk} ${defaultConfig.localConflictTag}`
+const ancestorLine = `${ancMk} ${defaultConfig.ancestorConflictTag}`
+const otherLine = `${otherMk} ${defaultConfig.otherConflictTag}`
+
+const conflictOf = (
+  local: JsonArray,
+  ancestor: JsonArray,
+  other: JsonArray
+): JsonValue => ({ __conflict: true as const, local, ancestor, other })
 
 const DECL = '<?xml version="1.0" encoding="UTF-8"?>'
 
@@ -667,16 +680,177 @@ describe('XmlStreamWriter', () => {
       expect(out).toContain('<v>L</v>')
       expect(out).toContain('<v>A</v>')
       expect(out).toContain('<v>O</v>')
-      // Pin that the conflict is consumed in-place by writeNonObjectItem
-      // (returning true short-circuits the caller's key-iteration). If
-      // the early-return is removed, the caller would treat the block as
-      // a regular object and emit `<__conflict>`, `<local>`, `<ancestor>`,
-      // `<other>` element wrappers AFTER the markers. Catching this kills
-      // the L116 `return true` → `return false` mutant.
+      // Pin the `isConflictBlock` branch in writeRoot, which expands the
+      // block in place and skips the caller's key-iteration. Without that
+      // branch, writeRoot would treat the block as a regular object and
+      // emit `<__conflict>`, `<local>`, `<ancestor>`, `<other>` element
+      // wrappers AFTER the markers.
       expect(out).not.toContain('<__conflict>')
       expect(out).not.toContain('<local>')
       expect(out).not.toContain('<ancestor>')
       expect(out).not.toContain('<other>')
+    })
+  })
+
+  describe('given a whole-document ConflictBlock and root namespaces', () => {
+    const oneNamespace = { '@_xmlns': 'http://x' }
+
+    describe('when one side is blank', () => {
+      it('should carry the namespaces on every non-blank side root and leave the blank side blank', async () => {
+        // Arrange
+        const block = conflictOf([{}], [{ R: 'A' }], [{ R: 'O' }])
+
+        // Act
+        const result = await serializeToString(sut, [block], oneNamespace)
+
+        // Assert
+        expect(result).toBe(
+          `${DECL}\n${localLine}\n${ancestorLine}\n<R xmlns="http://x">A</R>\n${sepMk}\n<R xmlns="http://x">O</R>\n${otherLine}\n`
+        )
+      })
+    })
+
+    describe('when all three sides are non-blank', () => {
+      it('should carry the namespaces on all three side roots', async () => {
+        // Arrange
+        const block = conflictOf([{ R: 'L' }], [{ R: 'A' }], [{ R: 'O' }])
+
+        // Act
+        const result = await serializeToString(sut, [block], oneNamespace)
+
+        // Assert
+        expect(result).toBe(
+          `${DECL}\n${localLine}\n<R xmlns="http://x">L</R>\n${ancestorLine}\n<R xmlns="http://x">A</R>\n${sepMk}\n<R xmlns="http://x">O</R>\n${otherLine}\n`
+        )
+      })
+    })
+
+    describe('when a side holds two top-level elements', () => {
+      it('should carry the namespaces on the first element only', async () => {
+        // Arrange
+        const block = conflictOf([{}], [{ A: '1' }, { B: '2' }], [{}])
+
+        // Act
+        const result = await serializeToString(sut, [block], oneNamespace)
+
+        // Assert
+        expect(result).toBe(
+          `${DECL}\n${localLine}\n${ancestorLine}\n<A xmlns="http://x">1</A>\n<B>2</B>\n${sepMk}\n${otherLine}\n`
+        )
+      })
+    })
+
+    describe('when a sibling element follows the conflict', () => {
+      it('should let the conflict consume the root slot so the sibling stays bare', async () => {
+        // Arrange
+        const block = conflictOf([{}], [{ R: 'A' }], [{ R: 'O' }])
+
+        // Act
+        const result = await serializeToString(
+          sut,
+          [block, { Sib: 'z' }],
+          oneNamespace
+        )
+
+        // Assert
+        expect(result).toBe(
+          `${DECL}\n${localLine}\n${ancestorLine}\n<R xmlns="http://x">A</R>\n${sepMk}\n<R xmlns="http://x">O</R>\n${otherLine}\n<Sib>z</Sib>\n`
+        )
+      })
+    })
+
+    describe('when several namespaces arrive in non-alphabetical insertion order', () => {
+      it('should preserve that order on every non-blank side root', async () => {
+        // Arrange
+        const block = conflictOf([{}], [{ R: 'A' }], [{ R: 'O' }])
+        const namespaces = {
+          '@_xmlns:z': 'http://z',
+          '@_xmlns': 'http://a',
+        }
+
+        // Act
+        const result = await serializeToString(sut, [block], namespaces)
+
+        // Assert
+        expect(result).toBe(
+          `${DECL}\n${localLine}\n${ancestorLine}\n<R xmlns:z="http://z" xmlns="http://a">A</R>\n${sepMk}\n<R xmlns:z="http://z" xmlns="http://a">O</R>\n${otherLine}\n`
+        )
+      })
+    })
+
+    describe('when the document declares no namespaces', () => {
+      it('should render every side root bare', async () => {
+        // Arrange
+        const block = conflictOf([{}], [{ R: 'A' }], [{ R: 'O' }])
+
+        // Act
+        const result = await serializeToString(sut, [block], {})
+
+        // Assert
+        expect(result).toBe(
+          `${DECL}\n${localLine}\n${ancestorLine}\n<R>A</R>\n${sepMk}\n<R>O</R>\n${otherLine}\n`
+        )
+      })
+    })
+
+    describe('when a top-level scalar precedes the root element', () => {
+      it('should leave the root slot for the element because a scalar opens none', async () => {
+        // Arrange
+        const compactRoot = ['raw', { E: 'y' }]
+
+        // Act
+        const result = await serializeToString(sut, compactRoot, oneNamespace)
+
+        // Assert
+        expect(result).toBe(`${DECL}\nraw<E xmlns="http://x">y</E>\n`)
+      })
+    })
+  })
+
+  describe('given a ConflictBlock below the root element and root namespaces', () => {
+    const oneNamespace = { '@_xmlns': 'http://x' }
+
+    describe('when the conflict is a property of the root element', () => {
+      it('should keep the namespaces on the root element and off both sides', async () => {
+        // Arrange
+        const block = conflictOf([{ v: 'L' }], [{ v: 'A' }], [{ v: 'O' }])
+
+        // Act
+        const result = await serializeToString(
+          sut,
+          [{ Root: [{ w: block }] }],
+          oneNamespace
+        )
+
+        // Assert
+        expect(result).toBe(
+          `${DECL}\n<Root xmlns="http://x">\n${localLine}\n    <v>L</v>\n${ancestorLine}\n    <v>A</v>\n${sepMk}\n    <v>O</v>\n${otherLine}</Root>\n`
+        )
+      })
+    })
+
+    describe('when a conflict nests inside another conflict side', () => {
+      it('should keep the namespaces on the root element and off every nested side', async () => {
+        // Arrange
+        const inner = conflictOf(
+          [{ deep: 'dL' }],
+          [{ deep: 'dA' }],
+          [{ deep: 'dO' }]
+        )
+        const outer = conflictOf([inner], [{ s: 'A' }], [{ s: 'O' }])
+
+        // Act
+        const result = await serializeToString(
+          sut,
+          [{ Root: [{ w: outer }] }],
+          oneNamespace
+        )
+
+        // Assert
+        expect(result).toBe(
+          `${DECL}\n<Root xmlns="http://x">\n${localLine}\n${localLine}\n    <deep>dL</deep>\n${ancestorLine}\n    <deep>dA</deep>\n${sepMk}\n    <deep>dO</deep>\n${otherLine}${ancestorLine}\n    <s>A</s>\n${sepMk}\n    <s>O</s>\n${otherLine}</Root>\n`
+        )
+      })
     })
   })
 
