@@ -5,7 +5,7 @@ on:
     inputs:
       channel:
         type: string
-        default: latest-rc
+        required: true
 
 jobs:
   e2e-test:
@@ -44,7 +44,12 @@ jobs:
       - name: Install new plugin version
         env:
           CHANNEL: ${{ inputs.channel }}
-        run: echo y | sf plugins install "$CHANNEL"
+        run: |
+          # A caller whose channel expression resolves to an empty string would
+          # otherwise leave every cell installing something other than the build
+          # under test, and passing.
+          [ -n "$CHANNEL" ] || { echo "::error::empty channel"; exit 1; }
+          echo y | sf plugins install "$CHANNEL"
 
       - name: Test new plugin version installation
         run: sf git merge driver --help
