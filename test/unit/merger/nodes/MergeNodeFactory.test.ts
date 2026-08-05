@@ -65,6 +65,24 @@ describe('MergeNodeFactory', () => {
         expect(node).toBeInstanceOf(TextMergeNode)
       })
 
+      it('given attribute=members with object-shaped values then returns PropertyMergeNode, not TextArrayMergeNode', () => {
+        // Arrange — the schema override exists to defeat an *incidental*
+        // cardinality check, not the shape checks below it. TextArrayMergeNode
+        // dedups with `new Set(items)` (reference identity — never matches
+        // across two parsed sides) and sorts via JSON.stringify, so routing
+        // object-shaped values there unions every side instead of merging
+        // them property by property.
+        const ancestor = { sub: 'a' }
+        const local = { sub: 'b' }
+        const other = { sub: 'a' }
+
+        // Act
+        const node = factory.createNode(ancestor, local, other, 'members')
+
+        // Assert
+        expect(node).toBeInstanceOf(PropertyMergeNode)
+      })
+
       it('given objects when createNode then returns PropertyMergeNode', () => {
         // Arrange
         const ancestor = { a: 1 }

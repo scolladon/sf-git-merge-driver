@@ -51,9 +51,13 @@ class DefaultMergeNodeFactory implements MergeNodeFactory {
     other: JsonValue | undefined,
     attribute: string
   ): MergeNode {
+    // The schema override defeats an incidental cardinality check, not the
+    // shape checks below it: TextArrayMergeNode compares items by reference
+    // and sorts them by JSON.stringify, so it only ever holds for scalars.
     if (
       isStringArray(ancestor, local, other) ||
-      MetadataService.isTextArrayAttribute(attribute)
+      (MetadataService.isTextArrayAttribute(attribute) &&
+        !isKnownObject(ancestor, local, other))
     ) {
       const [ancestorArr, localArr, otherArr] = [ancestor, local, other].map(
         toArray
