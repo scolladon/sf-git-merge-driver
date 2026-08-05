@@ -64,6 +64,23 @@ const mergeNamespaces = (
   return result
 }
 
+interface ParsedDocument {
+  readonly content: JsonObject
+  readonly namespaces: JsonObject
+}
+
+// A side that dropped the whole file carries an empty namespaces bucket for
+// the trivial reason that it has no root element to carry them on — not
+// because it removed the xmlns. Reading that emptiness as a removal erases a
+// namespace the surviving side still declares. The ancestor is never
+// substituted: a rootless ancestor is the "file added on both sides" case,
+// where an empty bucket genuinely means the namespace did not exist before.
+const namespacesOf = (
+  side: ParsedDocument,
+  ancestor: ParsedDocument
+): JsonObject =>
+  Object.keys(side.content).length > 0 ? side.namespaces : ancestor.namespaces
+
 // When the JSON merge yields no output but BOTH live sides (ours and theirs)
 // still carry the root element, rebuild it as an empty element
 // (<Root/>) so an empty-bodied root round-trips instead of blanking the
@@ -114,16 +131,13 @@ export class XmlMerger {
     const failure = results.find(r => r.status === 'rejected')
     if (failure) throw (failure as PromiseRejectedResult).reason
     const [anc, local, other] = (
-      results as PromiseFulfilledResult<{
-        content: JsonObject
-        namespaces: JsonObject
-      }>[]
+      results as PromiseFulfilledResult<ParsedDocument>[]
     ).map(r => r.value)
 
     const namespaces = mergeNamespaces(
       anc!.namespaces,
-      local!.namespaces,
-      other!.namespaces
+      namespacesOf(local!, anc!),
+      namespacesOf(other!, anc!)
     )
 
     const mergedResult = this.jsonMerger.mergeThreeWay(
