@@ -241,7 +241,8 @@ comment on the pull request with the install command:
 sf plugins install https://pkg.pr.new/sf-git-merge-driver@<short-sha>
 ```
 
-This works the same way for pull requests from forks.
+Pull requests from forks publish a preview too, but get no comment — their install
+URL appears on the `Continuous Releases` check run instead.
 
 ### Update the pull request
 
