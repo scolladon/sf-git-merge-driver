@@ -119,8 +119,13 @@ jobs:
             echo "::error::expected exactly one preview URL, got '$URLS'"
             exit 1
           fi
-          if ! printf '%s' "$URLS" | grep -Eq '^https://pkg\.pr\.new/[A-Za-z0-9._@/-]+@[0-9a-f]{7,40}$'; then
-            echo "::error::unexpected preview URL: '$URLS'"
+          host="https://pkg.pr.new/"
+          if [ "${URLS#"$host"}" = "$URLS" ]; then
+            echo "::error::preview URL is not on pkg.pr.new: '$URLS'"
+            exit 1
+          fi
+          if ! printf '%s' "$URLS" | grep -Eq '@[0-9a-f]{7,40}$'; then
+            echo "::error::preview URL is not commit-pinned: '$URLS'"
             exit 1
           fi
 
