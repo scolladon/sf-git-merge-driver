@@ -136,7 +136,8 @@ generally follows the same pattern each time:
 4. [Rebase](#rebase)
 5. [Check your submission](#check-your-submission)
 6. [Create a pull request](#create-a-pull-request)
-7. [Update the pull request](#update-the-pull-request)
+7. [Try the pull request build](#try-the-pull-request-build)
+8. [Update the pull request](#update-the-pull-request)
 
 ### Fork the repo
 
@@ -230,6 +231,17 @@ Test your change by running the unit tests and integration tests. Instructions [
 
 If you've never created a pull request before, follow [these
 instructions](https://help.github.com/articles/creating-a-pull-request/). Pull request samples [here](https://github.com/scolladon/sfdx-git-delta/pulls)
+
+### Try the pull request build
+
+Every push to the pull request publishes an installable preview build and a bot
+comment on the pull request with the install command:
+
+```bash
+sf plugins install https://pkg.pr.new/sf-git-merge-driver@<short-sha>
+```
+
+This works the same way for pull requests from forks.
 
 ### Update the pull request
 
