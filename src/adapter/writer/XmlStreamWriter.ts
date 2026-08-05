@@ -129,8 +129,10 @@ const writeNonObjectItem = (
 // through to `writeChildren`, which iterates one object with zero own
 // keys and appends nothing — leaving the marker for that side glued to
 // the very next line with no newline in between (e.g. `||||||| base=======`).
+// No separate `content.length === 0` check: `[].every(...)` is vacuously
+// true, so an empty array already satisfies `.every()` on its own — a
+// dedicated empty-array branch would never change the result.
 const isBlankConflictSide = (content: JsonArray): boolean =>
-  content.length === 0 ||
   content.every(item => isObject(item) && Object.keys(item).length === 0)
 
 const writeConflictContent = (

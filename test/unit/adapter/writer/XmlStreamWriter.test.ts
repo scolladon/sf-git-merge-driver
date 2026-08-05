@@ -753,6 +753,24 @@ describe('XmlStreamWriter', () => {
       expect(out).not.toContain(`${aMk}=======`)
       expect(out).not.toContain(`=======${oMk}`)
     })
+
+    it('when a side mixes one blank placeholder with a real item then it is NOT treated as blank', async () => {
+      // isBlankConflictSide must require EVERY item to be an empty object,
+      // not just one — a side is only ever actually [{}] (all-blank) or
+      // real content in practice, but the helper's contract is "blank only
+      // if nothing in here is real", not "blank if anything in here is".
+      const block = {
+        __conflict: true as const,
+        local: [{}, { v: 'real' }],
+        ancestor: [{ v: 'A' }],
+        other: [{ v: 'O' }],
+      }
+      const out = await serializeToString(sut, [block as never], {})
+      const lMk = `<<<<<<< ${defaultConfig.localConflictTag}`
+      const aMk = `||||||| ${defaultConfig.ancestorConflictTag}`
+      expect(out).not.toContain(`${lMk}${aMk}`)
+      expect(out).toContain('<v>real</v>')
+    })
   })
 
   describe('given a ConflictBlock as the very first top-level item', () => {

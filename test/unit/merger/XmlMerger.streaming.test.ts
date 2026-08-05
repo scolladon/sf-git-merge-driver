@@ -68,6 +68,18 @@ describe('XmlMerger.mergeThreeWay', () => {
       const result = await runMergeStreams(sut, ancestor, ours, theirs)
       expect(result.output).toContain('xmlns="http://ours"')
     })
+
+    it('when merged then no divergence warning is logged (this is a clean resolution, not a tie)', async () => {
+      const warnSpy = vi
+        .spyOn(Logger, 'warn')
+        .mockImplementation(() => undefined)
+      const ancestor = `<?xml version="1.0"?><R xmlns="http://anc"><v>a</v></R>`
+      const ours = `<?xml version="1.0"?><R xmlns="http://ours"><v>a</v></R>`
+      const theirs = `<?xml version="1.0"?><R xmlns="http://anc"><v>a</v></R>`
+      await runMergeStreams(sut, ancestor, ours, theirs)
+      expect(warnSpy).not.toHaveBeenCalled()
+      warnSpy.mockRestore()
+    })
   })
 
   describe('given only theirs changes the namespace (ours unchanged from ancestor)', () => {
@@ -87,6 +99,18 @@ describe('XmlMerger.mergeThreeWay', () => {
       const theirs = `<?xml version="1.0"?><R xmlns="http://new"><v>a</v></R>`
       const result = await runMergeStreams(sut, ancestor, ours, theirs)
       expect(result.output).toContain('xmlns="http://new"')
+    })
+
+    it('when merged then no divergence warning is logged (both sides agreeing is not a tie)', async () => {
+      const warnSpy = vi
+        .spyOn(Logger, 'warn')
+        .mockImplementation(() => undefined)
+      const ancestor = `<?xml version="1.0"?><R xmlns="http://anc"><v>a</v></R>`
+      const ours = `<?xml version="1.0"?><R xmlns="http://new"><v>a</v></R>`
+      const theirs = `<?xml version="1.0"?><R xmlns="http://new"><v>a</v></R>`
+      await runMergeStreams(sut, ancestor, ours, theirs)
+      expect(warnSpy).not.toHaveBeenCalled()
+      warnSpy.mockRestore()
     })
   })
 

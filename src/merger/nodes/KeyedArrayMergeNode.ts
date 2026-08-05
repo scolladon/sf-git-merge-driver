@@ -35,12 +35,10 @@ class UnkeyedConflictStrategy implements KeyedArrayMergeStrategy {
   ) {}
 
   merge(_config: MergeConfig): MergeResult {
-    if (
-      jsonEqual(this.ancestor, this.local) &&
-      jsonEqual(this.local, this.other)
-    ) {
-      return this.resolved(this.local)
-    }
+    // No separate "all three equal" branch: when local and other both equal
+    // ancestor, this first check already fires and returns `other`, which
+    // equals `local` in that case — same outcome as a dedicated branch,
+    // one fewer redundant condition for the "all equal" case to hide behind.
     if (jsonEqual(this.ancestor, this.local)) {
       return this.resolved(this.other)
     }
