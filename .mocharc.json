@@ -3,5 +3,6 @@
   "node-option": ["import=tsx"],
   "recursive": true,
   "reporter": "spec",
+  "require": "./test/utils/mochaRootHooks.ts",
   "timeout": 120000
 }
