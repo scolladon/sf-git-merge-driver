@@ -781,4 +781,25 @@ describe('MetadataService', () => {
       expect(result).toBe(false)
     })
   })
+
+  describe('isTextArrayAttribute', () => {
+    it.each(['members'])('should return true for %s', attribute => {
+      // Act
+      const result = MetadataService.isTextArrayAttribute(attribute)
+
+      // Assert
+      expect(result).toBe(true)
+    })
+
+    it.each(['fullName', 'name', 'value', 'customValue', 'fieldPermissions'])(
+      'should return false for %s',
+      attribute => {
+        // Act
+        const result = MetadataService.isTextArrayAttribute(attribute)
+
+        // Assert
+        expect(result).toBe(false)
+      }
+    )
+  })
 })

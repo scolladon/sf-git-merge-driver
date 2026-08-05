@@ -1,6 +1,7 @@
 import { PassThrough, Readable, Writable } from 'node:stream'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MergeDriver } from '../../../src/driver/MergeDriver.js'
+import { Logger } from '../../../src/utils/LoggingService.js'
 import { defaultConfig } from '../../utils/testConfig.js'
 
 // Mocks here are narrowly scoped: only the behaviours that are
@@ -8,6 +9,23 @@ import { defaultConfig } from '../../utils/testConfig.js'
 // injecting an error on the tmp write stream mid-write, asserting the
 // exact `eol` arg propagates to mergeThreeWay. Everything else lives
 // in test/integration/MergeDriver.test.ts against real tmp files.
+
+vi.mock('../../../src/utils/LoggingService.js', async importOriginal => {
+  const actual =
+    await importOriginal<
+      typeof import('../../../src/utils/LoggingService.js')
+    >()
+  return {
+    ...actual,
+    Logger: {
+      trace: vi.fn(),
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    },
+  }
+})
 
 const mockCreateReadStream = vi.fn<(path: string) => Readable>()
 const mockCreateWriteStream = vi.fn<(path: string) => Writable>()
@@ -110,10 +128,30 @@ describe('MergeDriver (unit — mock-required edge cases only)', () => {
   })
 
   describe('given mergeThreeWay rejects with a non-ENOENT error', () => {
-    it('when merged then returns hasConflict=true (leave-ours-alone policy)', async () => {
-      mockMergeThreeWay.mockRejectedValue(new Error('parse boom'))
-      const result = await sut.mergeFiles('a', 'o', 't')
-      expect(result).toBe(true)
+    it('when merged then the error propagates (leave-ours-alone policy relies on the caller to catch it)', async () => {
+      const boom = new Error('parse boom')
+      mockMergeThreeWay.mockRejectedValue(boom)
+      await expect(sut.mergeFiles('a', 'o', 't')).rejects.toBe(boom)
+    })
+
+    it('when merged then Logger.error is called with the exact message and the original error', async () => {
+      // Exact message-string assertion guards against mutants that gut
+      // the literal to "" — mirrors the convention in
+      // UninstallService.test.ts.
+      const boom = new Error('parse boom')
+      mockMergeThreeWay.mockRejectedValue(boom)
+      await expect(sut.mergeFiles('a', 'o', 't')).rejects.toThrow()
+      expect(Logger.error).toHaveBeenCalledWith(
+        'Merge failed; leaving ours unchanged',
+        boom
+      )
+    })
+
+    it('when a non-Error value is rejected then it still propagates as-is', async () => {
+      mockMergeThreeWay.mockRejectedValue('raw string failure')
+      await expect(sut.mergeFiles('a', 'o', 't')).rejects.toBe(
+        'raw string failure'
+      )
     })
   })
 
@@ -137,47 +175,47 @@ describe('MergeDriver (unit — mock-required edge cases only)', () => {
   })
 
   describe('given peekEol itself rejects (ours file unreadable)', () => {
-    it('when merged then returns hasConflict=true without crashing', async () => {
+    it('when merged then the error propagates', async () => {
       mockPeekEol.mockRejectedValue(new Error('ENOENT ours'))
-      const result = await sut.mergeFiles('a', 'o', 't')
-      expect(result).toBe(true)
+      await expect(sut.mergeFiles('a', 'o', 't')).rejects.toThrow('ENOENT ours')
     })
   })
 
   describe('given a non-Error primitive is thrown from mergeThreeWay', () => {
-    it('when merged then returns true (primitive has no `.code`, cannot be ENOENT)', async () => {
+    it('when merged then it propagates via the generic branch, not the ENOENT rethrow (primitive has no `.code`)', async () => {
       // Kills the `typeof error === 'object'` → `true` mutant: if the
       // guard were weakened, a primitive throw would be mistaken for
-      // an ENOENT Error and rethrown.
+      // an ENOENT Error. Both branches throw the same value now, so
+      // this is pinned via the Logger.error call, which only the
+      // generic branch makes.
       mockMergeThreeWay.mockImplementation(() => {
         throw 'ENOENT' as unknown as Error
       })
-      const result = await sut.mergeFiles('a', 'o', 't')
-      expect(result).toBe(true)
+      await expect(sut.mergeFiles('a', 'o', 't')).rejects.toBe('ENOENT')
+      expect(Logger.error).toHaveBeenCalledOnce()
     })
   })
 
   describe('given null is thrown from mergeThreeWay', () => {
-    it('when merged then returns true (null cannot be an ENOENT Error)', async () => {
+    it('when merged then it propagates via the generic branch (null cannot be an ENOENT Error)', async () => {
       // Kills the `error !== null` → `true` mutant: if the guard were
       // weakened, `null.code === 'ENOENT'` would throw TypeError
-      // instead of cleanly falling through to the swallow-and-return
-      // branch.
+      // instead of cleanly falling through to the generic branch below.
       mockMergeThreeWay.mockImplementation(() => {
         throw null as unknown as Error
       })
-      const result = await sut.mergeFiles('a', 'o', 't')
-      expect(result).toBe(true)
+      await expect(sut.mergeFiles('a', 'o', 't')).rejects.toBe(null)
+      expect(Logger.error).toHaveBeenCalledOnce()
     })
   })
 
   describe('given a function with a fake ENOENT code is thrown from mergeThreeWay', () => {
-    it('when merged then returns true (typeof function !== "object"; guard must reject)', async () => {
+    it('when merged then it propagates via the generic branch (typeof function !== "object"; guard must reject)', async () => {
       // Kills the `typeof error === 'object'` → `true` mutant. A
       // function value passes `!== null` and, by pathological design,
       // has a `.code === 'ENOENT'` property — but `typeof` is
       // 'function', not 'object'. If the guard's object check were
-      // weakened, this value would be rethrown instead of swallowed.
+      // weakened, this value would skip the Logger.error call below.
       const fakeErr = (() => undefined) as unknown as Error & {
         code: string
       }
@@ -185,21 +223,21 @@ describe('MergeDriver (unit — mock-required edge cases only)', () => {
       mockMergeThreeWay.mockImplementation(() => {
         throw fakeErr
       })
-      const result = await sut.mergeFiles('a', 'o', 't')
-      expect(result).toBe(true)
+      await expect(sut.mergeFiles('a', 'o', 't')).rejects.toBe(fakeErr)
+      expect(Logger.error).toHaveBeenCalledOnce()
     })
   })
 
   describe('given unlink fails during the finally cleanup', () => {
-    it('when merged then unlink is called, its error is swallowed, and hasConflict is returned', async () => {
+    it('when merged then unlink is called, its error is swallowed, and the original merge error still propagates', async () => {
       // Triple-assert kills both BlockStatement mutants on the
       // safeUnlink body (`try { await unlink } catch {}` emptied).
       // Without calling unlink the mock wouldn't register the
-      // invocation; without the catch the rejection would escalate.
+      // invocation; without the catch the EACCES rejection would
+      // replace/mask the original 'parse boom' rejection.
       mockUnlink.mockRejectedValue(new Error('EACCES'))
       mockMergeThreeWay.mockRejectedValue(new Error('parse boom'))
-      const result = await sut.mergeFiles('a', 'o', 't')
-      expect(result).toBe(true)
+      await expect(sut.mergeFiles('a', 'o', 't')).rejects.toThrow('parse boom')
       expect(mockUnlink).toHaveBeenCalledOnce()
     })
   })

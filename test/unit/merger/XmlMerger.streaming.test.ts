@@ -1,6 +1,7 @@
 import { PassThrough, Readable } from 'node:stream'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { XmlMerger } from '../../../src/merger/XmlMerger.js'
+import { Logger } from '../../../src/utils/LoggingService.js'
 import { defaultConfig } from '../../utils/testConfig.js'
 
 const collect = async (stream: PassThrough): Promise<string> => {
@@ -56,30 +57,113 @@ describe('XmlMerger.mergeThreeWay', () => {
     })
   })
 
-  describe('given namespace merge across three sides', () => {
-    it('when merged then namespace order is ancestor-ours-theirs (declaration order)', async () => {
-      // local URI for the SAME prefix wins over other; ancestor is
-      // overridden by both.
+  describe('given only ours changes the namespace (theirs unchanged from ancestor)', () => {
+    it('when merged then the local change is kept, not silently discarded', async () => {
+      // Regression guard: the previous Object.assign-based merge let
+      // `other` win unconditionally, so a local-only namespace change
+      // vanished with no trace whenever theirs left it untouched.
       const ancestor = `<?xml version="1.0"?><R xmlns="http://anc"><v>a</v></R>`
       const ours = `<?xml version="1.0"?><R xmlns="http://ours"><v>a</v></R>`
+      const theirs = `<?xml version="1.0"?><R xmlns="http://anc"><v>a</v></R>`
+      const result = await runMergeStreams(sut, ancestor, ours, theirs)
+      expect(result.output).toContain('xmlns="http://ours"')
+    })
+
+    it('when merged then no divergence warning is logged (this is a clean resolution, not a tie)', async () => {
+      const warnSpy = vi
+        .spyOn(Logger, 'warn')
+        .mockImplementation(() => undefined)
+      const ancestor = `<?xml version="1.0"?><R xmlns="http://anc"><v>a</v></R>`
+      const ours = `<?xml version="1.0"?><R xmlns="http://ours"><v>a</v></R>`
+      const theirs = `<?xml version="1.0"?><R xmlns="http://anc"><v>a</v></R>`
+      await runMergeStreams(sut, ancestor, ours, theirs)
+      expect(warnSpy).not.toHaveBeenCalled()
+      warnSpy.mockRestore()
+    })
+  })
+
+  describe('given only theirs changes the namespace (ours unchanged from ancestor)', () => {
+    it('when merged then the other change is kept', async () => {
+      const ancestor = `<?xml version="1.0"?><R xmlns="http://anc"><v>a</v></R>`
+      const ours = `<?xml version="1.0"?><R xmlns="http://anc"><v>a</v></R>`
       const theirs = `<?xml version="1.0"?><R xmlns="http://theirs"><v>a</v></R>`
       const result = await runMergeStreams(sut, ancestor, ours, theirs)
-      // Object.assign({}, anc, local, other) => other wins
       expect(result.output).toContain('xmlns="http://theirs"')
     })
   })
 
+  describe('given ours and theirs change the namespace to the same value', () => {
+    it('when merged then the converged value is kept', async () => {
+      const ancestor = `<?xml version="1.0"?><R xmlns="http://anc"><v>a</v></R>`
+      const ours = `<?xml version="1.0"?><R xmlns="http://new"><v>a</v></R>`
+      const theirs = `<?xml version="1.0"?><R xmlns="http://new"><v>a</v></R>`
+      const result = await runMergeStreams(sut, ancestor, ours, theirs)
+      expect(result.output).toContain('xmlns="http://new"')
+    })
+
+    it('when merged then no divergence warning is logged (both sides agreeing is not a tie)', async () => {
+      const warnSpy = vi
+        .spyOn(Logger, 'warn')
+        .mockImplementation(() => undefined)
+      const ancestor = `<?xml version="1.0"?><R xmlns="http://anc"><v>a</v></R>`
+      const ours = `<?xml version="1.0"?><R xmlns="http://new"><v>a</v></R>`
+      const theirs = `<?xml version="1.0"?><R xmlns="http://new"><v>a</v></R>`
+      await runMergeStreams(sut, ancestor, ours, theirs)
+      expect(warnSpy).not.toHaveBeenCalled()
+      warnSpy.mockRestore()
+    })
+  })
+
+  describe('given all three sides disagree on the namespace (no pair agreeing)', () => {
+    it('when merged then local wins the unrepresentable tie (an xmlns value cannot carry conflict markers)', async () => {
+      const ancestor = `<?xml version="1.0"?><R xmlns="http://anc"><v>a</v></R>`
+      const ours = `<?xml version="1.0"?><R xmlns="http://ours"><v>a</v></R>`
+      const theirs = `<?xml version="1.0"?><R xmlns="http://theirs"><v>a</v></R>`
+      const result = await runMergeStreams(sut, ancestor, ours, theirs)
+      expect(result.output).toContain('xmlns="http://ours"')
+      expect(result.output).not.toContain('xmlns="http://theirs"')
+    })
+
+    it('when merged then the discarded divergence is logged (it leaves no trace in the XML itself)', async () => {
+      const warnSpy = vi
+        .spyOn(Logger, 'warn')
+        .mockImplementation(() => undefined)
+      const ancestor = `<?xml version="1.0"?><R xmlns="http://anc"><v>a</v></R>`
+      const ours = `<?xml version="1.0"?><R xmlns="http://ours"><v>a</v></R>`
+      const theirs = `<?xml version="1.0"?><R xmlns="http://theirs"><v>a</v></R>`
+      await runMergeStreams(sut, ancestor, ours, theirs)
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('xmlns divergence'),
+        expect.objectContaining({
+          ancestor: 'http://anc',
+          local: 'http://ours',
+          other: 'http://theirs',
+        })
+      )
+      warnSpy.mockRestore()
+    })
+  })
+
+  describe('given one side removes the namespace while the other leaves it unchanged', () => {
+    it('when merged then the removal wins and no xmlns attribute is emitted', async () => {
+      const ancestor = `<?xml version="1.0"?><R xmlns="http://anc"><v>a</v></R>`
+      const ours = `<?xml version="1.0"?><R><v>a</v></R>`
+      const theirs = `<?xml version="1.0"?><R xmlns="http://anc"><v>a</v></R>`
+      const result = await runMergeStreams(sut, ancestor, ours, theirs)
+      expect(result.output).not.toContain('xmlns')
+    })
+  })
+
   describe('given the ancestor stream is delayed behind ours and theirs', () => {
-    it('when merged then namespace order is still ancestor-ours-theirs (declaration order, not resolution order)', async () => {
-      // Design §6.4 F-NS-ORDER: Promise.allSettled results[] is
-      // indexed by declaration order, so even if ancestor's parse
-      // completes AFTER ours and theirs, the `Object.assign` that
-      // builds the namespace map must still stack anc → ours → other.
-      // This guards against a regression that accidentally indexes
-      // the results by resolution order.
+    it('when merged then the three-way resolution still runs on declaration order, not resolution order', async () => {
+      // Promise.allSettled results[] is indexed by declaration order, so
+      // even if ancestor's parse completes AFTER ours and theirs,
+      // mergeNamespaces must still compare the value at each side's fixed
+      // slot — not whichever value happened to resolve first. This guards
+      // against a regression that accidentally indexes by resolution order.
       const ancXml = `<?xml version="1.0"?><R xmlns="http://anc"><v>a</v></R>`
       const oursXml = `<?xml version="1.0"?><R xmlns="http://ours"><v>a</v></R>`
-      const theirsXml = `<?xml version="1.0"?><R xmlns="http://theirs"><v>a</v></R>`
+      const theirsXml = `<?xml version="1.0"?><R xmlns="http://anc"><v>a</v></R>`
 
       // Make the ancestor stream slow — it will finish last.
       const slowAncestor = new Readable({
@@ -99,12 +183,10 @@ describe('XmlMerger.mergeThreeWay', () => {
       await sut.mergeThreeWay(slowAncestor, fastOurs, fastTheirs, sink)
       sink.end()
       const out = await collector
-      // Declaration order preserved: `other` (theirs) wins the prefix
-      // collision because `Object.assign({}, anc, ours, theirs)`
-      // overwrites left-to-right.
-      expect(out).toContain('xmlns="http://theirs"')
+      // theirs is unchanged from ancestor regardless of parse timing, so
+      // ours's change must win even though its stream resolved first.
+      expect(out).toContain('xmlns="http://ours"')
       expect(out).not.toContain('xmlns="http://anc"')
-      expect(out).not.toContain('xmlns="http://ours"')
     })
   })
 

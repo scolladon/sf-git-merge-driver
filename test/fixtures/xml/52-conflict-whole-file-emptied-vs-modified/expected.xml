@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<<<<<<< ours
+||||||| base
+<PermissionSet>
+    <label>Base</label>
+</PermissionSet>
+=======
+<PermissionSet>
+    <label>Base changed by theirs</label>
+</PermissionSet>
+>>>>>>> theirs

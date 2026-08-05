@@ -606,6 +606,120 @@ describe('KeyedArrayMergeNode', () => {
       // Assert
       expect(result.hasConflict).toBe(true)
     })
+
+    it('should not conflict when the unkeyed array is unchanged on all three sides', () => {
+      // Arrange — same content everywhere; only present because a sibling
+      // property elsewhere forced a walk into this node.
+      const ancestor = [{ x: '1' }, { x: '2' }]
+      const local = [{ x: '1' }, { x: '2' }]
+      const other = [{ x: '1' }, { x: '2' }]
+      const node = new KeyedArrayMergeNode(
+        ancestor,
+        local,
+        other,
+        'unknownAttribute',
+        undefined,
+        false
+      )
+
+      // Act
+      const result = node.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      expect(result.output).toEqual([
+        { unknownAttribute: { x: '1' } },
+        { unknownAttribute: { x: '2' } },
+      ])
+    })
+
+    it('should not conflict when only local added the unkeyed array', () => {
+      // Arrange — ancestor and other agree (both absent); local alone changed.
+      const ancestor: JsonArray = []
+      const local = [{ x: '1' }]
+      const other: JsonArray = []
+      const node = new KeyedArrayMergeNode(
+        ancestor,
+        local,
+        other,
+        'unknownAttribute',
+        undefined,
+        false
+      )
+
+      // Act
+      const result = node.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      expect(result.output).toEqual([{ unknownAttribute: { x: '1' } }])
+    })
+
+    it('should not conflict when only other added the unkeyed array', () => {
+      // Arrange — ancestor and local agree (both absent); other alone changed.
+      const ancestor: JsonArray = []
+      const local: JsonArray = []
+      const other = [{ x: '1' }]
+      const node = new KeyedArrayMergeNode(
+        ancestor,
+        local,
+        other,
+        'unknownAttribute',
+        undefined,
+        false
+      )
+
+      // Act
+      const result = node.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      expect(result.output).toEqual([{ unknownAttribute: { x: '1' } }])
+    })
+
+    it('should not conflict when local and other converge on the same change', () => {
+      // Arrange — ancestor differs from both, but local and other agree.
+      const ancestor = [{ x: '0' }]
+      const local = [{ x: '1' }]
+      const other = [{ x: '1' }]
+      const node = new KeyedArrayMergeNode(
+        ancestor,
+        local,
+        other,
+        'unknownAttribute',
+        undefined,
+        false
+      )
+
+      // Act
+      const result = node.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      expect(result.output).toEqual([{ unknownAttribute: { x: '1' } }])
+    })
+
+    it('should still conflict when all three sides genuinely differ', () => {
+      // Arrange — regression guard: equality fast paths must not swallow a
+      // real divergence with no matching pair.
+      const ancestor = [{ x: '0' }]
+      const local = [{ x: '1' }]
+      const other = [{ x: '2' }]
+      const node = new KeyedArrayMergeNode(
+        ancestor,
+        local,
+        other,
+        'unknownAttribute',
+        undefined,
+        false
+      )
+
+      // Act
+      const result = node.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(true)
+    })
   })
 
   describe('merge with empty arrays', () => {

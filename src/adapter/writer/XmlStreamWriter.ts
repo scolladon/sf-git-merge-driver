@@ -122,6 +122,19 @@ const writeNonObjectItem = (
   return false
 }
 
+// `buildConflictMarkers` normalises a side with no content to a bare `{}`
+// (see ConflictMarkerBuilder's `hasNoContent`), and `buildConflictBlock`
+// wraps a non-array value as a single-element array — so "no content" on
+// a conflict side is `[{}]`, not `[]`. Without this check, `[{}]` fell
+// through to `writeChildren`, which iterates one object with zero own
+// keys and appends nothing — leaving the marker for that side glued to
+// the very next line with no newline in between (e.g. `||||||| base=======`).
+// No separate `content.length === 0` check: `[].every(...)` is vacuously
+// true, so an empty array already satisfies `.every()` on its own — a
+// dedicated empty-array branch would never change the result.
+const isBlankConflictSide = (content: JsonArray): boolean =>
+  content.every(item => isObject(item) && Object.keys(item).length === 0)
+
 const writeConflictContent = (
   st: WalkState,
   content: JsonArray,
@@ -129,7 +142,7 @@ const writeConflictContent = (
 ): void => {
   // Empty side: emit the EOL placeholder so the marker pair stays on
   // its own line, matching the byte layout of the previous pipeline.
-  if (content.length === 0) {
+  if (isBlankConflictSide(content)) {
     writeText(st, SALESFORCE_EOL)
     return
   }
@@ -146,6 +159,14 @@ const writeConflict = (
   block: ConflictBlock,
   markers: ConflictMarkers
 ): void => {
+  // A conflict block can be the very first thing ever written (e.g. one
+  // side deletes the whole file while the other edits it). The "first
+  // top-level element" indent suppression is meant for a normal open tag
+  // right after the XML declaration, not for content nested inside a
+  // conflict side — consume it here so the first real element inside
+  // block.ancestor/other still gets its newline+indent instead of gluing
+  // onto the marker line above it.
+  st.isFirstTopLevelAfterDecl = false
   writeText(st, markers.local)
   writeConflictContent(st, block.local, markers)
   writeText(st, markers.ancestor)

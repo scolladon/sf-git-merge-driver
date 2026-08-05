@@ -36,6 +36,53 @@ describe('MergeNodeFactory', () => {
         expect(node).toBeInstanceOf(TextArrayMergeNode)
       })
 
+      it('given attribute=members with scalar values on all three sides (cardinality 1) then returns TextArrayMergeNode', () => {
+        // Arrange — a single occurrence on every side parses to a bare
+        // scalar (isStringArray sees no array at all), but 'members' is a
+        // known text-array attribute regardless of incidental cardinality.
+        const ancestor = 'Obj1'
+        const local = 'Obj1b'
+        const other = 'Obj1'
+
+        // Act
+        const node = factory.createNode(ancestor, local, other, 'members')
+
+        // Assert
+        expect(node).toBeInstanceOf(TextArrayMergeNode)
+      })
+
+      it('given an unrelated attribute with scalar values on all three sides then still returns TextMergeNode', () => {
+        // Arrange — regression guard: the forced routing must not leak to
+        // every scalar attribute, only the ones MetadataService lists.
+        const ancestor = 'Obj1'
+        const local = 'Obj1b'
+        const other = 'Obj1'
+
+        // Act
+        const node = factory.createNode(ancestor, local, other, 'name')
+
+        // Assert
+        expect(node).toBeInstanceOf(TextMergeNode)
+      })
+
+      it('given attribute=members with object-shaped values then returns PropertyMergeNode, not TextArrayMergeNode', () => {
+        // Arrange — the schema override exists to defeat an *incidental*
+        // cardinality check, not the shape checks below it. TextArrayMergeNode
+        // dedups with `new Set(items)` (reference identity — never matches
+        // across two parsed sides) and sorts via JSON.stringify, so routing
+        // object-shaped values there unions every side instead of merging
+        // them property by property.
+        const ancestor = { sub: 'a' }
+        const local = { sub: 'b' }
+        const other = { sub: 'a' }
+
+        // Act
+        const node = factory.createNode(ancestor, local, other, 'members')
+
+        // Assert
+        expect(node).toBeInstanceOf(PropertyMergeNode)
+      })
+
       it('given objects when createNode then returns PropertyMergeNode', () => {
         // Arrange
         const ancestor = { a: 1 }

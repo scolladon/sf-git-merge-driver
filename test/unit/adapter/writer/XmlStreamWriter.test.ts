@@ -718,6 +718,81 @@ describe('XmlStreamWriter', () => {
     })
   })
 
+  describe('given a ConflictBlock whose empty side is [{}] rather than []', () => {
+    // buildConflictMarkers normalises "no content" to a bare `{}`, and
+    // buildConflictBlock wraps a non-array value as a single-element
+    // array — so a genuinely-empty side is `[{}]`, not `[]`. This shape
+    // shows up whenever a conflicting leaf has no ancestor counterpart
+    // (both sides added it fresh) or when one side of a keyed-array
+    // element deletion/addition is absent.
+    it('when serialized then the marker for that side does not glue to the following marker', async () => {
+      const block = {
+        __conflict: true as const,
+        local: [{}],
+        ancestor: [{ v: 'A' }],
+        other: [{ v: 'O' }],
+      }
+      const out = await serializeToString(sut, [block as never], {})
+      const lMk = `<<<<<<< ${defaultConfig.localConflictTag}`
+      const aMk = `||||||| ${defaultConfig.ancestorConflictTag}`
+      expect(out).not.toContain(`${lMk}${aMk}`)
+      const between = out.slice(out.indexOf(lMk) + lMk.length, out.indexOf(aMk))
+      expect(between).toMatch(/^\s*$/)
+    })
+
+    it('when both ancestor and other sides are [{}] then neither glues to its neighbour', async () => {
+      const block = {
+        __conflict: true as const,
+        local: [{ v: 'L' }],
+        ancestor: [{}],
+        other: [{}],
+      }
+      const out = await serializeToString(sut, [block as never], {})
+      const aMk = `||||||| ${defaultConfig.ancestorConflictTag}`
+      const oMk = `>>>>>>> ${defaultConfig.otherConflictTag}`
+      expect(out).not.toContain(`${aMk}=======`)
+      expect(out).not.toContain(`=======${oMk}`)
+    })
+
+    it('when a side mixes one blank placeholder with a real item then it is NOT treated as blank', async () => {
+      // isBlankConflictSide must require EVERY item to be an empty object,
+      // not just one — a side is only ever actually [{}] (all-blank) or
+      // real content in practice, but the helper's contract is "blank only
+      // if nothing in here is real", not "blank if anything in here is".
+      const block = {
+        __conflict: true as const,
+        local: [{}, { v: 'real' }],
+        ancestor: [{ v: 'A' }],
+        other: [{ v: 'O' }],
+      }
+      const out = await serializeToString(sut, [block as never], {})
+      const lMk = `<<<<<<< ${defaultConfig.localConflictTag}`
+      const aMk = `||||||| ${defaultConfig.ancestorConflictTag}`
+      expect(out).not.toContain(`${lMk}${aMk}`)
+      expect(out).toContain('<v>real</v>')
+    })
+  })
+
+  describe('given a ConflictBlock as the very first top-level item', () => {
+    it('when a non-empty side holds a real element then it still gets its own indented line', async () => {
+      // The "first top-level element after the XML declaration" indent
+      // suppression is meant for a normal open tag, not for content
+      // nested inside a conflict side — regression guard for the glued
+      // `||||||| base<Root>` layout produced when the flag survived into
+      // writeConflictContent's first writeElement call.
+      const block = {
+        __conflict: true as const,
+        local: [],
+        ancestor: [{ Root: 'A' }],
+        other: [{ Root: 'B' }],
+      }
+      const out = await serializeToString(sut, [block as never], {})
+      const aMk = `||||||| ${defaultConfig.ancestorConflictTag}`
+      expect(out).not.toContain(`${aMk}<Root>`)
+      expect(out).toContain('\n<Root>A</Root>')
+    })
+  })
+
   describe('given a ConflictBlock whose content contains a scalar', () => {
     it('when serialized then the scalar lands in its respective side', async () => {
       const block = {

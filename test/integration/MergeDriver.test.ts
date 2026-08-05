@@ -132,7 +132,7 @@ describe('MergeDriver (integration — real filesystem, no mocks)', () => {
     expect(merged).toBe(`${PROFILE_BASE}\n`)
   })
 
-  it('Given malformed XML on the local side, When running mergeFiles, Then restores original ourContent and returns hasConflict=true', async () => {
+  it('Given malformed XML on the local side, When running mergeFiles, Then rejects and leaves local untouched on disk', async () => {
     // Arrange — ancestor/other are valid, local is malformed (missing closing tag)
     const ancestor = writeFixture('base.xml', PROFILE_BASE)
     const badXml = '<?xml version="1.0"?><Profile><broken>'
@@ -140,11 +140,10 @@ describe('MergeDriver (integration — real filesystem, no mocks)', () => {
     const other = writeFixture('other.xml', PROFILE_OTHER)
     const sut = new MergeDriver(defaultConfig)
 
-    // Act
-    const hasConflict = await sut.mergeFiles(ancestor, local, other)
-
-    // Assert — merge failure is surfaced as a conflict, and local is restored
-    expect(hasConflict).toBe(true)
+    // Act & Assert — the parse failure propagates so bin/driver.ts can
+    // report it on stderr and exit 1; `local` is only ever overwritten by
+    // the rename() on the success path, so it stays exactly as written.
+    await expect(sut.mergeFiles(ancestor, local, other)).rejects.toThrow()
     const restored = readFileSync(local, 'utf8')
     expect(restored).toBe(badXml)
   })
@@ -204,9 +203,9 @@ describe('MergeDriver (integration — real filesystem, no mocks)', () => {
 
   it('Given a missing ancestor file, When running mergeFiles, Then rejects with ENOENT (bin classifies as usage error, exit 2)', async () => {
     // Input-not-found is a caller contract violation (git passed us a
-    // bad path). The driver rethrows ENOENT so the bin can exit 2;
-    // other failures are swallowed and return hasConflict=true. `local`
-    // is never touched on disk — the write path is never reached.
+    // bad path). The driver rethrows ENOENT so the bin can exit 2; every
+    // other failure is rethrown too (exit 1). `local` is never touched on
+    // disk — the write path is never reached.
     const ancestor = join(workDir, 'does-not-exist.xml')
     const localBytes = PROFILE_LOCAL
     const local = writeFixture('local.xml', localBytes)

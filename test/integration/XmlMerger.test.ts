@@ -184,6 +184,33 @@ describe('XmlMerger integration', () => {
     })
   })
 
+  describe('text-array attribute carrying child elements', () => {
+    // `members` is listed in MetadataService.isTextArrayAttribute so that
+    // cardinality-1 manifests get the same set semantics as cardinality-2+
+    // ones. That override must stay scoped to scalar values: an element of
+    // the same name carrying children has to keep merging property by
+    // property, exactly as it did before the attribute was listed.
+    const wrap = (members: string) => `<?xml version="1.0" encoding="UTF-8"?>
+<Root xmlns="http://soap.sforce.com/2006/04/metadata">
+    <types>
+        <members>${members}</members>
+        <name>CustomObject</name>
+    </types>
+</Root>`
+
+    it('given ours edits a child of members and theirs leaves it untouched when merging then the edit replaces the ancestor value', async () => {
+      const ancestor = wrap('<sub>a</sub>')
+      const local = wrap('<sub>b</sub>')
+      const other = ancestor
+
+      const result = await mergeXmlStrings(sut, ancestor, local, other)
+
+      expect(result.hasConflict).toBe(false)
+      expect(result.output).toContain('<sub>b</sub>')
+      expect(result.output).not.toContain('<sub>a</sub>')
+    })
+  })
+
   describe('empty root preservation (residual #3)', () => {
     const NS = 'http://soap.sforce.com/2006/04/metadata'
 
