@@ -533,5 +533,40 @@ describe('XmlMerger integration', () => {
         expect(result.output).not.toContain('<valueSet>')
       })
     })
+
+    describe('when the absent element carried a tag named after an inherited property', () => {
+      const withInherited = `<?xml version="1.0" encoding="UTF-8"?>
+<Root xmlns="${NS}"><keep>k</keep><bogusThing><constructor>A</constructor></bogusThing></Root>`
+
+      it('given ours dropped it and theirs left it untouched then the deletion propagates instead of resurrecting a prototype member', async () => {
+        // Act
+        const result = await mergeXmlStrings(
+          sut,
+          withInherited,
+          withoutThing,
+          withInherited
+        )
+
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(result.output).not.toContain('bogusThing')
+        expect(result.output).not.toContain('native code')
+      })
+
+      it('given theirs dropped it and ours left it untouched then the deletion propagates', async () => {
+        // Act
+        const result = await mergeXmlStrings(
+          sut,
+          withInherited,
+          withInherited,
+          withoutThing
+        )
+
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(result.output).not.toContain('bogusThing')
+        expect(result.output).not.toContain('native code')
+      })
+    })
   })
 })

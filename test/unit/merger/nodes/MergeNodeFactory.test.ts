@@ -258,9 +258,11 @@ describe('MergeNodeFactory', () => {
             expect(result).toEqual({ output: [], hasConflict: false })
           })
 
-          it('should let a scalar side contribute no keys at all', () => {
-            // Arrange
-            const ancestor = 'text'
+          it('should leave a scalar side to the character-indexed path it already took', () => {
+            // Arrange — a text-bodied element against a child-bearing one is a
+            // separate, pre-existing shape; normalising an absent side must not
+            // quietly change how it merges.
+            const ancestor = 'ab'
             const local = { a: 1 }
             const other = undefined as never
 
@@ -269,11 +271,87 @@ describe('MergeNodeFactory', () => {
               .createNode(ancestor, local, other, 'attr')
               .merge(defaultConfig)
 
+            // Assert — the scalar's characters still take part as keys
+            expect(result.hasConflict).toBe(false)
+            expect(JSON.stringify(result.output)).toContain('"a"')
+          })
+
+          it('should not resurrect a deleted element through an inherited key name', () => {
+            // Arrange — `constructor` is a legitimate XML tag name, and both
+            // live sides dropped the element carrying it.
+            const ancestor = { constructor: 'A' }
+            const local = undefined as never
+            const other = undefined as never
+
+            // Act
+            const result = sut
+              .createNode(ancestor, local, other, 'attr')
+              .merge(defaultConfig)
+
+            // Assert — the deletion propagates, no prototype member leaks in
+            expect(result).toEqual({ output: [], hasConflict: false })
+          })
+
+          it('should not read an inherited key name off the side that dropped it', () => {
+            // Arrange
+            const ancestor = { toString: 'A' }
+            const local = { toString: 'A' }
+            const other = undefined as never
+
+            // Act
+            const result = sut
+              .createNode(ancestor, local, other, 'attr')
+              .merge(defaultConfig)
+
+            // Assert — other dropped it, so the deletion wins cleanly
+            expect(result).toEqual({ output: [], hasConflict: false })
+          })
+        })
+
+        describe('when the factory routes an absent side away from the property node', () => {
+          it('should merge a keyed-array route without throwing', () => {
+            // Arrange
+            const ancestor = { fullName: 'A' }
+            const local = undefined as never
+            const other = { fullName: 'A' }
+
+            // Act
+            const result = sut
+              .createNode(ancestor, local, other, 'customValue')
+              .merge(defaultConfig)
+
             // Assert
-            expect(result).toEqual({
-              output: [{ attr: [{ a: 1 }] }],
-              hasConflict: false,
-            })
+            expect(result).toEqual({ output: [], hasConflict: false })
+          })
+
+          it('should merge a text-array route without throwing', () => {
+            // Arrange
+            const ancestor = ['a', 'b']
+            const local = undefined as never
+            const other = ['a', 'b']
+
+            // Act
+            const result = sut
+              .createNode(ancestor, local, other, 'members')
+              .merge(defaultConfig)
+
+            // Assert
+            expect(result).toEqual({ output: [], hasConflict: false })
+          })
+
+          it('should merge an all-absent text route without throwing', () => {
+            // Arrange
+            const ancestor = undefined as never
+            const local = undefined as never
+            const other = undefined as never
+
+            // Act
+            const result = sut
+              .createNode(ancestor, local, other, 'label')
+              .merge(defaultConfig)
+
+            // Assert
+            expect(result).toEqual({ output: [], hasConflict: false })
           })
         })
       })
