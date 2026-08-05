@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785765088881,
+  "lastUpdate": 1785935144214,
   "repoUrl": "https://github.com/scolladon/sf-git-merge-driver",
   "entries": {
     "Binary Size Benchmark": [
@@ -289,6 +289,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "bin/merge-driver.cjs",
             "value": 37717,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "kevin.gossent@gmail.com",
+            "name": "yohanim",
+            "username": "yohanim"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "062e2d602ba984ca98834d8420e8d70808faa8f5",
+          "message": "fix: correct five merge-engine edge cases found in a functional audit (#207)\n\nCo-authored-by: Sébastien Colladon <colladonsebastien@gmail.com>",
+          "timestamp": "2026-08-05T15:03:15+02:00",
+          "tree_id": "336386813dcab68f197664588f4f3088a4aa04af",
+          "url": "https://github.com/scolladon/sf-git-merge-driver/commit/062e2d602ba984ca98834d8420e8d70808faa8f5"
+        },
+        "date": 1785935144135,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "bin/merge-driver.cjs",
+            "value": 38352,
             "unit": "bytes"
           }
         ]
