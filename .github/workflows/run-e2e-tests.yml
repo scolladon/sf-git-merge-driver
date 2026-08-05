@@ -45,9 +45,9 @@ jobs:
         env:
           CHANNEL: ${{ inputs.channel }}
         run: |
-          # A caller whose channel expression resolves to an empty string would
-          # otherwise leave every cell installing something other than the build
-          # under test, and passing.
+          # `required: true` enforces that a caller passes the input, not that
+          # the expression it passes resolves to anything. Name the problem here
+          # rather than leave nine cells failing on `sf plugins install ""`.
           [ -n "$CHANNEL" ] || { echo "::error::empty channel"; exit 1; }
           echo y | sf plugins install "$CHANNEL"
 

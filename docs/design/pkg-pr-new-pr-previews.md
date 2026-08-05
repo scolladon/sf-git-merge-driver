@@ -341,6 +341,37 @@ choices rather than around them.
 | D5 | How to obtain the `pkg-pr-new` CLI | Floating `npx pkg-pr-new`, matching `scolladon/tsgit`. **This deviates from the recommendation this document originally carried** (a Dependabot-maintained `devDependency`); cross-repository consistency and keeping `lint:dependencies` free of a knip exception were judged to outweigh pinning. The cost is a live failure mode, recorded in the failure-semantics table above. | `docs/adr/005-pkg-pr-new-cli-version.md` |
 | D6 | Where the craft artifacts live | This document and ADRs 001-006 are committed on the branch for handoff and stripped from the branch tip before the PR opens (R12); the PR body carries the rationale. Raised by the repository's `docs/`-is-local-only convention, not by this design's decision candidates. | `docs/adr/006-craft-artifacts-stay-local.md` |
 
+## Amendments after review
+
+Four things landed differently from the shape sketched above. Recorded here so the
+document does not outlive its own accuracy.
+
+1. **The install comment is its own `comment` job**, not a step of `preview`. Review found
+   that `pull-requests: write` was sharing a runner with `npm ci`, the build scripts and an
+   unpinned third-party CLI, and that a transient failure of the comment action would fail
+   `preview` and skip all nine e2e cells. `preview` is now `contents: read` only; `comment`
+   needs it, checks out nothing, and keeps the same-repository gate. D1 still holds — the
+   repository posts its own correctly-worded comment — only its placement changed.
+2. **R6 was deliberately broken.** `run-e2e-tests.yml` now declares `channel` as
+   `required: true` with no `latest-rc` default, and asserts it is non-empty. The
+   producer-side assert alone could not close the trap it was written for: if the default
+   really is substituted for an explicitly-passed empty string, no producer-side check can
+   prevent it and the matrix passes while testing the last release. Removing the default —
+   which had no other consumer, this workflow having exactly one caller — closes the hole
+   under either reading of the semantics, and turns the one unprobed claim in this document
+   into a moot one rather than a load-bearing one.
+3. **`npm shrinkwrap` runs before `npm pack`.** `prepublishOnly` is where this repository
+   generates `npm-shrinkwrap.json`, and `npm pack` never triggers it — so the preview
+   tarball was missing a file the published one ships, and the e2e matrix resolved a
+   dependency tree no user installs. R10 is now true rather than aspirational.
+4. **The fork-approval control is weaker than first stated.** The accepted fork-publishing
+   risk rests on the repository's fork pull-request approval policy. GitHub's default for
+   public repositories gates first-time contributors only, and this repository already has
+   several non-owner contributors on `main`, so under the default a returning contributor
+   publishes unattended. Setting that policy to require approval for all outside
+   collaborators is a **prerequisite**, not an assumption; the workflow comment states the
+   real semantics rather than the hoped-for one.
+
 ## Test strategy
 
 There is no unit-test surface here — this is CI YAML, and honesty about that is more

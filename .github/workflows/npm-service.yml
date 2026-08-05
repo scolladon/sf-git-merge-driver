@@ -99,8 +99,10 @@ jobs:
       # That App holds repository-wide read on contents, checks and metadata,
       # and write on pull requests and commit statuses, granted once at
       # installation. A fork's build is published under this repository's
-      # package name, so the control on it is GitHub requiring approval before
-      # a fork pull request's workflows run at all.
+      # package name, and the only control on that is the repository's fork
+      # pull-request approval policy — which, unless set to require approval for
+      # all outside collaborators, gates first-time contributors only, so a
+      # returning contributor publishes unattended.
       - name: Publish preview
         id: preview
         env:
@@ -113,15 +115,16 @@ jobs:
         run: |
           # This URL is installed unattended on nine e2e runners and handed to
           # whoever reads the pull request, and it is printed by a third-party
-          # CLI. Accept only a single commit-pinned pkg.pr.new URL: never empty
-          # (e2e would silently stop testing this build), never several, never
-          # the mutable per-pull-request alias, never anything else the CLI
-          # might print.
+          # CLI. Accept only a single commit-pinned pkg.pr.new URL: never empty,
+          # never several, never the mutable per-pull-request alias, never
+          # anything else the CLI might print. Failing here names the problem;
+          # the alternative is nine opaque install failures, or worse, an
+          # install of something that is not this build.
           if [ "$(printf '%s' "$URLS" | wc -w)" -ne 1 ]; then
             echo "::error::expected exactly one preview URL, got '$URLS'"
             exit 1
           fi
-          if ! printf '%s' "$URLS" | grep -Eq '^https://pkg\.pr\.new/\S+@[0-9a-f]{7}'; then
+          if ! printf '%s' "$URLS" | grep -Eq '^https://pkg\.pr\.new/[A-Za-z0-9._@/-]+@[0-9a-f]{7,40}$'; then
             echo "::error::unexpected preview URL: '$URLS'"
             exit 1
           fi
@@ -131,8 +134,9 @@ jobs:
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     # Separate from `preview` so the only job holding a write scope checks out
-    # nothing and runs neither the build nor any third-party CLI, and so a
-    # failure to comment cannot skip the e2e matrix.
+    # nothing, installs no dependency tree and runs no repository code — the
+    # only third-party code beside the token is the commenting action itself.
+    # It also means a failure to comment cannot skip the e2e matrix.
     permissions:
       pull-requests: write
     steps:
