@@ -81,9 +81,11 @@ export class MergeDriver {
       return hasConflict
     } catch (error) {
       // ENOENT on any input file is a caller contract violation (git
-      // passed us a bad path); the bin classifies it as a usage error
-      // and exits 2. All other failures are treated as "merge failed,
-      // leave ours alone" → return true so git keeps the file in place.
+      // passed us a bad path); rethrown as-is so bin/driver.ts can
+      // classify it as a usage error and exit 2. Every other failure is
+      // logged and rethrown too — bin/driver.ts reports it and exits 1 —
+      // but since `oursPath` is only touched by the rename() above on the
+      // success path, `ours` is left untouched on disk either way.
       if (
         error !== null &&
         typeof error === 'object' &&
@@ -92,16 +94,7 @@ export class MergeDriver {
         throw error
       }
       Logger.error('Merge failed; leaving ours unchanged', error)
-      // The exit code alone can't distinguish this from a real conflict
-      // (both return hasConflict=true → exit 1), and Logger only reaches
-      // stderr when SF_LOG_STDERR is set — so without this, a git merge
-      // hitting this path leaves `ours` untouched with zero markers and
-      // zero visible indication anything failed. Surface it unconditionally.
-      const message = error instanceof Error ? error.message : String(error)
-      process.stderr.write(
-        `sf-git-merge-driver: merge failed for ${oursPath}; left unchanged: ${message}\n`
-      )
-      return true
+      throw error
     } finally {
       for (const r of readers) r.destroy()
       // Destroy tmpWS too — on Windows an open write handle blocks
