@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785935144214,
+  "lastUpdate": 1785937576313,
   "repoUrl": "https://github.com/scolladon/sf-git-merge-driver",
   "entries": {
     "Binary Size Benchmark": [
@@ -313,6 +313,35 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/scolladon/sf-git-merge-driver/commit/062e2d602ba984ca98834d8420e8d70808faa8f5"
         },
         "date": 1785935144135,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "bin/merge-driver.cjs",
+            "value": 38352,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "colladonsebastien@gmail.com",
+            "name": "Sebastien",
+            "username": "scolladon"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "149ce1453f80b538a45b183a4918f7ed84b6b53a",
+          "message": "fix(test): stop NUTs inheriting the ambient git context (#208)",
+          "timestamp": "2026-08-05T15:44:15+02:00",
+          "tree_id": "321e1b5a0a9e7831764b48d9945370497a4a9f8d",
+          "url": "https://github.com/scolladon/sf-git-merge-driver/commit/149ce1453f80b538a45b183a4918f7ed84b6b53a"
+        },
+        "date": 1785937576236,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
