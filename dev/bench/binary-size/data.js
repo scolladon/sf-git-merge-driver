@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785937576313,
+  "lastUpdate": 1785941607293,
   "repoUrl": "https://github.com/scolladon/sf-git-merge-driver",
   "entries": {
     "Binary Size Benchmark": [
@@ -342,6 +342,35 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/scolladon/sf-git-merge-driver/commit/149ce1453f80b538a45b183a4918f7ed84b6b53a"
         },
         "date": 1785937576236,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "bin/merge-driver.cjs",
+            "value": 38352,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "colladonsebastien@gmail.com",
+            "name": "Sebastien",
+            "username": "scolladon"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "cb328c92b8e5c97d2d5ef9e9bf0554c8c1cbb9e7",
+          "message": "fix!: replace the shipped shrinkwrap with exact runtime dependency pins (#209)",
+          "timestamp": "2026-08-05T16:50:49+02:00",
+          "tree_id": "a0b0ed1c1013f5e539e696c41276b0008d8c109d",
+          "url": "https://github.com/scolladon/sf-git-merge-driver/commit/cb328c92b8e5c97d2d5ef9e9bf0554c8c1cbb9e7"
+        },
+        "date": 1785941607226,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
