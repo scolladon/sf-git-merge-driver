@@ -6,12 +6,12 @@ on:
     types: [published]
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened, closed]
+    types: [opened, synchronize, reopened]
     paths-ignore:
       - "**.md"
 
 # Least-privilege default; jobs that need more escalate explicitly
-# (publish → id-token, dev-release/cleanup → contents/pull-requests).
+# (publish → id-token, preview → pull-requests).
 permissions:
   contents: read
 
@@ -51,33 +51,35 @@ jobs:
           npm publish --provenance --access public --tag "latest-rc"
           echo "channel=sf-git-merge-driver@$RELEASE_TAG" >> "$GITHUB_OUTPUT"
 
-  dev-release:
+  preview:
     if: >-
       github.event_name == 'pull_request' &&
-      github.event.action != 'closed' &&
       github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     outputs:
-      channel: ${{ steps.release.outputs.channel }}
+      channel: ${{ steps.preview.outputs.urls }}
+    # `pull-requests: write` is for the install comment this job posts itself;
+    # publishing the preview needs no write scope at all, which is what lets
+    # pull requests from forks publish.
     permissions:
-      contents: write
+      contents: read
       pull-requests: write
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      # No `cache:` input is set, so setup-node restores no cache here; this
-      # PR-triggered dev build publishes only a draft prerelease asset.
-      # zizmor's heuristic flags setup-node in any publishing workflow.
-      - uses: actions/setup-node@v7 # zizmor: ignore[cache-poisoning]
+      # `./.github/actions/install` already restores the npm cache via
+      # actions/cache@v6, so setup-node's own package-manager cache is
+      # redundant here; disabling it also keeps this publishing workflow clear
+      # of the cache-poisoning audit without a suppression.
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
+          package-manager-cache: false
       - uses: ./.github/actions/install
 
       - name: Build and pack
         id: pack
-        env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           npm run build
           npm pack
@@ -85,65 +87,41 @@ jobs:
           # `npm pack` stdout: newer npm prints the filename to stderr, so
           # `npm pack 2>/dev/null | tail -1` silently yields an empty string.
           TARBALL=$(node -p "const p=require('./package.json'); p.name.replace('@','').replace('/','-')+'-'+p.version+'.tgz'")
-          FIXED_NAME="sf-git-merge-driver-dev-pr-${PR_NUMBER}.tgz"
-          mv "$TARBALL" "$FIXED_NAME"
-          echo "tarball=$FIXED_NAME" >> "$GITHUB_OUTPUT"
+          echo "tarball=$TARBALL" >> "$GITHUB_OUTPUT"
 
-      - name: Upsert prerelease
-        id: release
+      - name: Publish preview
+        id: preview
         env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
           TARBALL: ${{ steps.pack.outputs.tarball }}
-        run: |
-          DEV_TAG="dev-pr-${PR_NUMBER}"
+        run: npx pkg-pr-new publish "./$TARBALL" --comment=off
 
-          # Try uploading to existing release, create if it doesn't exist
-          if gh release view "$DEV_TAG" > /dev/null 2>&1; then
-            gh release upload "$DEV_TAG" "$TARBALL" --clobber
-          else
-            gh release create "$DEV_TAG" "$TARBALL" \
-              --title "Dev build for PR #${PR_NUMBER}" \
-              --notes "Automated dev build — not a real release." \
-              --prerelease
+      - name: Assert a single preview URL
+        env:
+          URLS: ${{ steps.preview.outputs.urls }}
+        run: |
+          # run-e2e-tests.yml defaults `channel` to latest-rc, so an empty URL
+          # would turn the whole matrix green against the last release instead
+          # of this build. Fail here rather than pass a malformed channel on.
+          if [ "$(printf '%s' "$URLS" | wc -w)" -ne 1 ]; then
+            echo "::error::expected exactly one preview URL, got '$URLS'"
+            exit 1
           fi
 
-          ASSET_URL=$(gh release view "$DEV_TAG" --json assets --jq ".assets[] | select(.name == \"$TARBALL\") | .url")
-          echo "channel=$ASSET_URL" >> "$GITHUB_OUTPUT"
-
       - name: Comment PR
+        if: github.event.pull_request.head.repo.full_name == github.repository
         uses: thollander/actions-comment-pull-request@v3
         with:
           message: |
-            Published under `dev-pr-${{ github.event.pull_request.number }}` draft release.
+            Preview build published for this pull request.
             ```sh
-            sf plugins install ${{ steps.release.outputs.channel }}
+            sf plugins install ${{ steps.preview.outputs.urls }}
             ```
           comment-tag: dev-publish
           mode: recreate
 
-  cleanup:
-    if: >-
-      github.event.action == 'closed' &&
-      github.actor != 'dependabot[bot]'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Delete dev prerelease
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          DEV_TAG="dev-pr-${PR_NUMBER}"
-          gh release delete "$DEV_TAG" \
-            --repo "${{ github.repository }}" \
-            --yes \
-            --cleanup-tag 2>/dev/null || echo "No release to clean up"
-
   e2e-tests:
-    needs: [publish, dev-release]
-    if: "!cancelled() && (needs.publish.result == 'success' || needs.dev-release.result == 'success')"
+    needs: [publish, preview]
+    if: "!cancelled() && (needs.publish.result == 'success' || needs.preview.result == 'success')"
     uses: ./.github/workflows/run-e2e-tests.yml
     with:
-      channel: ${{ needs.publish.outputs.channel || needs.dev-release.outputs.channel }}
+      channel: ${{ needs.publish.outputs.channel || needs.preview.outputs.channel }}
