@@ -2,7 +2,7 @@
 
 > Brief: replace the per-PR draft GitHub prerelease dev-build flow with pkg.pr.new
 > preview publishing in `.github/workflows/npm-service.yml`.
-> Status: draft → self-reviewed ×3
+> Status: accepted — revised against ADRs 001-006
 
 ## Context
 
@@ -62,11 +62,16 @@ Established in `.github/`, verified in the worktree:
   active.
 - Workflow-level and job-level `permissions:` blocks carry an explanatory comment.
 
-There are no prior ADRs and no `docs/design/` tree; this is the first document in it.
+`docs/` is local-only in this repository: `.git/info/exclude` carries `/docs/*` with
+`!/docs/media/` and the comment *"docs/: only media/ is committed; everything else is
+local-only"*. This document and ADRs 001-006 are committed on the feature branch for
+handoff and removed from the branch tip before the pull request opens — see
+ADR 006 and R12.
 
 ## Requirements
 
-Each of these is checkable against the resulting workflow file or against a real PR run.
+Each of these is checkable against the resulting workflow file, against the branch as
+it will be pushed, or against a real PR run.
 
 | # | Requirement |
 |---|---|
@@ -81,6 +86,7 @@ Each of these is checkable against the resulting workflow file or against a real
 | R9 | A PR raised from a fork publishes a preview successfully and runs the full `e2e-tests` matrix — i.e. the flow requires no write-scoped `GITHUB_TOKEN`. |
 | R10 | The artifact published as a preview is the same tarball `npm publish` would ship for that commit — same `prepack`, same `files` set, no repack. |
 | R11 | `actionlint` and `zizmor@1.25.0` (under `.github/zizmor.yml`) report no findings on the resulting file, and the change introduces **no new suppression directive** of any kind — no `# zizmor: ignore`, no rule disabled, no lint-silencing comment. (Adding a proper noun to the cspell project dictionary is not in this class: it teaches the checker a word rather than switching the check off.) |
+| R12 | The branch tip that the pull request is opened from contains **no file under `docs/`**: this document and ADRs 001-006 are removed in a dedicated strip commit, and that same commit drops every `.github/linters/.cspell.json` word that no tracked file still needs. Checkable as `git diff --name-only main...HEAD -- docs/` being empty, plus a cspell run over the tracked tree (ADR 006). |
 
 ## Design
 
@@ -90,6 +96,11 @@ Everything below was established empirically in this session against the live
 service and against `pkg-pr-new@0.0.86` (current `latest`), not from memory. Line
 references are into the published CLI bundle
 (`node_modules/pkg-pr-new/dist/index.js`) and into `stackblitz-labs/pkg.pr.new@main`.
+
+`0.0.86` is what a floating `npx` resolves today, so the matrix describes the CLI the
+first run will use. ADR 005 does not freeze that: a later run gets whatever `latest`
+is then. The matrix is therefore a snapshot, not a contract — the drift it permits is
+the last row of the failure-semantics table.
 
 | # | Question | Probe | Result |
 |---|---|---|---|
@@ -110,8 +121,9 @@ references are into the published CLI bundle
 
 ### Failure semantics
 
-Every CLI failure path is a `process.exit(1)` — the step goes red, the job goes red,
-and `e2e-tests` is skipped because neither `publish` nor `preview` reports `success`.
+Every failure path in the CLI as probed (`0.0.86`) is a `process.exit(1)` — the step
+goes red, the job goes red, and `e2e-tests` is skipped because neither `publish` nor
+`preview` reports `success`.
 
 | Condition | Observable | Acceptable? |
 |---|---|---|
@@ -120,6 +132,7 @@ and `e2e-tests` is skipped because neither `publish` nor `preview` reports `succ
 | Service returns non-2xx on publish | `Publishing failed (<status>): <body>` (L32822-32826) | Yes, same as above. |
 | Workflow record not yet registered (webhook race) | `Check failed (404): There is no workflow defined for <key>` | Yes — a re-run resolves it. |
 | Run outside GitHub Actions | `Continuous Releases are only available in GitHub Actions.` | Yes; makes the job non-reproducible locally by construction, which is inherent to the tool. |
+| **Upstream `pkg-pr-new` breaking change** — the CLI is resolved from `latest` at run time (ADR 005), so a new release can change flags, output keys or exit behaviour with no action on this side | Whatever the new version does: an unknown-flag exit, a missing `urls` output caught by the R5 assert, or a changed URL shape. Preview goes red on the next PR — no advance warning, and it lands on an unrelated PR | Yes, accepted deliberately. Same blast radius as every other row: `e2e-tests` is skipped, no other job is affected, and nothing that is already published changes. The remedy is one line — pin to `npx --yes pkg-pr-new@<version>` (ADR 005, option 2). |
 
 The net availability change is a swap of one third-party dependency for another:
 today a preview depends on the GitHub Releases API accepting a write; tomorrow it
@@ -158,7 +171,7 @@ jobs:
       channel: ${{ steps.preview.outputs.urls }}
     permissions:
       contents: read
-      pull-requests: write   # only if the workflow posts its own comment
+      pull-requests: write   # the workflow posts its own install comment (ADR 001)
     steps:
       - uses: actions/checkout@v7
         with:
@@ -168,9 +181,11 @@ jobs:
           node-version: 22
           package-manager-cache: false
       - uses: ./.github/actions/install
-      - name: Build and pack        # derives the tarball name from package.json
-      - name: Publish preview       # id: preview — pkg-pr-new publish "./$TARBALL"
-      - name: Comment PR            # gated on same-repo, if we post our own
+      - name: Build and pack        # npm run build, npm pack; tarball name from package.json
+      - name: Publish preview       # id: preview
+        # npx pkg-pr-new publish "./$TARBALL" --comment=off   (ADRs 003, 005)
+        # then assert exactly one URL in steps.preview.outputs.urls (R5)
+      - name: Comment PR            # sf plugins install <url>, gated on same-repo (ADR 001)
   e2e-tests:
     needs: [publish, preview]
     if: "!cancelled() && (needs.publish.result == 'success' || needs.preview.result == 'success')"
@@ -205,28 +220,37 @@ Notes on the non-obvious parts:
 - **Which URL to hand to e2e.** The sha-pinned URL from `urls`, not the rolling
   `@<pr-number>` alias: e2e must install exactly the build that this run produced,
   and the alias is mutable under concurrent runs.
+- **The publish invocation is `npx pkg-pr-new publish "./$TARBALL" --comment=off`.**
+  Three settled choices meet in that one line: a prebuilt tarball rather than the
+  source directory (ADR 003), the CLI resolved from a floating `npx` rather than a
+  pinned version or a `devDependency` (ADR 005), and the App comment suppressed in
+  favour of the repository's own (ADR 001). No secret is passed — the CLI reads none
+  (P1) — and no `pkg-pr-new` entry is added to `package.json`.
 - **`npm run build` before `npm pack`** stays. It is technically redundant — `npm
   pack` triggers `prepack`, which wireit resolves to `build` + `build:bin` — but it
   keeps compile/lint failures reported as their own step, and the second invocation
-  is a wireit cache hit.
+  is a wireit cache hit (ADR 003).
 - **Concurrency** is unchanged (`${{ github.ref }}-${{ github.workflow }}`,
   `cancel-in-progress: true`). Superseded preview runs are safe: the server's
   `isStaleCursor` check is keyed on run id (P12).
 - **Job-level `permissions:` replaces the workflow default, it does not merge with
-  it.** So `contents: read` must be listed explicitly on `preview` alongside anything
-  else it needs. If D1 lands on the App-comment option, the job needs nothing beyond
-  `contents: read` and the block can be dropped entirely in favour of the inherited
-  default.
+  it.** So `contents: read` must be listed explicitly on `preview` alongside
+  `pull-requests: write`. Both are required: ADR 001 keeps the repository's own
+  install comment, which needs the write scope. The block therefore stays, and
+  `contents: write` — the privilege this change exists to remove — is gone from every
+  `pull_request`-triggered job (R1).
 - **`paths-ignore: "**.md"` is retained**, which means a markdown-only PR triggers no
-  preview and no e2e — unchanged from today, but a trap worth naming, because this
-  very change is partly documentation. It only self-tests because the same PR also
-  edits `.github/workflows/npm-service.yml`.
+  preview and no e2e — unchanged from today, but a trap worth naming. It does not bite
+  this change: after the strip commit (ADR 006) the PR carries the workflow file and no
+  markdown at all, so the workflow triggers on itself. The trap is left for the next
+  markdown-only PR to walk into.
 - **Preview tarballs carry the released version number.** `package.json` says
   `1.9.1` and the tarball is taken as-is, so a reviewer who installs a preview sees
   `1.9.1` in `sf plugins` — indistinguishable from the published release by version
   string alone. This is true of the current `dev-pr-<N>` flow too, so it is not a
-  regression, but see D3: it is the one thing the source-directory alternative could
-  fix.
+  regression, and ADR 003 accepts it as the price of publishing the byte-identical
+  artifact: `--previewVersion`, the only thing that would rewrite it, is rejected in
+  tarball mode (P7).
 
 ### Channel flow
 
@@ -253,9 +277,12 @@ repository, so the App installation on `scolladon/sf-git-merge-driver` is the on
 that authenticates — no installation on the fork is required.
 
 The one thing a fork PR still cannot do is have the *workflow* post a comment, since
-its token is read-only. Whether that matters depends on the comment decision below;
-either way the preview URL remains visible on the PR via the `Continuous Releases`
-check run (P11) and in the job log.
+its token is read-only. ADR 001 accepts that: fork contributors read their preview URL
+off the `Continuous Releases` check run, which pkg.pr.new creates unconditionally
+(P11), and off the job log. The `Comment PR` step is therefore gated on
+`head.repo.full_name == github.repository` and simply does not run on forks — it must
+be skipped rather than allowed to fail, or a fork PR goes red on the comment step
+after having published a perfectly good preview.
 
 There is a cost to name plainly, because it is the flip side of the benefit: making
 fork PRs work means fork-authored code now gets built, packed, published to a public
@@ -277,22 +304,42 @@ configuration rather than anything expressible in the workflow file.
   sf-git-merge-driver@<beta-channel>`, which is about published beta channels and is
   unaffected. No edit is required; a short "how to try a PR build" note would be a
   documentation-phase addition, not a correction.
-- `.github/linters/.cspell.json` — already amended alongside this document with the
-  two proper nouns it needs (`stackblitz`, `tsgit`), following the existing precedent
-  in that list for vendor and author names. Implementation may need one or two more
-  if the new workflow comments introduce unknown tokens.
-- Repository state (releases `dev-pr-205`, `dev-pr-207` and their tags) — see the
-  decision candidates; nothing in the change touches them automatically.
+- `.github/linters/.cspell.json` — currently carries `stackblitz` and `tsgit`, added
+  in the first pass **solely** for words in this document and in ADRs 002 and 005.
+  Checked: neither word appears in any other tracked file, and the target workflow
+  needs neither — the publish step invokes `npx pkg-pr-new`, and nothing in the job
+  requires naming the upstream org `stackblitz-labs` or the reference repository
+  `scolladon/tsgit`. **Both entries are therefore dropped in the same strip commit
+  that removes this document** (ADR 006, R12). The two edits cancel — the file was
+  first touched in the same commit as this document — so the *net* diff against `main`
+  for `.github/linters/.cspell.json` is empty and the PR ends up carrying
+  `.github/workflows/npm-service.yml` alone. Keep it that way: do not put either proper
+  noun in a workflow comment, or the entry has to survive and R12's cspell check has to
+  be re-reasoned. `package.json` is *not* a surface — ADR 005 adds no dependency.
+- `docs/design/pkg-pr-new-pr-previews.md` and `docs/adr/001`-`006` — committed on the
+  branch for handoff, then removed from the branch tip in a dedicated strip commit
+  before the pull request opens, with copies kept in the main checkout's untracked
+  `docs/` (ADR 006). Consequence for whoever opens the PR: the rationale a reviewer
+  needs — the privilege reduction, the fork-PR gain, the floating-`npx` trade-off, and
+  the `dev-pr-*` follow-up — goes in the **PR body**, because there will be no
+  committed document to point at.
+- Repository state (releases `dev-pr-205`, `dev-pr-207` and their tags) — deleted by
+  hand at merge time per ADR 004; nothing in the change touches them automatically.
 
-## Decision candidates
+## Settled decisions
 
-| # | Choice | Alternatives (≤3) | Recommendation | Why |
-|---|---|---|---|---|
-| D1 | PR comment strategy | **(a)** App comment only (`--comment=update`); **(b)** `--comment=off` + workflow-authored comment reusing `thollander/actions-comment-pull-request@v3` with `comment-tag: dev-publish`, gated on `head.repo.full_name == github.repository`; **(c)** both — App comment everywhere plus a same-repo-only corrected comment | **(b)** | The comment's only job is to tell a reviewer how to try the build. The App's text is `npm i <url>` (P10), which is simply the wrong command for an `sf` plugin and cannot be customized — a confidently wrong instruction is worse than none. (b) preserves today's exact UX and reuses an action already in the file. Its cost — fork PRs get no *comment* — is much smaller than it first appears, because the `Continuous Releases` check run carries the URL regardless (P11), and fork PRs newly gain the thing that actually matters: a working preview and a green e2e matrix. (c) puts two comments on every internal PR, which is the common case. The counter-argument for (a) is real and worth weighing: it needs zero extra permissions, dropping `pull-requests: write` from the job as well as `contents: write`. |
-| D2 | Publish previews on pushes to `main` too | **(a)** PR only, as today; **(b)** add `push: [main]`, as `scolladon/tsgit` does, and let `e2e-tests` run on it as a third path; **(c)** add `push: [main]` for the preview only, leaving `e2e-tests` gated to the PR and release paths | **(a)** | A trunk preview is useful for installing `main` between releases, but `main` here is release-please-managed and a real `latest-rc` publish follows quickly, so the window it covers is thin. (b) is the costly one: `e2e-tests`'s `if:` and `channel:` expressions are currently keyed to exactly two mutually-exclusive event paths, and a third path means reworking both — nine more matrix cells per merge for no named consumer. (c) avoids that cost but produces preview URLs nothing verifies, which is a worse property than not having them. Keep (a); (c) becomes attractive the moment someone actually asks to install trunk. |
-| D3 | What to publish | **(a)** prebuilt tarball: `npm pack` then `pkg-pr-new publish "./$TARBALL"`; **(b)** source directory: bare `pkg-pr-new publish`, letting the CLI run `npm pack --json` itself; **(c)** source directory plus `--previewVersion` | **(a)** | Both (a) and (b) run `prepack` (hence `build`, `build:bin`, `oclif manifest`, `oclif readme`), so the contents are equivalent. (a) is preferred because the artifact is byte-identical to what `npm publish` would ship (R10) and the pack step stays visible and independently debuggable in the job log rather than happening inside a third-party CLI. The honest cost: (a) forfeits `--previewVersion`, which is rejected in tarball mode (P7), so every preview reports version `1.9.1` — that is the argument for (c), and it is a real one if version confusion is judged a live risk. It is not a *new* risk, though: the current `dev-pr-<N>` tarballs already carry the released version. Workspace-dependency rewriting, the other thing (a) forfeits, is a monorepo feature this single-package repo cannot use. |
-| D4 | Existing `dev-pr-205` / `dev-pr-207` releases and tags | **(a)** delete both releases and their tags by hand at merge time, not on this branch; **(b)** leave them and let a maintainer reap them whenever; **(c)** keep `cleanup` alive as a `pull_request: closed`-only job purely to drain the backlog, delete it in a follow-up | **(a)** | Both PRs are still open, so both releases are currently *in use* — deleting today breaks a live install link, which is why (a) is scheduled for merge time rather than now. After this ships they stop being refreshed, go stale on the next push to those PRs, and nothing will ever reap them; a note left on both PRs pointing at the new preview URL closes the loop. (c) directly contradicts R1/R2 by keeping a `contents: write` job on a PR trigger, which is the whole point of the change. (b) is acceptable but leaves two misleading prerelease entries on the releases page indefinitely. |
-| D5 | How to pin `pkg-pr-new` | **(a)** `npx --yes pkg-pr-new@0.0.86` — exact version, bumped by hand; **(b)** `npx pkg-pr-new` floating on `latest`, as `scolladon/tsgit` does; **(c)** add `pkg-pr-new` as a `devDependency` so Dependabot and the lockfile own the version | **(c)** | This repository pins every action to a tag and lets Dependabot move it (`.github/zizmor.yml` `ref-pin` policy exists specifically to encode that stance). An unpinned `npx` on every PR run is the one place that stance would be abandoned, and it fetches a third-party CLI that reads repository metadata. (c) is the closest fit to the house rule: exact version in `package-lock.json`, integrity-checked, Dependabot-maintained, and `npm ci` already runs in the job. Its cost is one more devDependency in a repo that runs `npm run lint:dependencies` — knip must be told the binary is used from CI, or the check will report it unused, which is the specific thing to verify before committing to (c). (a) is the zero-friction fallback with the same pinning property but manual bumps. |
+Every load-bearing choice is decided; each has an ADR carrying its options and
+rationale. Nothing in this table is open, and the body above is written to these
+choices rather than around them.
+
+| # | Question | Decision | ADR |
+|---|---|---|---|
+| D1 | PR comment strategy | Publish with `--comment=off`; the workflow posts its own comment carrying `sf plugins install <url>` via `thollander/actions-comment-pull-request@v3` (`comment-tag: dev-publish`), gated on `head.repo.full_name == github.repository`. The `preview` job therefore keeps `pull-requests: write`. Fork PRs get no comment; their URL lives on the `Continuous Releases` check run. | `docs/adr/001-pr-preview-comment-strategy.md` |
+| D2 | Trigger scope | `pull_request` only. No `push: [main]`, so `e2e-tests` keeps its two-path `if:` and `channel:` expressions and the only edit there is the renamed job in `needs`. | `docs/adr/002-preview-trigger-scope.md` |
+| D3 | What to publish | The prebuilt tarball: `npm run build`, `npm pack`, then `npx pkg-pr-new publish "./$TARBALL"`. Byte-identical to what `npm publish` would ship (R10); `--previewVersion` is forfeited, so previews carry the released version string. | `docs/adr/003-publish-prebuilt-tarball.md` |
+| D4 | Legacy `dev-pr-*` releases | `dev-pr-205` and `dev-pr-207` and their tags are deleted by hand at merge time — not on this branch, because both PRs are still open and their assets are live. Tracked in the PR body. | `docs/adr/004-legacy-dev-pr-release-cleanup.md` |
+| D5 | How to obtain the `pkg-pr-new` CLI | Floating `npx pkg-pr-new`, matching `scolladon/tsgit`. **This deviates from the recommendation this document originally carried** (a Dependabot-maintained `devDependency`); cross-repository consistency and keeping `lint:dependencies` free of a knip exception were judged to outweigh pinning. The cost is a live failure mode, recorded in the failure-semantics table above. | `docs/adr/005-pkg-pr-new-cli-version.md` |
+| D6 | Where the craft artifacts live | This document and ADRs 001-006 are committed on the branch for handoff and stripped from the branch tip before the PR opens (R12); the PR body carries the rationale. Raised by the repository's `docs/`-is-local-only convention, not by this design's decision candidates. | `docs/adr/006-craft-artifacts-stay-local.md` |
 
 ## Test strategy
 
@@ -315,7 +362,11 @@ this design:
   job, and the new job adds none. That count is the mechanical expression of R11.
 - MegaLinter locally, or at least its YAML/cspell/lychee subset, since it runs with
   `VALIDATE_ALL_CODEBASE: true` and will lint this design document as well as the
-  workflow.
+  workflow. Run it **again after the strip commit** — that commit removes both the
+  documents and the `stackblitz` / `tsgit` dictionary entries, and cspell over the
+  remaining tracked tree is exactly the check that proves the two removals are
+  consistent (R12). A cspell failure there means the workflow file grew a proper noun
+  it should not have.
 
 **Semantic review of the diff.** A reviewer should specifically confirm:
 
@@ -332,6 +383,15 @@ this design:
    silently skipped e2e matrix, which is the most likely mistake in this change.
 7. `github.actor != 'dependabot[bot]'` survived the `if:` rewrite (R8).
 8. No new `# zizmor: ignore` or any other lint-silencing comment (R11).
+9. The `preview` job declares exactly `contents: read` + `pull-requests: write`, and
+   the `Comment PR` step is *skipped* on forks rather than failing on them (ADR 001).
+10. The publish step reads `npx pkg-pr-new publish "./$TARBALL" --comment=off` — a
+    tarball argument, not a directory (ADR 003); no version specifier and no
+    `pkg-pr-new` entry in `package.json` (ADR 005).
+11. At the tip the PR is opened from, `git diff --name-only main...HEAD` names
+    `.github/workflows/npm-service.yml` and nothing else: no `docs/` path, and no
+    `.github/linters/.cspell.json` because the added and removed words cancel
+    (R12, ADR 006).
 
 **The real proof is the first PR that runs it — this one.** No amount of static
 checking substitutes; check on the PR:
@@ -388,3 +448,12 @@ rather than as equivalent behaviour.
   is under 1 MB (P8).
 - **Adding a "try this PR build" section to `CONTRIBUTING.md`.** Documentation-phase
   work; the file currently says nothing that this change makes wrong.
+- **Pinning the `pkg-pr-new` CLI, and any knip configuration for it.** ADR 005 settled
+  on a floating `npx`, so no `devDependency` is added and `npm run lint:dependencies`
+  needs no exception — the knip concern that the earlier draft flagged is moot. Pinning
+  remains the documented one-line remedy if an upstream break ever bites, but it is not
+  delivered here.
+- **Committing this design document and its ADRs.** ADR 006: they exist on the branch
+  only until the strip commit. Whatever a reviewer needs goes in the PR body. Publishing
+  a `docs/adr/` tree in this repository would be a separate decision about the `docs/*`
+  exclude, which this change leaves untouched.
