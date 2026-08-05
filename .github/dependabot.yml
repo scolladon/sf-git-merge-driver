@@ -21,3 +21,14 @@ updates:
       prefix: "build"
     allow:
       - dependency-type: "all"
+    # Runtime dependencies ship to consumers and are pinned exactly, so they are
+    # kept in their own pull request rather than buried among the dev bumps.
+    groups:
+      production-dependencies:
+        dependency-type: "production"
+        patterns:
+          - "*"
+      development-dependencies:
+        dependency-type: "development"
+        patterns:
+          - "*"
