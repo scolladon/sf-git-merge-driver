@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786007298966,
+  "lastUpdate": 1786021866224,
   "repoUrl": "https://github.com/scolladon/sf-git-merge-driver",
   "entries": {
     "Binary Size Benchmark": [
@@ -458,6 +458,35 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/scolladon/sf-git-merge-driver/commit/a93d5ddb9fcc98001e4535b4825e894337dc5d5f"
         },
         "date": 1786007298892,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "bin/merge-driver.cjs",
+            "value": 38513,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "colladonsebastien@gmail.com",
+            "name": "Sebastien",
+            "username": "scolladon"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b6b3cfdd665762c52dafa669d9bdbc7138f85633",
+          "message": "chore(harmonization): align CI, tooling and dependency policy across repos (#214)",
+          "timestamp": "2026-08-06T15:08:45+02:00",
+          "tree_id": "4c4a7ab00752f111668a0c136dc5708deefea44d",
+          "url": "https://github.com/scolladon/sf-git-merge-driver/commit/b6b3cfdd665762c52dafa669d9bdbc7138f85633"
+        },
+        "date": 1786021866167,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
