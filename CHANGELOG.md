@@ -1,5 +1,27 @@
 # Changelog
 
+## [2.0.0](https://github.com/scolladon/sf-git-merge-driver/compare/v1.9.1...v2.0.0) (2026-08-06)
+
+
+### ⚠ BREAKING CHANGES
+
+* replace the shipped shrinkwrap with exact runtime dependency pins ([#209](https://github.com/scolladon/sf-git-merge-driver/issues/209))
+* require Node.js >= 22.19 and upgrade dependencies to latest ([#206](https://github.com/scolladon/sf-git-merge-driver/issues/206))
+
+### Features
+
+* require Node.js &gt;= 22.19 and upgrade dependencies to latest ([#206](https://github.com/scolladon/sf-git-merge-driver/issues/206)) ([d4ccaee](https://github.com/scolladon/sf-git-merge-driver/commit/d4ccaee163ec7d628361fb0e70a3b2cd992291ff))
+
+
+### Bug Fixes
+
+* correct five merge-engine edge cases found in a functional audit ([#207](https://github.com/scolladon/sf-git-merge-driver/issues/207)) ([062e2d6](https://github.com/scolladon/sf-git-merge-driver/commit/062e2d602ba984ca98834d8420e8d70808faa8f5))
+* keep the root xmlns when the whole file becomes one conflict block ([#213](https://github.com/scolladon/sf-git-merge-driver/issues/213)) ([a93d5dd](https://github.com/scolladon/sf-git-merge-driver/commit/a93d5ddb9fcc98001e4535b4825e894337dc5d5f))
+* merge xml tag order three-way so new element groups keep their position ([#204](https://github.com/scolladon/sf-git-merge-driver/issues/204)) ([de5b0aa](https://github.com/scolladon/sf-git-merge-driver/commit/de5b0aaa388a2e427eddc9a391299ac1b67d1f5d))
+* normalise absent sides at the property merge node boundary ([#212](https://github.com/scolladon/sf-git-merge-driver/issues/212)) ([8860a69](https://github.com/scolladon/sf-git-merge-driver/commit/8860a6920e7195002c909c5d3fed644d0119de5d))
+* replace the shipped shrinkwrap with exact runtime dependency pins ([#209](https://github.com/scolladon/sf-git-merge-driver/issues/209)) ([cb328c9](https://github.com/scolladon/sf-git-merge-driver/commit/cb328c92b8e5c97d2d5ef9e9bf0554c8c1cbb9e7))
+* **test:** stop NUTs inheriting the ambient git context ([#208](https://github.com/scolladon/sf-git-merge-driver/issues/208)) ([149ce14](https://github.com/scolladon/sf-git-merge-driver/commit/149ce1453f80b538a45b183a4918f7ed84b6b53a))
+
 ## [1.9.1](https://github.com/scolladon/sf-git-merge-driver/compare/v1.9.0...v1.9.1) (2026-06-30)
 
 
