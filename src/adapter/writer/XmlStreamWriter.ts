@@ -36,6 +36,17 @@ const escapeCommentBody = (value: string): string =>
 const escapeCdataBody = (value: string): string =>
   value.replace(/\]\]>/g, ']]]]><![CDATA[>')
 
+// Values are emitted inside double quotes. A source attribute written with
+// single quotes may legally hold a raw `"`, which would otherwise close the
+// quote and let the rest of the value be read as markup. `&` is deliberately
+// left alone: the parser never decodes entities on the way in, so re-encoding
+// it here would corrupt values that already carry them.
+// No "does it contain one?" fast path: skipping a replace that would not
+// have matched is behaviourally invisible, so the branch could never be
+// killed by a test.
+const escapeAttrValue = (value: string): string =>
+  value.replace(/"/g, '&quot;').replace(/</g, '&lt;')
+
 // Hot path called once per element. The previous map().join('') form
 // allocated an intermediate array of formatted strings; this push-and-
 // concat loop avoids that allocation.
@@ -45,10 +56,14 @@ const attrsToString = (
   let s = ''
   for (let i = 0; i < attrs.length; i++) {
     const a = attrs[i]!
-    s += ` ${a[0]}="${a[1]}"`
+    s += ` ${a[0]}="${escapeAttrValue(a[1])}"`
   }
   return s
 }
+
+// Declared here rather than next to writeRoot because writeConflict and
+// writeChildren both use it as a default parameter value.
+const EMPTY_ATTRS: ReadonlyArray<readonly [string, string]> = []
 
 // When JsonMerger finds a three-way difference it can't resolve, it
 // emits a ConflictBlock object in place of the conflicting node. The
@@ -104,24 +119,6 @@ const writeComment = (st: WalkState, value: string): void => {
   st.endedWithGt = true
 }
 
-// Returns true if the item was a ConflictBlock or scalar (handled
-// in-place); false if the caller still has to iterate the item's keys.
-const writeNonObjectItem = (
-  st: WalkState,
-  item: JsonValue,
-  markers: ConflictMarkers
-): boolean => {
-  if (isConflictBlock(item)) {
-    writeConflict(st, item, markers)
-    return true
-  }
-  if (!isObject(item)) {
-    writeText(st, String(item))
-    return true
-  }
-  return false
-}
-
 // `buildConflictMarkers` normalises a side with no content to a bare `{}`
 // (see ConflictMarkerBuilder's `hasNoContent`), and `buildConflictBlock`
 // wraps a non-array value as a single-element array — so "no content" on
@@ -138,10 +135,12 @@ const isBlankConflictSide = (content: JsonArray): boolean =>
 const writeConflictContent = (
   st: WalkState,
   content: JsonArray,
-  markers: ConflictMarkers
+  markers: ConflictMarkers,
+  rootAttrs: ReadonlyArray<readonly [string, string]>
 ): void => {
   // Empty side: emit the EOL placeholder so the marker pair stays on
   // its own line, matching the byte layout of the previous pipeline.
+  // A blank side opens no element, so it never carries rootAttrs.
   if (isBlankConflictSide(content)) {
     writeText(st, SALESFORCE_EOL)
     return
@@ -151,13 +150,17 @@ const writeConflictContent = (
   // inlining the same loop — the two paths produce byte-equivalent
   // output; the conflict path inherits first-seen order through the
   // shared writeChildren.
-  writeChildren(st, content, markers)
+  writeChildren(st, content, markers, rootAttrs)
 }
 
 const writeConflict = (
   st: WalkState,
   block: ConflictBlock,
-  markers: ConflictMarkers
+  markers: ConflictMarkers,
+  // Only a conflict block occupying the whole document receives the root
+  // namespaces; nested conflict content is not a document root, so every
+  // other call site falls back to the default.
+  rootAttrs: ReadonlyArray<readonly [string, string]> = EMPTY_ATTRS
 ): void => {
   // A conflict block can be the very first thing ever written (e.g. one
   // side deletes the whole file while the other edits it). The "first
@@ -168,15 +171,28 @@ const writeConflict = (
   // onto the marker line above it.
   st.isFirstTopLevelAfterDecl = false
   writeText(st, markers.local)
-  writeConflictContent(st, block.local, markers)
+  writeConflictContent(st, block.local, markers, rootAttrs)
   writeText(st, markers.ancestor)
-  writeConflictContent(st, block.ancestor, markers)
+  writeConflictContent(st, block.ancestor, markers, rootAttrs)
   writeText(st, markers.separator)
-  writeConflictContent(st, block.other, markers)
+  writeConflictContent(st, block.other, markers, rootAttrs)
   writeText(st, markers.other)
 }
 
-const EMPTY_ATTRS: ReadonlyArray<readonly [string, string]> = []
+// Root namespaces reach the wire as ordinary attributes on whichever
+// element occupies the root slot. Insertion order of the bucket is the
+// source order the parser saw, so it is preserved verbatim.
+const buildNamespaceAttrs = (
+  namespaces: JsonObject
+): ReadonlyArray<readonly [string, string]> => {
+  const nsKeys = Object.keys(namespaces)
+  const built: Array<readonly [string, string]> = new Array(nsKeys.length)
+  for (let k = 0; k < nsKeys.length; k++) {
+    const nsKey = nsKeys[k]!
+    built[k] = [nsKey.slice(ATTR_PREFIX.length), String(namespaces[nsKey])]
+  }
+  return built
+}
 
 // Walk the compact merged tree and append serialized XML directly into
 // `st.buf`. Replaces the old `emit()` + `formatChunks()` generator pair:
@@ -190,30 +206,29 @@ const writeRoot = (
   markers: ConflictMarkers
 ): void => {
   st.buf += XML_DECL
-  let isFirstTopLevel = true
+  // The root slot: whichever element opens the document carries the
+  // namespaces, then the slot is spent. A whole-document ConflictBlock
+  // spends it too — each of its non-blank sides renders a document root.
+  let rootAttrs = buildNamespaceAttrs(namespaces)
   for (let i = 0; i < compactRoot.length; i++) {
     const item = compactRoot[i] as JsonValue
-    if (writeNonObjectItem(st, item, markers)) continue
-    const obj = item as JsonObject
-    const keys = Object.keys(obj)
+    if (isConflictBlock(item)) {
+      writeConflict(st, item, markers, rootAttrs)
+      rootAttrs = EMPTY_ATTRS
+      continue
+    }
+    // A top-level scalar opens no element, so it leaves the slot unspent
+    // for the element that follows it.
+    if (!isObject(item)) {
+      writeText(st, String(item))
+      continue
+    }
+    const keys = Object.keys(item)
     for (let j = 0; j < keys.length; j++) {
       const tagName = keys[j]!
       if (tagName === NAMESPACE_ROOT) continue
-      let extraAttrs: ReadonlyArray<readonly [string, string]> = EMPTY_ATTRS
-      if (isFirstTopLevel) {
-        const nsKeys = Object.keys(namespaces)
-        const built: Array<readonly [string, string]> = new Array(nsKeys.length)
-        for (let k = 0; k < nsKeys.length; k++) {
-          const nsKey = nsKeys[k]!
-          built[k] = [
-            nsKey.slice(ATTR_PREFIX.length),
-            String(namespaces[nsKey]),
-          ]
-        }
-        extraAttrs = built
-        isFirstTopLevel = false
-      }
-      writeElement(st, tagName, obj[tagName] as JsonValue, extraAttrs, markers)
+      writeElement(st, tagName, item[tagName] as JsonValue, rootAttrs, markers)
+      rootAttrs = EMPTY_ATTRS
     }
   }
 }
@@ -329,12 +344,18 @@ const writeUnfoldedChild = (
 const writeChildren = (
   st: WalkState,
   children: JsonArray,
-  markers: ConflictMarkers
+  markers: ConflictMarkers,
+  // Non-empty only when these children ARE a conflict side's content and
+  // that side occupies the document root; the head child then opens the
+  // side's root element. The multi-key branch below never receives them:
+  // a conflict side's head is always a single-key wrapper.
+  rootAttrs: ReadonlyArray<readonly [string, string]> = EMPTY_ATTRS
 ): void => {
   for (let i = 0; i < children.length; i++) {
     const child = children[i] as JsonValue
+    const attrs = i === 0 ? rootAttrs : EMPTY_ATTRS
     if (isConflictBlock(child)) {
-      writeConflict(st, child, markers)
+      writeConflict(st, child, markers, attrs)
       continue
     }
     if (!isObject(child)) {
@@ -349,13 +370,7 @@ const writeChildren = (
       // into writeChildren via splitAttrsAndChildren / the multi-key
       // branch below.
       const tagName = keys[0]!
-      writeElement(
-        st,
-        tagName,
-        child[tagName] as JsonValue,
-        EMPTY_ATTRS,
-        markers
-      )
+      writeElement(st, tagName, child[tagName] as JsonValue, attrs, markers)
       continue
     }
     for (let j = 0; j < keys.length; j++) {

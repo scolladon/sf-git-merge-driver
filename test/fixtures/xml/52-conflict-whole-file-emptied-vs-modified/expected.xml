@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <<<<<<< ours
 ||||||| base
-<PermissionSet>
+<PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
     <label>Base</label>
 </PermissionSet>
 =======
-<PermissionSet>
+<PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
     <label>Base changed by theirs</label>
 </PermissionSet>
 >>>>>>> theirs
