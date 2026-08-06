@@ -16,9 +16,9 @@
     "fileName": "reports/mutation/mutation.html"
   },
   "thresholds": {
-    "high": 80,
-    "low": 60,
-    "break": 70
+    "high": 95,
+    "low": 90,
+    "break": 90
   },
   "concurrency": 4,
   "cleanTempDir": "always",

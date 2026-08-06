@@ -4,14 +4,8 @@ name: NPM Service
 on:
   release:
     types: [published]
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened]
-    paths-ignore:
-      - "**.md"
 
-# Least-privilege default; jobs that need more escalate explicitly
-# (publish → id-token, comment → pull-requests).
+# Least-privilege default; the publish job escalates explicitly.
 permissions:
   contents: read
 
@@ -21,7 +15,6 @@ concurrency:
 
 jobs:
   publish:
-    if: github.event_name == 'release'
     runs-on: ubuntu-latest
     outputs:
       channel: ${{ steps.publish.outputs.channel }}
@@ -32,13 +25,9 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      # No `cache:` input is set, so setup-node restores no cache here; the
-      # published artifact's integrity is independently attested by npm
-      # provenance (`npm publish --provenance`). zizmor's heuristic flags
-      # setup-node in any publishing workflow regardless of caching.
       - uses: actions/setup-node@v7 # zizmor: ignore[cache-poisoning]
         with:
-          node-version: 22
+          node-version: 'lts/*'
           registry-url: "https://registry.npmjs.org"
       - run: npm install -g npm@latest
       - uses: ./.github/actions/install
@@ -51,108 +40,8 @@ jobs:
           npm publish --provenance --access public --tag "latest-rc"
           echo "channel=sf-git-merge-driver@$RELEASE_TAG" >> "$GITHUB_OUTPUT"
 
-  preview:
-    if: >-
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.user.login != 'dependabot[bot]'
-    runs-on: ubuntu-latest
-    outputs:
-      channel: ${{ steps.preview.outputs.urls }}
-    # Read-only throughout: publishing a preview needs no write scope, which is
-    # what lets pull requests from forks publish. The install comment lives in
-    # its own job so no write scope shares a runner with the build.
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      # setup-node's own package-manager cache never activates here — it keys
-      # off a `packageManager` field package.json does not declare — and the npm
-      # cache is restored by ./.github/actions/install regardless. Disabling it
-      # explicitly keeps that true if the field is ever added.
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          package-manager-cache: false
-      - uses: ./.github/actions/install
-
-      - name: Build and pack
-        id: pack
-        run: |
-          npm run build
-          npm pack
-          # Derive the tarball name from package.json rather than parsing
-          # `npm pack` stdout: newer npm prints the filename to stderr, so
-          # `npm pack 2>/dev/null | tail -1` silently yields an empty string.
-          TARBALL=$(node -p "const p=require('./package.json'); p.name.replace('@','').replace('/','-')+'-'+p.version+'.tgz'")
-          [ -f "$TARBALL" ] || { echo "::error::npm pack produced no $TARBALL"; exit 1; }
-          echo "tarball=$TARBALL" >> "$GITHUB_OUTPUT"
-
-      # No token is passed: the CLI identifies the workflow run to the
-      # pkg.pr.new GitHub App, which is what lets fork pull requests publish.
-      # That App holds repository-wide read on contents, checks and metadata,
-      # and write on pull requests and commit statuses, granted once at
-      # installation. A fork's build is published under this repository's
-      # package name, and the only control on that is the repository's fork
-      # pull-request approval policy — which, unless set to require approval for
-      # all outside collaborators, gates first-time contributors only, so a
-      # returning contributor publishes unattended.
-      - name: Publish preview
-        id: preview
-        env:
-          TARBALL: ${{ steps.pack.outputs.tarball }}
-        run: npx --yes pkg-pr-new publish "./$TARBALL" --comment=off
-
-      - name: Assert the preview URL
-        env:
-          URLS: ${{ steps.preview.outputs.urls }}
-        run: |
-          # This URL is installed unattended on nine e2e runners and handed to
-          # whoever reads the pull request, and it is printed by a third-party
-          # CLI. Accept only a single commit-pinned pkg.pr.new URL: never empty,
-          # never several, never the mutable per-pull-request alias, never
-          # anything else the CLI might print. Failing here names the problem;
-          # the alternative is nine opaque install failures, or worse, an
-          # install of something that is not this build.
-          if [ "$(printf '%s' "$URLS" | wc -w)" -ne 1 ]; then
-            echo "::error::expected exactly one preview URL, got '$URLS'"
-            exit 1
-          fi
-          host="https://pkg.pr.new/"
-          if [ "${URLS#"$host"}" = "$URLS" ]; then
-            echo "::error::preview URL is not on pkg.pr.new: '$URLS'"
-            exit 1
-          fi
-          if ! printf '%s' "$URLS" | grep -Eq '@[0-9a-f]{7,40}$'; then
-            echo "::error::preview URL is not commit-pinned: '$URLS'"
-            exit 1
-          fi
-
-  comment:
-    needs: preview
-    if: github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
-    # Separate from `preview` so the only job holding a write scope checks out
-    # nothing, installs no dependency tree and runs no repository code — the
-    # only third-party code beside the token is the commenting action itself.
-    # It also means a failure to comment cannot skip the e2e matrix.
-    permissions:
-      pull-requests: write
-    steps:
-      - uses: thollander/actions-comment-pull-request@v3
-        with:
-          message: |
-            Preview build published for this pull request.
-            ```sh
-            sf plugins install ${{ needs.preview.outputs.channel }}
-            ```
-          comment-tag: dev-publish
-          mode: recreate
-
   e2e-tests:
-    needs: [publish, preview]
-    if: "!cancelled() && (needs.publish.result == 'success' || needs.preview.result == 'success')"
+    needs: [publish]
     uses: ./.github/workflows/run-e2e-tests.yml
     with:
-      channel: ${{ needs.publish.outputs.channel || needs.preview.outputs.channel }}
+      channel: ${{ needs.publish.outputs.channel }}
