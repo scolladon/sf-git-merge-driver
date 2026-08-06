@@ -21,32 +21,34 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.7",
-    "@commitlint/config-conventional": "^21.2.0",
-    "@oclif/plugin-help": "^6.2.56",
-    "@salesforce/cli-plugins-testkit": "^5.3.65",
-    "@salesforce/dev-config": "^4.3.3",
-    "@stryker-mutator/core": "^9.6.1",
-    "@stryker-mutator/typescript-checker": "^9.6.1",
-    "@stryker-mutator/vitest-runner": "^9.6.1",
-    "@types/chai": "^5.2.3",
-    "@types/mocha": "^10.0.10",
-    "@vitest/coverage-v8": "^4.1.10",
-    "chai": "^6.2.2",
-    "esbuild": "^0.28.1",
-    "husky": "^9.1.7",
-    "knip": "^6.32.0",
-    "ls-engines": "^0.10.1",
-    "mocha": "^11.8.0",
-    "oclif": "^4.23.30",
-    "shx": "^0.4.0",
-    "tslib": "^2.8.1",
-    "tsx": "^4.23.9",
-    "typescript": "^7.0.2",
-    "vitest": "^4.1.10",
-    "wireit": "^0.14.13"
+    "@commitlint/config-conventional": "21.2.0",
+    "@oclif/plugin-help": "6.2.56",
+    "@salesforce/cli-plugins-testkit": "5.3.65",
+    "@salesforce/dev-config": "4.3.3",
+    "@stryker-mutator/core": "9.6.1",
+    "@stryker-mutator/typescript-checker": "9.6.1",
+    "@stryker-mutator/vitest-runner": "9.6.1",
+    "@types/chai": "5.2.3",
+    "@types/mocha": "10.0.10",
+    "@vitest/coverage-v8": "4.1.10",
+    "chai": "6.2.2",
+    "esbuild": "0.28.1",
+    "husky": "9.1.7",
+    "knip": "6.32.0",
+    "ls-engines": "0.10.1",
+    "mocha": "11.8.0",
+    "oclif": "4.23.30",
+    "pkg-pr-new": "0.0.87",
+    "shx": "0.4.0",
+    "tslib": "2.8.1",
+    "tsx": "4.23.9",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10",
+    "wireit": "0.14.13"
   },
   "engines": {
-    "node": ">=22.19"
+    "node": ">=22.19",
+    "npm": ">=12"
   },
   "files": [
     "/lib",
@@ -84,7 +86,7 @@
     "lint": "wireit",
     "lint:dependencies": "wireit",
     "lint:duplicates": "wireit",
-    "lint:engines": "wireit",
+    "lint:engine": "wireit",
     "lint:fix": "wireit",
     "lint:staged": "wireit",
     "postpack": "shx rm -f oclif.manifest.json && shx sed -i 'blob/v[^/]*/' 'blob/main/' README.md",
@@ -99,7 +101,8 @@
     "test:nut": "wireit",
     "test:perf": "wireit",
     "test:unit": "wireit",
-    "test": "wireit"
+    "test": "wireit",
+    "preview:publish": "pkg-pr-new publish --comment=off"
   },
   "overrides": {
     "mocha": {
@@ -216,7 +219,7 @@
         "lint"
       ]
     },
-    "lint:engines": {
+    "lint:engine": {
       "command": "ls-engines --no-current --no-dev --mode=virtual",
       "files": [
         "package.json",
@@ -339,7 +342,7 @@
       ]
     },
     "test:mutation:incremental": {
-      "command": "stryker run --incremental --incrementalFile reports/mutation/stryker-incremental.json",
+      "command": "FILES=$(git --no-pager diff --name-only --diff-filter=AM --merge-base origin/main src | grep '.ts$' | paste -sd ',' -) && [ -n \"$FILES\" ] && stryker run --mutate \"$FILES\" || echo 'No source files changed — skipping mutation testing'",
       "files": [
         "src/**/*.ts",
         "test/**/*.test.ts",

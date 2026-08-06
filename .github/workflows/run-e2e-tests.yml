@@ -4,8 +4,12 @@ on:
   workflow_call:
     inputs:
       channel:
+        description: npm spec or tarball url to install the plugin from
         type: string
         required: true
+
+permissions:
+  contents: read
 
 jobs:
   e2e-test:
@@ -13,11 +17,20 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest, ubuntu-latest]
-        node: [22, 24, 26]
+        # Floating: previous LTS, active LTS, current. These shift when a new
+        # LTS is cut (Oct), so engines.node must move with them or CI stops
+        # testing a version the manifest still promises.
+        node: ['lts/-1', 'lts/*', 'latest']
     runs-on: ${{ matrix.os }}
+    # Two different shells run here. `shell:` governs the run: block, where the
+    # windows default (pwsh) makes `>> "$GITHUB_ENV"` silently ineffective;
+    # npm_config_script_shell governs the bodies npm spawns for `npm run`, whose
+    # windows default is cmd.exe, not pwsh.
     defaults:
       run:
         shell: bash
+    env:
+      npm_config_script_shell: bash
     steps:
       - name: Checkout sources
         uses: actions/checkout@v7
@@ -31,7 +44,7 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
 
-      - name: Additional setup
+      - name: Set environment variables
         run: |
           echo "SF_DISABLE_AUTOUPDATE=true" >> "$GITHUB_ENV"
           echo "SF_DISABLE_TELEMETRY=true" >> "$GITHUB_ENV"
@@ -44,12 +57,7 @@ jobs:
       - name: Install new plugin version
         env:
           CHANNEL: ${{ inputs.channel }}
-        run: |
-          # `required: true` enforces that a caller passes the input, not that
-          # the expression it passes resolves to anything. Name the problem here
-          # rather than leave nine cells failing on `sf plugins install ""`.
-          [ -n "$CHANNEL" ] || { echo "::error::empty channel"; exit 1; }
-          echo y | sf plugins install "$CHANNEL"
+        run: echo y | sf plugins install "$CHANNEL"
 
       - name: Test new plugin version installation
         run: sf git merge driver --help
