@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786005861123,
+  "lastUpdate": 1786007298966,
   "repoUrl": "https://github.com/scolladon/sf-git-merge-driver",
   "entries": {
     "Binary Size Benchmark": [
@@ -434,6 +434,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "bin/merge-driver.cjs",
             "value": 38393,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "colladonsebastien@gmail.com",
+            "name": "Sebastien",
+            "username": "scolladon"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a93d5ddb9fcc98001e4535b4825e894337dc5d5f",
+          "message": "fix: keep the root xmlns when the whole file becomes one conflict block (#213)",
+          "timestamp": "2026-08-06T11:06:00+02:00",
+          "tree_id": "bb3ffdf9dd44de6be52d1ce62d1dd9637d5a9b20",
+          "url": "https://github.com/scolladon/sf-git-merge-driver/commit/a93d5ddb9fcc98001e4535b4825e894337dc5d5f"
+        },
+        "date": 1786007298892,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "bin/merge-driver.cjs",
+            "value": 38513,
             "unit": "bytes"
           }
         ]
