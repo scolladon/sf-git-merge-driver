@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785941615078,
+  "lastUpdate": 1786005861123,
   "repoUrl": "https://github.com/scolladon/sf-git-merge-driver",
   "entries": {
     "Binary Size Benchmark": [
@@ -405,6 +405,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "bin/merge-driver.cjs",
             "value": 38352,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "colladonsebastien@gmail.com",
+            "name": "Sebastien",
+            "username": "scolladon"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8860a6920e7195002c909c5d3fed644d0119de5d",
+          "message": "fix: normalise absent sides at the property merge node boundary (#212)",
+          "timestamp": "2026-08-06T10:42:01+02:00",
+          "tree_id": "9c39b465a699fcd300d34052e6dcc06ded6b7a1a",
+          "url": "https://github.com/scolladon/sf-git-merge-driver/commit/8860a6920e7195002c909c5d3fed644d0119de5d"
+        },
+        "date": 1786005861052,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "bin/merge-driver.cjs",
+            "value": 38393,
             "unit": "bytes"
           }
         ]
