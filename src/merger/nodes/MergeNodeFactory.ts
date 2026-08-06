@@ -25,6 +25,19 @@ const isStringArray = (...values: (JsonValue | undefined | null)[]): boolean =>
 const isPureObject = (val: JsonValue | undefined | null): boolean =>
   isObject(val) && !Array.isArray(val)
 
+// Shared, frozen and prototype-free. The parser builds every node with
+// Object.create(null) so that an untrusted XML tag name cannot resolve
+// through Object.prototype; a plain {} here would reintroduce that chain
+// and make a side that dropped an element look like it still carried
+// `constructor`, `toString` and their siblings.
+const NO_PROPERTIES: JsonObject = Object.freeze(Object.create(null))
+
+// Only an absent side is normalised. A scalar side is passed through so a
+// text-bodied element keeps merging exactly as it did before this helper
+// existed; isPureUnknown has already ruled out arrays.
+const toPropertyObject = (val: JsonValue | undefined): JsonObject =>
+  val == null ? NO_PROPERTIES : (val as JsonObject)
+
 const isPureUnknown = (
   values: (JsonValue | undefined | null)[],
   hasKeyExtractor: boolean
@@ -74,9 +87,9 @@ class DefaultMergeNodeFactory implements MergeNodeFactory {
 
     if (isPureUnknown([ancestor, local, other], keyField !== undefined)) {
       return new PropertyMergeNode(
-        ancestor as JsonObject,
-        local as JsonObject,
-        other as JsonObject,
+        toPropertyObject(ancestor),
+        toPropertyObject(local),
+        toPropertyObject(other),
         attribute
       )
     }
