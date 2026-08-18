@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import simpleGit from 'simple-git'
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest'
+import type { GitRepository } from '../../../src/adapter/GitRepository.js'
 import { DRIVER_NAME } from '../../../src/constant/driverConstant.js'
 import {
   MANIFEST_PATTERNS,
@@ -18,16 +18,20 @@ import { parse } from '../../../src/utils/gitAttributesFile.js'
 import { getGitAttributesPath } from '../../../src/utils/gitUtils.js'
 
 vi.mock('node:fs/promises')
-vi.mock('simple-git')
 vi.mock('../../../src/utils/gitUtils.js')
 
 const GIT_ATTRIBUTES_PATH = '.git/info/attributes'
+const COMMON_GIT_DIR = '/repo/.git'
 
-const mockedAddConfig = vi.fn()
-const simpleGitMock = simpleGit as unknown as Mock
-simpleGitMock.mockReturnValue({
-  addConfig: mockedAddConfig,
-})
+const { setConfig, removeSection } = vi.hoisted(() => ({
+  setConfig: vi.fn(),
+  removeSection: vi.fn(),
+}))
+
+vi.mock('../../../src/adapter/TsgitRepository.js', () => ({
+  withGitRepository: (use: (repo: GitRepository) => Promise<unknown>) =>
+    use({ commonGitDir: COMMON_GIT_DIR, setConfig, removeSection }),
+}))
 
 const getGitAttributesPathMocked = getGitAttributesPath as Mock
 const readFileMocked = vi.mocked(readFile) as Mock
@@ -50,7 +54,7 @@ describe('InstallService', () => {
 
   beforeEach(() => {
     sut = new InstallService()
-    mockedAddConfig.mockReset()
+    setConfig.mockReset()
     readFileMocked.mockReset()
     writeFileMocked.mockReset()
     mkdirMocked.mockReset()
@@ -130,27 +134,15 @@ describe('InstallService', () => {
       await sut.installMergeDriver()
 
       // Assert — two entries, no duplication via --add
-      expect(mockedAddConfig).toHaveBeenCalledTimes(2)
-      expect(mockedAddConfig).toHaveBeenCalledWith(
+      expect(setConfig).toHaveBeenCalledTimes(2)
+      expect(setConfig).toHaveBeenCalledWith(
         `merge.${DRIVER_NAME}.name`,
         'Salesforce source merge driver'
       )
-      expect(mockedAddConfig).toHaveBeenCalledWith(
+      expect(setConfig).toHaveBeenCalledWith(
         `merge.${DRIVER_NAME}.driver`,
         expect.stringMatching(DRIVER_LINE_PATTERN)
       )
-    })
-
-    it('Given simpleGit is created, Then it receives { unsafe: { allowUnsafeMergeDriver: true } } so the sh -c driver is accepted', async () => {
-      // Act
-      await sut.installMergeDriver()
-
-      // Assert — the option matters: without it simple-git refuses to
-      // set driver commands that invoke sh. Exact-shape assertion so
-      // mutation drops of any key are caught.
-      expect(simpleGitMock).toHaveBeenCalledWith({
-        unsafe: { allowUnsafeMergeDriver: true },
-      })
     })
 
     it('Given the resolved binary path, When installing, Then it points at bin/merge-driver.cjs relative to the plugin root', async () => {
@@ -158,12 +150,24 @@ describe('InstallService', () => {
       await sut.installMergeDriver()
 
       // Assert
-      const driverCall = mockedAddConfig.mock.calls.find(
+      const driverCall = setConfig.mock.calls.find(
         ([key]) => key === `merge.${DRIVER_NAME}.driver`
       )
       expect(driverCall).toBeDefined()
       const driverLine = driverCall?.[1] as string
       expect(driverLine).toMatch(/ ".+\/bin\/merge-driver\.cjs"/)
+    })
+
+    it('Given a non-dry-run install, When installing, Then git config is written before writeFile', async () => {
+      // Act
+      await sut.installMergeDriver()
+
+      // Assert — config-before-attributes ordering (design requirement 8):
+      // a failed config write must never leave a dangling merge= rule.
+      const setConfigOrder = setConfig.mock.invocationCallOrder[1] as number
+      const writeFileOrder = writeFileMocked.mock
+        .invocationCallOrder[0] as number
+      expect(writeFileOrder).toBeGreaterThan(setConfigOrder)
     })
   })
 
@@ -546,7 +550,7 @@ describe('InstallService', () => {
 
       // Assert — nothing written, plan reflects a fresh install
       expect(writeFileMocked).not.toHaveBeenCalled()
-      expect(mockedAddConfig).not.toHaveBeenCalled()
+      expect(setConfig).not.toHaveBeenCalled()
       expect(outcome.dryRun).toBe(true)
       expect(outcome.wroteAttributes).toBe(false)
       // Every desired pattern shows up as `add`
@@ -574,7 +578,7 @@ describe('InstallService', () => {
       expect(conflicts).toHaveLength(1)
       expect(conflicts[0]?.existingDriver).toBe('some-other-tool')
       expect(writeFileMocked).not.toHaveBeenCalled()
-      expect(mockedAddConfig).not.toHaveBeenCalled()
+      expect(setConfig).not.toHaveBeenCalled()
     })
   })
 })

@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { simpleGit } from 'simple-git'
+import { withGitRepository } from '../adapter/TsgitRepository.js'
 import { DRIVER_NAME } from '../constant/driverConstant.js'
 import {
   MANIFEST_PATTERNS,
@@ -238,9 +238,13 @@ export class InstallService {
 
     // git config goes first so the merge driver is defined before any
     // attribute rule references it.
-    const git = simpleGit({ unsafe: { allowUnsafeMergeDriver: true } })
-    await git.addConfig(`merge.${DRIVER_NAME}.name`, DRIVER_NAME_CONFIG_VALUE)
-    await git.addConfig(`merge.${DRIVER_NAME}.driver`, DRIVER_COMMAND)
+    await withGitRepository(async repo => {
+      await repo.setConfig(
+        `merge.${DRIVER_NAME}.name`,
+        DRIVER_NAME_CONFIG_VALUE
+      )
+      await repo.setConfig(`merge.${DRIVER_NAME}.driver`, DRIVER_COMMAND)
+    })
 
     // Apply plan and write attributes file only if the result differs
     // from what was read — saves an I/O and keeps timestamps stable.

@@ -16,7 +16,7 @@
     "@oclif/core": "4.13.3",
     "@salesforce/core": "9.1.0",
     "@salesforce/sf-plugins-core": "13.0.0",
-    "simple-git": "3.36.0",
+    "@scolladon/tsgit": "file:tsgit-pr277.tgz",
     "txml": "6.0.0"
   },
   "devDependencies": {
@@ -47,7 +47,7 @@
     "wireit": "0.14.13"
   },
   "engines": {
-    "node": ">=22.19",
+    "node": ">=22.22.1",
     "npm": ">=12"
   },
   "files": [
