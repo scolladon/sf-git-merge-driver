@@ -1,4 +1,9 @@
-import { openRepository, type Repository, TsgitError } from '@scolladon/tsgit'
+import {
+  type OpenRepositoryOptions,
+  openRepository,
+  type Repository,
+  TsgitError,
+} from '@scolladon/tsgit'
 import { Logger } from '../utils/LoggingService.js'
 import { type GitRepository, NotAGitRepositoryError } from './GitRepository.js'
 
@@ -43,6 +48,16 @@ const disposeQuietly = async (repo: Repository): Promise<void> => {
   }
 }
 
+// tsgit reads no environment variable of its own, so honouring `GIT_DIR` is
+// this adapter's job: git's own precedence is that an explicit git dir wins
+// over discovery from the working directory. An empty value is treated as
+// unset, matching git. Unlike git, tsgit does not validate the target at open
+// time — the repository probe below is what refuses a bogus one.
+const explicitGitDir = (): Pick<OpenRepositoryOptions, 'gitDir'> => {
+  const fromEnv = process.env['GIT_DIR']
+  return fromEnv === undefined || fromEnv === '' ? {} : { gitDir: fromEnv }
+}
+
 export const withGitRepository = async <T>(
   use: (repo: GitRepository) => Promise<T>
 ): Promise<T> => {
@@ -51,7 +66,11 @@ export const withGitRepository = async <T>(
     // `openRepository` succeeds outside a repository, returning a synthetic
     // layout, so the probe below — not the open — is what proves we are in
     // one. The open can still reject on a structurally broken layout.
-    repo = await openRepository({ hooks: false, command: false })
+    repo = await openRepository({
+      ...explicitGitDir(),
+      hooks: false,
+      command: false,
+    })
     await repo.config.get({ key: REPOSITORY_PROBE_KEY, scope: LOCAL_SCOPE })
     return await use(asGitRepository(repo))
   } catch (error) {

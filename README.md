@@ -231,7 +231,7 @@ The plugin writes to the repository's shared git directory — the same location
 
 ### Repository layout compatibility
 
-The installer resolves the attributes file in-process — no git binary is shelled out to — by discovering the repository's shared git directory from the current working directory (the equivalent of `git rev-parse --git-common-dir`), so a single install applies correctly across all of these layouts:
+The installer resolves the attributes file in-process — no git binary is shelled out to — from the repository's shared git directory (the equivalent of `git rev-parse --git-common-dir`), discovered from the current working directory or taken from `GIT_DIR` when set. A single install applies correctly across all of these layouts:
 
 | Layout | Where attributes are written | Notes |
 |---|---|---|
@@ -239,7 +239,7 @@ The installer resolves the attributes file in-process — no git binary is shell
 | **Linked worktrees** (`git worktree add`) | `<main>/.git/info/attributes` | Single install applies to **every** worktree of the repository — install once, no need to re-run in each worktree. |
 | **Submodules** | `<super>/.git/modules/<sub>/info/attributes` | Run install from inside the submodule; it registers the driver against that submodule's git dir. |
 | **Bare repos** | `<bare-repo>/info/attributes` | Works without a working tree (useful for server-side merges or scripted recovery). |
-| **Custom `GIT_DIR`** (env var) | `<cwd repository>/info/attributes` — `$GIT_DIR` is not read | **Ignored, by design.** The installer consults no environment variable; it discovers the repository by walking up from the current working directory only. This closes a path where a hostile `GIT_DIR` could redirect where the driver installs (an improvement), but if you legitimately relied on `GIT_DIR` to target a different repository, `cd` into it instead (a regression). |
+| **Custom `GIT_DIR`** (env var) | `$GIT_DIR/info/attributes` | Honoured — an explicit `GIT_DIR` wins over discovery, as it does for git itself. An empty value is treated as unset. A `GIT_DIR` that does not point at a real repository is refused before anything is written. |
 
 ## Advanced: direct binary invocation (for scripts)
 

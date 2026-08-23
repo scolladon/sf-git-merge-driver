@@ -211,30 +211,57 @@ describe('git merge driver repository layout contracts', () => {
   })
 
   describe('ambient GIT_DIR', () => {
-    it('Given GIT_DIR pointing at another repository, When installing, Then the cwd repository is used and the pointed-at one is untouched', () => {
+    it('Given GIT_DIR pointing at another repository, When installing, Then that repository is used and the cwd one is untouched', () => {
       // Arrange
       const cwdRepo = join(root, 'env-cwd')
-      const otherRepo = join(root, 'env-other')
+      const targetRepo = join(root, 'env-target')
       gitInit(cwdRepo)
-      gitInit(otherRepo)
+      gitInit(targetRepo)
 
-      // Act
+      // Act — stand in one repository, point GIT_DIR at another
       execCmd('git merge driver install', {
         ensureExitCode: 0,
         cwd: cwdRepo,
-        env: { ...process.env, GIT_DIR: join(otherRepo, '.git') },
+        env: { ...process.env, GIT_DIR: join(targetRepo, '.git') },
       })
 
-      // Assert — the rule landed in the cwd repository
-      expect(existsSync(join(cwdRepo, '.git', 'info', 'attributes'))).to.be.true
-
-      // Assert — the GIT_DIR target was not touched
-      expect(existsSync(join(otherRepo, '.git', 'info', 'attributes'))).to.be
-        .false
-      const otherConfig = execSync('git config --local --list', {
-        cwd: otherRepo,
+      // Assert — the rule landed in the GIT_DIR target, as real git would
+      const targetAttrs = join(targetRepo, '.git', 'info', 'attributes')
+      expect(existsSync(targetAttrs)).to.be.true
+      expect(readFileSync(targetAttrs, 'utf-8')).to.include(
+        `merge=${DRIVER_NAME}`
+      )
+      const targetConfig = execSync('git config --local --list', {
+        cwd: targetRepo,
       }).toString()
-      expect(otherConfig).to.not.include(`merge.${DRIVER_NAME}`)
+      expect(targetConfig).to.match(DRIVER_LINE_PATTERN)
+
+      // Assert — the directory we were standing in was left alone
+      expect(existsSync(join(cwdRepo, '.git', 'info', 'attributes'))).to.be
+        .false
+      const cwdConfig = execSync('git config --local --list', {
+        cwd: cwdRepo,
+      }).toString()
+      expect(cwdConfig).to.not.include(`merge.${DRIVER_NAME}`)
+    })
+
+    it('Given GIT_DIR pointing at a non-repository, When installing, Then it exits non-zero and writes nothing', () => {
+      // Arrange
+      const cwdRepo = join(root, 'env-guard-cwd')
+      const notARepo = mkdtempSync(join(root, 'env-guard-plain-'))
+      gitInit(cwdRepo)
+
+      // Act
+      execCmd('git merge driver install', {
+        ensureExitCode: 1,
+        cwd: cwdRepo,
+        env: { ...process.env, GIT_DIR: notARepo },
+      })
+
+      // Assert — the guard refuses, exactly as real git refuses a bad GIT_DIR
+      expect(readdirSync(notARepo)).to.be.empty
+      expect(existsSync(join(cwdRepo, '.git', 'info', 'attributes'))).to.be
+        .false
     })
   })
 })
