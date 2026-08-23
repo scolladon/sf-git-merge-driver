@@ -389,12 +389,13 @@
       ]
     },
     "test:typecheck": {
-      "command": "tsc -p tsconfig.test.json --pretty",
+      "command": "tsc -p tsconfig.test.json --pretty && tsc -p tsconfig.nut.json --pretty",
       "files": [
         "src/**/*.ts",
         "test/**/*.ts",
         "tsconfig.json",
-        "tsconfig.test.json"
+        "tsconfig.test.json",
+        "tsconfig.nut.json"
       ],
       "output": []
     },

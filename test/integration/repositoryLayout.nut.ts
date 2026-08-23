@@ -111,7 +111,7 @@ describe('git merge driver repository layout contracts', () => {
     it('Given install --dry-run outside a repository, When running, Then it exits non-zero and writes nothing', () => {
       // Act
       const result = execCmd('git merge driver install --dry-run', {
-        ensureExitCode: 'nonZero',
+        ensureExitCode: 1,
         cwd: plainDir,
       })
 
@@ -127,7 +127,7 @@ describe('git merge driver repository layout contracts', () => {
     it('Given install outside a repository, When running, Then it exits non-zero and writes nothing', () => {
       // Act
       const result = execCmd('git merge driver install', {
-        ensureExitCode: 'nonZero',
+        ensureExitCode: 1,
         cwd: plainDir,
       })
 

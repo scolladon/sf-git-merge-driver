@@ -5,6 +5,7 @@ import { type GitRepository, NotAGitRepositoryError } from './GitRepository.js'
 const NOT_A_REPOSITORY = 'NOT_A_REPOSITORY'
 const REPOSITORY_PROBE_KEY = 'core.repositoryformatversion'
 const LOCAL_SCOPE = 'local'
+const DISPOSE_FAILURE_MESSAGE = 'Failed to dispose the git repository handle'
 
 const isNotARepositoryError = (
   error: unknown
@@ -29,11 +30,16 @@ const asGitRepository = (repo: Repository): GitRepository => ({
 
 // Disposal must never replace an in-flight error: a rejecting `dispose` would
 // otherwise mask the mapped NotAGitRepositoryError the caller needs to see.
+// The payload is flattened because the logger JSON-serialises it: an Error's
+// message and stack are non-enumerable, so passing one raw persists `{}` and
+// a non-serialisable value would throw from inside this catch.
 const disposeQuietly = async (repo: Repository): Promise<void> => {
   try {
     await repo.dispose()
   } catch (error) {
-    Logger.error('Failed to dispose the git repository handle', error)
+    Logger.error(DISPOSE_FAILURE_MESSAGE, {
+      reason: error instanceof Error ? error.message : String(error),
+    })
   }
 }
 

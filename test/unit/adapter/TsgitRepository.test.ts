@@ -1,12 +1,21 @@
-import { type FilePath, TsgitError } from '@scolladon/tsgit'
+import { FilePath, TsgitError } from '@scolladon/tsgit'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GitRepository } from '../../../src/adapter/GitRepository.js'
 import { NotAGitRepositoryError } from '../../../src/adapter/GitRepository.js'
 import { withGitRepository } from '../../../src/adapter/TsgitRepository.js'
+import { Logger } from '../../../src/utils/LoggingService.js'
 
 const { openRepositoryMock } = vi.hoisted(() => ({
   openRepositoryMock: vi.fn(),
 }))
+
+vi.mock('../../../src/utils/LoggingService.js', async importOriginal => {
+  const actual =
+    await importOriginal<
+      typeof import('../../../src/utils/LoggingService.js')
+    >()
+  return { ...actual, Logger: { ...actual.Logger, error: vi.fn() } }
+})
 
 vi.mock('@scolladon/tsgit', async importOriginal => ({
   ...(await importOriginal<typeof import('@scolladon/tsgit')>()),
@@ -115,7 +124,7 @@ describe('TsgitRepository.withGitRepository', () => {
       // Arrange
       const repo = makeRepo({ gitDir: '/x/.git' })
       repo.config.get.mockRejectedValue(
-        new TsgitError({ code: 'NOT_A_REPOSITORY', path: '/x' as FilePath })
+        new TsgitError({ code: 'NOT_A_REPOSITORY', path: FilePath.from('/x') })
       )
       openRepositoryMock.mockResolvedValue(repo)
       const use = vi.fn()
@@ -296,11 +305,11 @@ describe('TsgitRepository.withGitRepository', () => {
   describe('given openRepository itself rejects with NOT_A_REPOSITORY', () => {
     it('should map it to NotAGitRepositoryError and dispose nothing', async () => {
       // Arrange
-      const sut = new TsgitError({
+      const rejection = new TsgitError({
         code: 'NOT_A_REPOSITORY',
-        path: '/gone' as FilePath,
+        path: FilePath.from('/gone'),
       })
-      openRepositoryMock.mockRejectedValue(sut)
+      openRepositoryMock.mockRejectedValue(rejection)
 
       // Act
       const result = await withGitRepository(async () => undefined).catch(
@@ -310,6 +319,7 @@ describe('TsgitRepository.withGitRepository', () => {
       // Assert
       expect(result).toBeInstanceOf(NotAGitRepositoryError)
       expect((result as NotAGitRepositoryError).path).toBe('/gone')
+      expect(Logger.error).not.toHaveBeenCalled()
     })
   })
 
@@ -318,7 +328,7 @@ describe('TsgitRepository.withGitRepository', () => {
       // Arrange
       const repo = makeRepo({ gitDir: '/x/.git' })
       repo.config.get.mockRejectedValue(
-        new TsgitError({ code: 'NOT_A_REPOSITORY', path: '/x' as FilePath })
+        new TsgitError({ code: 'NOT_A_REPOSITORY', path: FilePath.from('/x') })
       )
       repo.dispose.mockRejectedValue(new Error('dispose exploded'))
       openRepositoryMock.mockResolvedValue(repo)
@@ -331,6 +341,10 @@ describe('TsgitRepository.withGitRepository', () => {
       // Assert
       expect(result).toBeInstanceOf(NotAGitRepositoryError)
       expect((result as Error).message).not.toContain('dispose exploded')
+      expect(Logger.error).toHaveBeenCalledWith(
+        'Failed to dispose the git repository handle',
+        { reason: 'dispose exploded' }
+      )
     })
   })
 
@@ -346,6 +360,29 @@ describe('TsgitRepository.withGitRepository', () => {
 
       // Assert
       expect(result).toBe('value')
+      expect(Logger.error).toHaveBeenCalledWith(
+        'Failed to dispose the git repository handle',
+        { reason: 'dispose exploded' }
+      )
+    })
+  })
+
+  describe('given dispose rejects with a non-Error value', () => {
+    it('should still log a serialisable reason', async () => {
+      // Arrange
+      const repo = makeRepo({ gitDir: '/repo/.git' })
+      repo.dispose.mockRejectedValue('plain string failure')
+      openRepositoryMock.mockResolvedValue(repo)
+
+      // Act
+      const result = await withGitRepository(async () => 'value')
+
+      // Assert
+      expect(result).toBe('value')
+      expect(Logger.error).toHaveBeenCalledWith(
+        'Failed to dispose the git repository handle',
+        { reason: 'plain string failure' }
+      )
     })
   })
 })
