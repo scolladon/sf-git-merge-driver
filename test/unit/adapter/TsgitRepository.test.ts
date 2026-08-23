@@ -138,7 +138,10 @@ describe('TsgitRepository.withGitRepository', () => {
       expect((error as NotAGitRepositoryError).name).toBe(
         'NotAGitRepositoryError'
       )
-      expect((error as NotAGitRepositoryError).message).toContain('/x')
+      expect((error as NotAGitRepositoryError).message).toBe(
+        'not a git repository: /x — ' +
+          'run this command from inside a git working tree'
+      )
       expect(use).not.toHaveBeenCalled()
       expect(repo.dispose).toHaveBeenCalledTimes(1)
     })
