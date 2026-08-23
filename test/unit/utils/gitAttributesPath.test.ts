@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NotAGitRepositoryError } from '../../../src/adapter/GitRepository.js'
-import { getGitAttributesPath } from '../../../src/utils/gitUtils.js'
+import { getGitAttributesPath } from '../../../src/utils/gitAttributesPath.js'
 
 const { withGitRepositoryMock } = vi.hoisted(() => ({
   withGitRepositoryMock: vi.fn(),
@@ -11,7 +11,7 @@ vi.mock('../../../src/adapter/TsgitRepository.js', () => ({
   withGitRepository: (...args: unknown[]) => withGitRepositoryMock(...args),
 }))
 
-describe('gitUtils.getGitAttributesPath', () => {
+describe('gitAttributesPath.getGitAttributesPath', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })

@@ -8,11 +8,11 @@ import {
   UninstallService,
 } from '../../../src/service/UninstallService.js'
 import { parse } from '../../../src/utils/gitAttributesFile.js'
-import { getGitAttributesPath } from '../../../src/utils/gitUtils.js'
+import { getGitAttributesPath } from '../../../src/utils/gitAttributesPath.js'
 import { Logger } from '../../../src/utils/LoggingService.js'
 
 vi.mock('node:fs/promises')
-vi.mock('../../../src/utils/gitUtils.js')
+vi.mock('../../../src/utils/gitAttributesPath.js')
 
 const COMMON_GIT_DIR = '/repo/.git'
 

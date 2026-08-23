@@ -15,7 +15,7 @@ import {
   ruleWithAttr,
   serialise,
 } from '../utils/gitAttributesFile.js'
-import { getGitAttributesPath } from '../utils/gitUtils.js'
+import { getGitAttributesPath } from '../utils/gitAttributesPath.js'
 import { log } from '../utils/LoggingDecorator.js'
 import {
   type ConflictPolicy,

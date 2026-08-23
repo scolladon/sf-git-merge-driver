@@ -15,10 +15,10 @@ import {
   InstallService,
 } from '../../../src/service/InstallService.js'
 import { parse } from '../../../src/utils/gitAttributesFile.js'
-import { getGitAttributesPath } from '../../../src/utils/gitUtils.js'
+import { getGitAttributesPath } from '../../../src/utils/gitAttributesPath.js'
 
 vi.mock('node:fs/promises')
-vi.mock('../../../src/utils/gitUtils.js')
+vi.mock('../../../src/utils/gitAttributesPath.js')
 
 const GIT_ATTRIBUTES_PATH = '.git/info/attributes'
 const COMMON_GIT_DIR = '/repo/.git'
