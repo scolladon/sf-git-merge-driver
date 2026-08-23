@@ -1,3 +1,4 @@
+import { type FilePath, TsgitError } from '@scolladon/tsgit'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GitRepository } from '../../../src/adapter/GitRepository.js'
 import { NotAGitRepositoryError } from '../../../src/adapter/GitRepository.js'
@@ -7,7 +8,8 @@ const { openRepositoryMock } = vi.hoisted(() => ({
   openRepositoryMock: vi.fn(),
 }))
 
-vi.mock('@scolladon/tsgit', () => ({
+vi.mock('@scolladon/tsgit', async importOriginal => ({
+  ...(await importOriginal<typeof import('@scolladon/tsgit')>()),
   openRepository: (...args: unknown[]) => openRepositoryMock(...args),
 }))
 
@@ -27,7 +29,7 @@ type FakeRepo = {
 }
 
 const makeRepo = (layout: FakeLayout): FakeRepo => ({
-  layout,
+  layout: Object.freeze(layout),
   config: {
     get: vi.fn().mockResolvedValue(undefined),
     set: vi.fn().mockResolvedValue(undefined),
@@ -112,10 +114,9 @@ describe('TsgitRepository.withGitRepository', () => {
     it('should throw a NotAGitRepositoryError carrying the path and never invoke use, but still dispose', async () => {
       // Arrange
       const repo = makeRepo({ gitDir: '/x/.git' })
-      repo.config.get.mockRejectedValue({
-        name: 'TsgitError',
-        data: { code: 'NOT_A_REPOSITORY', path: '/x' },
-      })
+      repo.config.get.mockRejectedValue(
+        new TsgitError({ code: 'NOT_A_REPOSITORY', path: '/x' as FilePath })
+      )
       openRepositoryMock.mockResolvedValue(repo)
       const use = vi.fn()
 
@@ -138,10 +139,11 @@ describe('TsgitRepository.withGitRepository', () => {
     it('should rethrow the same error instance unchanged', async () => {
       // Arrange
       const repo = makeRepo({ gitDir: '/repo/.git' })
-      const rejection = {
-        name: 'TsgitError',
-        data: { code: 'CONFIG_SECTION_NOT_FOUND' },
-      }
+      const rejection = new TsgitError({
+        code: 'CONFIG_SECTION_NOT_FOUND',
+        name: 'merge.salesforce-source',
+        scope: 'local',
+      })
       repo.config.get.mockRejectedValue(rejection)
       openRepositoryMock.mockResolvedValue(repo)
 
@@ -153,11 +155,14 @@ describe('TsgitRepository.withGitRepository', () => {
     })
   })
 
-  describe('given the probe rejects with a TsgitError carrying no data', () => {
+  describe('given the probe rejects with a non-tsgit NOT_A_REPOSITORY look-alike', () => {
     it('should rethrow the error unchanged', async () => {
       // Arrange
       const repo = makeRepo({ gitDir: '/repo/.git' })
-      const rejection = { name: 'TsgitError' }
+      const rejection = {
+        name: 'TsgitError',
+        data: { code: 'NOT_A_REPOSITORY', path: '/x' },
+      }
       repo.config.get.mockRejectedValue(rejection)
       openRepositoryMock.mockResolvedValue(repo)
 
@@ -286,6 +291,61 @@ describe('TsgitRepository.withGitRepository', () => {
       // Assert
       expect(error).toBe(rejection)
       expect(repo.dispose).not.toHaveBeenCalled()
+    })
+  })
+  describe('given openRepository itself rejects with NOT_A_REPOSITORY', () => {
+    it('should map it to NotAGitRepositoryError and dispose nothing', async () => {
+      // Arrange
+      const sut = new TsgitError({
+        code: 'NOT_A_REPOSITORY',
+        path: '/gone' as FilePath,
+      })
+      openRepositoryMock.mockRejectedValue(sut)
+
+      // Act
+      const result = await withGitRepository(async () => undefined).catch(
+        e => e
+      )
+
+      // Assert
+      expect(result).toBeInstanceOf(NotAGitRepositoryError)
+      expect((result as NotAGitRepositoryError).path).toBe('/gone')
+    })
+  })
+
+  describe('given dispose rejects while an error is already in flight', () => {
+    it('should surface the original error, not the dispose failure', async () => {
+      // Arrange
+      const repo = makeRepo({ gitDir: '/x/.git' })
+      repo.config.get.mockRejectedValue(
+        new TsgitError({ code: 'NOT_A_REPOSITORY', path: '/x' as FilePath })
+      )
+      repo.dispose.mockRejectedValue(new Error('dispose exploded'))
+      openRepositoryMock.mockResolvedValue(repo)
+
+      // Act
+      const result = await withGitRepository(async () => undefined).catch(
+        e => e
+      )
+
+      // Assert
+      expect(result).toBeInstanceOf(NotAGitRepositoryError)
+      expect((result as Error).message).not.toContain('dispose exploded')
+    })
+  })
+
+  describe('given dispose rejects on the happy path', () => {
+    it('should still return the value produced by use', async () => {
+      // Arrange
+      const repo = makeRepo({ gitDir: '/repo/.git' })
+      repo.dispose.mockRejectedValue(new Error('dispose exploded'))
+      openRepositoryMock.mockResolvedValue(repo)
+
+      // Act
+      const result = await withGitRepository(async () => 'value')
+
+      // Assert
+      expect(result).toBe('value')
     })
   })
 })

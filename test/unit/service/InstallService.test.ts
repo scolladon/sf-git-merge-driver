@@ -162,8 +162,8 @@ describe('InstallService', () => {
       // Act
       await sut.installMergeDriver()
 
-      // Assert — config-before-attributes ordering (design requirement 8):
-      // a failed config write must never leave a dangling merge= rule.
+      // Assert — a failed config write must never leave a dangling
+      // merge= rule, so config is written first.
       const setConfigOrder = setConfig.mock.invocationCallOrder[1] as number
       const writeFileOrder = writeFileMocked.mock
         .invocationCallOrder[0] as number

@@ -1,4 +1,5 @@
 import { readFile, writeFile } from 'node:fs/promises'
+import { TsgitError } from '@scolladon/tsgit'
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest'
 import type { GitRepository } from '../../../src/adapter/GitRepository.js'
 import { DRIVER_NAME } from '../../../src/constant/driverConstant.js'
@@ -48,20 +49,14 @@ const FILTERED_CONTENT = 'some other content'
 const getGitAttributesPathMocked = vi.mocked(getGitAttributesPath)
 const readFileMocked = vi.mocked(readFile) as Mock
 
-// TsgitError is not a runtime export — a stand-in shape is the only way
-// to construct one. `removeSection` throws this when the merge driver's
-// config section is not installed.
-const configSectionNotFoundError = () => ({
-  name: 'TsgitError',
-  message:
-    'CONFIG_SECTION_NOT_FOUND: config section not found in scope local: ' +
-    `merge.${DRIVER_NAME}`,
-  data: {
+// `removeSection` throws this when the merge driver's config section is
+// not installed.
+const configSectionNotFoundError = () =>
+  new TsgitError({
     code: 'CONFIG_SECTION_NOT_FOUND',
     name: `merge.${DRIVER_NAME}`,
     scope: 'local',
-  },
-})
+  })
 
 describe('UninstallService', () => {
   let sut: UninstallService
@@ -109,7 +104,7 @@ describe('UninstallService', () => {
   describe('given config cleanup fails when uninstalling', () => {
     it('then still cleans up attributes', async () => {
       // Arrange
-      removeSection.mockRejectedValue(configSectionNotFoundError())
+      removeSection.mockRejectedValueOnce(configSectionNotFoundError())
 
       // Act
       await sut.uninstallMergeDriver()
@@ -127,8 +122,8 @@ describe('UninstallService', () => {
       // Arrange
       const configError = configSectionNotFoundError()
       const attrsError = new Error('Failed to cleanup git attributes')
-      removeSection.mockRejectedValue(configError)
-      readFileMocked.mockRejectedValue(attrsError)
+      removeSection.mockRejectedValueOnce(configError)
+      readFileMocked.mockRejectedValueOnce(attrsError)
 
       // Act
       await expect(sut.uninstallMergeDriver()).resolves.not.toThrow()
