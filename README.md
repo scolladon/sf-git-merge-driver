@@ -231,7 +231,7 @@ The plugin writes to the repository's shared git directory — the same location
 
 ### Repository layout compatibility
 
-The installer resolves the attributes file in-process — no git binary is shelled out to — from the repository's shared git directory (the equivalent of `git rev-parse --git-common-dir`), discovered from the current working directory or taken from `GIT_DIR` when set. A single install applies correctly across all of these layouts:
+The installer resolves the attributes file in-process — no git binary is shelled out to — from the repository's shared git directory (the equivalent of `git rev-parse --git-common-dir`), discovered from the current working directory, or taken from `GIT_DIR` / `GIT_COMMON_DIR` when set. A single install applies correctly across all of these layouts:
 
 | Layout | Where attributes are written | Notes |
 |---|---|---|
@@ -240,6 +240,7 @@ The installer resolves the attributes file in-process — no git binary is shell
 | **Submodules** | `<super>/.git/modules/<sub>/info/attributes` | Run install from inside the submodule; it registers the driver against that submodule's git dir. |
 | **Bare repos** | `<bare-repo>/info/attributes` | Works without a working tree (useful for server-side merges or scripted recovery). |
 | **Custom `GIT_DIR`** (env var) | `$GIT_DIR/info/attributes` | Honoured — an explicit `GIT_DIR` wins over discovery, as it does for git itself. An empty value is treated as unset. A `GIT_DIR` that does not point at a real repository is refused before anything is written. |
+| **Custom `GIT_COMMON_DIR`** (env var) | `$GIT_COMMON_DIR/info/attributes` | Honoured, and independent of `GIT_DIR` — attributes and config are shared, non-worktree files, so they follow the common dir exactly as `git rev-parse --git-common-dir` reports it. |
 
 ## Advanced: direct binary invocation (for scripts)
 

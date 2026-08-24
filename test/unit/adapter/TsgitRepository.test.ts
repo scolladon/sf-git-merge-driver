@@ -388,6 +388,67 @@ describe('TsgitRepository.withGitRepository', () => {
       )
     })
   })
+  describe('given GIT_COMMON_DIR is set in the environment', () => {
+    it('should forward it to openRepository as an explicit commonDir', async () => {
+      // Arrange
+      vi.stubEnv('GIT_COMMON_DIR', '/shared/.git')
+      const repo = makeRepo({ gitDir: '/repo/.git' })
+      openRepositoryMock.mockResolvedValue(repo)
+
+      // Act
+      await withGitRepository(async gitRepo => gitRepo.commonGitDir)
+
+      // Assert
+      expect(openRepositoryMock.mock.calls[0]?.[0]).toStrictEqual({
+        commonDir: '/shared/.git',
+        hooks: false,
+        command: false,
+      })
+      vi.unstubAllEnvs()
+    })
+  })
+
+  describe('given both GIT_DIR and GIT_COMMON_DIR are set', () => {
+    it('should forward both, as git treats them independently', async () => {
+      // Arrange
+      vi.stubEnv('GIT_DIR', '/elsewhere/.git')
+      vi.stubEnv('GIT_COMMON_DIR', '/shared/.git')
+      const repo = makeRepo({ gitDir: '/elsewhere/.git' })
+      openRepositoryMock.mockResolvedValue(repo)
+
+      // Act
+      await withGitRepository(async gitRepo => gitRepo.commonGitDir)
+
+      // Assert
+      expect(openRepositoryMock.mock.calls[0]?.[0]).toStrictEqual({
+        gitDir: '/elsewhere/.git',
+        commonDir: '/shared/.git',
+        hooks: false,
+        command: false,
+      })
+      vi.unstubAllEnvs()
+    })
+  })
+
+  describe('given GIT_COMMON_DIR is set to an empty string', () => {
+    it('should treat it as unset, exactly as git does', async () => {
+      // Arrange
+      vi.stubEnv('GIT_COMMON_DIR', '')
+      const repo = makeRepo({ gitDir: '/repo/.git' })
+      openRepositoryMock.mockResolvedValue(repo)
+
+      // Act
+      await withGitRepository(async gitRepo => gitRepo.commonGitDir)
+
+      // Assert
+      expect(openRepositoryMock.mock.calls[0]?.[0]).toStrictEqual({
+        hooks: false,
+        command: false,
+      })
+      vi.unstubAllEnvs()
+    })
+  })
+
   describe('given GIT_DIR is set in the environment', () => {
     it('should forward it to openRepository as an explicit gitDir', async () => {
       // Arrange

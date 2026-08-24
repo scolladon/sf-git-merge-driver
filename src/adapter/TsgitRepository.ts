@@ -48,14 +48,28 @@ const disposeQuietly = async (repo: Repository): Promise<void> => {
   }
 }
 
-// tsgit reads no environment variable of its own, so honouring `GIT_DIR` is
-// this adapter's job: git's own precedence is that an explicit git dir wins
-// over discovery from the working directory. An empty value is treated as
-// unset, matching git. Unlike git, tsgit does not validate the target at open
-// time — the repository probe below is what refuses a bogus one.
-const explicitGitDir = (): Pick<OpenRepositoryOptions, 'gitDir'> => {
-  const fromEnv = process.env['GIT_DIR']
-  return fromEnv === undefined || fromEnv === '' ? {} : { gitDir: fromEnv }
+// tsgit reads no environment variable of its own, so honouring git's layout
+// variables is this adapter's job. `GIT_DIR` overrides discovery from the
+// working directory; `GIT_COMMON_DIR` independently overrides where the
+// shared, non-worktree files (config, info/attributes) live. Empty values are
+// treated as unset, matching git. Unlike git, tsgit does not validate the
+// targets at open time — the repository probe below is what refuses a bogus
+// one.
+const fromEnv = (name: string): string | undefined => {
+  const value = process.env[name]
+  return value === '' ? undefined : value
+}
+
+const explicitLayout = (): Pick<
+  OpenRepositoryOptions,
+  'gitDir' | 'commonDir'
+> => {
+  const gitDir = fromEnv('GIT_DIR')
+  const commonDir = fromEnv('GIT_COMMON_DIR')
+  return {
+    ...(gitDir === undefined ? {} : { gitDir }),
+    ...(commonDir === undefined ? {} : { commonDir }),
+  }
 }
 
 export const withGitRepository = async <T>(
@@ -67,7 +81,7 @@ export const withGitRepository = async <T>(
     // layout, so the probe below — not the open — is what proves we are in
     // one. The open can still reject on a structurally broken layout.
     repo = await openRepository({
-      ...explicitGitDir(),
+      ...explicitLayout(),
       hooks: false,
       command: false,
     })

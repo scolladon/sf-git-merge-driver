@@ -245,6 +245,31 @@ describe('git merge driver repository layout contracts', () => {
       expect(cwdConfig).to.not.include(`merge.${DRIVER_NAME}`)
     })
 
+    it('Given GIT_COMMON_DIR set, When installing, Then the shared files land in that directory', () => {
+      // Arrange — stand in one repository, point the SHARED dir at another
+      const cwdRepo = join(root, 'common-cwd')
+      const sharedRepo = join(root, 'common-shared')
+      gitInit(cwdRepo)
+      gitInit(sharedRepo)
+
+      // Act
+      execCmd('git merge driver install', {
+        ensureExitCode: 0,
+        cwd: cwdRepo,
+        env: { ...process.env, GIT_COMMON_DIR: join(sharedRepo, '.git') },
+      })
+
+      // Assert — attributes are a shared, non-worktree file, so they follow
+      // GIT_COMMON_DIR exactly as `git rev-parse --git-common-dir` reports it
+      const sharedAttrs = join(sharedRepo, '.git', 'info', 'attributes')
+      expect(existsSync(sharedAttrs)).to.be.true
+      expect(readFileSync(sharedAttrs, 'utf-8')).to.include(
+        `merge=${DRIVER_NAME}`
+      )
+      expect(existsSync(join(cwdRepo, '.git', 'info', 'attributes'))).to.be
+        .false
+    })
+
     it('Given GIT_DIR pointing at a non-repository, When installing, Then it exits non-zero and writes nothing', () => {
       // Arrange
       const cwdRepo = join(root, 'env-guard-cwd')
