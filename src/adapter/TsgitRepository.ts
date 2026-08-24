@@ -4,6 +4,7 @@ import {
   type Repository,
   TsgitError,
 } from '@scolladon/tsgit'
+import { commonDirOf } from '@scolladon/tsgit/primitives'
 import { Logger } from '../utils/LoggingService.js'
 import { type GitRepository, NotAGitRepositoryError } from './GitRepository.js'
 
@@ -17,14 +18,8 @@ const isNotARepositoryError = (
 ): error is TsgitError & { data: { code: typeof NOT_A_REPOSITORY } } =>
   error instanceof TsgitError && error.data.code === NOT_A_REPOSITORY
 
-// `commonDir` is absent for a normal repo and the main worktree, and set only
-// for a linked worktree. Spelled as an explicit conditional rather than `??`
-// so the two arms stay independently observable.
-const commonGitDirOf = (layout: Repository['layout']): string =>
-  layout.commonDir === undefined ? layout.gitDir : layout.commonDir
-
 const asGitRepository = (repo: Repository): GitRepository => ({
-  commonGitDir: commonGitDirOf(repo.layout),
+  commonGitDir: commonDirOf(repo.layout),
   setConfig: async (key, value) => {
     await repo.config.set({ key, value, scope: LOCAL_SCOPE })
   },
