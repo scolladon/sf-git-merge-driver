@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1](https://github.com/scolladon/sf-git-merge-driver/compare/v2.0.0...v2.0.1) (2026-08-26)
+
+
+### Bug Fixes
+
+* **git:** resolve the repository without shelling out to git ([#215](https://github.com/scolladon/sf-git-merge-driver/issues/215)) ([8f968ac](https://github.com/scolladon/sf-git-merge-driver/commit/8f968ac1188aa8156647b15dc66804d157c06204))
+
 ## [2.0.0](https://github.com/scolladon/sf-git-merge-driver/compare/v1.9.1...v2.0.0) (2026-08-06)
 
 
