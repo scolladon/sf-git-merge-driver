@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786021866224,
+  "lastUpdate": 1787746449508,
   "repoUrl": "https://github.com/scolladon/sf-git-merge-driver",
   "entries": {
     "Binary Size Benchmark": [
@@ -492,6 +492,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "bin/merge-driver.cjs",
             "value": 38513,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "colladonsebastien@gmail.com",
+            "name": "Sebastien",
+            "username": "scolladon"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8f968ac1188aa8156647b15dc66804d157c06204",
+          "message": "fix(git): resolve the repository without shelling out to git (#215)",
+          "timestamp": "2026-08-26T14:11:39+02:00",
+          "tree_id": "78dcc880e5c830eebdf3d121a2171dc5cc0e057f",
+          "url": "https://github.com/scolladon/sf-git-merge-driver/commit/8f968ac1188aa8156647b15dc66804d157c06204"
+        },
+        "date": 1787746449436,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "bin/merge-driver.cjs",
+            "value": 38701,
             "unit": "bytes"
           }
         ]
