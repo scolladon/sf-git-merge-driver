@@ -1,18 +1,30 @@
 import { readFile, writeFile } from 'node:fs/promises'
-import simpleGit from 'simple-git'
+import { TsgitError } from '@scolladon/tsgit'
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest'
+import type { GitRepository } from '../../../src/adapter/GitRepository.js'
 import { DRIVER_NAME } from '../../../src/constant/driverConstant.js'
 import {
   applyUninstallPlan,
   UninstallService,
 } from '../../../src/service/UninstallService.js'
 import { parse } from '../../../src/utils/gitAttributesFile.js'
-import { getGitAttributesPath } from '../../../src/utils/gitUtils.js'
+import { getGitAttributesPath } from '../../../src/utils/gitAttributesPath.js'
 import { Logger } from '../../../src/utils/LoggingService.js'
 
 vi.mock('node:fs/promises')
-vi.mock('simple-git')
-vi.mock('../../../src/utils/gitUtils.js')
+vi.mock('../../../src/utils/gitAttributesPath.js')
+
+const COMMON_GIT_DIR = '/repo/.git'
+
+const { setConfig, removeSection } = vi.hoisted(() => ({
+  setConfig: vi.fn(),
+  removeSection: vi.fn(),
+}))
+
+vi.mock('../../../src/adapter/TsgitRepository.js', () => ({
+  withGitRepository: (use: (repo: GitRepository) => Promise<unknown>) =>
+    use({ commonGitDir: COMMON_GIT_DIR, setConfig, removeSection }),
+}))
 vi.mock('../../../src/utils/LoggingService.js', async importOriginal => {
   const actual =
     await importOriginal<
@@ -34,14 +46,17 @@ const GIT_ATTRIBUTES_PATH = '.git/info/attributes'
 const ATTRIBUTES_CONTENT = `*.xml merge=salesforce-source\nsome other content`
 const FILTERED_CONTENT = 'some other content'
 
-const mockedRaw = vi.fn()
-const simpleGitMock = simpleGit as unknown as Mock
-simpleGitMock.mockReturnValue({
-  raw: mockedRaw,
-})
-
 const getGitAttributesPathMocked = vi.mocked(getGitAttributesPath)
 const readFileMocked = vi.mocked(readFile) as Mock
+
+// `removeSection` throws this when the merge driver's config section is
+// not installed.
+const configSectionNotFoundError = () =>
+  new TsgitError({
+    code: 'CONFIG_SECTION_NOT_FOUND',
+    name: `merge.${DRIVER_NAME}`,
+    scope: 'local',
+  })
 
 describe('UninstallService', () => {
   let sut: UninstallService
@@ -59,11 +74,7 @@ describe('UninstallService', () => {
       await sut.uninstallMergeDriver()
 
       // Assert
-      expect(mockedRaw).toHaveBeenCalledWith([
-        'config',
-        '--remove-section',
-        `merge.${DRIVER_NAME}`,
-      ])
+      expect(removeSection).toHaveBeenCalledWith(`merge.${DRIVER_NAME}`)
     })
 
     it('then writes filtered content back', async () => {
@@ -93,7 +104,7 @@ describe('UninstallService', () => {
   describe('given config cleanup fails when uninstalling', () => {
     it('then still cleans up attributes', async () => {
       // Arrange
-      mockedRaw.mockRejectedValue(new Error('Failed to cleanup git config'))
+      removeSection.mockRejectedValueOnce(configSectionNotFoundError())
 
       // Act
       await sut.uninstallMergeDriver()
@@ -109,10 +120,10 @@ describe('UninstallService', () => {
   describe('given both config and attributes cleanup fail when uninstalling', () => {
     it('then fails silently AND both errors are logged with their distinct prefixes', async () => {
       // Arrange
-      const configError = new Error('Failed to cleanup git config')
+      const configError = configSectionNotFoundError()
       const attrsError = new Error('Failed to cleanup git attributes')
-      mockedRaw.mockRejectedValue(configError)
-      readFileMocked.mockRejectedValue(attrsError)
+      removeSection.mockRejectedValueOnce(configError)
+      readFileMocked.mockRejectedValueOnce(attrsError)
 
       // Act
       await expect(sut.uninstallMergeDriver()).resolves.not.toThrow()
@@ -275,7 +286,7 @@ describe('UninstallService', () => {
       const outcome = await sut.uninstallMergeDriver({ dryRun: true })
 
       // Assert — side effects suppressed
-      expect(mockedRaw).not.toHaveBeenCalled()
+      expect(removeSection).not.toHaveBeenCalled()
       expect(writeFile).not.toHaveBeenCalled()
 
       // Assert — plan preview available: one drop, one rewrite

@@ -186,12 +186,27 @@ classDiagram
 
     XmlParser <|.. TxmlXmlParser
     XmlSerializer <|.. XmlStreamWriter
+
+    class GitRepository {
+        <<interface>>
+        +commonGitDir string
+        +setConfig(key, value) Promise~void~
+        +removeSection(name) Promise~void~
+    }
+
+    class TsgitRepository {
+        +withGitRepository(use) Promise~T~
+    }
+
+    GitRepository <|.. TsgitRepository
 ```
 
 - **`XmlParser` port** — Reads XML from a `Readable` (or a string), returns `NormalisedParseResult = { content, namespaces }`.
 - **`XmlSerializer` port** — Writes the serialized document to a `Writable`: XML declaration, elements (open/close/cdata/comment), namespaces on the first top-level element, and inline conflict-block expansion. When the whole document is a single conflict block there is no first top-level element, so the root element of each non-blank side carries the namespaces instead. The optional `hasConflict` parameter (defaults to `true`) lets callers skip the conflict-line filter when the merge produced no `ConflictBlock` — the common case.
 - **`TxmlXmlParser`** — Adapter wrapping the `txml` library (1.5 KiB gzipped, zero deps after our preprocess). Pre-processes `<![CDATA[…]]>` regions into a sentinel element before parsing (txml flattens CDATA into text, losing the boundary the writer needs to preserve). After parsing, walks tXml's `TNode { tagName, attributes, children }` tree once, converting it to the compact JsonObject shape the merger and writer expect: collapses repeated same-name siblings into arrays, prefixes attributes with `@_`, extracts root `xmlns*` into the namespaces bucket, decodes the CDATA sentinel back into `__cdata` keys, and runs a tag-balance check to throw on malformed input (txml itself is permissive). The conversion is benchmark-measured 62-67 % faster end-to-end than the previous `@nodable/flexible-xml-parser` adapter, with a -70 % bundle-size reduction (110 KiB → 33.5 KiB). See `docs/plans/2026-04-25-parser-spike-txml-vs-sax.md` for the spike that justified the swap.
 - **`XmlStreamWriter`** — Single recursive walker (`writeRoot` → `writeElement` → `writeChildren`) that appends serialized XML directly to a mutable `WalkState.buf` string. No generators, no per-chunk object allocations, no `for...of` over generators. `getIndent` memoises the per-depth `\n + N×indent` prefix. The walker is sync; only `writeTo` is async, awaiting `out.write`'s drain signal once at the end (no-conflict path) or per 16 KiB filter window (conflict path). Child element tags and attributes within each node are emitted in **first-seen (source) order** — the insertion order of keys in the compact JSON object as set by the parser — rather than alphabetical order. Because `TxmlXmlParser` preserves source tag order and `sf project retrieve` writes files in the Metadata API XSD `xs:sequence` order, the driver's output matches the canonical Salesforce order for retrieve-sourced files. This is a layout-only property: it does not affect merge decisions (see §6 below).
+- **`GitRepository` port** — Exposes `commonGitDir` (absolute path to the repository's shared git directory), `setConfig(key, value)`, and `removeSection(name)`. Keeps `gitAttributesPath.ts`, `InstallService`, and `UninstallService` free of any git-library import; the port throws `NotAGitRepositoryError` when the caller is not inside a git working tree.
+- **`TsgitRepository`** — The single file that imports `@scolladon/tsgit`, wired through `withGitRepository(use)`. Opens the repository with `hooks: false` and `command: false` so a hostile repository's `.git/hooks/*` scripts or a configured `[merge].driver` command can never execute during install/uninstall. `openRepository` itself succeeds even outside a repository, returning a synthetic layout, so a probe of `core.repositoryformatversion` (local scope) runs before anything reads the layout — that probe, not the open, is what proves the current directory is a real repository. The handle is disposed in a `finally`. The shared git dir is resolved with the vendor's own `commonDirOf(layout)` (from the `@scolladon/tsgit/primitives` subpath) rather than a hand-rolled `commonDir ?? gitDir`, so the linked-worktree semantics stay owned by the library. `GIT_DIR` and `GIT_COMMON_DIR` are read here and forwarded as explicit `gitDir` / `commonDir` options, because tsgit consults no environment variable of its own.
 
 ## Binary Entry Point
 

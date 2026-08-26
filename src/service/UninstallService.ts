@@ -1,5 +1,5 @@
 import { readFile, writeFile } from 'node:fs/promises'
-import { simpleGit } from 'simple-git'
+import { withGitRepository } from '../adapter/TsgitRepository.js'
 import { DRIVER_NAME } from '../constant/driverConstant.js'
 import {
   type Line,
@@ -8,7 +8,7 @@ import {
   ruleWithoutAttr,
   serialise,
 } from '../utils/gitAttributesFile.js'
-import { getGitAttributesPath } from '../utils/gitUtils.js'
+import { getGitAttributesPath } from '../utils/gitAttributesPath.js'
 import { log } from '../utils/LoggingDecorator.js'
 import { Logger } from '../utils/LoggingService.js'
 import { planUninstall, type UninstallPlan } from './GitAttributesPlanner.js'
@@ -81,10 +81,11 @@ export class UninstallService {
 
     let removedConfigSection = false
     if (!dryRun) {
-      const git = simpleGit()
       try {
         // Throws when the merge driver is not installed
-        await git.raw(['config', '--remove-section', `merge.${DRIVER_NAME}`])
+        await withGitRepository(repo =>
+          repo.removeSection(`merge.${DRIVER_NAME}`)
+        )
         removedConfigSection = true
       } catch (error) {
         Logger.error(

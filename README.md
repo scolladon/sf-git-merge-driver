@@ -96,7 +96,7 @@ One case has no answer in the data: when **both** branches introduce *different*
 
 ## Installation (30 seconds)
 
-> **Requires Node.js >= 22.19.** Node 18 and 20 are end-of-life and are no longer
+> **Requires Node.js >= 22.22.1.** Node 18 and 20 are end-of-life and are no longer
 > supported by the Salesforce CLI ([forcedotcom/cli#3603](https://github.com/forcedotcom/cli/issues/3603)).
 
 ### With Salesforce CLI
@@ -227,11 +227,11 @@ grep "merge=salesforce-source" .git/info/attributes
 
 ## Specificities in CI/CD context
 
-The plugin writes to `$GIT_COMMON_DIR/info/attributes`. The installer creates the `info/` directory and the `attributes` file on demand if either is missing (some `git init` implementations — notably Apple Git ≥ 2.50 — do not create `info/` on a fresh repository), so the only precondition is a real git repository: ensure the repository is cloned / checked out / `git init`'d in your CI/CD context before running install.
+The plugin writes to the repository's shared git directory — the same location `git rev-parse --git-common-dir` would report — at `info/attributes`. The installer creates the `info/` directory and the `attributes` file on demand if either is missing (some `git init` implementations — notably Apple Git ≥ 2.50 — do not create `info/` on a fresh repository), so the only precondition is a real git repository: ensure the repository is cloned / checked out / `git init`'d in your CI/CD context before running install.
 
 ### Repository layout compatibility
 
-The installer resolves the attributes file via `git rev-parse --git-common-dir`, so a single install applies correctly across all of these layouts:
+The installer resolves the attributes file in-process — no git binary is shelled out to — from the repository's shared git directory (the equivalent of `git rev-parse --git-common-dir`), discovered from the current working directory, or taken from `GIT_DIR` / `GIT_COMMON_DIR` when set. A single install applies correctly across all of these layouts:
 
 | Layout | Where attributes are written | Notes |
 |---|---|---|
@@ -239,7 +239,8 @@ The installer resolves the attributes file via `git rev-parse --git-common-dir`,
 | **Linked worktrees** (`git worktree add`) | `<main>/.git/info/attributes` | Single install applies to **every** worktree of the repository — install once, no need to re-run in each worktree. |
 | **Submodules** | `<super>/.git/modules/<sub>/info/attributes` | Run install from inside the submodule; it registers the driver against that submodule's git dir. |
 | **Bare repos** | `<bare-repo>/info/attributes` | Works without a working tree (useful for server-side merges or scripted recovery). |
-| **Custom `GIT_DIR`** (env var) | `$GIT_DIR/info/attributes` | Honoured. Path is canonicalised, so traversal components like `GIT_DIR=../..` cannot escape the repository. |
+| **Custom `GIT_DIR`** (env var) | `$GIT_DIR/info/attributes` | Honoured — an explicit `GIT_DIR` wins over discovery, as it does for git itself. An empty value is treated as unset. A `GIT_DIR` that does not point at a real repository is refused before anything is written. |
+| **Custom `GIT_COMMON_DIR`** (env var) | `$GIT_COMMON_DIR/info/attributes` | Honoured, and independent of `GIT_DIR` — attributes and config are shared, non-worktree files, so they follow the common dir exactly as `git rev-parse --git-common-dir` reports it. |
 
 ## Advanced: direct binary invocation (for scripts)
 
