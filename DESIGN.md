@@ -267,7 +267,7 @@ src/**/*.ts → tsc → lib/**/*.js → esbuild (minify, treeshake, cjs) → bin
 
 Key build choices:
 - `keepNames: false` — saves ~22 KB; `@log('ClassName')` decorator passes names as string literals instead
-- Shebang + compile-cache banner — `module.enableCompileCache()` gated on Node ≥ 22.8 (stable API)
+- Shebang banner only. `module.enableCompileCache()` was measured as a no-op for a single-file bundle (see *Measured and rejected*)
 - `__VERSION__` + `__BUNDLED__` injected via esbuild `--define` from `package.json`
 
 Implementation: [tooling/build-bin.mjs](tooling/build-bin.mjs)

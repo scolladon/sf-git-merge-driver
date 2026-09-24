@@ -1,5 +1,5 @@
 /// <reference types="node" />
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import {
   existsSync,
   mkdirSync,
@@ -55,6 +55,18 @@ const runBinary = (args: string[]): SpawnResult => {
       stderr: e.stderr ?? '',
     }
   }
+}
+
+const runBinaryWithEnv = (
+  args: string[],
+  env: NodeJS.ProcessEnv
+): SpawnResult => {
+  const r = spawnSync('node', [BINARY, ...args], {
+    cwd: ROOT_FOLDER,
+    encoding: 'utf-8',
+    env: { ...process.env, ...env },
+  })
+  return { status: r.status ?? -1, stdout: r.stdout, stderr: r.stderr }
 }
 
 describe('bin/merge-driver.cjs', () => {
@@ -219,6 +231,14 @@ describe('bin/merge-driver.cjs', () => {
       for (const flag of ['-O', '-A', '-B', '-P', '-L', '-S', '-X', '-Y']) {
         expect(stdout).to.include(flag)
       }
+    })
+
+    it('Given NODE_DEBUG_NATIVE=COMPILE_CACHE, When running --version, Then stderr carries no compile-cache line', () => {
+      const { status, stderr } = runBinaryWithEnv(['--version'], {
+        NODE_DEBUG_NATIVE: 'COMPILE_CACHE',
+      })
+      expect(status).to.equal(0)
+      expect(stderr).to.not.match(/compile cache/i)
     })
   })
 })
