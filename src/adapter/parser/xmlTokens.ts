@@ -1,4 +1,4 @@
-export const ATTR_PREFIX = '@_'
+export const CLOSE_TAG_OPEN = '</'
 export const CDATA_OPEN = '<![CDATA['
 export const CDATA_CLOSE = ']]>'
 export const COMMENT_OPEN = '<!--'

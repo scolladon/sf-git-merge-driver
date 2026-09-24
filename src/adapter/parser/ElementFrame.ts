@@ -1,6 +1,5 @@
-import { TEXT_TAG } from '../../constant/parserConstant.js'
+import { ATTR_PREFIX, TEXT_TAG } from '../../constant/parserConstant.js'
 import type { JsonObject, JsonValue } from '../../types/jsonTypes.js'
-import { ATTR_PREFIX } from './xmlTokens.js'
 
 type ElementAttrs = Readonly<Record<string, string | null>>
 
@@ -21,13 +20,15 @@ export const NO_ATTRS: AttrSet = Object.freeze({
 // node shape in Salesforce metadata — never allocates a Map.
 export class ElementFrame {
   readonly name: string
-  private readonly attrSet: AttrSet
+  private readonly attrs: ElementAttrs
+  private readonly hasAttrs: boolean
   private textBuf = ''
   private grouped: Map<string, JsonValue[]> | undefined
 
-  constructor(name: string, attrSet: AttrSet) {
+  constructor(name: string, { attrs, hasAttrs }: AttrSet) {
     this.name = name
-    this.attrSet = attrSet
+    this.attrs = attrs
+    this.hasAttrs = hasAttrs
   }
 
   addText(text: string): void {
@@ -45,7 +46,7 @@ export class ElementFrame {
   }
 
   toCompact(): JsonValue {
-    if (!this.attrSet.hasAttrs && this.grouped === undefined) {
+    if (!this.hasAttrs && this.grouped === undefined) {
       return this.textBuf
     }
     const out: JsonObject = Object.create(null)
@@ -56,8 +57,7 @@ export class ElementFrame {
   }
 
   private writeAttrsInto(out: JsonObject): void {
-    const { attrs } = this.attrSet
-    for (const k in attrs) out[`${ATTR_PREFIX}${k}`] = attrs[k]
+    for (const k in this.attrs) out[`${ATTR_PREFIX}${k}`] = this.attrs[k]
   }
 
   private writeGroupedInto(out: JsonObject): void {

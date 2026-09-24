@@ -428,11 +428,10 @@ describe('assertBalancedTags', () => {
     ['<!--->', '<a><!---> x --></a>'],
   ])('given the short comment opener %s with a later -->', (_, xml) => {
     it('when called then the comment runs to that --> and balances', () => {
-      // Arrange
-      const input = xml
+      // Arrange — the input comes from the table above
 
       // Act
-      const act = () => assertBalancedTags(input)
+      const act = () => assertBalancedTags(xml)
 
       // Assert
       expect(act).not.toThrow()

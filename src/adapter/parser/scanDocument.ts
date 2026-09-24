@@ -1,4 +1,5 @@
 import {
+  ATTR_PREFIX,
   CDATA_PROP_NAME,
   XML_COMMENT_PROP_NAME,
 } from '../../constant/parserConstant.js'
@@ -21,9 +22,9 @@ import {
   unexpectedCloseTag,
 } from './parseErrors.js'
 import {
-  ATTR_PREFIX,
   CDATA_CLOSE,
   CDATA_OPEN,
+  CLOSE_TAG_OPEN,
   COMMENT_CLOSE,
   COMMENT_OPEN,
   DECLARATION_OPEN,
@@ -138,13 +139,13 @@ class DocumentScanner {
   }
 
   private scanClose(): ScanOutcome | undefined {
-    const gt = this.xml.indexOf('>', this.pos + 2)
+    const gt = this.xml.indexOf('>', this.pos + CLOSE_TAG_OPEN.length)
     if (gt < 0) return failed(UNTERMINATED_TAG)
     if (this.stack.length === 1) {
       this.needsOracle = true
       return this.parsedResult()
     }
-    const closeText = this.xml.slice(this.pos + 2, gt)
+    const closeText = this.xml.slice(this.pos + CLOSE_TAG_OPEN.length, gt)
     const frame = this.stack[this.stack.length - 1]
     if (closeText.indexOf(frame.name) === -1) {
       return failed(unexpectedCloseTag(this.xml, gt))
@@ -186,7 +187,7 @@ class DocumentScanner {
   }
 
   private scanBang(): ScanOutcome | undefined {
-    const c2 = this.xml.charCodeAt(this.pos + 2)
+    const c2 = this.xml.charCodeAt(this.pos + DECLARATION_OPEN.length)
     if (c2 === DASH && this.xml.startsWith(COMMENT_OPEN, this.pos)) {
       return this.scanComment()
     }
@@ -196,6 +197,9 @@ class DocumentScanner {
     return this.scanDeclaration()
   }
 
+  // The close search starts right after `<!`, not after `<!--`, so an
+  // opener overlapping its own `-->` (`<!-->`, `<!--->`) is caught as a
+  // short comment.
   private scanComment(): ScanOutcome | undefined {
     const end = this.xml.indexOf(
       COMMENT_CLOSE,

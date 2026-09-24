@@ -798,11 +798,10 @@ describe('scanDocument', () => {
     'given a self-closing tag with a %s-quoted > in an attribute',
     (_, xml) => {
       it('when scanning then the tag still self-closes with the full value', () => {
-        // Arrange
-        const input = xml
+        // Arrange — the input comes from the table above
 
         // Act
-        const outcome = scanDocument(input)
+        const outcome = scanDocument(xml)
 
         // Assert
         expect(outcome).toEqual({

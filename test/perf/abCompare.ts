@@ -154,10 +154,19 @@ const createBaseSide = (ref: string): string => {
   return dir
 }
 
-const createCandSide = (): string => {
-  const dir = mkdtempSync(join(tmpdir(), 'ab-cand-'))
+const copyWorkingTree = (dir: string): void => {
   for (const entry of COPIED_ENTRIES) {
     cpSync(join(REPO_ROOT, entry), join(dir, entry), { recursive: true })
+  }
+}
+
+const createCandSide = (): string => {
+  const dir = mkdtempSync(join(tmpdir(), 'ab-cand-'))
+  try {
+    copyWorkingTree(dir)
+  } catch (error) {
+    cleanupDirs([dir])
+    throw error
   }
   return dir
 }
@@ -250,11 +259,10 @@ const importExport = async <T>(
   guard: (value: unknown) => value is T
 ): Promise<T> => {
   const mod: unknown = await import(pathToFileURL(path).href)
-  const record =
+  const value =
     typeof mod === 'object' && mod !== null
-      ? (mod as Record<string, unknown>)
-      : {}
-  const value = record[exportName]
+      ? Reflect.get(mod, exportName)
+      : undefined
   if (!guard(value)) {
     throw new Error(`${path} does not export a valid ${exportName}`)
   }
@@ -376,21 +384,25 @@ const collectRound = async (
   return { base: await measured(samplers.base), cand }
 }
 
+interface PairedSamples extends Pair<number[]> {
+  readonly ratios: number[]
+}
+
 const collectPairedSamples = async (
   sampleBase: () => Promise<number>,
   sampleCand: () => Promise<number>,
   rounds: number
-): Promise<Pair<number[]>> => {
+): Promise<PairedSamples> => {
   const samplers = { base: sampleBase, cand: sampleCand }
   for (let i = 0; i < WARMUP_SAMPLES; i++) await collectRound(samplers, true)
-  const base: number[] = []
-  const cand: number[] = []
+  const samples: PairedSamples = { base: [], cand: [], ratios: [] }
   for (let i = 0; i < rounds; i++) {
     const round = await collectRound(samplers, i % 2 === 0)
-    base.push(round.base)
-    cand.push(round.cand)
+    samples.base.push(round.base)
+    samples.cand.push(round.cand)
+    samples.ratios.push(round.cand / round.base)
   }
-  return { base, cand }
+  return samples
 }
 
 const median = (values: readonly number[]): number => {
@@ -414,27 +426,35 @@ interface Row {
   readonly gated: boolean
 }
 
-// A side whose median sits this far above its min was disturbed by
-// something outside the code under test; its verdict is not trusted.
-const NOISE_LIMIT = 1.1
+// Interquartile spread of the per-round ratios, relative to their
+// median, above which a row's verdict is not trusted. Drift that hits
+// both sides of a round cancels in the ratio and does not count.
+const RATIO_SPREAD_LIMIT = 0.1
+const LOWER_QUARTILE = 0.25
+const UPPER_QUARTILE = 0.75
 const PERCENT = 100
 
 interface RowDescriptor {
   readonly tier: string
   readonly label: string
-  readonly samples: Pair<number[]>
+  readonly samples: PairedSamples
   readonly gated: boolean
 }
 
 // Median of the per-round ratios, so drift that hits both sides of a
 // round cancels out instead of skewing two independent medians.
-const pairedDeltaPct = (samples: Pair<number[]>): number => {
-  const ratios = samples.base.map((base, i) => (samples.cand[i] ?? 0) / base)
-  return (median(ratios) - 1) * PERCENT
+const pairedDeltaPct = (ratios: readonly number[]): number =>
+  (median(ratios) - 1) * PERCENT
+
+const quantile = (values: readonly number[], q: number): number => {
+  const sorted = [...values].sort((a, b) => a - b)
+  return sorted[Math.floor((sorted.length - 1) * q)] ?? 0
 }
 
-const isNoisy = (values: readonly number[]): boolean =>
-  median(values) / min(values) > NOISE_LIMIT
+const isNoisy = (ratios: readonly number[]): boolean =>
+  (quantile(ratios, UPPER_QUARTILE) - quantile(ratios, LOWER_QUARTILE)) /
+    median(ratios) >
+  RATIO_SPREAD_LIMIT
 
 const toRow = ({ tier, label, samples, gated }: RowDescriptor): Row => ({
   tier,
@@ -443,8 +463,8 @@ const toRow = ({ tier, label, samples, gated }: RowDescriptor): Row => ({
   baseMin: min(samples.base),
   candMedian: median(samples.cand),
   candMin: min(samples.cand),
-  pairedDeltaPct: pairedDeltaPct(samples),
-  noisy: isNoisy(samples.base) || isNoisy(samples.cand),
+  pairedDeltaPct: pairedDeltaPct(samples.ratios),
+  noisy: isNoisy(samples.ratios),
   gated,
 })
 
@@ -478,6 +498,18 @@ const printVerdict = (
 
 // ---- phase: parse ----
 
+const parseSampler =
+  (
+    side: SideModules,
+    fixtures: ReturnType<typeof generateProfileFixtures>
+  ): (() => Promise<number>) =>
+  () =>
+    timeUntilStable(() => {
+      side.parser.parseString(fixtures.ancestor)
+      side.parser.parseString(fixtures.local)
+      side.parser.parseString(fixtures.other)
+    })
+
 const runParsePhase = async (
   sides: Pair<SideModules>,
   tiers: readonly FixtureSize[],
@@ -486,17 +518,9 @@ const runParsePhase = async (
   const rows: Row[] = []
   for (const tier of tiers) {
     const fixtures = generateProfileFixtures(tier)
-    const sample =
-      (side: SideModules): (() => Promise<number>) =>
-      () =>
-        timeUntilStable(() => {
-          side.parser.parseString(fixtures.ancestor)
-          side.parser.parseString(fixtures.local)
-          side.parser.parseString(fixtures.other)
-        })
     const samples = await collectPairedSamples(
-      sample(sides.base),
-      sample(sides.cand),
+      parseSampler(sides.base, fixtures),
+      parseSampler(sides.cand, fixtures),
       rounds
     )
     rows.push(toRow({ tier, label: 'parse', samples, gated: true }))
