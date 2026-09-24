@@ -23,7 +23,7 @@ export interface LexedOpenTag {
   readonly strayQuote: boolean
 }
 
-export interface UnterminatedOpenTag {
+interface UnterminatedOpenTag {
   readonly kind: 'unterminated'
 }
 

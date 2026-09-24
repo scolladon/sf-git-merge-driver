@@ -17,7 +17,7 @@ export const parseOutcome = (parser: ParityParser, xml: string): string => {
   }
 }
 
-export const PARSER_EDGE_CASES: Readonly<Record<string, string>> = {
+const PARSER_EDGE_CASES: Readonly<Record<string, string>> = {
   'P2 trim per segment': '<a><b>  x  y  </b></a>',
   'P2 mixed segments': '<a> t1 <b>x</b> t2 </a>',
   'P2 whitespace leaf': '<a><b>  </b></a>',
