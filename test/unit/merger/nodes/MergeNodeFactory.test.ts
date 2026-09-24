@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { KeyedArrayMergeNode } from '../../../../src/merger/nodes/KeyedArrayMergeNode.js'
 import { defaultNodeFactory } from '../../../../src/merger/nodes/MergeNodeFactory.js'
 import { PropertyMergeNode } from '../../../../src/merger/nodes/PropertyMergeNode.js'
 import { TextArrayMergeNode } from '../../../../src/merger/nodes/TextArrayMergeNode.js'
 import { TextMergeNode } from '../../../../src/merger/nodes/TextMergeNode.js'
+import { MetadataService } from '../../../../src/service/MetadataService.js'
 import { defaultConfig } from '../../../utils/testConfig.js'
 
 describe('MergeNodeFactory', () => {
@@ -11,6 +12,10 @@ describe('MergeNodeFactory', () => {
     const factory = defaultNodeFactory
 
     describe('createNode', () => {
+      afterEach(() => {
+        vi.restoreAllMocks()
+      })
+
       it('given string arrays when createNode then returns TextArrayMergeNode', () => {
         // Arrange
         const ancestor = ['a', 'b']
@@ -52,6 +57,35 @@ describe('MergeNodeFactory', () => {
         expect(node).toBeInstanceOf(TextArrayMergeNode)
       })
 
+      it('given attribute=members with null on every side when createNode then returns TextArrayMergeNode', () => {
+        // Arrange — regression guard: none of the three sides is a known
+        // object, so isKnownObject must stay false and route to the
+        // text-array branch rather than falling through to PropertyMergeNode.
+        const ancestor = null
+        const local = null
+        const other = null
+
+        // Act
+        const node = factory.createNode(ancestor, local, other, 'members')
+
+        // Assert
+        expect(node).toBeInstanceOf(TextArrayMergeNode)
+      })
+
+      it('given attribute=members with exactly one object side when createNode then returns PropertyMergeNode', () => {
+        // Arrange — regression guard: isKnownObject must fire on *any*
+        // object side, not only when every side is one.
+        const ancestor = { sub: 'a' }
+        const local = 'b'
+        const other = 'c'
+
+        // Act
+        const node = factory.createNode(ancestor, local, other, 'members')
+
+        // Assert
+        expect(node).toBeInstanceOf(PropertyMergeNode)
+      })
+
       it('given an unrelated attribute with scalar values on all three sides then still returns TextMergeNode', () => {
         // Arrange — regression guard: the forced routing must not leak to
         // every scalar attribute, only the ones MetadataService lists.
@@ -64,6 +98,72 @@ describe('MergeNodeFactory', () => {
 
         // Assert
         expect(node).toBeInstanceOf(TextMergeNode)
+      })
+
+      it('given a scalar trio on an ordinary attribute when createNode then returns TextMergeNode without consulting the key extractor', () => {
+        // Arrange
+        const getKeyFieldExtractor = vi.spyOn(
+          MetadataService,
+          'getKeyFieldExtractor'
+        )
+        const ancestor = 'a'
+        const local = 'b'
+        const other = 'c'
+
+        // Act
+        const node = factory.createNode(ancestor, local, other, 'name')
+
+        // Assert
+        expect(node).toBeInstanceOf(TextMergeNode)
+        expect(getKeyFieldExtractor).not.toHaveBeenCalled()
+      })
+
+      it('given a scalar trio on a text-array attribute when createNode then returns TextArrayMergeNode without consulting the key extractor', () => {
+        // Arrange
+        const getKeyFieldExtractor = vi.spyOn(
+          MetadataService,
+          'getKeyFieldExtractor'
+        )
+        const ancestor = 'Obj1'
+        const local = 'Obj1b'
+        const other = 'Obj1'
+
+        // Act
+        const node = factory.createNode(ancestor, local, other, 'members')
+
+        // Assert
+        expect(node).toBeInstanceOf(TextArrayMergeNode)
+        expect(getKeyFieldExtractor).not.toHaveBeenCalled()
+      })
+
+      it('given mixed null, number, boolean and undefined sides when createNode then returns TextMergeNode', () => {
+        // Arrange
+        const ancestor = null
+        const local = 42
+        const other = false
+
+        // Act
+        const node = factory.createNode(ancestor, local, other, 'attr')
+
+        // Assert
+        expect(node).toBeInstanceOf(TextMergeNode)
+      })
+
+      it('given one object side when createNode then still consults the key extractor', () => {
+        // Arrange
+        const getKeyFieldExtractor = vi.spyOn(
+          MetadataService,
+          'getKeyFieldExtractor'
+        )
+        const ancestor = { a: 1 }
+        const local = 'b'
+        const other = 'c'
+
+        // Act
+        factory.createNode(ancestor, local, other, 'attr')
+
+        // Assert
+        expect(getKeyFieldExtractor).toHaveBeenCalled()
       })
 
       it('given attribute=members with object-shaped values then returns PropertyMergeNode, not TextArrayMergeNode', () => {

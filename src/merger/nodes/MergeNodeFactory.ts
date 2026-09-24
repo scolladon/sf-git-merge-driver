@@ -25,6 +25,11 @@ const isStringArray = (...values: (JsonValue | undefined | null)[]): boolean =>
 const isPureObject = (val: JsonValue | undefined | null): boolean =>
   isObject(val) && !Array.isArray(val)
 
+// undefined is scalar: an absent side carries no object or array shape
+// either, so it must not block the early exit below.
+const isScalar = (val: JsonValue | undefined): boolean =>
+  val === null || typeof val !== 'object'
+
 // Shared, frozen and prototype-free. The parser builds every node with
 // Object.create(null) so that an untrusted XML tag name cannot resolve
 // through Object.prototype; a plain {} here would reintroduce that chain
@@ -64,6 +69,15 @@ class DefaultMergeNodeFactory implements MergeNodeFactory {
     other: JsonValue | undefined,
     attribute: string
   ): MergeNode {
+    if (
+      isScalar(ancestor) &&
+      isScalar(local) &&
+      isScalar(other) &&
+      !MetadataService.isTextArrayAttribute(attribute)
+    ) {
+      return new TextMergeNode(ancestor, local, other, attribute)
+    }
+
     // The schema override defeats an incidental cardinality check, not the
     // shape checks below it: TextArrayMergeNode compares items by reference
     // and sorts them by JSON.stringify, so it only ever holds for scalars.
@@ -94,21 +108,22 @@ class DefaultMergeNodeFactory implements MergeNodeFactory {
       )
     }
 
-    if (isKnownObject(ancestor, local, other)) {
-      const [ancestorArr, localArr, otherArr] = [ancestor, local, other].map(
-        toArray
-      )
-      return new KeyedArrayMergeNode(
-        ancestorArr as JsonArray,
-        localArr as JsonArray,
-        otherArr as JsonArray,
-        attribute,
-        keyField,
-        MetadataService.isOrderedAttribute(attribute)
-      )
-    }
-
-    return new TextMergeNode(ancestor, local, other, attribute)
+    // Reaching here means at least one side is an object or array: the
+    // early exit above already returned for an all-scalar, non-text-array
+    // trio, and the text-array branch above already returned for an
+    // all-scalar trio on a text-array attribute. isKnownObject is
+    // therefore always true, so this is the routing's final node type.
+    const [ancestorArr, localArr, otherArr] = [ancestor, local, other].map(
+      toArray
+    )
+    return new KeyedArrayMergeNode(
+      ancestorArr as JsonArray,
+      localArr as JsonArray,
+      otherArr as JsonArray,
+      attribute,
+      keyField,
+      MetadataService.isOrderedAttribute(attribute)
+    )
   }
 }
 

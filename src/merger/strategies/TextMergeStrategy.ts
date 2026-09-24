@@ -7,9 +7,7 @@ import { buildConflictMarkers } from '../ConflictMarkerBuilder.js'
 
 interface TextMergeParams {
   readonly config: MergeConfig
-  readonly objAncestor: JsonObject
-  readonly objLocal: JsonObject
-  readonly objOther: JsonObject
+  readonly attribute: string
   readonly ancestor: unknown
   readonly local: unknown
   readonly other: unknown
@@ -19,74 +17,84 @@ interface TextMergeStrategy {
   handle(params: TextMergeParams): MergeResult
 }
 
+const asProperty = (attribute: string, value: unknown): JsonObject =>
+  ({ [attribute]: value }) as JsonObject
+
 class OtherOnlyStrategy implements TextMergeStrategy {
-  handle({ objOther }: TextMergeParams): MergeResult {
-    return noConflict([objOther])
+  handle({ attribute, other }: TextMergeParams): MergeResult {
+    return noConflict([asProperty(attribute, other)])
   }
 }
 
 class LocalOnlyStrategy implements TextMergeStrategy {
-  handle({ objLocal }: TextMergeParams): MergeResult {
-    return noConflict([objLocal])
+  handle({ attribute, local }: TextMergeParams): MergeResult {
+    return noConflict([asProperty(attribute, local)])
   }
 }
 
 class LocalAndOtherStrategy implements TextMergeStrategy {
-  handle({ objLocal, objOther, local, other }: TextMergeParams): MergeResult {
+  handle({ attribute, local, other }: TextMergeParams): MergeResult {
     if (local === other) {
-      return noConflict([objLocal])
+      return noConflict([asProperty(attribute, local)])
     }
-    return withConflict([buildConflictMarkers(objLocal, {}, objOther)])
+    return withConflict([
+      buildConflictMarkers(
+        asProperty(attribute, local),
+        {},
+        asProperty(attribute, other)
+      ),
+    ])
   }
 }
 
 class AncestorAndOtherStrategy implements TextMergeStrategy {
-  handle({
-    objAncestor,
-    objOther,
-    ancestor,
-    other,
-  }: TextMergeParams): MergeResult {
+  handle({ attribute, ancestor, other }: TextMergeParams): MergeResult {
     if (ancestor !== other) {
-      return withConflict([buildConflictMarkers({}, objAncestor, objOther)])
+      return withConflict([
+        buildConflictMarkers(
+          {},
+          asProperty(attribute, ancestor),
+          asProperty(attribute, other)
+        ),
+      ])
     }
     return noConflict([])
   }
 }
 
 class AncestorAndLocalStrategy implements TextMergeStrategy {
-  handle({
-    objAncestor,
-    objLocal,
-    ancestor,
-    local,
-  }: TextMergeParams): MergeResult {
+  handle({ attribute, ancestor, local }: TextMergeParams): MergeResult {
     if (ancestor !== local) {
-      return withConflict([buildConflictMarkers(objLocal, objAncestor, {})])
+      return withConflict([
+        buildConflictMarkers(
+          asProperty(attribute, local),
+          asProperty(attribute, ancestor),
+          {}
+        ),
+      ])
     }
     return noConflict([])
   }
 }
 
 class AllPresentStrategy implements TextMergeStrategy {
-  handle({
-    objAncestor,
-    objLocal,
-    objOther,
-    ancestor,
-    local,
-    other,
-  }: TextMergeParams): MergeResult {
+  handle({ attribute, ancestor, local, other }: TextMergeParams): MergeResult {
     if (ancestor === local) {
-      return noConflict([objOther])
+      return noConflict([asProperty(attribute, other)])
     }
     if (ancestor === other) {
-      return noConflict([objLocal])
+      return noConflict([asProperty(attribute, local)])
     }
     if (local === other) {
-      return noConflict([objLocal])
+      return noConflict([asProperty(attribute, local)])
     }
-    return withConflict([buildConflictMarkers(objLocal, objAncestor, objOther)])
+    return withConflict([
+      buildConflictMarkers(
+        asProperty(attribute, local),
+        asProperty(attribute, ancestor),
+        asProperty(attribute, other)
+      ),
+    ])
   }
 }
 

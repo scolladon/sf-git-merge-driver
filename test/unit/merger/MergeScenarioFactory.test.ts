@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { getScenario } from '../../../src/merger/MergeScenarioFactory.js'
+import {
+  getScalarScenario,
+  getScenario,
+} from '../../../src/merger/MergeScenarioFactory.js'
 import type { JsonValue } from '../../../src/types/jsonTypes.js'
 import { MergeScenario } from '../../../src/types/mergeScenario.js'
 
@@ -87,6 +90,62 @@ describe('MergeScenarioFactory', () => {
         getScenario({ key: 'ancestor' }, { key: 'local' }, { key: 'other' })
       ).toBe(MergeScenario.ALL)
       expect(getScenario([1], [2], [3])).toBe(MergeScenario.ALL)
+    })
+  })
+
+  describe('getScalarScenario', () => {
+    it('given null and undefined sides when getScalarScenario then returns NONE', () => {
+      // Assert
+      expect(getScalarScenario(null, undefined, null)).toBe(MergeScenario.NONE)
+    })
+
+    it('given an empty string on other when getScalarScenario then returns OTHER_ONLY', () => {
+      // Assert
+      expect(getScalarScenario(null, undefined, '')).toBe(
+        MergeScenario.OTHER_ONLY
+      )
+    })
+
+    it('given zero on local when getScalarScenario then returns LOCAL_ONLY', () => {
+      // Assert
+      expect(getScalarScenario(undefined, 0, null)).toBe(
+        MergeScenario.LOCAL_ONLY
+      )
+    })
+
+    it('given false on local and text on other when getScalarScenario then returns LOCAL_AND_OTHER', () => {
+      // Assert
+      expect(getScalarScenario(null, false, 'other')).toBe(
+        MergeScenario.LOCAL_AND_OTHER
+      )
+    })
+
+    it('given text on ancestor only when getScalarScenario then returns ANCESTOR_ONLY', () => {
+      // Assert
+      expect(getScalarScenario('ancestor', null, undefined)).toBe(
+        MergeScenario.ANCESTOR_ONLY
+      )
+    })
+
+    it('given text on ancestor and other when getScalarScenario then returns ANCESTOR_AND_OTHER', () => {
+      // Assert
+      expect(getScalarScenario('ancestor', null, 'other')).toBe(
+        MergeScenario.ANCESTOR_AND_OTHER
+      )
+    })
+
+    it('given text on ancestor and local when getScalarScenario then returns ANCESTOR_AND_LOCAL', () => {
+      // Assert
+      expect(getScalarScenario('ancestor', 'local', undefined)).toBe(
+        MergeScenario.ANCESTOR_AND_LOCAL
+      )
+    })
+
+    it('given text on all three sides when getScalarScenario then returns ALL', () => {
+      // Assert
+      expect(getScalarScenario('ancestor', 'local', 'other')).toBe(
+        MergeScenario.ALL
+      )
     })
   })
 })
