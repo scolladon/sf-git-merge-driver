@@ -19,8 +19,8 @@ export class CompactXmlParser implements XmlParser {
   parseString(xml: string): NormalisedParseResult {
     const outcome = scanDocument(xml)
     if (outcome.kind === 'failed') {
-      // Today's precedence: the balance-family message wins when both
-      // passes reject the input (design rule 8).
+      // The balance-family message wins when both passes reject the
+      // input, so a malformed file reports the same error either way.
       assertBalancedTags(xml)
       throw new Error(outcome.message)
     }

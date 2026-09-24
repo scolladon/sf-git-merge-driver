@@ -1,0 +1,8 @@
+export const ATTR_PREFIX = '@_'
+export const CDATA_OPEN = '<![CDATA['
+export const CDATA_CLOSE = ']]>'
+export const COMMENT_OPEN = '<!--'
+export const COMMENT_CLOSE = '-->'
+export const DECLARATION_OPEN = '<!'
+export const PI_OPEN = '<?'
+export const PI_CLOSE = '?>'

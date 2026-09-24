@@ -6,7 +6,7 @@ import type { JsonObject, JsonValue } from '../../types/jsonTypes.js'
 import type { NormalisedParseResult } from '../XmlParser.js'
 import { findTagEnd } from './balanceOracle.js'
 import { BANG, DASH, isQuote, LBRACKET, LT, QMARK, SLASH } from './charCodes.js'
-import { ElementFrame } from './ElementFrame.js'
+import { type AttrSet, ElementFrame, NO_ATTRS } from './ElementFrame.js'
 import {
   type LexedOpenTag,
   lexOpenTag,
@@ -20,6 +20,16 @@ import {
   unbalancedTags,
   unexpectedCloseTag,
 } from './parseErrors.js'
+import {
+  ATTR_PREFIX,
+  CDATA_CLOSE,
+  CDATA_OPEN,
+  COMMENT_CLOSE,
+  COMMENT_OPEN,
+  DECLARATION_OPEN,
+  PI_CLOSE,
+  PI_OPEN,
+} from './xmlTokens.js'
 
 export type ScanOutcome =
   | {
@@ -30,14 +40,8 @@ export type ScanOutcome =
   | { readonly kind: 'failed'; readonly message: string }
 
 const TOP_FRAME_NAME = ''
-const ATTR_PREFIX = '@_'
 const XMLNS_RE = /^xmlns(?::.+)?$/
-const CDATA_OPEN = '<![CDATA['
-const CDATA_CLOSE = ']]>'
-const COMMENT_OPEN = '<!--'
-const COMMENT_CLOSE = '-->'
-const PI_CLOSE = '?>'
-const SHORT_COMMENT_LIMIT = 7
+const SHORT_COMMENT_LIMIT = COMMENT_OPEN.length + COMMENT_CLOSE.length
 
 const failed = (message: string): ScanOutcome => ({ kind: 'failed', message })
 
@@ -49,8 +53,7 @@ const hasQuoteChar = (text: string): boolean => {
 }
 
 interface RootAttrSplit {
-  readonly rootAttrs: OpenTagAttrs
-  readonly hasRootAttrs: boolean
+  readonly rest: AttrSet
   readonly namespaces: JsonObject
 }
 
@@ -69,7 +72,7 @@ const splitRootAttrs = (attrs: OpenTagAttrs): RootAttrSplit => {
       hasRootAttrs = true
     }
   }
-  return { rootAttrs, hasRootAttrs, namespaces }
+  return { rest: { attrs: rootAttrs, hasAttrs: hasRootAttrs }, namespaces }
 }
 
 // One-pass token scanner over an explicit frame stack (no recursion).
@@ -88,7 +91,7 @@ class DocumentScanner {
 
   constructor(xml: string) {
     this.xml = xml
-    this.stack = [new ElementFrame(TOP_FRAME_NAME, Object.create(null), false)]
+    this.stack = [new ElementFrame(TOP_FRAME_NAME, NO_ATTRS)]
   }
 
   run(): ScanOutcome {
@@ -194,7 +197,10 @@ class DocumentScanner {
   }
 
   private scanComment(): ScanOutcome | undefined {
-    const end = this.xml.indexOf(COMMENT_CLOSE, this.pos + 2)
+    const end = this.xml.indexOf(
+      COMMENT_CLOSE,
+      this.pos + DECLARATION_OPEN.length
+    )
     if (end < 0) return failed(UNTERMINATED_COMMENT)
     const tokenEnd = end + COMMENT_CLOSE.length
     if (tokenEnd - this.pos < SHORT_COMMENT_LIMIT) {
@@ -218,14 +224,14 @@ class DocumentScanner {
   }
 
   private scanDeclaration(): ScanOutcome | undefined {
-    const end = findTagEnd(this.xml, this.pos + 2)
+    const end = findTagEnd(this.xml, this.pos + DECLARATION_OPEN.length)
     if (end < 0) return failed(UNTERMINATED_DECLARATION)
     this.pos = end + 1
     return undefined
   }
 
   private scanProcessingInstruction(): ScanOutcome | undefined {
-    const end = this.xml.indexOf(PI_CLOSE, this.pos + 2)
+    const end = this.xml.indexOf(PI_CLOSE, this.pos + PI_OPEN.length)
     if (end < 0) return failed(UNTERMINATED_PROCESSING_INSTRUCTION)
     this.pos = end + PI_CLOSE.length
     return undefined
@@ -250,12 +256,10 @@ class DocumentScanner {
   }
 
   private buildFrame(lexed: LexedOpenTag): ElementFrame {
-    if (!this.isRootCandidate()) {
-      return new ElementFrame(lexed.name, lexed.attrs, lexed.hasAttrs)
-    }
-    const { rootAttrs, hasRootAttrs, namespaces } = splitRootAttrs(lexed.attrs)
+    if (!this.isRootCandidate()) return new ElementFrame(lexed.name, lexed)
+    const { rest, namespaces } = splitRootAttrs(lexed.attrs)
     this.namespaces = namespaces
-    return new ElementFrame(lexed.name, rootAttrs, hasRootAttrs)
+    return new ElementFrame(lexed.name, rest)
   }
 }
 

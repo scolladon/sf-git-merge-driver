@@ -6,9 +6,15 @@ import {
   UNTERMINATED_TAG,
   unbalancedTags,
 } from './parseErrors.js'
-
-const CDATA_OPEN = '<![CDATA['
-const CDATA_CLOSE = ']]>'
+import {
+  CDATA_CLOSE,
+  CDATA_OPEN,
+  COMMENT_CLOSE,
+  COMMENT_OPEN,
+  DECLARATION_OPEN,
+  PI_CLOSE,
+  PI_OPEN,
+} from './xmlTokens.js'
 
 // Quote-aware scan for the next unescaped `>` that closes a tag
 // starting at `from` (the position of the `<`). Walks past `>` chars
@@ -53,18 +59,18 @@ const skipDeclaration = (xml: string, next: number, c1: number): number => {
   if (c1 === BANG) {
     const cdataEnd = skipCdata(xml, next)
     if (cdataEnd >= 0) return cdataEnd
-    if (xml.startsWith('<!--', next)) {
-      const end = xml.indexOf('-->', next + 4)
+    if (xml.startsWith(COMMENT_OPEN, next)) {
+      const end = xml.indexOf(COMMENT_CLOSE, next + COMMENT_OPEN.length)
       if (end < 0) throw new Error(UNTERMINATED_COMMENT)
-      return end + 3
+      return end + COMMENT_CLOSE.length
     }
-    const end = findTagEnd(xml, next + 2)
+    const end = findTagEnd(xml, next + DECLARATION_OPEN.length)
     if (end < 0) throw new Error(UNTERMINATED_DECLARATION)
     return end + 1
   }
-  const end = xml.indexOf('?>', next + 2)
+  const end = xml.indexOf(PI_CLOSE, next + PI_OPEN.length)
   if (end < 0) throw new Error(UNTERMINATED_PROCESSING_INSTRUCTION)
-  return end + 2
+  return end + PI_CLOSE.length
 }
 
 // Cursors for the next double/single quote at or after the scan point,
@@ -96,13 +102,13 @@ const elementTagEnd = (
   return quoteInsideTag ? findTagEnd(xml, next + 1) : tagEnd
 }
 
-// tXml is permissive on malformed input: an unclosed tag like
-// `<Profile><broken>` parses without complaint. The previous parser
-// threw on the same input, and MergeDriver relies on the throw to
-// surface a parse failure as a merge conflict.
-//
-// Restore that behaviour with a minimal well-formedness pass: walk the
-// XML once, track open-vs-close tag depth, throw on mismatch.
+// Whole-document well-formedness pass: track open-vs-close tag depth
+// and throw on mismatch. The scanner only runs it when its own single
+// pass cannot settle the outcome alone (stray quotes, short comments, a
+// top-level close tag) or has already failed — in the latter case the
+// balance-family message takes precedence over the scanner's.
+// MergeDriver relies on the throw to surface a parse failure as a
+// merge conflict.
 export const assertBalancedTags = (xml: string): void => {
   let depth = 0
   let i = 0

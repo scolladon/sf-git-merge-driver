@@ -9,9 +9,8 @@ const isPresent = (value: JsonValue | undefined): boolean => {
   return true
 }
 
-// A scalar side has no wrapper object to be empty: only null/undefined are
-// absent. This mirrors getScenario(toObj(v)) for a scalar v, where
-// toObj('') is { [attr]: '' } and therefore present.
+// A scalar side is present unless nullish: '' counts as present, unlike
+// isPresent, because an empty text element is still a stated value.
 const isScalarPresent = (value: JsonValue | undefined): boolean => value != null
 
 const scenarioOf =

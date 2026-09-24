@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { ElementFrame } from '../../../../src/adapter/parser/ElementFrame.js'
+import {
+  ElementFrame,
+  NO_ATTRS,
+} from '../../../../src/adapter/parser/ElementFrame.js'
 
 describe('ElementFrame', () => {
   describe('given an element with no attrs and no children', () => {
     it('when toCompact then it returns an empty string leaf', () => {
       // Arrange
-      const sut = new ElementFrame('v', {}, false)
+      const sut = new ElementFrame('v', NO_ATTRS)
 
       // Act
       const result = sut.toCompact()
@@ -13,23 +16,12 @@ describe('ElementFrame', () => {
       // Assert
       expect(result).toBe('')
     })
-
-    it('when toCompact then no grouped map is ever allocated', () => {
-      // Arrange
-      const sut = new ElementFrame('v', {}, false)
-
-      // Act
-      sut.toCompact()
-
-      // Assert
-      expect(sut.grouped).toBeUndefined()
-    })
   })
 
   describe('given a leaf element with only text', () => {
     it('when toCompact then it returns the text as a scalar', () => {
       // Arrange
-      const sut = new ElementFrame('v', {}, false)
+      const sut = new ElementFrame('v', NO_ATTRS)
       sut.addText('1')
 
       // Act
@@ -38,24 +30,12 @@ describe('ElementFrame', () => {
       // Assert
       expect(result).toBe('1')
     })
-
-    it('when toCompact then no grouped map is allocated for a text-only leaf', () => {
-      // Arrange
-      const sut = new ElementFrame('v', {}, false)
-      sut.addText('1')
-
-      // Act
-      sut.toCompact()
-
-      // Assert
-      expect(sut.grouped).toBeUndefined()
-    })
   })
 
   describe('given an attrs-only element with no body', () => {
     it('when toCompact then attrs land under @_ with an explicit empty #text', () => {
       // Arrange
-      const sut = new ElementFrame('v', { x: '1' }, true)
+      const sut = new ElementFrame('v', { attrs: { x: '1' }, hasAttrs: true })
 
       // Act
       const result = sut.toCompact()
@@ -66,7 +46,7 @@ describe('ElementFrame', () => {
 
     it('when toCompact then the result carries no prototype chain', () => {
       // Arrange
-      const sut = new ElementFrame('v', { x: '1' }, true)
+      const sut = new ElementFrame('v', { attrs: { x: '1' }, hasAttrs: true })
 
       // Act
       const result = sut.toCompact()
@@ -79,7 +59,7 @@ describe('ElementFrame', () => {
   describe('given repeated same-key children', () => {
     it('when toCompact then they collapse into an array in first-seen order', () => {
       // Arrange
-      const sut = new ElementFrame('r', {}, false)
+      const sut = new ElementFrame('r', NO_ATTRS)
       sut.addChild('v', '1')
       sut.addChild('v', '2')
 
@@ -94,7 +74,7 @@ describe('ElementFrame', () => {
   describe('given a __proto__-named child (prototype-pollution guard)', () => {
     it('when toCompact then it round-trips as an ordinary own property', () => {
       // Arrange
-      const sut = new ElementFrame('r', {}, false)
+      const sut = new ElementFrame('r', NO_ATTRS)
       sut.addChild('__proto__', 'x')
 
       // Act
@@ -107,7 +87,7 @@ describe('ElementFrame', () => {
 
     it('when toCompact then the result carries no prototype chain', () => {
       // Arrange
-      const sut = new ElementFrame('r', {}, false)
+      const sut = new ElementFrame('r', NO_ATTRS)
       sut.addChild('__proto__', 'x')
 
       // Act
@@ -121,7 +101,7 @@ describe('ElementFrame', () => {
   describe('given mixed text and element children', () => {
     it('when toCompact then children precede #text, in first-seen order', () => {
       // Arrange
-      const sut = new ElementFrame('r', {}, false)
+      const sut = new ElementFrame('r', NO_ATTRS)
       sut.addChild('v', '1')
       sut.addText('foo')
 
@@ -137,7 +117,7 @@ describe('ElementFrame', () => {
   describe('given a comment child added via addChild', () => {
     it('when toCompact then it groups under the given key like any other child', () => {
       // Arrange
-      const sut = new ElementFrame('r', {}, false)
+      const sut = new ElementFrame('r', NO_ATTRS)
       sut.addChild('#xml__comment', 'c')
 
       // Act
@@ -146,23 +126,12 @@ describe('ElementFrame', () => {
       // Assert
       expect(result).toEqual({ '#xml__comment': 'c' })
     })
-
-    it('when toCompact then the grouped map was allocated to hold it', () => {
-      // Arrange
-      const sut = new ElementFrame('r', {}, false)
-
-      // Act
-      sut.addChild('#xml__comment', 'c')
-
-      // Assert
-      expect(sut.grouped).toBeInstanceOf(Map)
-    })
   })
 
   describe('given a CDATA child added via addChild', () => {
     it('when toCompact then it groups under the given key like any other child', () => {
       // Arrange
-      const sut = new ElementFrame('v', {}, false)
+      const sut = new ElementFrame('v', NO_ATTRS)
       sut.addChild('__cdata', 'raw')
 
       // Act

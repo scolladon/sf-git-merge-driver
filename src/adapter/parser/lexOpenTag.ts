@@ -77,8 +77,8 @@ interface AttrValue {
 }
 
 // `pos` is the position right after `=`. A quoted value keeps its
-// interior quotes and `>` as data (rule 10) — only an unquoted run is
-// checked for a stray quote.
+// interior quotes and `>` as data — only an unquoted run is checked
+// for a stray quote.
 const lexAttrValue = (xml: string, pos: number): AttrValue | null => {
   const afterEq = skipWhitespace(xml, pos)
   const quoteCode = xml.charCodeAt(afterEq)
