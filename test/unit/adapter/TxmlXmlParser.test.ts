@@ -377,6 +377,145 @@ describe('TxmlXmlParser', () => {
     })
   })
 
+  describe('given a quote that appears only in text, never inside a tag', () => {
+    it('when parseString then the balance pass is unaffected by it', () => {
+      const result = sut.parseString(`<a>it's "ok"</a>`)
+      expect(result.content).toEqual({ a: `it's "ok"` })
+    })
+  })
+
+  describe('given a tag carrying a quoted attribute followed by a quote-free tag', () => {
+    it('when parseString then the trailing tag still balances correctly', () => {
+      // Pins the quote-cursor refresh: once `next` moves past a quote
+      // seen in an earlier tag, the cursor must catch up rather than
+      // keep reporting a quote inside every later tag.
+      const result = sut.parseString(`<a><b x="1">t</b><c>u</c></a>`)
+      expect(result.content).toEqual({
+        a: { b: { '@_x': '1', '#text': 't' }, c: 'u' },
+      })
+    })
+  })
+
+  describe('given a stray quote ahead of the real attribute quote in a tag', () => {
+    it('when parseString then it throws with the unterminated-tag message', () => {
+      expect(() => sut.parseString(`<a><b x"y="1">t</b></a>`)).toThrow(
+        /unterminated tag/i
+      )
+    })
+  })
+
+  describe('given a self-closing root followed by a stray extra close tag', () => {
+    it('when parseString then it throws on the unbalanced count', () => {
+      expect(() => sut.parseString(`<a/></a>`)).toThrow(
+        /unbalanced \(final depth -1\)/i
+      )
+    })
+  })
+
+  describe('given a quote character sitting exactly at the tag-scan cursor', () => {
+    // Pins the `!== -1` "no cached quote" guard in elementTagEnd's
+    // quoteInsideTag check against the specific numeral -1, not just
+    // any falsy/boundary value — a tag whose own leading quote is at
+    // absolute index 1 is the only witness that tells -1 apart from
+    // an arbitrary other index.
+    it('when parseString and the quote is double then the quote-aware scan still wins', () => {
+      const result = sut.parseString(`<"x>y"/>`)
+      expect(result.content).toEqual({ '"x': 'y"/>' })
+    })
+
+    it('when parseString and the quote is single then the quote-aware scan still wins', () => {
+      const result = sut.parseString(`<'x>y'/>`)
+      expect(result.content).toEqual({ "'x": "y'/>" })
+    })
+  })
+
+  describe('given a comment body containing a stray < near its closing -->', () => {
+    it('when parseString then the comment resumes exactly after its own -->', () => {
+      // Pins skipDeclaration's `end + 3` resume offset: landing 3
+      // chars short would re-discover the embedded '<' as a bogus
+      // open tag instead of the real element that follows.
+      const result = sut.parseString(`<a><!--<x-->y</a>`)
+      expect(result.content).toEqual({
+        a: { '#xml__comment': '<x', '#text': 'y' },
+      })
+    })
+  })
+
+  describe('given a non-comment declaration containing an empty <> near its close', () => {
+    it('when parseString then the declaration resumes exactly after its own >', () => {
+      // Pins skipDeclaration's `end + 1` resume offset for the
+      // generic <! ... > branch.
+      const result = sut.parseString(`<a><!x<>z</a>`)
+      expect(result.content).toEqual({ a: '!x<z' })
+    })
+  })
+
+  describe('given a processing instruction preceded by a stray literal ?>', () => {
+    it('when parseString then the PI search does not latch onto the earlier ?>', () => {
+      // Pins the `next + 2` search-from offset for the <? ?> branch —
+      // searching from `next - 2` would find the stray "?>" that
+      // precedes the real PI and never make forward progress.
+      const result = sut.parseString(`<a>?><?pi?>z</a>`)
+      expect(result.content).toEqual({ a: { '?pi?': '', '#text': '?>z' } })
+    })
+  })
+
+  describe('given a processing instruction body containing a stray <', () => {
+    it('when parseString then the PI resumes exactly after its own ?>', () => {
+      // Pins skipDeclaration's `end + 2` resume offset for the <? ?>
+      // branch.
+      const result = sut.parseString(`<a><?pi <x?>y</a>`)
+      expect(result.content).toEqual({
+        a: { '?pi': { '@_x?': null, '#text': '' }, '#text': 'y' },
+      })
+    })
+  })
+
+  describe('given an element named after the #text key', () => {
+    it('when parseString then it stays a sibling key, never collapsing the parent to a scalar', () => {
+      // Pins unboxScalar's `keys.length === 1` guard: without it, a
+      // node whose FIRST inserted key happens to be literally '#text'
+      // (from a same-named child) would wrongly unbox to that child's
+      // value alone, discarding the sibling 'b' key.
+      const result = sut.parseString(`<a><#text>x</#text><b>y</b></a>`)
+      expect(result.content).toEqual({ a: { '#text': 'x', b: 'y' } })
+    })
+  })
+
+  describe('given an attribute-bearing leaf whose body is whitespace-only', () => {
+    it('when parseString then the whitespace is dropped, not kept as #text', () => {
+      // Pins the `.trim()` in the general path's textBuf check — this
+      // node has attrs, so it takes the general path, not the leaf
+      // fast path (whose own `.trim()` is covered elsewhere).
+      const result = sut.parseString(`<a><style x="1">   </style></a>`)
+      expect(result.content).toEqual({ a: { style: { '@_x': '1' } } })
+    })
+  })
+
+  describe('given a single XML comment as the sole child of an element', () => {
+    it('when parseString then it falls through to the comment branch, not the leaf text fast path', () => {
+      const result = sut.parseString(`<a><b><!--c--></b></a>`)
+      expect(result.content).toEqual({ a: { b: { '#xml__comment': 'c' } } })
+    })
+  })
+
+  describe('given text starting with < that is not a well-formed comment', () => {
+    it('when parseString then it falls through to classifyChildren as literal text', () => {
+      const result = sut.parseString(`<a><!-->t--></a>`)
+      expect(result.content).toEqual({ a: '<!-->t-->' })
+    })
+  })
+
+  describe('given whitespace-only text in a leaf element (the toCompact fast path)', () => {
+    it('when parseString then it collapses to a null-prototype empty object', () => {
+      const result = sut.parseString(`<a><style>  </style></a>`)
+      const styleNode = (result.content as JsonObject)['a'] as JsonObject
+
+      expect(styleNode['style']).toEqual({})
+      expect(Object.getPrototypeOf(styleNode['style'])).toBeNull()
+    })
+  })
+
   describe('given a __proto__-named element (prototype-pollution guard)', () => {
     it('when parseString then it round-trips as an ordinary own property visible in Object.keys', () => {
       const result = sut.parseString(`<r><__proto__><v>1</v></__proto__></r>`)

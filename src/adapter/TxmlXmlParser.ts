@@ -38,6 +38,13 @@ const XMLNS_RE = /^xmlns(?::.+)?$/
 // Matches a raw comment string emitted by tXml when keepComments=true.
 // Body (the `[\s\S]*?` capture) is what we store under #xml__comment.
 const COMMENT_RE = /^<!--([\s\S]*?)-->$/
+// charCodeAt values for the bytes assertBalancedTags and toCompact
+// dispatch on. Comparing char codes instead of slicing/startsWith
+// substrings avoids an allocation per tag on the hot path.
+const LT = 60 // '<'
+const SLASH = 47 // '/'
+const BANG = 33 // '!'
+const QMARK = 63 // '?'
 // Sentinel tag we substitute for CDATA pre-tXml so the boundary
 // survives. Per the XML 1.0 spec, an element name's NameStartChar
 // disallows ASCII control bytes — so `\x00` cannot appear in a real
@@ -98,6 +105,56 @@ const findTagEnd = (xml: string, from: number): number => {
   return -1
 }
 
+// Resume index for a `<!…` or `<?…` declaration starting at `next`
+// (the position of `<`). Covers `<!-- comment -->`, `<!DOCTYPE …>` /
+// `<!ENTITY …>` / etc (CDATA sections are already preprocessed away
+// by the time this runs), and `<?xml ... ?>` processing instructions.
+// None of these contribute to element nesting.
+const skipDeclaration = (xml: string, next: number, c1: number): number => {
+  if (c1 === BANG) {
+    if (xml.startsWith('<!--', next)) {
+      const end = xml.indexOf('-->', next + 4)
+      if (end < 0) throw new Error('XML parse error: unterminated comment')
+      return end + 3
+    }
+    const end = findTagEnd(xml, next + 2)
+    if (end < 0) throw new Error('XML parse error: unterminated <! ... >')
+    return end + 1
+  }
+  const end = xml.indexOf('?>', next + 2)
+  if (end < 0) throw new Error('XML parse error: unterminated <? ?>')
+  return end + 2
+}
+
+// Cursors for the next double/single quote at or after the scan
+// point, local to one assertBalancedTags call. The scan point only
+// moves forward, so refreshing each lazily (only once it falls behind
+// `next`) keeps the whole pass O(n) even on documents with no quotes
+// after the root element — the common Salesforce shape.
+interface QuoteCursors {
+  dq: number
+  sq: number
+}
+
+// End of an element tag starting at `next`. The native `indexOf('>')`
+// is correct unless a quote lies inside the tag (an attribute value
+// containing `>`), in which case only the quote-aware findTagEnd scan
+// is safe.
+const elementTagEnd = (
+  xml: string,
+  next: number,
+  quotes: QuoteCursors
+): number => {
+  const tagEnd = xml.indexOf('>', next + 1)
+  if (tagEnd < 0) return -1
+  if (quotes.dq !== -1 && quotes.dq < next) quotes.dq = xml.indexOf('"', next)
+  if (quotes.sq !== -1 && quotes.sq < next) quotes.sq = xml.indexOf("'", next)
+  const quoteInsideTag =
+    (quotes.dq !== -1 && quotes.dq < tagEnd) ||
+    (quotes.sq !== -1 && quotes.sq < tagEnd)
+  return quoteInsideTag ? findTagEnd(xml, next + 1) : tagEnd
+}
+
 // tXml is permissive on malformed input: an unclosed tag like
 // `<Profile><broken>` parses without complaint. The previous parser
 // threw on the same input, and MergeDriver relies on the throw to
@@ -105,45 +162,24 @@ const findTagEnd = (xml: string, from: number): number => {
 //
 // Restore that behaviour with a minimal well-formedness pass: walk the
 // preprocessed XML once, track open-vs-close tag depth, throw on
-// mismatch. CDATA sections have already been replaced by sentinel
-// elements at this point so we don't need to skip them here.
+// mismatch.
 const assertBalancedTags = (xml: string): void => {
   let depth = 0
   let i = 0
+  const quotes: QuoteCursors = { dq: xml.indexOf('"'), sq: xml.indexOf("'") }
   while (i < xml.length) {
     const next = xml.indexOf('<', i)
     if (next < 0) break
-    // <!-- comment -->
-    if (xml.startsWith('<!--', next)) {
-      const end = xml.indexOf('-->', next + 4)
-      if (end < 0) throw new Error('XML parse error: unterminated comment')
-      i = end + 3
+    const c1 = xml.charCodeAt(next + 1)
+    if (c1 === BANG || c1 === QMARK) {
+      i = skipDeclaration(xml, next, c1)
       continue
     }
-    // <!DOCTYPE …>, <![CDATA[…]]> (already preprocessed away),
-    // <!ENTITY …>, etc. None contribute to element nesting; skip the
-    // whole declaration. Salesforce metadata never emits these but
-    // defensive handling costs two lines and prevents a false
-    // unbalanced-tags throw on any document with a DOCTYPE prologue.
-    if (xml.startsWith('<!', next)) {
-      const end = findTagEnd(xml, next + 2)
-      if (end < 0) throw new Error('XML parse error: unterminated <! ... >')
-      i = end + 1
-      continue
-    }
-    // <?xml ... ?> declaration / processing instruction
-    if (xml.startsWith('<?', next)) {
-      const end = xml.indexOf('?>', next + 2)
-      if (end < 0) throw new Error('XML parse error: unterminated <? ?>')
-      i = end + 2
-      continue
-    }
-    const tagEnd = findTagEnd(xml, next + 1)
+    const tagEnd = elementTagEnd(xml, next, quotes)
     if (tagEnd < 0) throw new Error('XML parse error: unterminated tag')
-    const tagBody = xml.slice(next + 1, tagEnd)
-    if (tagBody.startsWith('/')) {
+    if (c1 === SLASH) {
       depth--
-    } else if (!tagBody.endsWith('/')) {
+    } else if (xml.charCodeAt(tagEnd - 1) !== SLASH) {
       depth++
     }
     // self-closing `<x/>` does not change depth
@@ -183,12 +219,16 @@ const classifyChildren = (
   }
   for (const child of children) {
     if (typeof child === 'string') {
-      const commentMatch = child.match(COMMENT_RE)
-      if (commentMatch !== null) {
-        // commentMatch[1] is the [\s\S]*? capture — always defined here
-        // (even an empty `<!---->` matches with body = '').
-        push(XML_COMMENT_PROP_NAME, commentMatch[1]!)
-        continue
+      // COMMENT_RE only ever matches a string starting with '<' — text
+      // never does, so charCodeAt is a cheap reject before the regex.
+      if (child.charCodeAt(0) === LT) {
+        const commentMatch = child.match(COMMENT_RE)
+        if (commentMatch !== null) {
+          // commentMatch[1] is the [\s\S]*? capture — always defined here
+          // (even an empty `<!---->` matches with body = '').
+          push(XML_COMMENT_PROP_NAME, commentMatch[1]!)
+          continue
+        }
       }
       textBuf += child
       continue
@@ -229,6 +269,16 @@ const unboxScalar = (out: JsonObject): JsonValue => {
   return out
 }
 
+// Whether an attribute bag has at least one key, without allocating
+// the Object.keys array toCompact's emptiness check would otherwise
+// build on every node. txml's attribute bags are plain `{}` objects
+// populated by bracket assignment, so every enumerable key here is
+// always an own key — no Object.hasOwn guard is reachable.
+const hasOwnAttribute = (attrs: Readonly<Record<string, string>>): boolean => {
+  for (const _k in attrs) return true
+  return false
+}
+
 // Convert a TNode subtree into the compact JsonObject shape.
 //
 // Rules (each one anchored by a specific spike-probed case):
@@ -242,11 +292,28 @@ const unboxScalar = (out: JsonObject): JsonValue => {
 // - CDATA (via the synthetic sentinel)    → '__cdata' key, multi-segment as array
 // - root-element xmlns attributes         → extracted by the caller, NOT here
 const toCompact = (node: TNode): JsonValue => {
-  const noChildren = node.children.length === 0
-  const noAttrs = Object.keys(node.attributes).length === 0
+  const { children, attributes } = node
+  const noChildren = children.length === 0
+  const noAttrs = !hasOwnAttribute(attributes)
   if (noChildren && noAttrs) return ''
 
-  const { textBuf, grouped } = classifyChildren(node.children)
+  // Leaf fast path: <tag>text</tag> is the shape of nearly every node
+  // in Salesforce metadata. A comment token is the only single string
+  // child that must NOT take this path (it starts with '<' and needs
+  // classifyChildren's COMMENT_RE handling below); every other single
+  // string child produces the exact same result the general path
+  // below would: an unboxed scalar, or a null-prototype empty object
+  // for whitespace-only text.
+  const onlyChild = children.length === 1 ? children[0] : undefined
+  if (
+    noAttrs &&
+    typeof onlyChild === 'string' &&
+    onlyChild.charCodeAt(0) !== LT
+  ) {
+    return onlyChild.trim().length > 0 ? onlyChild : Object.create(null)
+  }
+
+  const { textBuf, grouped } = classifyChildren(children)
 
   // Attributes first matches the previous parser's emission order,
   // which the writer relies on for stable byte output.
@@ -268,8 +335,8 @@ const toCompact = (node: TNode): JsonValue => {
   // coercing — see the coercion helpers in MetadataService and
   // TextArrayMergeNode.
   const out: JsonObject = Object.create(null)
-  for (const [k, v] of Object.entries(node.attributes)) {
-    out[`${ATTR_PREFIX}${k}`] = v
+  for (const k in attributes) {
+    out[`${ATTR_PREFIX}${k}`] = attributes[k]
   }
   for (const [tag, arr] of grouped) {
     out[tag] = arr.length === 1 ? (arr[0] as JsonValue) : (arr as JsonValue[])
