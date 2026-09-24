@@ -2,7 +2,7 @@ import { TEXT_TAG } from '../../constant/parserConstant.js'
 import type { JsonObject, JsonValue } from '../../types/jsonTypes.js'
 import { ATTR_PREFIX } from './xmlTokens.js'
 
-export type ElementAttrs = Readonly<Record<string, string | null>>
+type ElementAttrs = Readonly<Record<string, string | null>>
 
 // `hasAttrs` travels with the bag so the frame never recounts keys.
 export interface AttrSet {

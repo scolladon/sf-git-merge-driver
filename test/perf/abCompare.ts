@@ -56,7 +56,7 @@ interface CliOptions {
 const toMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error)
 
-const usageError = (message: string): never => {
+function usageError(message: string): never {
   process.stderr.write(`${message}\n`)
   process.exit(USAGE_EXIT_CODE)
 }
@@ -67,13 +67,14 @@ const isPhase = (value: string): value is Phase =>
 const isTier = (value: string): value is FixtureSize =>
   (TIER_VALUES as readonly string[]).includes(value)
 
+const areTiers = (values: readonly string[]): values is FixtureSize[] =>
+  values.every(isTier)
+
 const parseTiers = (raw: string | undefined): readonly FixtureSize[] => {
   if (raw === undefined) return TIER_VALUES
   const values = raw.split(',')
-  for (const value of values) {
-    if (!isTier(value)) usageError(`invalid --tiers value: ${value}`)
-  }
-  return values as FixtureSize[]
+  if (!areTiers(values)) usageError(`invalid --tiers value: ${raw}`)
+  return values
 }
 
 const parseRounds = (raw: string | undefined): number => {
@@ -91,26 +92,26 @@ const parseExpectGain = (raw: string | undefined): number | undefined => {
   return value
 }
 
-const parseCliArgs = (argv: readonly string[]): CliOptions => {
-  const { values } = parseArgs({
-    args: argv as string[],
-    options: {
-      base: { type: 'string', default: 'main' },
-      phase: { type: 'string' },
-      tiers: { type: 'string' },
-      rounds: { type: 'string' },
-      'expect-gain': { type: 'string' },
-    },
-  })
-
-  const rawPhase = values.phase
-  if (rawPhase === undefined || !isPhase(rawPhase)) {
+const parsePhase = (raw: string | undefined): Phase => {
+  if (raw === undefined || !isPhase(raw)) {
     usageError(`--phase is required, one of: ${PHASES.join('|')}`)
   }
+  return raw
+}
 
+const CLI_OPTIONS = {
+  base: { type: 'string', default: 'main' },
+  phase: { type: 'string' },
+  tiers: { type: 'string' },
+  rounds: { type: 'string' },
+  'expect-gain': { type: 'string' },
+} as const
+
+const parseCliArgs = (argv: readonly string[]): CliOptions => {
+  const { values } = parseArgs({ args: [...argv], options: CLI_OPTIONS })
   return {
-    base: values.base as string,
-    phase: rawPhase as Phase,
+    base: values.base,
+    phase: parsePhase(values.phase),
     tiers: parseTiers(values.tiers),
     rounds: parseRounds(values.rounds),
     expectGain: parseExpectGain(values['expect-gain']),
@@ -123,14 +124,33 @@ const REPO_ROOT = process.cwd()
 const COPIED_ENTRIES = ['src', 'tooling', 'package.json', 'tsconfig.json']
 const MAX_BUFFER = 1024 * 1024 * 256
 
-const createBaseSide = (ref: string): string => {
-  const dir = mkdtempSync(join(tmpdir(), 'ab-base-'))
+// Resolving first means a value like `--output=…` can never reach
+// `git archive` as an option.
+const resolveCommit = (ref: string): string =>
+  execFileSync(
+    'git',
+    ['rev-parse', '--verify', '--end-of-options', `${ref}^{commit}`],
+    { cwd: REPO_ROOT, encoding: 'utf8' }
+  ).trim()
+
+const extractRef = (commit: string, dir: string): void => {
   const tar = execFileSync(
     'git',
-    ['archive', '--format=tar', ref, ...COPIED_ENTRIES],
+    ['archive', '--format=tar', commit, ...COPIED_ENTRIES],
     { cwd: REPO_ROOT, maxBuffer: MAX_BUFFER }
   )
   execFileSync('tar', ['-x', '-C', dir], { input: tar, maxBuffer: MAX_BUFFER })
+}
+
+const createBaseSide = (ref: string): string => {
+  const commit = resolveCommit(ref)
+  const dir = mkdtempSync(join(tmpdir(), 'ab-base-'))
+  try {
+    extractRef(commit, dir)
+  } catch (error) {
+    cleanupDirs([dir])
+    throw error
+  }
   return dir
 }
 
@@ -268,10 +288,9 @@ interface SideModules {
   readonly parserExportName: string
 }
 
-const loadSideModules = async (dir: string): Promise<SideModules> => {
-  const { path: parserPath, exportName: parserExportName } =
-    resolveParserModule(dir)
-  const Parser = await importExport(parserPath, parserExportName, isParserCtor)
+const loadMergerAndWriter = async (
+  dir: string
+): Promise<Pick<SideModules, 'Merger' | 'Writer'>> => {
   const Merger = await importExport(
     join(dir, 'lib/merger/JsonMerger.js'),
     'JsonMerger',
@@ -282,14 +301,20 @@ const loadSideModules = async (dir: string): Promise<SideModules> => {
     'XmlStreamWriter',
     isWriterCtor
   )
+  return { Merger, Writer }
+}
+
+const loadSideModules = async (dir: string): Promise<SideModules> => {
+  const { path: parserPath, exportName: parserExportName } =
+    resolveParserModule(dir)
+  const Parser = await importExport(parserPath, parserExportName, isParserCtor)
   const constants = await importModule(
     join(dir, 'lib/constant/conflictConstant.js'),
     isConflictConstants
   )
   return {
     parser: new Parser(),
-    Merger,
-    Writer,
+    ...(await loadMergerAndWriter(dir)),
     config: buildMergeConfig(constants),
     parserPath,
     parserExportName,
@@ -320,25 +345,50 @@ const timeUntilStable = async (
   return elapsed / iterations
 }
 
+// Collecting before every sample keeps one side's garbage from being
+// swept on the other side's clock. Needs `node --expose-gc`.
+const collectGarbage = (): void => {
+  globalThis.gc?.()
+}
+
+const warnWithoutGc = (): void => {
+  if (globalThis.gc !== undefined) return
+  process.stderr.write(
+    'warning: gc not exposed; run `node --expose-gc --import tsx …` for ' +
+      'cleaner samples\n'
+  )
+}
+
+const measured = async (sample: () => Promise<number>): Promise<number> => {
+  collectGarbage()
+  return sample()
+}
+
+const collectRound = async (
+  samplers: Pair<() => Promise<number>>,
+  baseFirst: boolean
+): Promise<Pair<number>> => {
+  if (baseFirst) {
+    const base = await measured(samplers.base)
+    return { base, cand: await measured(samplers.cand) }
+  }
+  const cand = await measured(samplers.cand)
+  return { base: await measured(samplers.base), cand }
+}
+
 const collectPairedSamples = async (
   sampleBase: () => Promise<number>,
   sampleCand: () => Promise<number>,
   rounds: number
 ): Promise<Pair<number[]>> => {
-  for (let i = 0; i < WARMUP_SAMPLES; i++) {
-    await sampleBase()
-    await sampleCand()
-  }
+  const samplers = { base: sampleBase, cand: sampleCand }
+  for (let i = 0; i < WARMUP_SAMPLES; i++) await collectRound(samplers, true)
   const base: number[] = []
   const cand: number[] = []
   for (let i = 0; i < rounds; i++) {
-    if (i % 2 === 0) {
-      base.push(await sampleBase())
-      cand.push(await sampleCand())
-    } else {
-      cand.push(await sampleCand())
-      base.push(await sampleBase())
-    }
+    const round = await collectRound(samplers, i % 2 === 0)
+    base.push(round.base)
+    cand.push(round.cand)
   }
   return { base, cand }
 }
@@ -359,8 +409,15 @@ interface Row {
   readonly baseMin: number
   readonly candMedian: number
   readonly candMin: number
+  readonly pairedDeltaPct: number
+  readonly noisy: boolean
   readonly gated: boolean
 }
+
+// A side whose median sits this far above its min was disturbed by
+// something outside the code under test; its verdict is not trusted.
+const NOISE_LIMIT = 1.1
+const PERCENT = 100
 
 interface RowDescriptor {
   readonly tier: string
@@ -369,6 +426,16 @@ interface RowDescriptor {
   readonly gated: boolean
 }
 
+// Median of the per-round ratios, so drift that hits both sides of a
+// round cancels out instead of skewing two independent medians.
+const pairedDeltaPct = (samples: Pair<number[]>): number => {
+  const ratios = samples.base.map((base, i) => (samples.cand[i] ?? 0) / base)
+  return (median(ratios) - 1) * PERCENT
+}
+
+const isNoisy = (values: readonly number[]): boolean =>
+  median(values) / min(values) > NOISE_LIMIT
+
 const toRow = ({ tier, label, samples, gated }: RowDescriptor): Row => ({
   tier,
   label,
@@ -376,22 +443,27 @@ const toRow = ({ tier, label, samples, gated }: RowDescriptor): Row => ({
   baseMin: min(samples.base),
   candMedian: median(samples.cand),
   candMin: min(samples.cand),
+  pairedDeltaPct: pairedDeltaPct(samples),
+  noisy: isNoisy(samples.base) || isNoisy(samples.cand),
   gated,
 })
 
-const deltaPct = (row: Row): number =>
-  ((row.candMedian - row.baseMedian) / row.baseMedian) * 100
-
-const gainOf = (row: Row): number => -deltaPct(row)
+const gainOf = (row: Row): number => -row.pairedDeltaPct
 
 const formatRow = (row: Row): string =>
-  `| ${row.tier} | ${row.label} | ${row.baseMedian.toFixed(2)} | ${row.baseMin.toFixed(2)} | ${row.candMedian.toFixed(2)} | ${row.candMin.toFixed(2)} | ${deltaPct(row).toFixed(1)}% |`
+  `| ${row.tier} | ${row.label} | ${row.baseMedian.toFixed(2)} | ${row.baseMin.toFixed(2)} | ${row.candMedian.toFixed(2)} | ${row.candMin.toFixed(2)} | ${row.pairedDeltaPct.toFixed(1)}% | ${row.noisy ? 'noisy' : 'ok'} |`
 
 const formatMarkdownTable = (rows: readonly Row[]): string => {
   const header =
-    '| tier | label | base median (ms) | base min | cand median (ms) | cand min | Δ median % |'
-  const separator = '|---|---|---|---|---|---|---|'
+    '| tier | label | base median (ms) | base min | cand median (ms) | cand min | Δ paired % | noise |'
+  const separator = '|---|---|---|---|---|---|---|---|'
   return `${[header, separator, ...rows.map(formatRow)].join('\n')}\n`
+}
+
+const verdictOf = (rows: readonly Row[], expectGain: number): string => {
+  const gated = rows.filter(row => row.gated)
+  if (gated.some(row => row.noisy)) return 'unreliable'
+  return gated.every(row => gainOf(row) >= expectGain) ? 'pass' : 'fail'
 }
 
 const printVerdict = (
@@ -399,12 +471,9 @@ const printVerdict = (
   expectGain: number | undefined
 ): void => {
   if (expectGain === undefined) return
-  const failing = rows.filter(row => row.gated && gainOf(row) < expectGain)
-  const passed = failing.length === 0
-  process.stdout.write(
-    `verdict: ${passed ? 'pass' : 'fail'} (expect-gain ${expectGain}%)\n`
-  )
-  if (!passed) process.exitCode = 1
+  const verdict = verdictOf(rows, expectGain)
+  process.stdout.write(`verdict: ${verdict} (expect-gain ${expectGain}%)\n`)
+  if (verdict !== 'pass') process.exitCode = 1
 }
 
 // ---- phase: parse ----
@@ -554,10 +623,9 @@ const runPipelinePhase = async (
 
 // ---- phase: rss ----
 
-const RSS_TRIO_DIR = join(tmpdir(), `ab-rss-${process.pid}`)
-
-const writeRssTrio = (): readonly string[] => {
-  mkdirSync(RSS_TRIO_DIR, { recursive: true })
+const writeRssTrio = (workDir: string): readonly string[] => {
+  const trioDir = join(workDir, 'rss')
+  mkdirSync(trioDir)
   const fixtures = generateProfileFixtures('xl')
   const names = ['ancestor', 'local', 'other'] as const
   const contents = {
@@ -566,7 +634,7 @@ const writeRssTrio = (): readonly string[] => {
     other: fixtures.other,
   }
   return names.map(name => {
-    const path = join(RSS_TRIO_DIR, `${name}.xml`)
+    const path = join(trioDir, `${name}.xml`)
     writeFileSync(path, contents[name])
     return path
   })
@@ -604,9 +672,10 @@ const sampleRss = (
 
 const runRssPhase = async (
   sides: Pair<SideModules>,
+  workDir: string,
   rounds: number
 ): Promise<Row[]> => {
-  const files = writeRssTrio()
+  const files = writeRssTrio(workDir)
   const samples = await collectPairedSamples(
     async () =>
       sampleRss(sides.base.parserPath, sides.base.parserExportName, files),
@@ -619,6 +688,10 @@ const runRssPhase = async (
 
 // ---- phase: binary ----
 
+interface SideDirs extends Pair<string> {
+  readonly work: string
+}
+
 interface BinaryTrio {
   readonly ancestor: string
   readonly local: string
@@ -627,7 +700,7 @@ interface BinaryTrio {
 }
 
 const writeTierTrio = (dir: string, size: FixtureSize): BinaryTrio => {
-  mkdirSync(dir, { recursive: true })
+  mkdirSync(dir)
   const fixtures = generateProfileFixtures(size)
   const ancestor = join(dir, 'ancestor.xml')
   const local = join(dir, 'local.xml')
@@ -661,20 +734,14 @@ const sampleBinary = (binPath: string, trio: BinaryTrio): number => {
 }
 
 const runBinaryPhase = async (
-  dirs: Pair<string>,
+  dirs: SideDirs,
   tiers: readonly FixtureSize[],
   rounds: number
 ): Promise<Row[]> => {
   const rows: Row[] = []
   for (const tier of tiers) {
-    const baseTrio = writeTierTrio(
-      join(tmpdir(), `ab-bin-base-${tier}-${process.pid}`),
-      tier
-    )
-    const candTrio = writeTierTrio(
-      join(tmpdir(), `ab-bin-cand-${tier}-${process.pid}`),
-      tier
-    )
+    const baseTrio = writeTierTrio(join(dirs.work, `bin-base-${tier}`), tier)
+    const candTrio = writeTierTrio(join(dirs.work, `bin-cand-${tier}`), tier)
     const baseBin = join(dirs.base, 'bin/merge-driver.cjs')
     const candBin = join(dirs.cand, 'bin/merge-driver.cjs')
     const samples = await collectPairedSamples(
@@ -715,7 +782,7 @@ const writeSnapshot = (parser: ParityParser): void => {
 const runPairedPhase = async (
   phase: PairedPhase,
   sides: Pair<SideModules>,
-  dirs: Pair<string>,
+  dirs: SideDirs,
   tiers: readonly FixtureSize[],
   rounds: number
 ): Promise<Row[]> => {
@@ -727,13 +794,13 @@ const runPairedPhase = async (
     case 'pipeline':
       return runPipelinePhase(sides, tiers, rounds)
     case 'rss':
-      return runRssPhase(sides, rounds)
+      return runRssPhase(sides, dirs.work, rounds)
     case 'binary':
       return runBinaryPhase(dirs, tiers, rounds)
   }
 }
 
-const cleanupSides = (dirs: readonly string[]): void => {
+function cleanupDirs(dirs: readonly string[]): void {
   for (const dir of dirs) {
     try {
       rmSync(dir, { recursive: true, force: true })
@@ -751,7 +818,20 @@ const runSnapshot = async (base: string): Promise<void> => {
     const { parser } = await loadSideModules(baseDir)
     writeSnapshot(parser)
   } finally {
-    cleanupSides([baseDir])
+    cleanupDirs([baseDir])
+  }
+}
+
+const prepareSides = async (
+  dirs: SideDirs,
+  phase: PairedPhase
+): Promise<Pair<SideModules>> => {
+  const buildBinary = phase === 'binary'
+  compileSide(dirs.base, { buildBinary })
+  compileSide(dirs.cand, { buildBinary })
+  return {
+    base: await loadSideModules(dirs.base),
+    cand: await loadSideModules(dirs.cand),
   }
 }
 
@@ -759,33 +839,30 @@ const runPaired = async (
   options: CliOptions,
   phase: PairedPhase
 ): Promise<void> => {
-  const baseDir = createBaseSide(options.base)
-  const candDir = createCandSide()
+  const created: string[] = []
+  const track = (dir: string): string => {
+    created.push(dir)
+    return dir
+  }
   try {
-    const needsBinary = phase === 'binary'
-    compileSide(baseDir, { buildBinary: needsBinary })
-    compileSide(candDir, { buildBinary: needsBinary })
-    const sides: Pair<SideModules> = {
-      base: await loadSideModules(baseDir),
-      cand: await loadSideModules(candDir),
+    const dirs: SideDirs = {
+      base: track(createBaseSide(options.base)),
+      cand: track(createCandSide()),
+      work: track(mkdtempSync(join(tmpdir(), 'ab-work-'))),
     }
-    const dirs: Pair<string> = { base: baseDir, cand: candDir }
-    const rows = await runPairedPhase(
-      phase,
-      sides,
-      dirs,
-      options.tiers,
-      options.rounds
-    )
+    const sides = await prepareSides(dirs, phase)
+    const { tiers, rounds, expectGain } = options
+    const rows = await runPairedPhase(phase, sides, dirs, tiers, rounds)
     process.stdout.write(formatMarkdownTable(rows))
-    printVerdict(rows, options.expectGain)
+    printVerdict(rows, expectGain)
   } finally {
-    cleanupSides([baseDir, candDir])
+    cleanupDirs(created)
   }
 }
 
 const main = async (): Promise<void> => {
   const options = parseCliArgs(process.argv.slice(2))
+  warnWithoutGc()
   if (options.phase === 'snapshot') {
     await runSnapshot(options.base)
     return
