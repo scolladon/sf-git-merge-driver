@@ -15,10 +15,10 @@ describe('assertBalancedTags', () => {
       const xml = '<a><b>x</b></a>'
 
       // Act
-      const sut = () => assertBalancedTags(xml)
+      const act = () => assertBalancedTags(xml)
 
       // Assert
-      expect(sut).not.toThrow()
+      expect(act).not.toThrow()
     })
   })
 
@@ -28,10 +28,10 @@ describe('assertBalancedTags', () => {
       const xml = '<a/>'
 
       // Act
-      const sut = () => assertBalancedTags(xml)
+      const act = () => assertBalancedTags(xml)
 
       // Assert
-      expect(sut).not.toThrow()
+      expect(act).not.toThrow()
     })
   })
 
@@ -41,10 +41,10 @@ describe('assertBalancedTags', () => {
       const xml = '<?xml version="1.0"?><Profile><broken>'
 
       // Act
-      const sut = () => assertBalancedTags(xml)
+      const act = () => assertBalancedTags(xml)
 
       // Assert
-      expect(sut).toThrow(unbalancedTags(2))
+      expect(act).toThrow(unbalancedTags(2))
     })
   })
 
@@ -54,10 +54,10 @@ describe('assertBalancedTags', () => {
       const xml = '<a/></a>'
 
       // Act
-      const sut = () => assertBalancedTags(xml)
+      const act = () => assertBalancedTags(xml)
 
       // Assert
-      expect(sut).toThrow(unbalancedTags(-1))
+      expect(act).toThrow(unbalancedTags(-1))
     })
   })
 
@@ -67,10 +67,10 @@ describe('assertBalancedTags', () => {
       const xml = '<r><!-- never closes'
 
       // Act
-      const sut = () => assertBalancedTags(xml)
+      const act = () => assertBalancedTags(xml)
 
       // Assert
-      expect(sut).toThrow(UNTERMINATED_COMMENT)
+      expect(act).toThrow(UNTERMINATED_COMMENT)
     })
   })
 
@@ -80,10 +80,10 @@ describe('assertBalancedTags', () => {
       const xml = '<r><v'
 
       // Act
-      const sut = () => assertBalancedTags(xml)
+      const act = () => assertBalancedTags(xml)
 
       // Assert
-      expect(sut).toThrow(UNTERMINATED_TAG)
+      expect(act).toThrow(UNTERMINATED_TAG)
     })
   })
 
@@ -93,10 +93,10 @@ describe('assertBalancedTags', () => {
       const xml = '<?xml version="1.0"'
 
       // Act
-      const sut = () => assertBalancedTags(xml)
+      const act = () => assertBalancedTags(xml)
 
       // Assert
-      expect(sut).toThrow(UNTERMINATED_PROCESSING_INSTRUCTION)
+      expect(act).toThrow(UNTERMINATED_PROCESSING_INSTRUCTION)
     })
   })
 
@@ -106,10 +106,10 @@ describe('assertBalancedTags', () => {
       const xml = '<!DOCTYPE r'
 
       // Act
-      const sut = () => assertBalancedTags(xml)
+      const act = () => assertBalancedTags(xml)
 
       // Assert
-      expect(sut).toThrow(UNTERMINATED_DECLARATION)
+      expect(act).toThrow(UNTERMINATED_DECLARATION)
     })
   })
 
@@ -119,10 +119,10 @@ describe('assertBalancedTags', () => {
       const xml = '<!DOCTYPE r SYSTEM "x.dtd"><r><v>1</v></r>'
 
       // Act
-      const sut = () => assertBalancedTags(xml)
+      const act = () => assertBalancedTags(xml)
 
       // Assert
-      expect(sut).not.toThrow()
+      expect(act).not.toThrow()
     })
   })
 
@@ -134,10 +134,10 @@ describe('assertBalancedTags', () => {
       const xml = '<r><v>1</v></r>\n  \n'
 
       // Act
-      const sut = () => assertBalancedTags(xml)
+      const act = () => assertBalancedTags(xml)
 
       // Assert
-      expect(sut).not.toThrow()
+      expect(act).not.toThrow()
     })
   })
 
@@ -147,26 +147,25 @@ describe('assertBalancedTags', () => {
       const xml = `<a>it's "ok"</a>`
 
       // Act
-      const sut = () => assertBalancedTags(xml)
+      const act = () => assertBalancedTags(xml)
 
       // Assert
-      expect(sut).not.toThrow()
+      expect(act).not.toThrow()
     })
   })
 
   describe('given a quoted attribute followed by a quote-free tag', () => {
-    // Pins the quote-cursor refresh: once `next` moves past a quote seen
-    // in an earlier tag, the cursor must catch up instead of keeping
-    // every later tag flagged as holding a quote.
+    // A quote seen in an earlier tag must not unbalance a later,
+    // quote-free one.
     it('when called then the trailing tag still balances', () => {
       // Arrange
       const xml = '<a><b x="1">t</b><c>u</c></a>'
 
       // Act
-      const sut = () => assertBalancedTags(xml)
+      const act = () => assertBalancedTags(xml)
 
       // Assert
-      expect(sut).not.toThrow()
+      expect(act).not.toThrow()
     })
   })
 
@@ -176,10 +175,10 @@ describe('assertBalancedTags', () => {
       const xml = '<a><b x"y="1">t</b></a>'
 
       // Act
-      const sut = () => assertBalancedTags(xml)
+      const act = () => assertBalancedTags(xml)
 
       // Assert
-      expect(sut).toThrow(UNTERMINATED_TAG)
+      expect(act).toThrow(UNTERMINATED_TAG)
     })
   })
 
@@ -189,10 +188,10 @@ describe('assertBalancedTags', () => {
       const xml = `<"x>y"/>`
 
       // Act
-      const sut = () => assertBalancedTags(xml)
+      const act = () => assertBalancedTags(xml)
 
       // Assert
-      expect(sut).not.toThrow()
+      expect(act).not.toThrow()
     })
   })
 
@@ -202,10 +201,10 @@ describe('assertBalancedTags', () => {
       const xml = `<'x>y'/>`
 
       // Act
-      const sut = () => assertBalancedTags(xml)
+      const act = () => assertBalancedTags(xml)
 
       // Assert
-      expect(sut).not.toThrow()
+      expect(act).not.toThrow()
     })
   })
 
@@ -215,10 +214,10 @@ describe('assertBalancedTags', () => {
       const xml = '<r><v attr="a>b">x</v></r>'
 
       // Act
-      const sut = () => assertBalancedTags(xml)
+      const act = () => assertBalancedTags(xml)
 
       // Assert
-      expect(sut).not.toThrow()
+      expect(act).not.toThrow()
     })
   })
 
@@ -228,10 +227,10 @@ describe('assertBalancedTags', () => {
       const xml = '<r><v attr="a>b"/></r>'
 
       // Act
-      const sut = () => assertBalancedTags(xml)
+      const act = () => assertBalancedTags(xml)
 
       // Assert
-      expect(sut).not.toThrow()
+      expect(act).not.toThrow()
     })
   })
 
@@ -241,10 +240,10 @@ describe('assertBalancedTags', () => {
       const xml = "<r><v attr='a>b'>x</v></r>"
 
       // Act
-      const sut = () => assertBalancedTags(xml)
+      const act = () => assertBalancedTags(xml)
 
       // Assert
-      expect(sut).not.toThrow()
+      expect(act).not.toThrow()
     })
   })
 
@@ -254,10 +253,10 @@ describe('assertBalancedTags', () => {
       const xml = "<r><v attr='a>b'/></r>"
 
       // Act
-      const sut = () => assertBalancedTags(xml)
+      const act = () => assertBalancedTags(xml)
 
       // Assert
-      expect(sut).not.toThrow()
+      expect(act).not.toThrow()
     })
   })
 
@@ -269,10 +268,10 @@ describe('assertBalancedTags', () => {
       const xml = '<a><!--<x-->y</a>'
 
       // Act
-      const sut = () => assertBalancedTags(xml)
+      const act = () => assertBalancedTags(xml)
 
       // Assert
-      expect(sut).not.toThrow()
+      expect(act).not.toThrow()
     })
   })
 
@@ -283,10 +282,10 @@ describe('assertBalancedTags', () => {
       const xml = '<a><!x<>z</a>'
 
       // Act
-      const sut = () => assertBalancedTags(xml)
+      const act = () => assertBalancedTags(xml)
 
       // Assert
-      expect(sut).not.toThrow()
+      expect(act).not.toThrow()
     })
   })
 
@@ -297,10 +296,10 @@ describe('assertBalancedTags', () => {
       const xml = '<a>?><?pi?>z</a>'
 
       // Act
-      const sut = () => assertBalancedTags(xml)
+      const act = () => assertBalancedTags(xml)
 
       // Assert
-      expect(sut).not.toThrow()
+      expect(act).not.toThrow()
     })
   })
 
@@ -311,10 +310,10 @@ describe('assertBalancedTags', () => {
       const xml = '<a><?pi <x?>y</a>'
 
       // Act
-      const sut = () => assertBalancedTags(xml)
+      const act = () => assertBalancedTags(xml)
 
       // Assert
-      expect(sut).not.toThrow()
+      expect(act).not.toThrow()
     })
   })
 
@@ -324,10 +323,10 @@ describe('assertBalancedTags', () => {
       const xml = '<a><![CDATA[x]]></a>'
 
       // Act
-      const sut = () => assertBalancedTags(xml)
+      const act = () => assertBalancedTags(xml)
 
       // Assert
-      expect(sut).not.toThrow()
+      expect(act).not.toThrow()
     })
   })
 
@@ -339,10 +338,10 @@ describe('assertBalancedTags', () => {
       const xml = '<a><![CDATA[<b>]]></a>'
 
       // Act
-      const sut = () => assertBalancedTags(xml)
+      const act = () => assertBalancedTags(xml)
 
       // Assert
-      expect(sut).not.toThrow()
+      expect(act).not.toThrow()
     })
   })
 
@@ -357,10 +356,10 @@ describe('assertBalancedTags', () => {
       const xml = '<a><![CDATA[a>b</c>d]]></a>'
 
       // Act
-      const sut = () => assertBalancedTags(xml)
+      const act = () => assertBalancedTags(xml)
 
       // Assert
-      expect(sut).not.toThrow()
+      expect(act).not.toThrow()
     })
   })
 
@@ -373,10 +372,10 @@ describe('assertBalancedTags', () => {
       const xml = '<a>]]><![CDATA[z]]></a>'
 
       // Act
-      const sut = () => assertBalancedTags(xml)
+      const act = () => assertBalancedTags(xml)
 
       // Assert
-      expect(sut).not.toThrow()
+      expect(act).not.toThrow()
     })
   })
 
@@ -388,10 +387,10 @@ describe('assertBalancedTags', () => {
       const xml = '<a><![CDATA[x'
 
       // Act
-      const sut = () => assertBalancedTags(xml)
+      const act = () => assertBalancedTags(xml)
 
       // Assert
-      expect(sut).toThrow(UNTERMINATED_DECLARATION)
+      expect(act).toThrow(UNTERMINATED_DECLARATION)
     })
   })
 
@@ -404,10 +403,39 @@ describe('assertBalancedTags', () => {
       const xml = '<a><![cdata[x]]></a>'
 
       // Act
-      const sut = () => assertBalancedTags(xml)
+      const act = () => assertBalancedTags(xml)
 
       // Assert
-      expect(sut).not.toThrow()
+      expect(act).not.toThrow()
+    })
+  })
+
+  describe('given a comment token that closes before four characters', () => {
+    it('when called then it rejects the comment as unterminated', () => {
+      // Arrange
+      const xml = '<a><!--></a>'
+
+      // Act
+      const act = () => assertBalancedTags(xml)
+
+      // Assert
+      expect(act).toThrow(UNTERMINATED_COMMENT)
+    })
+  })
+
+  describe.each([
+    ['<!-->', '<a><!-->t--></a>'],
+    ['<!--->', '<a><!---> x --></a>'],
+  ])('given the short comment opener %s with a later -->', (_, xml) => {
+    it('when called then the comment runs to that --> and balances', () => {
+      // Arrange
+      const input = xml
+
+      // Act
+      const act = () => assertBalancedTags(input)
+
+      // Assert
+      expect(act).not.toThrow()
     })
   })
 })

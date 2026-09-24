@@ -136,7 +136,7 @@ describe('MergeNodeFactory', () => {
         expect(getKeyFieldExtractor).not.toHaveBeenCalled()
       })
 
-      it('given mixed null, number, boolean and undefined sides when createNode then returns TextMergeNode', () => {
+      it('given mixed null, number and boolean sides when createNode then returns TextMergeNode', () => {
         // Arrange
         const ancestor = null
         const local = 42
@@ -149,21 +149,17 @@ describe('MergeNodeFactory', () => {
         expect(node).toBeInstanceOf(TextMergeNode)
       })
 
-      it('given one object side when createNode then still consults the key extractor', () => {
+      it('given one object side when createNode then it takes the object route, not the scalar exit', () => {
         // Arrange
-        const getKeyFieldExtractor = vi.spyOn(
-          MetadataService,
-          'getKeyFieldExtractor'
-        )
         const ancestor = { a: 1 }
         const local = 'b'
         const other = 'c'
 
         // Act
-        factory.createNode(ancestor, local, other, 'attr')
+        const node = factory.createNode(ancestor, local, other, 'attr')
 
         // Assert
-        expect(getKeyFieldExtractor).toHaveBeenCalled()
+        expect(node).toBeInstanceOf(PropertyMergeNode)
       })
 
       it('given attribute=members with object-shaped values then returns PropertyMergeNode, not TextArrayMergeNode', () => {

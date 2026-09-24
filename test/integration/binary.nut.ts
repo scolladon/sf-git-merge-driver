@@ -61,10 +61,13 @@ const runBinaryWithEnv = (
   args: string[],
   env: NodeJS.ProcessEnv
 ): SpawnResult => {
+  // An ambient NODE_COMPILE_CACHE turns the cache on by itself and would
+  // make the binary's own behaviour unobservable.
+  const { NODE_COMPILE_CACHE: _ambient, ...inherited } = process.env
   const r = spawnSync('node', [BINARY, ...args], {
     cwd: ROOT_FOLDER,
     encoding: 'utf-8',
-    env: { ...process.env, ...env },
+    env: { ...inherited, ...env },
   })
   return { status: r.status ?? -1, stdout: r.stdout, stderr: r.stderr }
 }

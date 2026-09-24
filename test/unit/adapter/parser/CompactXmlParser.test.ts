@@ -23,7 +23,7 @@ describe('CompactXmlParser', () => {
     })
   })
 
-  describe('given a scan failure that the oracle does not reject (a P5 unwind row)', () => {
+  describe('given a scan failure that the oracle does not reject (an input the balance pass accepts)', () => {
     it("when parseString then the scanner's own message is thrown", () => {
       // The mismatched close `</b>` for open frame `bb` fails the
       // scanner's lax-name check, but assertBalancedTags only counts
@@ -46,7 +46,7 @@ describe('CompactXmlParser', () => {
     })
   })
 
-  describe('given a stray quote in an open tag (needsOracle witness)', () => {
+  describe('given a stray quote in an open tag (needs the balance pass)', () => {
     it('when parseString then the oracle throws over the scanned result', () => {
       expect(() => sut.parseString('<a><b x"y="1">t</b></a>')).toThrow(
         'XML parse error: unterminated tag'

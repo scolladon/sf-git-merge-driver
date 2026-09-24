@@ -29,10 +29,10 @@ describe('parseErrors', () => {
       const finalDepth = 2
 
       // Act
-      const sut = unbalancedTags(finalDepth)
+      const message = unbalancedTags(finalDepth)
 
       // Assert
-      expect(sut).toBe('XML parse error: tags unbalanced (final depth 2)')
+      expect(message).toBe('XML parse error: tags unbalanced (final depth 2)')
     })
   })
 
@@ -42,10 +42,10 @@ describe('parseErrors', () => {
       const xml = '<a></b>'
 
       // Act
-      const sut = unexpectedCloseTag(xml, 6)
+      const message = unexpectedCloseTag(xml, 6)
 
       // Assert
-      expect(sut).toBe('Unexpected close tag\nLine: 0\nColumn: 7\nChar: >')
+      expect(message).toBe('Unexpected close tag\nLine: 0\nColumn: 7\nChar: >')
     })
   })
 
@@ -55,10 +55,10 @@ describe('parseErrors', () => {
       const xml = '<a>\n<b>\n</c>'
 
       // Act
-      const sut = unexpectedCloseTag(xml, 11)
+      const message = unexpectedCloseTag(xml, 11)
 
       // Assert
-      expect(sut).toBe('Unexpected close tag\nLine: 2\nColumn: 4\nChar: >')
+      expect(message).toBe('Unexpected close tag\nLine: 2\nColumn: 4\nChar: >')
     })
   })
 
@@ -68,24 +68,24 @@ describe('parseErrors', () => {
       const xml = '<a>\n</b\r>'
 
       // Act
-      const sut = unexpectedCloseTag(xml, 8)
+      const message = unexpectedCloseTag(xml, 8)
 
       // Assert
-      expect(sut).toBe('Unexpected close tag\nLine: 1\nColumn: 5\nChar: >')
+      expect(message).toBe('Unexpected close tag\nLine: 1\nColumn: 5\nChar: >')
     })
   })
 
   describe('given a CDATA section on the mismatched close tag line', () => {
     it('when unexpectedCloseTag then it counts the input as written', () => {
-      // Arrange — ADR 016: no sentinel rewrite runs ahead of the scan, so
+      // Arrange — no rewrite runs ahead of the scan, so
       // the column points into the file the user wrote.
       const xml = '<a><![CDATA[1\n2]]><bb></b></a>'
 
       // Act
-      const sut = unexpectedCloseTag(xml, 25)
+      const message = unexpectedCloseTag(xml, 25)
 
       // Assert
-      expect(sut).toBe('Unexpected close tag\nLine: 1\nColumn: 12\nChar: >')
+      expect(message).toBe('Unexpected close tag\nLine: 1\nColumn: 12\nChar: >')
     })
   })
 })

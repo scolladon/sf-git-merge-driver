@@ -8,10 +8,10 @@ describe('scanDocument', () => {
       const xml = '<r><v>1</v></r>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      expect(sut).toEqual({
+      expect(outcome).toEqual({
         kind: 'parsed',
         result: { content: { r: { v: '1' } }, namespaces: {} },
         needsOracle: false,
@@ -25,11 +25,11 @@ describe('scanDocument', () => {
       const xml = '<a> t1 <b>x</b> t2 </a>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      if (sut.kind !== 'parsed') throw new Error('expected parsed')
-      expect(sut.result.content).toEqual({ a: { b: 'x', '#text': 't1t2' } })
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.result.content).toEqual({ a: { b: 'x', '#text': 't1t2' } })
     })
   })
 
@@ -39,11 +39,11 @@ describe('scanDocument', () => {
       const xml = '<a><b>  </b></a>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      if (sut.kind !== 'parsed') throw new Error('expected parsed')
-      expect(sut.result.content).toEqual({ a: { b: '' } })
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.result.content).toEqual({ a: { b: '' } })
     })
   })
 
@@ -53,10 +53,10 @@ describe('scanDocument', () => {
       const xml = '<a><b>x</b'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      expect(sut).toEqual({
+      expect(outcome).toEqual({
         kind: 'failed',
         message: 'XML parse error: unterminated tag',
       })
@@ -69,11 +69,11 @@ describe('scanDocument', () => {
       const xml = '<a><b>x</bb></a>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      if (sut.kind !== 'parsed') throw new Error('expected parsed')
-      expect(sut.result.content).toEqual({ a: { b: 'x' } })
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.result.content).toEqual({ a: { b: 'x' } })
     })
   })
 
@@ -83,10 +83,10 @@ describe('scanDocument', () => {
       const xml = '<a><bb>x</b></a>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      expect(sut).toEqual({
+      expect(outcome).toEqual({
         kind: 'failed',
         message: 'Unexpected close tag\nLine: 0\nColumn: 12\nChar: >',
       })
@@ -99,10 +99,10 @@ describe('scanDocument', () => {
       const xml = '</x><a>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      expect(sut).toEqual({
+      expect(outcome).toEqual({
         kind: 'parsed',
         result: { content: {}, namespaces: {} },
         needsOracle: true,
@@ -116,10 +116,10 @@ describe('scanDocument', () => {
       const xml = '<a/></x><b>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      expect(sut).toEqual({
+      expect(outcome).toEqual({
         kind: 'parsed',
         result: { content: { a: '' }, namespaces: {} },
         needsOracle: true,
@@ -128,52 +128,52 @@ describe('scanDocument', () => {
   })
 
   describe('given a stray quote ahead of the real attribute quote in an open tag', () => {
-    it('when scanning then it parses but flags needsOracle (witness of rule 8)', () => {
+    it('when scanning then it parses but flags needsOracle (defers to the balance pass)', () => {
       // Arrange
       const xml = '<a><b x"y="1">t</b></a>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      if (sut.kind !== 'parsed') throw new Error('expected parsed')
-      expect(sut.needsOracle).toBe(true)
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.needsOracle).toBe(true)
     })
   })
 
-  describe('given a quoted attribute name holding the stray quote (counterpart of rule 8)', () => {
+  describe('given a quoted attribute name holding the stray quote (settled by the scan alone)', () => {
     it('when scanning then it parses, flags needsOracle, and the compacted result stands', () => {
       // Arrange
       const xml = '<a><b x"y"="1">t</b></a>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      if (sut.kind !== 'parsed') throw new Error('expected parsed')
-      expect(sut.needsOracle).toBe(true)
-      expect(sut.result.content).toEqual({
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.needsOracle).toBe(true)
+      expect(outcome.result.content).toEqual({
         a: { b: { '@_x"y"': '1', '#text': 't' } },
       })
     })
   })
 
-  describe('given a quote inside a close tag (witness of rule 8)', () => {
+  describe('given a quote inside a close tag (defers to the balance pass)', () => {
     it('when scanning then it pops the frame and flags needsOracle', () => {
       // Arrange
       const xml = "<a><b>x</b '></a>"
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      if (sut.kind !== 'parsed') throw new Error('expected parsed')
-      expect(sut.needsOracle).toBe(true)
-      expect(sut.result.content).toEqual({ a: { b: 'x' } })
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.needsOracle).toBe(true)
+      expect(outcome.result.content).toEqual({ a: { b: 'x' } })
     })
   })
 
-  describe('given a quote inside a close tag attribute (counterpart of rule 8)', () => {
+  describe('given a quote inside a close tag attribute (settled by the scan alone)', () => {
     it('when scanning then the naive > search lands inside the quote and the leftover becomes trailing text', () => {
       // Arrange — indexOf('>', ...) is not quote-aware, so it matches
       // the '>' inside the quoted value; the '">' left over after that
@@ -181,12 +181,12 @@ describe('scanDocument', () => {
       const xml = '<a><b>x</b x=">"></a>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      if (sut.kind !== 'parsed') throw new Error('expected parsed')
-      expect(sut.needsOracle).toBe(true)
-      expect(sut.result.content).toEqual({ a: { b: 'x', '#text': '">' } })
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.needsOracle).toBe(true)
+      expect(outcome.result.content).toEqual({ a: { b: 'x', '#text': '">' } })
     })
   })
 
@@ -196,10 +196,10 @@ describe('scanDocument', () => {
       const xml = '<a><!-- never closes'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      expect(sut).toEqual({
+      expect(outcome).toEqual({
         kind: 'failed',
         message: 'XML parse error: unterminated comment',
       })
@@ -210,19 +210,19 @@ describe('scanDocument', () => {
     ['<!-->', 5],
     ['<!--->', 6],
   ])(
-    'given the short comment token %s (%i chars, witness of rule 8)',
+    'given the short comment token %s (%i chars, defers to the balance pass)',
     token => {
       it('when scanning then it is kept verbatim as text and flags needsOracle', () => {
         // Arrange
         const xml = `<a>${token}</a>`
 
         // Act
-        const sut = scanDocument(xml)
+        const outcome = scanDocument(xml)
 
         // Assert
-        if (sut.kind !== 'parsed') throw new Error('expected parsed')
-        expect(sut.needsOracle).toBe(true)
-        expect(sut.result.content).toEqual({ a: token })
+        if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+        expect(outcome.needsOracle).toBe(true)
+        expect(outcome.result.content).toEqual({ a: token })
       })
     }
   )
@@ -233,12 +233,12 @@ describe('scanDocument', () => {
       const xml = '<a><!-->t--></a>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      if (sut.kind !== 'parsed') throw new Error('expected parsed')
-      expect(sut.needsOracle).toBe(true)
-      expect(sut.result.content).toEqual({ a: '<!-->t-->' })
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.needsOracle).toBe(true)
+      expect(outcome.result.content).toEqual({ a: '<!-->t-->' })
     })
   })
 
@@ -248,12 +248,12 @@ describe('scanDocument', () => {
       const xml = '<a><!----></a>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      if (sut.kind !== 'parsed') throw new Error('expected parsed')
-      expect(sut.needsOracle).toBe(false)
-      expect(sut.result.content).toEqual({ a: { '#xml__comment': '' } })
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.needsOracle).toBe(false)
+      expect(outcome.result.content).toEqual({ a: { '#xml__comment': '' } })
     })
   })
 
@@ -263,11 +263,11 @@ describe('scanDocument', () => {
       const xml = '<r><!-- foo --><v>1</v></r>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      if (sut.kind !== 'parsed') throw new Error('expected parsed')
-      expect(sut.result.content).toEqual({
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.result.content).toEqual({
         r: { '#xml__comment': ' foo ', v: '1' },
       })
     })
@@ -279,12 +279,12 @@ describe('scanDocument', () => {
       const xml = '<!-- preamble --><r><v>1</v></r>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      if (sut.kind !== 'parsed') throw new Error('expected parsed')
-      expect(sut.result.content).toEqual({ r: { v: '1' } })
-      expect(sut.needsOracle).toBe(false)
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.result.content).toEqual({ r: { v: '1' } })
+      expect(outcome.needsOracle).toBe(false)
     })
   })
 
@@ -294,10 +294,10 @@ describe('scanDocument', () => {
       const xml = '<a><![CDATA[x'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      expect(sut).toEqual({
+      expect(outcome).toEqual({
         kind: 'failed',
         message: 'XML parse error: unterminated <! ... >',
       })
@@ -310,11 +310,11 @@ describe('scanDocument', () => {
       const xml = '<a><![CDATA[]]></a>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      if (sut.kind !== 'parsed') throw new Error('expected parsed')
-      expect(sut.result.content).toEqual({ a: { __cdata: '' } })
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.result.content).toEqual({ a: { __cdata: '' } })
     })
   })
 
@@ -324,11 +324,11 @@ describe('scanDocument', () => {
       const xml = '<a><![CDATA[  x  ]]></a>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      if (sut.kind !== 'parsed') throw new Error('expected parsed')
-      expect(sut.result.content).toEqual({ a: { __cdata: 'x' } })
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.result.content).toEqual({ a: { __cdata: 'x' } })
     })
   })
 
@@ -338,11 +338,11 @@ describe('scanDocument', () => {
       const xml = '<![CDATA[x]]><a>1</a>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      if (sut.kind !== 'parsed') throw new Error('expected parsed')
-      expect(sut.result.content).toEqual({ a: '1' })
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.result.content).toEqual({ a: '1' })
     })
   })
 
@@ -353,10 +353,10 @@ describe('scanDocument', () => {
       const xml = "<a><![cdata[ ' ]]></a>"
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      expect(sut).toEqual({
+      expect(outcome).toEqual({
         kind: 'failed',
         message: 'XML parse error: unterminated <! ... >',
       })
@@ -369,10 +369,10 @@ describe('scanDocument', () => {
       const xml = '<!DOCTYPE a'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      expect(sut).toEqual({
+      expect(outcome).toEqual({
         kind: 'failed',
         message: 'XML parse error: unterminated <! ... >',
       })
@@ -385,11 +385,11 @@ describe('scanDocument', () => {
       const xml = '<!DOCTYPE r SYSTEM "x.dtd"><r><v>1</v></r>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      if (sut.kind !== 'parsed') throw new Error('expected parsed')
-      expect(sut.result.content).toEqual({ r: { v: '1' } })
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.result.content).toEqual({ r: { v: '1' } })
     })
   })
 
@@ -399,11 +399,11 @@ describe('scanDocument', () => {
       const xml = '<!DOCTYPE a [ <!ENTITY e "v"> ]><a>x</a>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      if (sut.kind !== 'parsed') throw new Error('expected parsed')
-      expect(sut.result.content).toEqual({ a: 'x' })
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.result.content).toEqual({ a: 'x' })
     })
   })
 
@@ -413,11 +413,11 @@ describe('scanDocument', () => {
       const xml = '<a><!foo--><!-- c -->t</a>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      if (sut.kind !== 'parsed') throw new Error('expected parsed')
-      expect(sut.result.content).toEqual({
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.result.content).toEqual({
         a: { '#xml__comment': ' c ', '#text': 't' },
       })
     })
@@ -429,11 +429,11 @@ describe('scanDocument', () => {
       const xml = '<!DOCTYPE a "x>y"><a><b>x</b></a>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      if (sut.kind !== 'parsed') throw new Error('expected parsed')
-      expect(sut.result.content).toEqual({ a: { b: 'x' } })
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.result.content).toEqual({ a: { b: 'x' } })
     })
   })
 
@@ -446,11 +446,11 @@ describe('scanDocument', () => {
       const xml = '<a><!x "y>z">t</a>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      if (sut.kind !== 'parsed') throw new Error('expected parsed')
-      expect(sut.result.content).toEqual({ a: 't' })
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.result.content).toEqual({ a: 't' })
     })
   })
 
@@ -463,11 +463,11 @@ describe('scanDocument', () => {
       const xml = '<a><!- x --></a>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      if (sut.kind !== 'parsed') throw new Error('expected parsed')
-      expect(sut.result.content).toEqual({ a: '' })
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.result.content).toEqual({ a: '' })
     })
   })
 
@@ -477,10 +477,10 @@ describe('scanDocument', () => {
       const xml = '<?xml version="1.0"'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      expect(sut).toEqual({
+      expect(outcome).toEqual({
         kind: 'failed',
         message: 'XML parse error: unterminated <? ?>',
       })
@@ -493,11 +493,11 @@ describe('scanDocument', () => {
       const xml = '<?foo?><a><?pi?>x</a>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      if (sut.kind !== 'parsed') throw new Error('expected parsed')
-      expect(sut.result.content).toEqual({ a: 'x' })
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.result.content).toEqual({ a: 'x' })
     })
   })
 
@@ -509,11 +509,11 @@ describe('scanDocument', () => {
       const xml = '<a>?><?pi?>z</a>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      if (sut.kind !== 'parsed') throw new Error('expected parsed')
-      expect(sut.result.content).toEqual({ a: '?>z' })
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.result.content).toEqual({ a: '?>z' })
     })
   })
 
@@ -523,10 +523,10 @@ describe('scanDocument', () => {
       const xml = '<a><b'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      expect(sut).toEqual({
+      expect(outcome).toEqual({
         kind: 'failed',
         message: 'XML parse error: unterminated tag',
       })
@@ -539,11 +539,11 @@ describe('scanDocument', () => {
       const xml = '<a x="1"/>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      if (sut.kind !== 'parsed') throw new Error('expected parsed')
-      expect(sut.result.content).toEqual({ a: { '@_x': '1', '#text': '' } })
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.result.content).toEqual({ a: { '@_x': '1', '#text': '' } })
     })
   })
 
@@ -562,11 +562,11 @@ describe('scanDocument', () => {
       const xml = `<a><${name} x="1">t</${name}></a>`
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      if (sut.kind !== 'parsed') throw new Error('expected parsed')
-      expect(sut.result.content).toEqual({
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.result.content).toEqual({
         a: { [name]: { '@_x': '1', '#text': 't' } },
       })
     })
@@ -578,10 +578,10 @@ describe('scanDocument', () => {
       const xml = '<a>x'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      expect(sut).toEqual({
+      expect(outcome).toEqual({
         kind: 'failed',
         message: 'XML parse error: tags unbalanced (final depth 1)',
       })
@@ -594,10 +594,10 @@ describe('scanDocument', () => {
       const xml = '<a><b><c>x'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      expect(sut).toEqual({
+      expect(outcome).toEqual({
         kind: 'failed',
         message: 'XML parse error: tags unbalanced (final depth 3)',
       })
@@ -610,11 +610,11 @@ describe('scanDocument', () => {
       const xml = '<a>1</a><b>2</b>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      if (sut.kind !== 'parsed') throw new Error('expected parsed')
-      expect(sut.result.content).toEqual({ a: '1' })
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.result.content).toEqual({ a: '1' })
     })
   })
 
@@ -624,10 +624,10 @@ describe('scanDocument', () => {
       const xml = '<a/><b></c>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      expect(sut.kind).toBe('failed')
+      expect(outcome.kind).toBe('failed')
     })
   })
 
@@ -637,14 +637,14 @@ describe('scanDocument', () => {
       const xml = '<r foo="x" xmlns="http://x"><v>1</v></r>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      if (sut.kind !== 'parsed') throw new Error('expected parsed')
-      expect(sut.result.content).toEqual({
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.result.content).toEqual({
         r: { '@_foo': 'x', v: '1' },
       })
-      expect(sut.result.namespaces).toEqual({ '@_xmlns': 'http://x' })
+      expect(outcome.result.namespaces).toEqual({ '@_xmlns': 'http://x' })
     })
   })
 
@@ -654,12 +654,12 @@ describe('scanDocument', () => {
       const xml = '<r xmlns="http://x" xmlns:xsi="http://y"><v>1</v></r>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      if (sut.kind !== 'parsed') throw new Error('expected parsed')
-      expect(sut.result.content).toEqual({ r: { v: '1' } })
-      expect(sut.result.namespaces).toEqual({
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.result.content).toEqual({ r: { v: '1' } })
+      expect(outcome.result.namespaces).toEqual({
         '@_xmlns': 'http://x',
         '@_xmlns:xsi': 'http://y',
       })
@@ -672,12 +672,14 @@ describe('scanDocument', () => {
       const xml = '<r data-xmlns="x"><v>1</v></r>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      if (sut.kind !== 'parsed') throw new Error('expected parsed')
-      expect(sut.result.content).toEqual({ r: { '@_data-xmlns': 'x', v: '1' } })
-      expect(sut.result.namespaces).toEqual({})
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.result.content).toEqual({
+        r: { '@_data-xmlns': 'x', v: '1' },
+      })
+      expect(outcome.result.namespaces).toEqual({})
     })
   })
 
@@ -687,12 +689,14 @@ describe('scanDocument', () => {
       const xml = '<r xmlnsfoo="x"><v>1</v></r>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      if (sut.kind !== 'parsed') throw new Error('expected parsed')
-      expect(sut.result.content).toEqual({ r: { '@_xmlnsfoo': 'x', v: '1' } })
-      expect(sut.result.namespaces).toEqual({})
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.result.content).toEqual({
+        r: { '@_xmlnsfoo': 'x', v: '1' },
+      })
+      expect(outcome.result.namespaces).toEqual({})
     })
   })
 
@@ -702,11 +706,11 @@ describe('scanDocument', () => {
       const xml = '<r><inner xmlns:y="http://y"><v>1</v></inner></r>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      if (sut.kind !== 'parsed') throw new Error('expected parsed')
-      expect(sut.result.content).toEqual({
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.result.content).toEqual({
         r: { inner: { '@_xmlns:y': 'http://y', v: '1' } },
       })
     })
@@ -718,10 +722,10 @@ describe('scanDocument', () => {
       const xml = 'hello'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      expect(sut).toEqual({
+      expect(outcome).toEqual({
         kind: 'parsed',
         result: { content: {}, namespaces: {} },
         needsOracle: false,
@@ -735,10 +739,10 @@ describe('scanDocument', () => {
       const xml = ''
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      expect(sut).toEqual({
+      expect(outcome).toEqual({
         kind: 'parsed',
         result: { content: {}, namespaces: {} },
         needsOracle: false,
@@ -752,11 +756,11 @@ describe('scanDocument', () => {
       const xml = '<r><__proto__><v>1</v></__proto__></r>'
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      if (sut.kind !== 'parsed') throw new Error('expected parsed')
-      const rNode = (sut.result.content as { r: object }).r as Record<
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      const rNode = (outcome.result.content as { r: object }).r as Record<
         string,
         unknown
       >
@@ -765,6 +769,54 @@ describe('scanDocument', () => {
     })
   })
 
+  describe.each(['constructor', 'toString', 'hasOwnProperty', 'valueOf'])(
+    'given an element named after Object.prototype member %s',
+    name => {
+      it('when scanning then it is an own key holding its value', () => {
+        // Arrange
+        const xml = `<r><${name}>1</${name}></r>`
+
+        // Act
+        const outcome = scanDocument(xml)
+
+        // Assert
+        if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+        const rNode = (outcome.result.content as { r: object }).r as Record<
+          string,
+          unknown
+        >
+        expect(Object.hasOwn(rNode, name)).toBe(true)
+        expect(rNode[name]).toBe('1')
+      })
+    }
+  )
+
+  describe.each([
+    ['double', '<r><v attr="a>b"/></r>'],
+    ['single', "<r><v attr='a>b'/></r>"],
+  ])(
+    'given a self-closing tag with a %s-quoted > in an attribute',
+    (_, xml) => {
+      it('when scanning then the tag still self-closes with the full value', () => {
+        // Arrange
+        const input = xml
+
+        // Act
+        const outcome = scanDocument(input)
+
+        // Assert
+        expect(outcome).toEqual({
+          kind: 'parsed',
+          needsOracle: false,
+          result: {
+            content: { r: { v: { '@_attr': 'a>b', '#text': '' } } },
+            namespaces: {},
+          },
+        })
+      })
+    }
+  )
+
   describe('given 20,000 levels of nesting', () => {
     it('when scanning then it parses without a stack overflow', () => {
       // Arrange
@@ -772,11 +824,11 @@ describe('scanDocument', () => {
       const xml = `${'<e>'.repeat(depth)}x${'</e>'.repeat(depth)}`
 
       // Act
-      const sut = scanDocument(xml)
+      const outcome = scanDocument(xml)
 
       // Assert
-      if (sut.kind !== 'parsed') throw new Error('expected parsed')
-      let node: unknown = sut.result.content['e']
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      let node: unknown = outcome.result.content['e']
       for (let i = 1; i < depth; i++) {
         node = (node as Record<string, unknown>)['e']
       }
