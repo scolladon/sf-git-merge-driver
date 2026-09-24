@@ -329,6 +329,23 @@ flowchart TD
     Walk --> Filter --> Eol --> Result
 ```
 
+### Measured and rejected
+
+- **Buffered `readFile`/`writeFile` instead of streams in `MergeDriver`.**
+  Paired against the stream path: −0.1 ms (small fixture) to −1.7 ms (xl
+  fixture), under 1% of end-to-end time. Rejected; the stream path stays.
+- **A two-file compile-cache loader.** `module.enableCompileCache()` never
+  populates its cache in the single-file bundle — a `mkdir` per run, zero
+  entries, `Clear deserialized cache.` on stderr. A two-file loader that
+  does let the cache hit measured −0.9..−1.4%, paired, under 1 ms. Not
+  worth a second shipped file; the banner was removed.
+- **`for…in` and lazy getters in the merge phase.** `for…in` traversal of
+  the null-prototype parsed nodes in `isPresent` and `jsonEqual` measured
+  slower than `Object.keys`, so both keep their current form. Lazy
+  parameter getters in `TextMergeStrategy` bought nothing, because
+  `AllPresentStrategy` — the dominant scenario — reads every field
+  regardless.
+
 ## Key Design Decisions
 
 ### 1. Compact JSON Intermediate Representation
