@@ -1,5 +1,5 @@
 import type { Readable, Writable } from 'node:stream'
-import { TxmlXmlParser } from '../adapter/TxmlXmlParser.js'
+import { CompactXmlParser } from '../adapter/parser/CompactXmlParser.js'
 import { XmlStreamWriter } from '../adapter/writer/XmlStreamWriter.js'
 import type { NormalisedParseResult, XmlParser } from '../adapter/XmlParser.js'
 import type { MergeConfig } from '../types/conflictTypes.js'
@@ -9,7 +9,7 @@ import { Logger } from '../utils/LoggingService.js'
 import { JsonMerger } from './JsonMerger.js'
 
 // Root xmlns* attributes live in a bucket parsed separately from `content`
-// (see TxmlXmlParser.splitRootAttrs) and never reach MergeOrchestrator, so
+// (see scanDocument's splitRootAttrs) and never reach MergeOrchestrator, so
 // they need their own three-way resolution instead of inheriting one for
 // free. Per key: unchanged-on-one-side defers to whatever the other side
 // did (add, change or remove); both sides agreeing (including both
@@ -102,7 +102,7 @@ export class XmlMerger {
   private readonly jsonMerger: JsonMerger
 
   constructor(config: MergeConfig) {
-    this.parser = new TxmlXmlParser()
+    this.parser = new CompactXmlParser()
     this.writer = new XmlStreamWriter(config)
     this.jsonMerger = new JsonMerger(config)
   }

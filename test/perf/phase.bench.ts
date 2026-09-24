@@ -1,6 +1,6 @@
 import { PassThrough } from 'node:stream'
 import { bench, describe } from 'vitest'
-import { TxmlXmlParser } from '../../src/adapter/TxmlXmlParser.js'
+import { CompactXmlParser } from '../../src/adapter/parser/CompactXmlParser.js'
 import { XmlStreamWriter } from '../../src/adapter/writer/XmlStreamWriter.js'
 import {
   DEFAULT_ANCESTOR_CONFLICT_TAG,
@@ -27,7 +27,7 @@ const sizes = ['small', 'medium', 'large'] as const
 
 for (const size of sizes) {
   const fixtures = generateProfileFixtures(size)
-  const parser = new TxmlXmlParser()
+  const parser = new CompactXmlParser()
 
   // Pre-warm: parse once outside the bench to set up merged tree + ns.
   const ancestor = parser.parseString(fixtures.ancestor)
@@ -49,7 +49,7 @@ for (const size of sizes) {
 
   describe(`phase-parse-${size}`, () => {
     bench(`parse-${size}`, () => {
-      const p = new TxmlXmlParser()
+      const p = new CompactXmlParser()
       p.parseString(fixtures.ancestor)
       p.parseString(fixtures.local)
       p.parseString(fixtures.other)

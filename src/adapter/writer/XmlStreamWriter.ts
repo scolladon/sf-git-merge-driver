@@ -236,7 +236,7 @@ const writeRoot = (
 // An element renders empty when every child produces no output. The only
 // such child is empty text (`{ '#text': '' }`) — the shape a `''` or
 // attr-only body collapses to in splitAttrsAndChildren, and what both
-// `<tag/>` and `<tag></tag>` parse to via TxmlXmlParser. An element with no
+// `<tag/>` and `<tag></tag>` parse to via CompactXmlParser. An element with no
 // children is empty too (`[].every` is vacuously true). `sf project retrieve`
 // self-closes every empty element, so the writer matches that wire form.
 const isEmptyElementBody = (children: JsonArray): boolean =>

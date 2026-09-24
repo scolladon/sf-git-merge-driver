@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { TxmlXmlParser as LiveParser } from '../../src/adapter/TxmlXmlParser.js'
+import { CompactXmlParser as LiveParser } from '../../src/adapter/parser/CompactXmlParser.js'
 import type { JsonValue } from '../../src/types/jsonTypes.js'
 import {
   buildParitySnapshot,
@@ -25,7 +25,7 @@ const assertNullPrototypeTree = (node: JsonValue): void => {
   for (const value of Object.values(node)) assertNullPrototypeTree(value)
 }
 
-describe('parser parity — TxmlXmlParser vs the pinned snapshot', () => {
+describe('parser parity — CompactXmlParser vs the pinned snapshot', () => {
   const sut = new LiveParser()
   const snapshot = readSnapshot()
   const live = buildParitySnapshot(sut)

@@ -8,7 +8,7 @@
  */
 
 import { PassThrough } from 'node:stream'
-import { TxmlXmlParser } from '../../src/adapter/TxmlXmlParser.js'
+import { CompactXmlParser } from '../../src/adapter/parser/CompactXmlParser.js'
 import { XmlStreamWriter } from '../../src/adapter/writer/XmlStreamWriter.js'
 import { JsonMerger } from '../../src/merger/JsonMerger.js'
 import { generateProfileFixtures } from './fixtures/generateFixtures.js'
@@ -29,7 +29,7 @@ const fixtures = generateProfileFixtures(size)
 console.info(`Running ${iterations} iterations with ${size} fixtures...`)
 
 for (let i = 0; i < iterations; i++) {
-  const parser = new TxmlXmlParser()
+  const parser = new CompactXmlParser()
   const ancestor = parser.parseString(fixtures.ancestor)
   const local = parser.parseString(fixtures.local)
   const other = parser.parseString(fixtures.other)

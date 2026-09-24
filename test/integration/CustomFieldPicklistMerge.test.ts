@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { TxmlXmlParser } from '../../src/adapter/TxmlXmlParser.js'
+import { CompactXmlParser } from '../../src/adapter/parser/CompactXmlParser.js'
 import { XmlMerger } from '../../src/merger/XmlMerger.js'
 import { mergeXmlStrings } from '../utils/mergeXmlStrings.js'
 import { defaultConfig } from '../utils/testConfig.js'
@@ -8,7 +8,7 @@ import { defaultConfig } from '../utils/testConfig.js'
 // over the merge output. The shape is compact JsonObject — repeated
 // children collapse into arrays, attributes are `@_`-prefixed, and
 // scalar values stay as strings (no number/boolean coercion).
-const parser = new TxmlXmlParser()
+const parser = new CompactXmlParser()
 const parseXml = (xml: string): Record<string, unknown> =>
   parser.parseString(xml).content as Record<string, unknown>
 
@@ -148,7 +148,7 @@ describe('CustomField picklist merge (issue #174)', () => {
         const result = await mergeXmlStrings(merger, ancestor, local, other)
         const parsed = parseXml(result.output)
         // Shape under test: CustomField → valueSet → valueSetDefinition →
-        // value[]. TxmlXmlParser returns the merged tree as JsonObject
+        // value[]. CompactXmlParser returns the merged tree as JsonObject
         // (compact form); cast to navigate without spreading `as` casts
         // through every property access.
         type ValueSet = {
@@ -165,7 +165,7 @@ describe('CustomField picklist merge (issue #174)', () => {
 
         // Assert
         expect(valueSet).toBeDefined()
-        // TxmlXmlParser keeps scalars as strings (no implicit
+        // CompactXmlParser keeps scalars as strings (no implicit
         // boolean/number coercion); the previous assertion against
         // `true`/`false` relied on fast-xml-parser's default coercion.
         expect(valueSet.restricted).toBe('true')
