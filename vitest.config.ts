@@ -20,6 +20,11 @@ export default defineConfig({
       exclude: [
         'node_modules/',
         'test/utils/',
+        // Fixture generators reused by test/utils/parserParity.ts, whose
+        // exports test/unit pins directly — that import chain pulls this
+        // module into the v8 coverage run even though it is test
+        // infrastructure, not src.
+        'test/perf/',
         'reports/',
         'e2e/',
         // oclif command classes have entrypoint side-effects at module

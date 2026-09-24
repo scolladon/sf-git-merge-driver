@@ -7,6 +7,8 @@ import {
   TxmlXmlParser,
 } from '../../../src/adapter/TxmlXmlParser.js'
 import type { JsonObject } from '../../../src/types/jsonTypes.js'
+import { PARSER_BEHAVIOUR_CHANGES } from '../../utils/parserBehaviourChanges.js'
+import { parseOutcome } from '../../utils/parserParity.js'
 
 describe('TxmlXmlParser', () => {
   const sut = new TxmlXmlParser()
@@ -409,6 +411,15 @@ describe('TxmlXmlParser', () => {
 
         expect(Object.keys(rNode)).toContain(name)
         expect(rNode[name]).toBe('1')
+      }
+    )
+  })
+
+  describe('given input outside the Salesforce shape', () => {
+    it.each(Object.entries(PARSER_BEHAVIOUR_CHANGES))(
+      "when parsing %s then today's outcome is pinned",
+      (_label, { xml, outcome }) => {
+        expect(parseOutcome(sut, xml)).toBe(outcome)
       }
     )
   })

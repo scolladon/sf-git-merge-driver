@@ -6,7 +6,7 @@ const GLOBAL_VALUE_SET_HEADER =
   '<?xml version="1.0" encoding="UTF-8"?>\n<GlobalValueSet xmlns="http://soap.sforce.com/2006/04/metadata">'
 const GLOBAL_VALUE_SET_FOOTER = '\n</GlobalValueSet>'
 
-type FixtureSize = 'small' | 'medium' | 'large'
+export type FixtureSize = 'small' | 'medium' | 'large' | 'xl'
 
 interface SizeConfig {
   readonly fieldPermissions: number
@@ -21,6 +21,11 @@ const SIZE_CONFIGS: Record<FixtureSize, SizeConfig> = {
     fieldPermissions: 2000,
     classAccesses: 200,
     objectPermissions: 50,
+  },
+  xl: {
+    fieldPermissions: 20000,
+    classAccesses: 2000,
+    objectPermissions: 500,
   },
 }
 
