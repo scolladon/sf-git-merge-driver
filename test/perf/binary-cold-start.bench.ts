@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
-import { bench, describe } from 'vitest'
+import { describe, test } from 'vitest'
 
 // Measures the end-to-end cost of spawning the bundled binary. This is the
 // figure git pays per merge driver invocation — the hot path we're optimizing.
@@ -10,7 +10,9 @@ import { bench, describe } from 'vitest'
 const BINARY = resolve(process.cwd(), 'bin', 'merge-driver.cjs')
 
 describe('binary cold start', () => {
-  bench('node bin/merge-driver.cjs --version', () => {
-    execFileSync('node', [BINARY, '--version'], { stdio: 'ignore' })
+  test('node bin/merge-driver.cjs --version', async ({ bench }) => {
+    await bench('node bin/merge-driver.cjs --version', () => {
+      execFileSync('node', [BINARY, '--version'], { stdio: 'ignore' })
+    }).run()
   })
 })

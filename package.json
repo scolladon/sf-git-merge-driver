@@ -29,7 +29,7 @@
     "@stryker-mutator/vitest-runner": "10.0.0",
     "@types/chai": "5.2.3",
     "@types/mocha": "10.0.10",
-    "@vitest/coverage-v8": "4.1.11",
+    "@vitest/coverage-v8": "5.0.2",
     "chai": "6.2.2",
     "esbuild": "0.28.2",
     "husky": "9.1.7",
@@ -42,7 +42,7 @@
     "tslib": "2.8.1",
     "tsx": "4.23.15",
     "typescript": "7.0.2",
-    "vitest": "4.1.11",
+    "vitest": "5.0.2",
     "wireit": "0.14.13"
   },
   "engines": {
@@ -392,7 +392,7 @@
       "output": []
     },
     "test:perf": {
-      "command": "node --expose-gc ./node_modules/.bin/vitest bench --config vitest.config.perf.ts && node test/perf/formatResults.mjs && node test/perf/binarySize.mjs",
+      "command": "node --expose-gc ./node_modules/.bin/vitest bench --config vitest.config.perf.ts --reporter=default --reporter=json --outputFile=perf-raw.json && node test/perf/formatResults.mjs && node test/perf/binarySize.mjs",
       "files": [
         "src/**/*.ts",
         "test/perf/**",

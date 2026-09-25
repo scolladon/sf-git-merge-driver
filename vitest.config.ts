@@ -18,22 +18,22 @@ export default defineConfig({
       provider: 'v8',
       reportsDirectory: 'reports/coverage',
       exclude: [
-        'node_modules/',
-        'test/utils/',
+        'node_modules/**',
+        'test/utils/**',
         // Fixture generators reused by test/utils/parserParity.ts, whose
         // exports test/unit pins directly — that import chain pulls this
         // module into the v8 coverage run even though it is test
         // infrastructure, not src.
-        'test/perf/',
-        'reports/',
-        'e2e/',
+        'test/perf/**',
+        'reports/**',
+        'e2e/**',
         // oclif command classes have entrypoint side-effects at module
         // load (readline, Messages.loadMessages, etc.) that aren't
         // meaningfully unit-coverable without running the command
         // through oclif itself. They're covered by NUT tests, and any
         // pure helpers they expose (parsePromptAnswer, etc.) are
         // exercised by dedicated unit tests.
-        'src/commands/',
+        'src/commands/**',
       ],
       reporter: ['lcov'],
       thresholds: {

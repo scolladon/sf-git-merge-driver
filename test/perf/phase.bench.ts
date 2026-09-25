@@ -1,5 +1,5 @@
 import { PassThrough } from 'node:stream'
-import { bench, describe } from 'vitest'
+import { describe, test } from 'vitest'
 import { CompactXmlParser } from '../../src/adapter/parser/CompactXmlParser.js'
 import { XmlStreamWriter } from '../../src/adapter/writer/XmlStreamWriter.js'
 import {
@@ -48,28 +48,34 @@ for (const size of sizes) {
   )
 
   describe(`phase-parse-${size}`, () => {
-    bench(`parse-${size}`, () => {
-      const p = new CompactXmlParser()
-      p.parseString(fixtures.ancestor)
-      p.parseString(fixtures.local)
-      p.parseString(fixtures.other)
+    test(`parse-${size}`, async ({ bench }) => {
+      await bench(`parse-${size}`, () => {
+        const p = new CompactXmlParser()
+        p.parseString(fixtures.ancestor)
+        p.parseString(fixtures.local)
+        p.parseString(fixtures.other)
+      }).run()
     })
   })
 
   describe(`phase-merge-${size}`, () => {
-    bench(`merge-${size}`, () => {
-      const jm = new JsonMerger(config)
-      jm.mergeThreeWay(ancestor.content, local.content, other.content)
+    test(`merge-${size}`, async ({ bench }) => {
+      await bench(`merge-${size}`, () => {
+        const jm = new JsonMerger(config)
+        jm.mergeThreeWay(ancestor.content, local.content, other.content)
+      }).run()
     })
   })
 
   describe(`phase-serialize-${size}`, () => {
-    bench(`serialize-${size}`, async () => {
-      const w = new XmlStreamWriter(config)
-      const sink = new PassThrough()
-      sink.resume()
-      await w.writeTo(sink, mergedResult.output, namespaces)
-      sink.end()
+    test(`serialize-${size}`, async ({ bench }) => {
+      await bench(`serialize-${size}`, async () => {
+        const w = new XmlStreamWriter(config)
+        const sink = new PassThrough()
+        sink.resume()
+        await w.writeTo(sink, mergedResult.output, namespaces)
+        sink.end()
+      }).run()
     })
   })
 }

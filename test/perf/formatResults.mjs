@@ -1,24 +1,30 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 
 /**
- * Converts Vitest bench JSON output to benchmark-action/github-action-benchmark format.
+ * Converts the Vitest JSON reporter output to benchmark-action/github-action-benchmark format.
  *
- * Vitest bench JSON structure (v3.x):
+ * Vitest JSON reporter structure (v5.x), benchmark statistics come from Tinybench:
  * {
- *   "files": [{
- *     "filepath": "test/perf/merge.bench.ts",
- *     "groups": [{
- *       "fullName": "test/perf/merge.bench.ts > merge-small",
+ *   "testResults": [{
+ *     "name": "/abs/path/test/perf/merge.bench.ts",
+ *     "assertionResults": [{
+ *       "fullName": "merge-small merge-small-no-conflict",
  *       "benchmarks": [{
- *         "name": "merge-small-no-conflict",
- *         "hz": 1234.56,
- *         "mean": 1.304,
- *         "rme": 1.76,
- *         ...
+ *         "name": "merge-small > merge-small-no-conflict",
+ *         "tasks": [{
+ *           "name": "merge-small-no-conflict",
+ *           "latency": { "mean": 1.304, "rme": 1.76, ... },
+ *           "throughput": { "mean": 812.3, "rme": 1.52, ... },
+ *           ...
+ *         }]
  *       }]
  *     }]
  *   }]
  * }
+ *
+ * ops/sec is derived as 1000 / latency.mean (not throughput.mean) so the figure
+ * stays comparable with baselines recorded by the Vitest 4 `hz` field, which
+ * was computed the same way.
  *
  * benchmark-action customBiggerIsBetter format:
  * [{ "name": "...", "unit": "ops/sec", "value": 1234, "range": "±1.2%" }]
@@ -30,18 +36,20 @@ import { readFileSync, writeFileSync } from 'node:fs'
 const inputPath = 'perf-raw.json'
 const runtimeOutputPath = 'perf-runtime.json'
 const memoryOutputPath = 'perf-memory.json'
+const MS_PER_SECOND = 1000
 
 const raw = JSON.parse(readFileSync(inputPath, 'utf-8'))
 
-const benchmarks = []
-
-for (const file of raw.files || []) {
-  for (const group of file.groups || []) {
-    for (const b of group.benchmarks || []) {
-      benchmarks.push(b)
-    }
-  }
-}
+const benchmarks = (raw.testResults ?? [])
+  .flatMap(file => file.assertionResults ?? [])
+  .flatMap(assertion => assertion.benchmarks ?? [])
+  .flatMap(benchmark => benchmark.tasks ?? [])
+  .map(task => ({
+    name: task.name,
+    hz: MS_PER_SECOND / task.latency.mean,
+    mean: task.latency.mean,
+    rme: task.latency.rme,
+  }))
 
 const runtimeEntries = benchmarks.map(b => ({
   name: b.name,
