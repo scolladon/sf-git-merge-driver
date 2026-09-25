@@ -1,17 +1,17 @@
 import { PassThrough } from 'node:stream'
 import { describe, test } from 'vitest'
-import { CompactXmlParser } from '../../src/adapter/parser/CompactXmlParser.js'
-import { XmlStreamWriter } from '../../src/adapter/writer/XmlStreamWriter.js'
+import { CompactXmlParser } from '../../lib/adapter/parser/CompactXmlParser.js'
+import { XmlStreamWriter } from '../../lib/adapter/writer/XmlStreamWriter.js'
 import {
   DEFAULT_ANCESTOR_CONFLICT_TAG,
   DEFAULT_CONFLICT_MARKER_SIZE,
   DEFAULT_LOCAL_CONFLICT_TAG,
   DEFAULT_OTHER_CONFLICT_TAG,
-} from '../../src/constant/conflictConstant.js'
-import { JsonMerger } from '../../src/merger/JsonMerger.js'
+} from '../../lib/constant/conflictConstant.js'
+import { JsonMerger } from '../../lib/merger/JsonMerger.js'
 import type { MergeConfig } from '../../src/types/conflictTypes.js'
 import type { JsonObject } from '../../src/types/jsonTypes.js'
-import { generateProfileFixtures } from './fixtures/generateFixtures.js'
+import { generateProfileFixtures } from './fixtures/generateFixtures.ts'
 
 const config: MergeConfig = {
   conflictMarkerSize: DEFAULT_CONFLICT_MARKER_SIZE,

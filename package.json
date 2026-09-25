@@ -389,7 +389,10 @@
         "tsconfig.test.json",
         "tsconfig.nut.json"
       ],
-      "output": []
+      "output": [],
+      "dependencies": [
+        "compile"
+      ]
     },
     "test:perf": {
       "command": "node --expose-gc ./node_modules/.bin/vitest bench --config vitest.config.perf.ts --reporter=default --reporter=json --outputFile=perf-raw.json && node test/perf/formatResults.mjs && node test/perf/binarySize.mjs",

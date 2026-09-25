@@ -4,15 +4,15 @@ import {
   DEFAULT_CONFLICT_MARKER_SIZE,
   DEFAULT_LOCAL_CONFLICT_TAG,
   DEFAULT_OTHER_CONFLICT_TAG,
-} from '../../src/constant/conflictConstant.js'
+} from '../../lib/constant/conflictConstant.js'
 import type { MergeConfig } from '../../src/types/conflictTypes.js'
 import {
   generateOrderedFixtures,
   generatePicklistFixtures,
   generateProfileFixtures,
-} from './fixtures/generateFixtures.js'
-import { instrumentedMerge } from './instrumentation/instrumentedMerge.js'
-import { PhaseTimer } from './instrumentation/PhaseTimer.js'
+} from './fixtures/generateFixtures.ts'
+import { instrumentedMerge } from './instrumentation/instrumentedMerge.ts'
+import { PhaseTimer } from './instrumentation/PhaseTimer.ts'
 
 const config: MergeConfig = {
   conflictMarkerSize: DEFAULT_CONFLICT_MARKER_SIZE,
