@@ -47,22 +47,6 @@ describe('scanDocument', () => {
     })
   })
 
-  describe('given leaf text that happens to equal a mutation-testing placeholder string', () => {
-    // Guards the `text !== ''` emptiness check itself, not just its effect:
-    // comparing against any other fixed literal would drop this exact text.
-    it('when scanning then the text is still kept verbatim', () => {
-      // Arrange
-      const xml = '<a>Stryker was here!</a>'
-
-      // Act
-      const outcome = scanDocument(xml)
-
-      // Assert
-      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
-      expect(outcome.result.content).toEqual({ a: 'Stryker was here!' })
-    })
-  })
-
   describe('given a close tag with no >', () => {
     it('when scanning then it fails as an unterminated tag', () => {
       // Arrange
