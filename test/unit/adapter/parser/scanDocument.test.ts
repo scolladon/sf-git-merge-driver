@@ -93,6 +93,22 @@ describe('scanDocument', () => {
     })
   })
 
+  describe('given an open frame named `<` and a close tag with an empty name', () => {
+    it('when scanning then the `</` opener is not matched as part of the name', () => {
+      // Arrange
+      const xml = '<<>x</>'
+
+      // Act
+      const outcome = scanDocument(xml)
+
+      // Assert
+      expect(outcome).toEqual({
+        kind: 'failed',
+        message: 'Unexpected close tag\nLine: 0\nColumn: 7\nChar: >',
+      })
+    })
+  })
+
   describe('given a close tag at the top level before any root was found', () => {
     it('when scanning then it needs the oracle and stops with no root', () => {
       // Arrange
@@ -635,6 +651,20 @@ describe('scanDocument', () => {
       // Assert
       if (outcome.kind !== 'parsed') throw new Error('expected parsed')
       expect(outcome.result.content).toEqual({ a: '1' })
+    })
+  })
+
+  describe('given two top-level elements each declaring a namespace', () => {
+    it('when scanning then the namespaces come from the root, not the dropped element', () => {
+      // Arrange
+      const xml = '<a xmlns="http://a"/><b xmlns="http://b"/>'
+
+      // Act
+      const outcome = scanDocument(xml)
+
+      // Assert
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.result.namespaces).toEqual({ '@_xmlns': 'http://a' })
     })
   })
 
