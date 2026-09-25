@@ -4,7 +4,11 @@ import { MergeScenario } from '../types/mergeScenario.js'
 const isPresent = (value: JsonValue | undefined): boolean => {
   if (value == null) return false
   if (typeof value === 'string') return value.length > 0
-  if (Array.isArray(value)) return value.length > 0
+  // Stryker disable next-line ConditionalExpression: Object.keys of a dense JSON array has its length; this skips the key list
+  // Stryker disable next-line BlockStatement: an array falling through gets the same answer from Object.keys
+  if (Array.isArray(value)) {
+    return value.length > 0
+  }
   if (typeof value === 'object') return Object.keys(value).length > 0
   return true
 }

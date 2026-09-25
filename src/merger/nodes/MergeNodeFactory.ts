@@ -23,6 +23,8 @@ const isStringArray = (...values: (JsonValue | undefined | null)[]): boolean =>
   )
 
 const isPureObject = (val: JsonValue | undefined | null): boolean =>
+  // Stryker disable next-line ConditionalExpression: only read once a side is an object or array, so with no array one is a pure object
+  // Stryker disable next-line LogicalOperator: only read once a side is an object or array, so with no array one is a pure object
   isObject(val) && !Array.isArray(val)
 
 // undefined is scalar: an absent side carries no object or array shape
