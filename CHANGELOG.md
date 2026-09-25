@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.2](https://github.com/scolladon/sf-git-merge-driver/compare/v2.0.1...v2.0.2) (2026-09-25)
+
+
+### Performance Improvements
+
+* **parser:** replace txml with a single-pass scanner and cut merge allocations ([#218](https://github.com/scolladon/sf-git-merge-driver/issues/218)) ([e848f86](https://github.com/scolladon/sf-git-merge-driver/commit/e848f86521d2e320f6511a470434e2648914e933))
+
 ## [2.0.1](https://github.com/scolladon/sf-git-merge-driver/compare/v2.0.0...v2.0.1) (2026-08-26)
 
 
