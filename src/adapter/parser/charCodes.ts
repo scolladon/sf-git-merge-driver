@@ -13,8 +13,6 @@ export const SPACE = 32 // ' '
 export const TAB = 9 // '\t'
 export const LF = 10 // '\n'
 export const CR = 13 // '\r'
-export const DASH = 45 // '-'
-export const LBRACKET = 91 // '['
 
 const UPPER_A = 65
 const UPPER_Z = 90

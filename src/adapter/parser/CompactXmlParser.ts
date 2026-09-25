@@ -10,7 +10,7 @@ import { scanDocument } from './scanDocument.js'
 const readStreamAsUtf8 = async (source: Readable): Promise<string> => {
   const chunks: Buffer[] = []
   for await (const c of source) {
-    chunks.push(typeof c === 'string' ? Buffer.from(c, 'utf8') : (c as Buffer))
+    chunks.push(typeof c === 'string' ? Buffer.from(c) : (c as Buffer))
   }
   return Buffer.concat(chunks).toString('utf8')
 }

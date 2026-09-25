@@ -87,7 +87,7 @@ const lexAttrValue = (xml: string, pos: number): AttrValue | null => {
     if (quoted === null) return null
     return { end: quoted.end, value: quoted.value, strayQuote: false }
   }
-  if (afterEq >= xml.length || quoteCode === GT) {
+  if (quoteCode === GT) {
     return { end: afterEq, value: null, strayQuote: false }
   }
   const run = scanStopRun(xml, afterEq)

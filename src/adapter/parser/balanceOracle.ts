@@ -1,4 +1,4 @@
-import { BANG, LBRACKET, QMARK, SLASH } from './charCodes.js'
+import { BANG, QMARK, SLASH } from './charCodes.js'
 import {
   UNTERMINATED_COMMENT,
   UNTERMINATED_DECLARATION,
@@ -11,7 +11,6 @@ import {
   CDATA_OPEN,
   COMMENT_CLOSE,
   COMMENT_OPEN,
-  DECLARATION_OPEN,
   PI_CLOSE,
   PI_OPEN,
 } from './xmlTokens.js'
@@ -45,7 +44,6 @@ export const findTagEnd = (xml: string, from: number): number => {
 // branch — the same outcome the previous prepass produced for an
 // unterminated section (it never rewrote one).
 const skipCdata = (xml: string, next: number): number => {
-  if (xml.charCodeAt(next + 2) !== LBRACKET) return -1
   if (!xml.startsWith(CDATA_OPEN, next)) return -1
   const end = xml.indexOf(CDATA_CLOSE, next + CDATA_OPEN.length)
   return end < 0 ? -1 : end + CDATA_CLOSE.length
@@ -64,7 +62,7 @@ const skipDeclaration = (xml: string, next: number, c1: number): number => {
       if (end < 0) throw new Error(UNTERMINATED_COMMENT)
       return end + COMMENT_CLOSE.length
     }
-    const end = findTagEnd(xml, next + DECLARATION_OPEN.length)
+    const end = findTagEnd(xml, next)
     if (end < 0) throw new Error(UNTERMINATED_DECLARATION)
     return end + 1
   }
@@ -83,17 +81,17 @@ interface QuoteCursors {
   sq: number
 }
 
-// End of an element tag starting at `next`. The native `indexOf('>')`
-// is correct unless a quote lies inside the tag (an attribute value
-// containing `>`), in which case only the quote-aware findTagEnd scan
-// is safe.
+// End of an element tag starting at `next`, or -1 when no `>` follows
+// (a -1 fails both `< tagEnd` quote checks and flows straight out).
+// The native `indexOf('>')` is correct unless a quote lies inside the
+// tag (an attribute value containing `>`), in which case only the
+// quote-aware findTagEnd scan is safe.
 const elementTagEnd = (
   xml: string,
   next: number,
   quotes: QuoteCursors
 ): number => {
   const tagEnd = xml.indexOf('>', next + 1)
-  if (tagEnd < 0) return -1
   if (quotes.dq !== -1 && quotes.dq < next) quotes.dq = xml.indexOf('"', next)
   if (quotes.sq !== -1 && quotes.sq < next) quotes.sq = xml.indexOf("'", next)
   const quoteInsideTag =

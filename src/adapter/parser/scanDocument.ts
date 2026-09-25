@@ -6,7 +6,7 @@ import {
 import type { JsonObject, JsonValue } from '../../types/jsonTypes.js'
 import type { NormalisedParseResult } from '../XmlParser.js'
 import { findTagEnd } from './balanceOracle.js'
-import { BANG, DASH, isQuote, LBRACKET, LT, QMARK, SLASH } from './charCodes.js'
+import { BANG, isQuote, LT, QMARK, SLASH } from './charCodes.js'
 import { type AttrSet, ElementFrame, NO_ATTRS } from './ElementFrame.js'
 import {
   type LexedOpenTag,
@@ -27,7 +27,6 @@ import {
   CLOSE_TAG_OPEN,
   COMMENT_CLOSE,
   COMMENT_OPEN,
-  DECLARATION_OPEN,
   PI_CLOSE,
   PI_OPEN,
 } from './xmlTokens.js'
@@ -76,18 +75,22 @@ const splitRootAttrs = (attrs: OpenTagAttrs): RootAttrSplit => {
   return { rest: { attrs: rootAttrs, hasAttrs: hasRootAttrs }, namespaces }
 }
 
+interface RootElement {
+  readonly name: string
+  readonly value: JsonValue
+}
+
 // One-pass token scanner over an explicit frame stack (no recursion).
 // The stack always starts with a sentinel top frame (name ''), whose
-// only role is bookkeeping: it is never compacted, and `stack.length
+// only role is bookkeeping: it is never compacted, so the text and
+// children it collects outside the root are dropped, and `stack.length
 // === 1` is the "at top level" test used throughout.
 class DocumentScanner {
   private readonly xml: string
   private readonly stack: ElementFrame[]
   private pos = 0
   private needsOracle = false
-  private hasRoot = false
-  private rootName = ''
-  private rootValue: JsonValue = ''
+  private root: RootElement | undefined
   private namespaces: JsonObject = {}
 
   constructor(xml: string) {
@@ -111,12 +114,13 @@ class DocumentScanner {
   }
 
   private parsedResult(): ScanOutcome {
-    const result: NormalisedParseResult = this.hasRoot
-      ? {
-          content: { [this.rootName]: this.rootValue },
-          namespaces: this.namespaces,
-        }
-      : { content: {}, namespaces: {} }
+    const result: NormalisedParseResult =
+      this.root === undefined
+        ? { content: {}, namespaces: {} }
+        : {
+            content: { [this.root.name]: this.root.value },
+            namespaces: this.namespaces,
+          }
     return { kind: 'parsed', result, needsOracle: this.needsOracle }
   }
 
@@ -133,7 +137,7 @@ class DocumentScanner {
     const next = this.xml.indexOf('<', this.pos)
     const end = next < 0 ? this.xml.length : next
     const text = this.xml.slice(this.pos, end).trim()
-    if (text !== '') this.addText(text)
+    if (text !== '') this.currentFrame().addText(text)
     this.pos = end
     return undefined
   }
@@ -146,7 +150,7 @@ class DocumentScanner {
       return this.parsedResult()
     }
     const closeText = this.xml.slice(this.pos + CLOSE_TAG_OPEN.length, gt)
-    const frame = this.stack[this.stack.length - 1]
+    const frame = this.currentFrame()
     if (closeText.indexOf(frame.name) === -1) {
       return failed(unexpectedCloseTag(this.xml, gt))
     }
@@ -166,53 +170,35 @@ class DocumentScanner {
 
   private addToParent(name: string, value: JsonValue): void {
     if (this.stack.length === 1) {
-      if (!this.hasRoot) {
-        this.hasRoot = true
-        this.rootName = name
-        this.rootValue = value
-      }
+      if (this.root === undefined) this.root = { name, value }
       return
     }
-    this.stack[this.stack.length - 1].addChild(name, value)
+    this.currentFrame().addChild(name, value)
   }
 
-  private addText(text: string): void {
-    if (this.stack.length > 1) this.stack[this.stack.length - 1].addText(text)
-  }
-
-  private addChild(key: string, value: JsonValue): void {
-    if (this.stack.length > 1) {
-      this.stack[this.stack.length - 1].addChild(key, value)
-    }
+  private currentFrame(): ElementFrame {
+    return this.stack[this.stack.length - 1]
   }
 
   private scanBang(): ScanOutcome | undefined {
-    const c2 = this.xml.charCodeAt(this.pos + DECLARATION_OPEN.length)
-    if (c2 === DASH && this.xml.startsWith(COMMENT_OPEN, this.pos)) {
-      return this.scanComment()
-    }
-    if (c2 === LBRACKET && this.xml.startsWith(CDATA_OPEN, this.pos)) {
-      return this.scanCdata()
-    }
+    if (this.xml.startsWith(COMMENT_OPEN, this.pos)) return this.scanComment()
+    if (this.xml.startsWith(CDATA_OPEN, this.pos)) return this.scanCdata()
     return this.scanDeclaration()
   }
 
-  // The close search starts right after `<!`, not after `<!--`, so an
+  // The close search starts at the opener, not after `<!--`, so an
   // opener overlapping its own `-->` (`<!-->`, `<!--->`) is caught as a
   // short comment.
   private scanComment(): ScanOutcome | undefined {
-    const end = this.xml.indexOf(
-      COMMENT_CLOSE,
-      this.pos + DECLARATION_OPEN.length
-    )
+    const end = this.xml.indexOf(COMMENT_CLOSE, this.pos)
     if (end < 0) return failed(UNTERMINATED_COMMENT)
     const tokenEnd = end + COMMENT_CLOSE.length
     if (tokenEnd - this.pos < SHORT_COMMENT_LIMIT) {
       this.needsOracle = true
-      this.addText(this.xml.slice(this.pos, tokenEnd))
+      this.currentFrame().addText(this.xml.slice(this.pos, tokenEnd))
     } else {
       const body = this.xml.slice(this.pos + COMMENT_OPEN.length, end)
-      this.addChild(XML_COMMENT_PROP_NAME, body)
+      this.currentFrame().addChild(XML_COMMENT_PROP_NAME, body)
     }
     this.pos = tokenEnd
     return undefined
@@ -222,13 +208,13 @@ class DocumentScanner {
     const end = this.xml.indexOf(CDATA_CLOSE, this.pos + CDATA_OPEN.length)
     if (end < 0) return failed(UNTERMINATED_DECLARATION)
     const content = this.xml.slice(this.pos + CDATA_OPEN.length, end).trim()
-    this.addChild(CDATA_PROP_NAME, content)
+    this.currentFrame().addChild(CDATA_PROP_NAME, content)
     this.pos = end + CDATA_CLOSE.length
     return undefined
   }
 
   private scanDeclaration(): ScanOutcome | undefined {
-    const end = findTagEnd(this.xml, this.pos + DECLARATION_OPEN.length)
+    const end = findTagEnd(this.xml, this.pos)
     if (end < 0) return failed(UNTERMINATED_DECLARATION)
     this.pos = end + 1
     return undefined
@@ -256,7 +242,7 @@ class DocumentScanner {
   }
 
   private isRootCandidate(): boolean {
-    return this.stack.length === 1 && !this.hasRoot
+    return this.stack.length === 1 && this.root === undefined
   }
 
   private buildFrame(lexed: LexedOpenTag): ElementFrame {
