@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1787746449508,
+  "lastUpdate": 1790353313423,
   "repoUrl": "https://github.com/scolladon/sf-git-merge-driver",
   "entries": {
     "Binary Size Benchmark": [
@@ -521,6 +521,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "bin/merge-driver.cjs",
             "value": 38701,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "colladonsebastien@gmail.com",
+            "name": "Sebastien",
+            "username": "scolladon"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e848f86521d2e320f6511a470434e2648914e933",
+          "message": "perf(parser): replace txml with a single-pass scanner and cut merge allocations (#218)",
+          "timestamp": "2026-09-25T18:19:00+02:00",
+          "tree_id": "4ae19504595420317086ce51547e912d2043ab97",
+          "url": "https://github.com/scolladon/sf-git-merge-driver/commit/e848f86521d2e320f6511a470434e2648914e933"
+        },
+        "date": 1790353313354,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "bin/merge-driver.cjs",
+            "value": 38842,
             "unit": "bytes"
           }
         ]
