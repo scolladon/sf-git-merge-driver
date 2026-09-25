@@ -66,7 +66,7 @@ interface QuotedValue {
 const lexQuotedValue = (xml: string, pos: number): QuotedValue | null => {
   const quote = xml[pos]
   const close = xml.indexOf(quote, pos + 1)
-  if (close < 0) return null
+  if (close === -1) return null
   return { end: close + 1, value: xml.slice(pos + 1, close) }
 }
 

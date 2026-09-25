@@ -135,7 +135,7 @@ class DocumentScanner {
 
   private scanText(): undefined {
     const next = this.xml.indexOf('<', this.pos)
-    const end = next < 0 ? this.xml.length : next
+    const end = next === -1 ? this.xml.length : next
     const text = this.xml.slice(this.pos, end).trim()
     if (text !== '') this.currentFrame().addText(text)
     this.pos = end
@@ -144,7 +144,7 @@ class DocumentScanner {
 
   private scanClose(): ScanOutcome | undefined {
     const gt = this.xml.indexOf('>', this.pos + CLOSE_TAG_OPEN.length)
-    if (gt < 0) return failed(UNTERMINATED_TAG)
+    if (gt === -1) return failed(UNTERMINATED_TAG)
     if (this.stack.length === 1) {
       this.needsOracle = true
       return this.parsedResult()
@@ -191,7 +191,7 @@ class DocumentScanner {
   // short comment.
   private scanComment(): ScanOutcome | undefined {
     const end = this.xml.indexOf(COMMENT_CLOSE, this.pos)
-    if (end < 0) return failed(UNTERMINATED_COMMENT)
+    if (end === -1) return failed(UNTERMINATED_COMMENT)
     const tokenEnd = end + COMMENT_CLOSE.length
     if (tokenEnd - this.pos < SHORT_COMMENT_LIMIT) {
       this.needsOracle = true
@@ -206,7 +206,7 @@ class DocumentScanner {
 
   private scanCdata(): ScanOutcome | undefined {
     const end = this.xml.indexOf(CDATA_CLOSE, this.pos + CDATA_OPEN.length)
-    if (end < 0) return failed(UNTERMINATED_DECLARATION)
+    if (end === -1) return failed(UNTERMINATED_DECLARATION)
     const content = this.xml.slice(this.pos + CDATA_OPEN.length, end).trim()
     this.currentFrame().addChild(CDATA_PROP_NAME, content)
     this.pos = end + CDATA_CLOSE.length
@@ -215,14 +215,14 @@ class DocumentScanner {
 
   private scanDeclaration(): ScanOutcome | undefined {
     const end = findTagEnd(this.xml, this.pos)
-    if (end < 0) return failed(UNTERMINATED_DECLARATION)
+    if (end === -1) return failed(UNTERMINATED_DECLARATION)
     this.pos = end + 1
     return undefined
   }
 
   private scanProcessingInstruction(): ScanOutcome | undefined {
     const end = this.xml.indexOf(PI_CLOSE, this.pos + PI_OPEN.length)
-    if (end < 0) return failed(UNTERMINATED_PROCESSING_INSTRUCTION)
+    if (end === -1) return failed(UNTERMINATED_PROCESSING_INSTRUCTION)
     this.pos = end + PI_CLOSE.length
     return undefined
   }

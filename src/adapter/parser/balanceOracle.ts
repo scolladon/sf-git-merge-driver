@@ -46,7 +46,7 @@ export const findTagEnd = (xml: string, from: number): number => {
 const skipCdata = (xml: string, next: number): number => {
   if (!xml.startsWith(CDATA_OPEN, next)) return -1
   const end = xml.indexOf(CDATA_CLOSE, next + CDATA_OPEN.length)
-  return end < 0 ? -1 : end + CDATA_CLOSE.length
+  return end === -1 ? -1 : end + CDATA_CLOSE.length
 }
 
 // Resume index for a `<!…` or `<?…` declaration starting at `next`
@@ -56,18 +56,18 @@ const skipCdata = (xml: string, next: number): number => {
 const skipDeclaration = (xml: string, next: number, c1: number): number => {
   if (c1 === BANG) {
     const cdataEnd = skipCdata(xml, next)
-    if (cdataEnd >= 0) return cdataEnd
+    if (cdataEnd !== -1) return cdataEnd
     if (xml.startsWith(COMMENT_OPEN, next)) {
       const end = xml.indexOf(COMMENT_CLOSE, next + COMMENT_OPEN.length)
-      if (end < 0) throw new Error(UNTERMINATED_COMMENT)
+      if (end === -1) throw new Error(UNTERMINATED_COMMENT)
       return end + COMMENT_CLOSE.length
     }
     const end = findTagEnd(xml, next)
-    if (end < 0) throw new Error(UNTERMINATED_DECLARATION)
+    if (end === -1) throw new Error(UNTERMINATED_DECLARATION)
     return end + 1
   }
   const end = xml.indexOf(PI_CLOSE, next + PI_OPEN.length)
-  if (end < 0) throw new Error(UNTERMINATED_PROCESSING_INSTRUCTION)
+  if (end === -1) throw new Error(UNTERMINATED_PROCESSING_INSTRUCTION)
   return end + PI_CLOSE.length
 }
 
@@ -120,7 +120,7 @@ export const assertBalancedTags = (xml: string): void => {
       continue
     }
     const tagEnd = elementTagEnd(xml, next, quotes)
-    if (tagEnd < 0) throw new Error(UNTERMINATED_TAG)
+    if (tagEnd === -1) throw new Error(UNTERMINATED_TAG)
     if (c1 === SLASH) {
       depth--
     } else if (xml.charCodeAt(tagEnd - 1) !== SLASH) {
