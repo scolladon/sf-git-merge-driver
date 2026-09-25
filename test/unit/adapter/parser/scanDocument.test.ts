@@ -47,6 +47,22 @@ describe('scanDocument', () => {
     })
   })
 
+  describe('given leaf text that happens to equal a mutation-testing placeholder string', () => {
+    // Guards the `text !== ''` emptiness check itself, not just its effect:
+    // comparing against any other fixed literal would drop this exact text.
+    it('when scanning then the text is still kept verbatim', () => {
+      // Arrange
+      const xml = '<a>Stryker was here!</a>'
+
+      // Act
+      const outcome = scanDocument(xml)
+
+      // Assert
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.result.content).toEqual({ a: 'Stryker was here!' })
+    })
+  })
+
   describe('given a close tag with no >', () => {
     it('when scanning then it fails as an unterminated tag', () => {
       // Arrange
@@ -475,6 +491,26 @@ describe('scanDocument', () => {
     it('when scanning then it fails with the PI-specific message', () => {
       // Arrange
       const xml = '<?xml version="1.0"'
+
+      // Act
+      const outcome = scanDocument(xml)
+
+      // Assert
+      expect(outcome).toEqual({
+        kind: 'failed',
+        message: 'XML parse error: unterminated <? ?>',
+      })
+    })
+  })
+
+  describe('given a processing instruction that closes immediately with no content', () => {
+    // Pins the `pos + PI_OPEN.length` search-from offset: searching from
+    // `pos` instead would let the opener's own trailing `?` complete a
+    // phantom `?>` one character early, at `<?` + `>`, instead of finding
+    // the real close (or correctly failing when there is none).
+    it('when scanning then it fails with the PI-specific message', () => {
+      // Arrange
+      const xml = '<a><?>x</a>'
 
       // Act
       const outcome = scanDocument(xml)

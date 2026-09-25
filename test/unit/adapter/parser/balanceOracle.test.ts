@@ -410,6 +410,23 @@ describe('assertBalancedTags', () => {
     })
   })
 
+  describe('given a near-CDATA opener whose exact text does not match CDATA_OPEN', () => {
+    // The cheap `[` reject passes, but the full-string comparison must still
+    // reject the mismatch and fall through to the generic <! ... > skip —
+    // which stops at the first bare `>`, not at a later `]]>` — so a real
+    // tag hidden between them is still parsed and counted toward depth.
+    it('when called then the tag between the bare > and the ]]> still unbalances the count', () => {
+      // Arrange
+      const xml = '<a><![>AAAAA<b>]]></a>'
+
+      // Act
+      const act = () => assertBalancedTags(xml)
+
+      // Assert
+      expect(act).toThrow(unbalancedTags(1))
+    })
+  })
+
   describe('given a comment token that closes before four characters', () => {
     it('when called then it rejects the comment as unterminated', () => {
       // Arrange
