@@ -1,17 +1,17 @@
 import { PassThrough } from 'node:stream'
-import { bench, describe } from 'vitest'
-import { TxmlXmlParser } from '../../src/adapter/TxmlXmlParser.js'
-import { XmlStreamWriter } from '../../src/adapter/writer/XmlStreamWriter.js'
+import { describe, test } from 'vitest'
+import { CompactXmlParser } from '../../lib/adapter/parser/CompactXmlParser.js'
+import { XmlStreamWriter } from '../../lib/adapter/writer/XmlStreamWriter.js'
 import {
   DEFAULT_ANCESTOR_CONFLICT_TAG,
   DEFAULT_CONFLICT_MARKER_SIZE,
   DEFAULT_LOCAL_CONFLICT_TAG,
   DEFAULT_OTHER_CONFLICT_TAG,
-} from '../../src/constant/conflictConstant.js'
-import { JsonMerger } from '../../src/merger/JsonMerger.js'
+} from '../../lib/constant/conflictConstant.js'
+import { JsonMerger } from '../../lib/merger/JsonMerger.js'
 import type { MergeConfig } from '../../src/types/conflictTypes.js'
 import type { JsonObject } from '../../src/types/jsonTypes.js'
-import { generateProfileFixtures } from './fixtures/generateFixtures.js'
+import { generateProfileFixtures } from './fixtures/generateFixtures.ts'
 
 const config: MergeConfig = {
   conflictMarkerSize: DEFAULT_CONFLICT_MARKER_SIZE,
@@ -27,7 +27,7 @@ const sizes = ['small', 'medium', 'large'] as const
 
 for (const size of sizes) {
   const fixtures = generateProfileFixtures(size)
-  const parser = new TxmlXmlParser()
+  const parser = new CompactXmlParser()
 
   // Pre-warm: parse once outside the bench to set up merged tree + ns.
   const ancestor = parser.parseString(fixtures.ancestor)
@@ -48,28 +48,34 @@ for (const size of sizes) {
   )
 
   describe(`phase-parse-${size}`, () => {
-    bench(`parse-${size}`, () => {
-      const p = new TxmlXmlParser()
-      p.parseString(fixtures.ancestor)
-      p.parseString(fixtures.local)
-      p.parseString(fixtures.other)
+    test(`parse-${size}`, async ({ bench }) => {
+      await bench(`parse-${size}`, () => {
+        const p = new CompactXmlParser()
+        p.parseString(fixtures.ancestor)
+        p.parseString(fixtures.local)
+        p.parseString(fixtures.other)
+      }).run()
     })
   })
 
   describe(`phase-merge-${size}`, () => {
-    bench(`merge-${size}`, () => {
-      const jm = new JsonMerger(config)
-      jm.mergeThreeWay(ancestor.content, local.content, other.content)
+    test(`merge-${size}`, async ({ bench }) => {
+      await bench(`merge-${size}`, () => {
+        const jm = new JsonMerger(config)
+        jm.mergeThreeWay(ancestor.content, local.content, other.content)
+      }).run()
     })
   })
 
   describe(`phase-serialize-${size}`, () => {
-    bench(`serialize-${size}`, async () => {
-      const w = new XmlStreamWriter(config)
-      const sink = new PassThrough()
-      sink.resume()
-      await w.writeTo(sink, mergedResult.output, namespaces)
-      sink.end()
+    test(`serialize-${size}`, async ({ bench }) => {
+      await bench(`serialize-${size}`, async () => {
+        const w = new XmlStreamWriter(config)
+        const sink = new PassThrough()
+        sink.resume()
+        await w.writeTo(sink, mergedResult.output, namespaces)
+        sink.end()
+      }).run()
     })
   })
 }

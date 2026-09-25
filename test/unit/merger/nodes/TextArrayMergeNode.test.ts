@@ -384,7 +384,7 @@ describe('TextArrayMergeNode', () => {
     })
 
     it('should sort a null-prototype object item instead of throwing (parser output shape)', () => {
-      // Arrange - txml builds compact nodes on Object.create(null), so a
+      // Arrange - the parser builds compact nodes on Object.create(null), so a
       // sibling that collapsed to a single object on one side (while this
       // side is an all-strings array) must not rely on the inherited
       // Object.prototype.toString to compare

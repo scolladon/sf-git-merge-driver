@@ -32,9 +32,7 @@ describe('TextMergeStrategy', () => {
       // Act
       const result = strategy.handle({
         config: defaultConfig,
-        objAncestor: {},
-        objLocal: {},
-        objOther: {},
+        attribute: 'field',
         ancestor: null,
         local: null,
         other: null,
@@ -55,9 +53,7 @@ describe('TextMergeStrategy', () => {
       // Act
       const result = strategy.handle({
         config: defaultConfig,
-        objAncestor: {},
-        objLocal: {},
-        objOther,
+        attribute: 'field',
         ancestor: null,
         local: null,
         other: 'otherValue',
@@ -78,9 +74,7 @@ describe('TextMergeStrategy', () => {
       // Act
       const result = strategy.handle({
         config: defaultConfig,
-        objAncestor: {},
-        objLocal,
-        objOther: {},
+        attribute: 'field',
         ancestor: null,
         local: 'localValue',
         other: null,
@@ -100,9 +94,7 @@ describe('TextMergeStrategy', () => {
       // Act
       const result = strategy.handle({
         config: defaultConfig,
-        objAncestor: {},
-        objLocal: {},
-        objOther: {},
+        attribute: 'field',
         ancestor: null,
         local: null,
         other: null,
@@ -124,9 +116,7 @@ describe('TextMergeStrategy', () => {
       // Act
       const result = strategy.handle({
         config: defaultConfig,
-        objAncestor: {},
-        objLocal,
-        objOther,
+        attribute: 'field',
         ancestor: null,
         local: 'localValue',
         other: 'otherValue',
@@ -148,14 +138,11 @@ describe('TextMergeStrategy', () => {
       // Arrange
       const strategy = getTextMergeStrategy(MergeScenario.LOCAL_AND_OTHER)
       const objLocal = { field: 'sameValue' }
-      const objOther = { field: 'sameValue' }
 
       // Act
       const result = strategy.handle({
         config: defaultConfig,
-        objAncestor: {},
-        objLocal,
-        objOther,
+        attribute: 'field',
         ancestor: null,
         local: 'sameValue',
         other: 'sameValue',
@@ -177,12 +164,10 @@ describe('TextMergeStrategy', () => {
       // Act
       const result = strategy.handle({
         config: defaultConfig,
-        objAncestor,
-        objLocal: {},
-        objOther,
-        ancestor: 'ancestor',
+        attribute: 'field',
+        ancestor: 'ancestorValue',
         local: null,
-        other: 'other',
+        other: 'otherValue',
       })
 
       // Assert
@@ -200,15 +185,11 @@ describe('TextMergeStrategy', () => {
     it('should return empty result when ancestor equals other', () => {
       // Arrange
       const strategy = getTextMergeStrategy(MergeScenario.ANCESTOR_AND_OTHER)
-      const objAncestor = { field: 'sameValue' }
-      const objOther = { field: 'sameValue' }
 
       // Act
       const result = strategy.handle({
         config: defaultConfig,
-        objAncestor,
-        objLocal: {},
-        objOther,
+        attribute: 'field',
         ancestor: 'sameValue',
         local: null,
         other: 'sameValue',
@@ -230,11 +211,9 @@ describe('TextMergeStrategy', () => {
       // Act
       const result = strategy.handle({
         config: defaultConfig,
-        objAncestor,
-        objLocal,
-        objOther: {},
-        ancestor: 'ancestor',
-        local: 'local',
+        attribute: 'field',
+        ancestor: 'ancestorValue',
+        local: 'localValue',
         other: null,
       })
 
@@ -253,15 +232,11 @@ describe('TextMergeStrategy', () => {
     it('should return empty result when ancestor equals local', () => {
       // Arrange
       const strategy = getTextMergeStrategy(MergeScenario.ANCESTOR_AND_LOCAL)
-      const objAncestor = { field: 'sameValue' }
-      const objLocal = { field: 'sameValue' }
 
       // Act
       const result = strategy.handle({
         config: defaultConfig,
-        objAncestor,
-        objLocal,
-        objOther: {},
+        attribute: 'field',
         ancestor: 'sameValue',
         local: 'sameValue',
         other: null,
@@ -277,16 +252,12 @@ describe('TextMergeStrategy', () => {
     it('should return other when ancestor equals local', () => {
       // Arrange
       const strategy = getTextMergeStrategy(MergeScenario.ALL)
-      const objAncestor = { field: 'ancestorValue' }
-      const objLocal = { field: 'ancestorValue' }
       const objOther = { field: 'otherValue' }
 
       // Act
       const result = strategy.handle({
         config: defaultConfig,
-        objAncestor,
-        objLocal,
-        objOther,
+        attribute: 'field',
         ancestor: 'ancestorValue',
         local: 'ancestorValue',
         other: 'otherValue',
@@ -300,16 +271,12 @@ describe('TextMergeStrategy', () => {
     it('should return local when ancestor equals other', () => {
       // Arrange
       const strategy = getTextMergeStrategy(MergeScenario.ALL)
-      const objAncestor = { field: 'ancestorValue' }
       const objLocal = { field: 'localValue' }
-      const objOther = { field: 'ancestorValue' }
 
       // Act
       const result = strategy.handle({
         config: defaultConfig,
-        objAncestor,
-        objLocal,
-        objOther,
+        attribute: 'field',
         ancestor: 'ancestorValue',
         local: 'localValue',
         other: 'ancestorValue',
@@ -330,9 +297,7 @@ describe('TextMergeStrategy', () => {
       // Act
       const result = strategy.handle({
         config: defaultConfig,
-        objAncestor,
-        objLocal,
-        objOther,
+        attribute: 'field',
         ancestor: 'ancestorValue',
         local: 'localValue',
         other: 'otherValue',
@@ -353,16 +318,12 @@ describe('TextMergeStrategy', () => {
     it('should return local when both local and other changed to same value', () => {
       // Arrange
       const strategy = getTextMergeStrategy(MergeScenario.ALL)
-      const objAncestor = { field: 'originalValue' }
       const objLocal = { field: 'newValue' }
-      const objOther = { field: 'newValue' }
 
       // Act
       const result = strategy.handle({
         config: defaultConfig,
-        objAncestor,
-        objLocal,
-        objOther,
+        attribute: 'field',
         ancestor: 'originalValue',
         local: 'newValue',
         other: 'newValue',

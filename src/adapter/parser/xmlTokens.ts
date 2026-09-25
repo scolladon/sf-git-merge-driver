@@ -1,0 +1,7 @@
+export const CLOSE_TAG_OPEN = '</'
+export const CDATA_OPEN = '<![CDATA['
+export const CDATA_CLOSE = ']]>'
+export const COMMENT_OPEN = '<!--'
+export const COMMENT_CLOSE = '-->'
+export const PI_OPEN = '<?'
+export const PI_CLOSE = '?>'

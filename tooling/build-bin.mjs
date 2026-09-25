@@ -9,10 +9,6 @@ const pkg = JSON.parse(
 )
 
 const SHEBANG = '#!/usr/bin/env node'
-const COMPILE_CACHE_BANNER =
-  'try { const v = process.versions.node.split(".").map(Number);' +
-  ' if (v[0] > 22 || (v[0] === 22 && v[1] >= 8))' +
-  ' require("node:module").enableCompileCache(); } catch {}'
 
 const OUTFILE = 'bin/merge-driver.cjs'
 const SIZE_LIMIT_BYTES = 300_000
@@ -28,7 +24,7 @@ await build({
   treeShaking: true,
   ...(debug ? { sourcemap: 'inline' } : {}),
   outfile: OUTFILE,
-  banner: { js: `${SHEBANG}\n${COMPILE_CACHE_BANNER}` },
+  banner: { js: SHEBANG },
   define: {
     __VERSION__: JSON.stringify(pkg.version),
     __BUNDLED__: 'true',

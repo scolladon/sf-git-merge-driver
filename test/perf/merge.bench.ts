@@ -1,18 +1,18 @@
-import { bench, describe } from 'vitest'
+import { describe, test } from 'vitest'
 import {
   DEFAULT_ANCESTOR_CONFLICT_TAG,
   DEFAULT_CONFLICT_MARKER_SIZE,
   DEFAULT_LOCAL_CONFLICT_TAG,
   DEFAULT_OTHER_CONFLICT_TAG,
-} from '../../src/constant/conflictConstant.js'
+} from '../../lib/constant/conflictConstant.js'
 import type { MergeConfig } from '../../src/types/conflictTypes.js'
 import {
   generateOrderedFixtures,
   generatePicklistFixtures,
   generateProfileFixtures,
-} from './fixtures/generateFixtures.js'
-import { instrumentedMerge } from './instrumentation/instrumentedMerge.js'
-import { PhaseTimer } from './instrumentation/PhaseTimer.js'
+} from './fixtures/generateFixtures.ts'
+import { instrumentedMerge } from './instrumentation/instrumentedMerge.ts'
+import { PhaseTimer } from './instrumentation/PhaseTimer.ts'
 
 const config: MergeConfig = {
   conflictMarkerSize: DEFAULT_CONFLICT_MARKER_SIZE,
@@ -33,26 +33,30 @@ for (const size of sizes) {
     // internal streams end, and vitest's fork pool times out on
     // teardown with "Timeout terminating forks worker" after the last
     // sample — even though every bench reported a result.
-    bench(`merge-${size}-no-conflict`, async () => {
-      const timer = new PhaseTimer()
-      await instrumentedMerge(
-        fixtures.ancestor,
-        fixtures.local,
-        fixtures.other,
-        config,
-        timer
-      )
+    test(`merge-${size}-no-conflict`, async ({ bench }) => {
+      await bench(`merge-${size}-no-conflict`, async () => {
+        const timer = new PhaseTimer()
+        await instrumentedMerge(
+          fixtures.ancestor,
+          fixtures.local,
+          fixtures.other,
+          config,
+          timer
+        )
+      }).run()
     })
 
-    bench(`merge-${size}-with-conflict`, async () => {
-      const timer = new PhaseTimer()
-      await instrumentedMerge(
-        fixtures.ancestor,
-        fixtures.conflictLocal,
-        fixtures.conflictOther,
-        config,
-        timer
-      )
+    test(`merge-${size}-with-conflict`, async ({ bench }) => {
+      await bench(`merge-${size}-with-conflict`, async () => {
+        const timer = new PhaseTimer()
+        await instrumentedMerge(
+          fixtures.ancestor,
+          fixtures.conflictLocal,
+          fixtures.conflictOther,
+          config,
+          timer
+        )
+      }).run()
     })
   })
 }
@@ -60,29 +64,33 @@ for (const size of sizes) {
 describe('merge-ordered', () => {
   const ordered = generateOrderedFixtures()
 
-  bench('merge-ordered-globalvalueset', async () => {
-    const timer = new PhaseTimer()
-    await instrumentedMerge(
-      ordered.ancestor,
-      ordered.local,
-      ordered.other,
-      config,
-      timer
-    )
+  test('merge-ordered-globalvalueset', async ({ bench }) => {
+    await bench('merge-ordered-globalvalueset', async () => {
+      const timer = new PhaseTimer()
+      await instrumentedMerge(
+        ordered.ancestor,
+        ordered.local,
+        ordered.other,
+        config,
+        timer
+      )
+    }).run()
   })
 })
 
 describe('merge-picklist', () => {
   const picklist = generatePicklistFixtures()
 
-  bench('merge-picklist-customfield', async () => {
-    const timer = new PhaseTimer()
-    await instrumentedMerge(
-      picklist.ancestor,
-      picklist.local,
-      picklist.other,
-      config,
-      timer
-    )
+  test('merge-picklist-customfield', async ({ bench }) => {
+    await bench('merge-picklist-customfield', async () => {
+      const timer = new PhaseTimer()
+      await instrumentedMerge(
+        picklist.ancestor,
+        picklist.local,
+        picklist.other,
+        config,
+        timer
+      )
+    }).run()
   })
 })

@@ -1,5 +1,5 @@
 import { FilePath, TsgitError } from '@scolladon/tsgit'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GitRepository } from '../../../src/adapter/GitRepository.js'
 import { NotAGitRepositoryError } from '../../../src/adapter/GitRepository.js'
 import { withGitRepository } from '../../../src/adapter/TsgitRepository.js'
@@ -50,6 +50,14 @@ const makeRepo = (layout: FakeLayout): FakeRepo => ({
 describe('TsgitRepository.withGitRepository', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // git exports GIT_DIR to hooks, so a pre-push run would otherwise
+    // leak the caller's repository into every "no layout" expectation.
+    vi.stubEnv('GIT_DIR', undefined)
+    vi.stubEnv('GIT_COMMON_DIR', undefined)
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
   })
 
   describe('given a layout with no commonDir', () => {

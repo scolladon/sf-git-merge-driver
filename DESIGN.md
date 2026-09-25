@@ -175,7 +175,7 @@ classDiagram
         +writeTo(out, ordered, namespaces, eol, hasConflict) Promise~void~
     }
 
-    class TxmlXmlParser {
+    class CompactXmlParser {
         +parseStream(input) Promise~NormalisedParseResult~
         +parseString(xml) NormalisedParseResult
     }
@@ -184,7 +184,7 @@ classDiagram
         +writeTo(out, ordered, namespaces, eol, hasConflict) Promise~void~
     }
 
-    XmlParser <|.. TxmlXmlParser
+    XmlParser <|.. CompactXmlParser
     XmlSerializer <|.. XmlStreamWriter
 
     class GitRepository {
@@ -203,8 +203,8 @@ classDiagram
 
 - **`XmlParser` port** — Reads XML from a `Readable` (or a string), returns `NormalisedParseResult = { content, namespaces }`.
 - **`XmlSerializer` port** — Writes the serialized document to a `Writable`: XML declaration, elements (open/close/cdata/comment), namespaces on the first top-level element, and inline conflict-block expansion. When the whole document is a single conflict block there is no first top-level element, so the root element of each non-blank side carries the namespaces instead. The optional `hasConflict` parameter (defaults to `true`) lets callers skip the conflict-line filter when the merge produced no `ConflictBlock` — the common case.
-- **`TxmlXmlParser`** — Adapter wrapping the `txml` library (1.5 KiB gzipped, zero deps after our preprocess). Pre-processes `<![CDATA[…]]>` regions into a sentinel element before parsing (txml flattens CDATA into text, losing the boundary the writer needs to preserve). After parsing, walks tXml's `TNode { tagName, attributes, children }` tree once, converting it to the compact JsonObject shape the merger and writer expect: collapses repeated same-name siblings into arrays, prefixes attributes with `@_`, extracts root `xmlns*` into the namespaces bucket, decodes the CDATA sentinel back into `__cdata` keys, and runs a tag-balance check to throw on malformed input (txml itself is permissive). The conversion is benchmark-measured 62-67 % faster end-to-end than the previous `@nodable/flexible-xml-parser` adapter, with a -70 % bundle-size reduction (110 KiB → 33.5 KiB). See `docs/plans/2026-04-25-parser-spike-txml-vs-sax.md` for the spike that justified the swap.
-- **`XmlStreamWriter`** — Single recursive walker (`writeRoot` → `writeElement` → `writeChildren`) that appends serialized XML directly to a mutable `WalkState.buf` string. No generators, no per-chunk object allocations, no `for...of` over generators. `getIndent` memoises the per-depth `\n + N×indent` prefix. The walker is sync; only `writeTo` is async, awaiting `out.write`'s drain signal once at the end (no-conflict path) or per 16 KiB filter window (conflict path). Child element tags and attributes within each node are emitted in **first-seen (source) order** — the insertion order of keys in the compact JSON object as set by the parser — rather than alphabetical order. Because `TxmlXmlParser` preserves source tag order and `sf project retrieve` writes files in the Metadata API XSD `xs:sequence` order, the driver's output matches the canonical Salesforce order for retrieve-sourced files. This is a layout-only property: it does not affect merge decisions (see §6 below).
+- **`CompactXmlParser`** — Adapter with no third-party XML library: `scanDocument` (`src/adapter/parser/scanDocument.ts`) makes one forward pass over the source string, pushing an `ElementFrame` accumulator on each open tag and popping it into its parent on the matching close, building the compact JsonObject shape the merger and writer expect directly — no intermediate DOM, no separate normalise walk. `<![CDATA[…]]>` sections are read natively into `__cdata` keys; there is no sentinel rewrite. The fast path resolves attributes, closes, comments and CDATA inline; when it meets a construct its lexer can't disambiguate on its own (a stray quote in a tag name, attribute name, unquoted attribute value, skipped position or close-tag text; a comment shorter than `<!---->`; or a close tag at top level) it sets a `needsOracle` flag instead of guessing, and `assertBalancedTags` (`src/adapter/parser/balanceOracle.ts`) re-walks the document quote-aware to settle it; a scan failure runs the oracle first, so its balance-family message wins when both passes reject the input. Contract: **byte-exact on Salesforce-shaped XML, XML-correct elsewhere**. Measured with paired A/B runs against the previous adapter: 25 % (medium), 28 % (large) and 40 % (xl) faster on the parse phase, with 32 % lower peak RSS on the xl tier, at a near-identical bundle size now that the external parser dependency is gone.
+- **`XmlStreamWriter`** — Single recursive walker (`writeRoot` → `writeElement` → `writeChildren`) that appends serialized XML directly to a mutable `WalkState.buf` string. No generators, no per-chunk object allocations, no `for...of` over generators. `getIndent` memoises the per-depth `\n + N×indent` prefix. The walker is sync; only `writeTo` is async, awaiting `out.write`'s drain signal once at the end (no-conflict path) or per 16 KiB filter window (conflict path). Child element tags and attributes within each node are emitted in **first-seen (source) order** — the insertion order of keys in the compact JSON object as set by the parser — rather than alphabetical order. Because `CompactXmlParser` preserves source tag order and `sf project retrieve` writes files in the Metadata API XSD `xs:sequence` order, the driver's output matches the canonical Salesforce order for retrieve-sourced files. This is a layout-only property: it does not affect merge decisions (see §6 below).
 - **`GitRepository` port** — Exposes `commonGitDir` (absolute path to the repository's shared git directory), `setConfig(key, value)`, and `removeSection(name)`. Keeps `gitAttributesPath.ts`, `InstallService`, and `UninstallService` free of any git-library import; the port throws `NotAGitRepositoryError` when the caller is not inside a git working tree.
 - **`TsgitRepository`** — The single file that imports `@scolladon/tsgit`, wired through `withGitRepository(use)`. Opens the repository with `hooks: false` and `command: false` so a hostile repository's `.git/hooks/*` scripts or a configured `[merge].driver` command can never execute during install/uninstall. `openRepository` itself succeeds even outside a repository, returning a synthetic layout, so a probe of `core.repositoryformatversion` (local scope) runs before anything reads the layout — that probe, not the open, is what proves the current directory is a real repository. The handle is disposed in a `finally`. The shared git dir is resolved with the vendor's own `commonDirOf(layout)` (from the `@scolladon/tsgit/primitives` subpath) rather than a hand-rolled `commonDir ?? gitDir`, so the linked-worktree semantics stay owned by the library. `GIT_DIR` and `GIT_COMMON_DIR` are read here and forwarded as explicit `gitDir` / `commonDir` options, because tsgit consults no environment variable of its own.
 
@@ -226,7 +226,7 @@ flowchart TD
     end
 
     subgraph Runtime["Runtime (per file, thousands per rebase)"]
-        Binary["bin/merge-driver.cjs<br/>(esbuild-bundled, ~34 KB)"]
+        Binary["bin/merge-driver.cjs<br/>(esbuild-bundled, ~38 KB)"]
         ArgvParser["argv parser<br/>(no oclif, no SF core)"]
         MD["MergeDriver.mergeFiles"]
     end
@@ -262,12 +262,12 @@ Deprecation is encoded natively via oclif's command-level deprecation API
 The binary is produced by esbuild from the compiled TypeScript:
 
 ```
-src/**/*.ts → tsc → lib/**/*.js → esbuild (minify, treeshake, cjs) → bin/merge-driver.cjs (~34 KB, mode 755)
+src/**/*.ts → tsc → lib/**/*.js → esbuild (minify, treeshake, cjs) → bin/merge-driver.cjs (~38 KB, mode 755)
 ```
 
 Key build choices:
 - `keepNames: false` — saves ~22 KB; `@log('ClassName')` decorator passes names as string literals instead
-- Shebang + compile-cache banner — `module.enableCompileCache()` gated on Node ≥ 22.8 (stable API)
+- Shebang banner only. `module.enableCompileCache()` was measured as a no-op for a single-file bundle (see *Measured and rejected*)
 - `__VERSION__` + `__BUNDLED__` injected via esbuild `--define` from `package.json`
 
 Implementation: [tooling/build-bin.mjs](tooling/build-bin.mjs)
@@ -299,9 +299,8 @@ flowchart TD
         XML["3 Readables (ancestor / ours / theirs)"]
     end
 
-    subgraph "Parser Adapter (txml + adapter)"
-        Parse["TxmlXmlParser.parseString"]
-        Normalise["TNode → compact JsonObject: extract root xmlns into namespaces bucket, decode CDATA sentinel, collapse repeated siblings into arrays"]
+    subgraph "Parser Adapter (single-pass scanner)"
+        Parse["CompactXmlParser.parseString: one forward pass builds the compact JsonObject directly — root xmlns into the namespaces bucket, CDATA read natively, repeated siblings grouped into arrays"]
     end
 
     subgraph "Domain (format-agnostic)"
@@ -321,7 +320,7 @@ flowchart TD
         Result["Writable sink (tmp file → atomic rename)"]
     end
 
-    XML --> Parse --> Normalise --> Orchestrator
+    XML --> Parse --> Orchestrator
     Orchestrator --> Strategy
     Strategy --> Nodes
     Strategy --> Conflict
@@ -329,6 +328,23 @@ flowchart TD
     Conflict --> Walk
     Walk --> Filter --> Eol --> Result
 ```
+
+### Measured and rejected
+
+- **Buffered `readFile`/`writeFile` instead of streams in `MergeDriver`.**
+  Paired against the stream path: −0.1 ms (small fixture) to −1.7 ms (xl
+  fixture), under 1% of end-to-end time. Rejected; the stream path stays.
+- **A two-file compile-cache loader.** `module.enableCompileCache()` never
+  populates its cache in the single-file bundle — a `mkdir` per run, zero
+  entries, `Clear deserialized cache.` on stderr. A two-file loader that
+  does let the cache hit measured −0.9..−1.4%, paired, under 1 ms. Not
+  worth a second shipped file; the banner was removed.
+- **`for…in` and lazy getters in the merge phase.** `for…in` traversal of
+  the null-prototype parsed nodes in `isPresent` and `jsonEqual` measured
+  slower than `Object.keys`, so both keep their current form. Lazy
+  parameter getters in `TextMergeStrategy` bought nothing, because
+  `AllPresentStrategy` — the dominant scenario — reads every field
+  regardless.
 
 ## Key Design Decisions
 
@@ -378,9 +394,9 @@ Within every serialized node, child element tags and `xmlns*` attributes are emi
 - **Merge-time**: `mergePropertyOrder` (`src/merger/mergePropertyOrder.ts`) merges the three sides' key *sequences*, not a flat set. It derives precedence edges from each side's consecutive key pairs — ancestor, local and other alike — and takes a Kahn topological sort over the union of the three key sets. Whenever several keys are simultaneously ready (indegree zero), or a cycle in the precedence graph leaves none ready, the next key is chosen among the unemitted keys with the **lowest residual indegree**, breaking ties by a **lexicographic** ordering of the key names (a bare `Array.prototype.sort()`, never `localeCompare`). Scoping the repair to the lowest-indegree keys — rather than the entire remaining set — keeps it confined to the actual cycle: a key downstream of a cycle but not part of it, whose position every side agrees on, is never displaced by that cycle's repair. A fast path — `sameSequence(local, other) && isSubsequence(ancestor, local)` — returns `local`'s key sequence directly whenever both sides already agree on an order the ancestor is consistent with; that condition makes the topological order unique, so the result there does not depend on the tie-break rank at all.
 - **Write-time**: all three sort sites in `XmlStreamWriter` (`writeRoot`, `writeChildren`, `splitAttrsAndChildren`) preserve object key insertion order as returned by `Object.keys`, rather than calling `.sort()`.
 
-Because `TxmlXmlParser` preserves the source tag order (`classifyChildren` uses a `Map` keyed by tagName in insertion order; `toCompact` emits keys as `[attrs…, grouped tags in first-seen order…, #text last]`), and `sf project retrieve` writes files in the Metadata API XSD `xs:sequence` order, "emit first-seen key order" equals "emit XSD sequence order" for retrieve-sourced files — with no schema table to maintain.
+Because `CompactXmlParser` preserves the source tag order (`ElementFrame.addChild` groups each child into a `Map` keyed by tag name, in first-seen order; `ElementFrame.toCompact` emits keys as `[attrs…, grouped tags in first-seen order…, #text last]`), and `sf project retrieve` writes files in the Metadata API XSD `xs:sequence` order, "emit first-seen key order" equals "emit XSD sequence order" for retrieve-sourced files — with no schema table to maintain.
 
-**Parsed nodes are null-prototype**, and that is a pipeline-wide contract, not a parser-local detail. `toCompact` builds each compact node with `Object.create(null)` because tag names come straight from untrusted XML and `__proto__` is a syntactically valid one: on a normal `{}`, `out['__proto__'] = value` invokes the inherited setter and rewrites the node's prototype instead of storing a child. Two obligations fall on every consumer of a parsed node:
+**Parsed nodes are null-prototype**, and that is a pipeline-wide contract, not a parser-local detail. `ElementFrame.toCompact` builds each compact node with `Object.create(null)` because tag names come straight from untrusted XML and `__proto__` is a syntactically valid one: on a normal `{}`, `out['__proto__'] = value` invokes the inherited setter and rewrites the node's prototype instead of storing a child. Two obligations fall on every consumer of a parsed node:
 
 - `key in node` is an **own-key test** — but only for parsed nodes. Objects the driver builds itself (the parser's `content` wrapper, constant tables such as `METADATA_KEY_EXTRACTORS` and `LEVELS`) still inherit from `Object.prototype`, so a key named `constructor`, `toString` or `__proto__` answers `true` there. Those lookups use `Object.hasOwn`.
 - `String(node)` **throws** rather than coercing, because there is no inherited `toString`. Values that may be object-shaped are coerced through the local helpers in `MetadataService.getPropertyValue` (which yields the `String(undefined)` "absent" sentinel, so an unusable key field is filtered out) and `TextArrayMergeNode.toComparable` (which yields `JSON.stringify`, so distinct items stay distinguishable for sorting). The two differ deliberately: one needs the value to disappear, the other needs it to stay distinct.
@@ -596,7 +612,7 @@ Ordered merging applies to metadata with position-significant arrays:
 
 ### XML Comment Positioning
 
-XML comments are not guaranteed to keep their exact position relative to sibling elements through a merge. The compact intermediate representation groups child elements by tag name (`classifyChildren` uses a `Map` keyed by tag), and comments are stored under a single `#xml__comment` key. This representation can express a comment's position **between distinct-tag siblings** (Map insertion order is preserved) but **not between same-tag siblings**: `<a>1</a><!--c--><a>2</a>` collapses to `{ a: ['1','2'], #xml__comment: 'c' }`, which loses the comment's position between the two `<a>` entries — the comment re-emits after both.
+XML comments are not guaranteed to keep their exact position relative to sibling elements through a merge. The compact intermediate representation groups child elements by tag name (`ElementFrame.addChild` groups them into a `Map` keyed by tag), and comments are stored under a single `#xml__comment` key. This representation can express a comment's position **between distinct-tag siblings** (Map insertion order is preserved) but **not between same-tag siblings**: `<a>1</a><!--c--><a>2</a>` collapses to `{ a: ['1','2'], #xml__comment: 'c' }`, which loses the comment's position between the two `<a>` entries — the comment re-emits after both.
 
 This is **cosmetic and low-impact in practice**: `sf project retrieve` strips comments from retrieved metadata, so the only comments affected are hand-added ones in a working copy. Preserving comment position in all cases would require re-representing the compact tree as an order-preserving list (touching the parser, writer, and every merge node) and would change byte output broadly — a breaking change deliberately deferred to a future release with a version bump (see also `test/fixtures/xml/19-btb-comments`). The current behavior is pinned by `test/fixtures/xml/45-comment-positioning` and the `comment positioning` regression tests in `test/integration/XmlMerger.test.ts` so any future change is deliberate.
 

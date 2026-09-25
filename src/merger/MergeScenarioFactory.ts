@@ -4,25 +4,38 @@ import { MergeScenario } from '../types/mergeScenario.js'
 const isPresent = (value: JsonValue | undefined): boolean => {
   if (value == null) return false
   if (typeof value === 'string') return value.length > 0
-  if (Array.isArray(value)) return value.length > 0
+  // Stryker disable next-line ConditionalExpression: Object.keys of a dense JSON array has its length; this skips the key list
+  // Stryker disable next-line BlockStatement: an array falling through gets the same answer from Object.keys
+  if (Array.isArray(value)) {
+    return value.length > 0
+  }
   if (typeof value === 'object') return Object.keys(value).length > 0
   return true
 }
 
-export const getScenario = (
-  ancestor: JsonValue | undefined,
-  local: JsonValue | undefined,
-  other: JsonValue | undefined
-): MergeScenario => {
-  let scenario = MergeScenario.NONE as number
-  if (isPresent(ancestor)) {
-    scenario |= MergeScenario.ANCESTOR_ONLY
+// A scalar side is present unless nullish: '' counts as present, unlike
+// isPresent, because an empty text element is still a stated value.
+const isScalarPresent = (value: JsonValue | undefined): boolean => value != null
+
+const scenarioOf =
+  (present: (value: JsonValue | undefined) => boolean) =>
+  (
+    ancestor: JsonValue | undefined,
+    local: JsonValue | undefined,
+    other: JsonValue | undefined
+  ): MergeScenario => {
+    let scenario = MergeScenario.NONE as number
+    if (present(ancestor)) {
+      scenario |= MergeScenario.ANCESTOR_ONLY
+    }
+    if (present(local)) {
+      scenario |= MergeScenario.LOCAL_ONLY
+    }
+    if (present(other)) {
+      scenario |= MergeScenario.OTHER_ONLY
+    }
+    return scenario as MergeScenario
   }
-  if (isPresent(local)) {
-    scenario |= MergeScenario.LOCAL_ONLY
-  }
-  if (isPresent(other)) {
-    scenario |= MergeScenario.OTHER_ONLY
-  }
-  return scenario as MergeScenario
-}
+
+export const getScenario = scenarioOf(isPresent)
+export const getScalarScenario = scenarioOf(isScalarPresent)

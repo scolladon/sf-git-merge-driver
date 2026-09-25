@@ -704,9 +704,9 @@ describe('MetadataService', () => {
 
     describe('given a key field whose value is a null-prototype object (parser output shape)', () => {
       it('should treat it as absent instead of throwing on String coercion', () => {
-        // Arrange - txml builds compact nodes on Object.create(null), so a
-        // key field with attributes/children (object-shaped) has no
-        // inherited toString
+        // Arrange - the parser builds compact nodes on Object.create(null), so
+        // a key field with attributes/children (object-shaped) has no inherited
+        // toString
         const nullProtoApexClass = Object.assign(Object.create(null), {
           '@_a': '1',
           '#text': '',
