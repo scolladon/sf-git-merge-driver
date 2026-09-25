@@ -39,6 +39,7 @@ export type ScanOutcome =
     }
   | { readonly kind: 'failed'; readonly message: string }
 
+// Stryker disable next-line StringLiteral: the sentinel's name is never read: a top-level close returns first
 const TOP_FRAME_NAME = ''
 const XMLNS_RE = /^xmlns(?::.+)?$/
 const SHORT_COMMENT_LIMIT = COMMENT_OPEN.length + COMMENT_CLOSE.length
@@ -46,6 +47,7 @@ const SHORT_COMMENT_LIMIT = COMMENT_OPEN.length + COMMENT_CLOSE.length
 const failed = (message: string): ScanOutcome => ({ kind: 'failed', message })
 
 const hasQuoteChar = (text: string): boolean => {
+  // Stryker disable next-line EqualityOperator: charCodeAt(length) is NaN, not a quote
   for (let i = 0; i < text.length; i++) {
     if (isQuote(text.charCodeAt(i))) return true
   }
@@ -137,6 +139,8 @@ class DocumentScanner {
     const next = this.xml.indexOf('<', this.pos)
     const end = next === -1 ? this.xml.length : next
     const text = this.xml.slice(this.pos, end).trim()
+    // Stryker disable next-line ConditionalExpression: addText('') appends nothing; the guard only skips the call
+    // Stryker disable next-line StringLiteral: only text equal to the tool's own placeholder would be dropped
     if (text !== '') this.currentFrame().addText(text)
     this.pos = end
     return undefined

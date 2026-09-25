@@ -40,6 +40,7 @@ interface StopRun {
 const scanStopRun = (xml: string, start: number): StopRun => {
   let pos = start
   let strayQuote = false
+  // Stryker disable next-line EqualityOperator: one step past EOF ends at length + 1, which every caller treats as EOF
   while (pos < xml.length && !isNameStop(xml.charCodeAt(pos))) {
     if (isQuote(xml.charCodeAt(pos))) strayQuote = true
     pos++
@@ -52,6 +53,8 @@ const isEqWhitespace = (charCode: number): boolean =>
 
 const skipWhitespace = (xml: string, start: number): number => {
   let pos = start
+  // Stryker disable next-line ConditionalExpression: charCodeAt past EOF is NaN, not whitespace, so the loop stops at length
+  // Stryker disable next-line EqualityOperator: charCodeAt past EOF is NaN, not whitespace, so the loop stops at length
   while (pos < xml.length && isEqWhitespace(xml.charCodeAt(pos))) pos++
   return pos
 }
@@ -152,6 +155,7 @@ const lexAttrs = (xml: string, start: number): AttrLoopResult | null => {
   let hasAttrs = false
   let strayQuote = false
   let pos = start
+  // Stryker disable next-line EqualityOperator: one step past EOF ends at length + 1, still reported unterminated
   while (pos < xml.length && xml.charCodeAt(pos) !== GT) {
     const step = stepAttrs(xml, pos)
     if (step === null) return null

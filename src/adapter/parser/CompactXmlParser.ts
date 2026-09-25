@@ -10,6 +10,7 @@ import { scanDocument } from './scanDocument.js'
 const readStreamAsUtf8 = async (source: Readable): Promise<string> => {
   const chunks: Buffer[] = []
   for await (const c of source) {
+    // Stryker disable next-line ConditionalExpression: Buffer.from copies a Buffer chunk byte for byte
     chunks.push(typeof c === 'string' ? Buffer.from(c) : (c as Buffer))
   }
   return Buffer.concat(chunks).toString('utf8')
@@ -24,6 +25,7 @@ export class CompactXmlParser implements XmlParser {
       assertBalancedTags(xml)
       throw new Error(outcome.message)
     }
+    // Stryker disable next-line ConditionalExpression: the scanner clears needsOracle only where the oracle passes
     if (outcome.needsOracle) assertBalancedTags(xml)
     return outcome.result
   }

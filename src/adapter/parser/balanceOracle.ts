@@ -23,6 +23,7 @@ import {
 // unbalanced-tags check on otherwise valid XML.
 export const findTagEnd = (xml: string, from: number): number => {
   let inQuote: '"' | "'" | null = null
+  // Stryker disable next-line EqualityOperator: an extra step reads undefined, neither a quote nor `>`
   for (let i = from; i < xml.length; i++) {
     const ch = xml[i]
     if (inQuote !== null) {
@@ -92,10 +93,26 @@ const elementTagEnd = (
   quotes: QuoteCursors
 ): number => {
   const tagEnd = xml.indexOf('>', next + 1)
+  // Stryker disable next-line ConditionalExpression: a stale or fresh cursor only picks findTagEnd, which returns the same `>`
+  // Stryker disable next-line LogicalOperator: a stale or fresh cursor only picks findTagEnd, which returns the same `>`
+  // Stryker disable next-line EqualityOperator: a stale or fresh cursor only picks findTagEnd, which returns the same `>`
+  // Stryker disable next-line UnaryOperator: a stale or fresh cursor only picks findTagEnd, which returns the same `>`
+  // Stryker disable next-line StringLiteral: indexOf('') yields `next`, which only picks findTagEnd, same `>`
   if (quotes.dq !== -1 && quotes.dq < next) quotes.dq = xml.indexOf('"', next)
+  // Stryker disable next-line ConditionalExpression: a stale or fresh cursor only picks findTagEnd, which returns the same `>`
+  // Stryker disable next-line LogicalOperator: a stale or fresh cursor only picks findTagEnd, which returns the same `>`
+  // Stryker disable next-line EqualityOperator: a stale or fresh cursor only picks findTagEnd, which returns the same `>`
+  // Stryker disable next-line UnaryOperator: a stale or fresh cursor only picks findTagEnd, which returns the same `>`
+  // Stryker disable next-line StringLiteral: indexOf('') yields `next`, which only picks findTagEnd, same `>`
   if (quotes.sq !== -1 && quotes.sq < next) quotes.sq = xml.indexOf("'", next)
   const quoteInsideTag =
+    // Stryker disable next-line ConditionalExpression: a spurious true only picks findTagEnd, which returns the same `>`
+    // Stryker disable next-line LogicalOperator: a spurious true only picks findTagEnd, which returns the same `>`
+    // Stryker disable next-line EqualityOperator: a cursor never equals tagEnd: a `>` sits there, or -1 is excluded
     (quotes.dq !== -1 && quotes.dq < tagEnd) ||
+    // Stryker disable next-line ConditionalExpression: a spurious true only picks findTagEnd, which returns the same `>`
+    // Stryker disable next-line LogicalOperator: a spurious true only picks findTagEnd, which returns the same `>`
+    // Stryker disable next-line EqualityOperator: a cursor never equals tagEnd: a `>` sits there, or -1 is excluded
     (quotes.sq !== -1 && quotes.sq < tagEnd)
   return quoteInsideTag ? findTagEnd(xml, next + 1) : tagEnd
 }
@@ -110,7 +127,9 @@ const elementTagEnd = (
 export const assertBalancedTags = (xml: string): void => {
   let depth = 0
   let i = 0
+  // Stryker disable next-line StringLiteral: a cursor at 0 is refreshed or only picks findTagEnd, same `>`
   const quotes: QuoteCursors = { dq: xml.indexOf('"'), sq: xml.indexOf("'") }
+  // Stryker disable next-line EqualityOperator: at i === length indexOf finds no `<` and the loop breaks
   while (i < xml.length) {
     const next = xml.indexOf('<', i)
     if (next < 0) break

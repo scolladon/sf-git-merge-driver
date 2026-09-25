@@ -9,6 +9,7 @@ export interface AttrSet {
   readonly hasAttrs: boolean
 }
 
+// Stryker disable next-line ObjectLiteral: an empty bag reads as no attributes: for-in over undefined is a no-op
 export const NO_ATTRS: AttrSet = Object.freeze({
   attrs: Object.freeze(Object.create(null)),
   hasAttrs: false,
