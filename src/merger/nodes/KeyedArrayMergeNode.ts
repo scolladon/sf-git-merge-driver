@@ -10,7 +10,11 @@ import { jsonEqual } from '../../utils/jsonEqual.js'
 import { buildConflictMarkers } from '../ConflictMarkerBuilder.js'
 import { MergeOrchestrator } from '../MergeOrchestrator.js'
 import type { EntryKey, KeyExtractor } from './KeyedArrayIndex.js'
-import { indexKeyedArrays, toEntryKey } from './KeyedArrayIndex.js'
+import {
+  hasKeylessCollision,
+  indexKeyedArrays,
+  toEntryKey,
+} from './KeyedArrayIndex.js'
 import type { KeyedArrayMergeStrategy } from './KeyedArrayMergeStrategy.js'
 import type { MergeNode } from './MergeNode.js'
 import { defaultNodeFactory, isAttributedTrio } from './MergeNodeFactory.js'
@@ -21,7 +25,8 @@ import { TextMergeNode } from './TextMergeNode.js'
 // Unkeyed Conflict Strategy
 // ============================================================================
 
-// No key extractor means individual elements can't be matched across
+// No key extractor, or entries sharing no key (a collision would silently
+// drop all but one), means individual elements can't be matched across
 // versions, so a genuine divergence still falls back to a whole-array
 // conflict (documented in the README). But without a same-as-every-other-
 // node-type equality check first, this used to conflict unconditionally —
@@ -160,7 +165,7 @@ export class KeyedArrayMergeNode implements MergeNode {
   ) {}
 
   merge(config: MergeConfig): MergeResult {
-    if (!this.keyField) {
+    if (!this.keyField || this.hasKeylessCollision(this.keyField)) {
       return new UnkeyedConflictStrategy(
         this.ancestor,
         this.local,
@@ -170,6 +175,13 @@ export class KeyedArrayMergeNode implements MergeNode {
     }
 
     return this.keyedStrategy(toEntryKey(this.keyField)).merge(config)
+  }
+
+  private hasKeylessCollision(keyField: KeyExtractor): boolean {
+    return hasKeylessCollision(
+      [this.ancestor, this.local, this.other],
+      keyField
+    )
   }
 
   private keyedStrategy(entryKey: EntryKey): KeyedArrayMergeStrategy {

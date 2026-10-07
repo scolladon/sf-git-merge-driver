@@ -12,6 +12,25 @@ export const toEntryKey =
   item =>
     keyOf(item) ?? LONE_KEYLESS_ENTRY_KEY
 
+// Two entries with no key on one side would land on one map slot and one
+// would silently disappear; a single one is still matched by key.
+const KEYLESS_COLLISION = 2
+
+const hasCollidingKeyless = (side: JsonArray, keyOf: KeyExtractor): boolean => {
+  let keyless = 0
+  for (const item of side) {
+    if (keyOf(item as JsonObject) !== undefined) continue
+    keyless++
+    if (keyless === KEYLESS_COLLISION) return true
+  }
+  return false
+}
+
+export const hasKeylessCollision = (
+  sides: readonly JsonArray[],
+  keyOf: KeyExtractor
+): boolean => sides.some(side => hasCollidingKeyless(side, keyOf))
+
 export const buildKeyedMap = (
   arr: JsonArray,
   keyField: EntryKey
