@@ -100,6 +100,7 @@ class UnorderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
       // skips both the attribute probe below (a key walk per side) and the
       // orchestrator, which would reach the same result.
       if (
+        // Stryker disable next-line ConditionalExpression: narrows `local` for the type checker; jsonEqual(ancestor, undefined) && jsonEqual(undefined, other) is always false for a key present on some side
         local !== undefined &&
         jsonEqual(ancestor, local) &&
         jsonEqual(local, other)
