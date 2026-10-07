@@ -9,8 +9,10 @@ const doc = (body: string, custom = 'false'): string =>
   `<Profile xmlns="http://soap.sforce.com/2006/04/metadata">${body}<custom>${custom}</custom></Profile>`
 const keyless = (editable = 'false', readable = 'false'): string =>
   `<fieldPermissions><editable>${editable}</editable><readable>${readable}</readable></fieldPermissions>`
-const keyed = (editable: string): string =>
-  `<fieldPermissions><editable>${editable}</editable><field>Account.X__c</field></fieldPermissions>`
+const keyed = (editable: string, field = 'Account.X__c'): string =>
+  `<fieldPermissions><editable>${editable}</editable><field>${field}</field></fieldPermissions>`
+const keyedLikeFallback = (editable: string): string =>
+  keyed(editable, 'undefined')
 const second = keyless('false', 'true')
 const secondEdited = keyless('true', 'true')
 const pair = keyless() + second
@@ -67,6 +69,13 @@ describe('given repeated entries without their key field', () => {
         doc(keyed('false') + keyed('true')),
         doc(keyed('true'), 'true'),
       ],
+      [
+        'a real key is spelled like the fallback key of a keyless entry',
+        doc(keyedLikeFallback('false') + keyless()),
+        doc(keyedLikeFallback('false') + keyless(), 'true'),
+        doc(keyedLikeFallback('true') + keyless()),
+        doc(keyedLikeFallback('true') + keyless(), 'true'),
+      ],
     ])(
       'then it preserves every entry when %s',
       async (_name, ancestor, ours, theirs, expected) => {
@@ -117,6 +126,26 @@ describe('given repeated entries without their key field', () => {
     })
   })
 
+  describe('when only the ancestor holds both entries and each side deletes a different one', () => {
+    it('then the conflict keeps the surviving entry of each side', async () => {
+      // Arrange
+      const ours = keyless()
+      const theirs = second
+
+      // Act
+      const result = await mergeXmlStrings(
+        sut,
+        doc(pair),
+        doc(ours),
+        doc(theirs)
+      )
+
+      // Assert
+      expect(result.hasConflict).toBe(true)
+      expect(conflictSides(result.output).map(countOpenTags)).toEqual([1, 2, 1])
+    })
+  })
+
   describe('when the entries are ordered', () => {
     it('then divergent edits conflict with both entries per side', async () => {
       // Arrange
@@ -124,7 +153,8 @@ describe('given repeated entries without their key field', () => {
         `<GlobalValueSet xmlns="http://soap.sforce.com/2006/04/metadata">${body}<sorted>false</sorted></GlobalValueSet>`
       const value = (label: string) =>
         `<customValue><label>${label}</label></customValue>`
-      const open = /<customValue>/g
+      const labels = (side: string) =>
+        Array.from(side.matchAll(/<label>([^<]*)<\/label>/g), m => m[1])
 
       // Act
       const result = await mergeXmlStrings(
@@ -136,10 +166,11 @@ describe('given repeated entries without their key field', () => {
 
       // Assert
       expect(result.hasConflict).toBe(true)
-      const counts = conflictSides(result.output).map(
-        side => side.match(open)?.length ?? 0
-      )
-      expect(counts).toEqual([2, 2, 2])
+      expect(conflictSides(result.output).map(labels)).toEqual([
+        ['x2', 'y'],
+        ['x', 'y'],
+        ['x', 'y2'],
+      ])
     })
   })
 })

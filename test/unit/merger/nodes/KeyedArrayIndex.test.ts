@@ -38,12 +38,12 @@ describe('KeyedArrayIndex', () => {
 
   describe('toEntryKey', () => {
     it.each([
-      ['no key', undefined, 'undefined'],
-      ['a key', 'k', 'k'],
-      ['an empty key', '', ''],
+      { name: 'no key', key: undefined, expected: 'undefined' },
+      { name: 'a key', key: 'k', expected: 'k' },
+      { name: 'an empty key', key: '', expected: '' },
     ])(
-      'given an extractor returning %s when indexing then returns %s',
-      (_, key, expected) => {
+      'given an extractor returning $name when indexing then returns "$expected"',
+      ({ key, expected }) => {
         // Arrange
         const sut = toEntryKey(() => key)
 
@@ -61,38 +61,82 @@ describe('KeyedArrayIndex', () => {
       item['k'] as string | undefined
     const keyed = { k: 'a' }
     const keyless = { v: '1' }
+    const keyedAsFallback = { k: 'undefined' }
 
     it.each([
-      ['no keyless entry', [[keyed], [keyed], [keyed]], false],
-      ['one keyless entry on one side', [[keyless], [keyed], [keyed]], false],
-      [
-        'one keyless entry on each side',
-        [[keyless], [keyless], [keyless]],
-        false,
-      ],
-      ['two keyless entries on local', [[], [keyless, keyless], []], true],
-      [
-        'two keyless entries on ancestor only',
-        [[keyless, keyless], [], []],
-        true,
-      ],
-      ['two keyless entries on other only', [[], [], [keyless, keyless]], true],
-      [
-        'three keyless entries on one side',
-        [[], [], [keyless, keyless, keyless]],
-        true,
-      ],
-      ['non-object entries', [[], ['x', 'y'], []], true],
-    ])('given %s when checking then returns %s', (_, sides, expected) => {
-      // Arrange
-      const arrays = sides as unknown as JsonArray[]
+      {
+        name: 'no keyless entry',
+        sides: [[keyed], [keyed], [keyed]],
+        expected: false,
+      },
+      {
+        name: 'one keyless entry on one side',
+        sides: [[keyless], [keyed], [keyed]],
+        expected: false,
+      },
+      {
+        name: 'one keyless entry on each side',
+        sides: [[keyless], [keyless], [keyless]],
+        expected: false,
+      },
+      {
+        name: 'two keyless entries on local',
+        sides: [[], [keyless, keyless], []],
+        expected: true,
+      },
+      {
+        name: 'two keyless entries on ancestor only',
+        sides: [[keyless, keyless], [], []],
+        expected: true,
+      },
+      {
+        name: 'two keyless entries on other only',
+        sides: [[], [], [keyless, keyless]],
+        expected: true,
+      },
+      {
+        name: 'three keyless entries on one side',
+        sides: [[], [], [keyless, keyless, keyless]],
+        expected: true,
+      },
+      {
+        name: 'non-object entries',
+        sides: [[], ['x', 'y'], []],
+        expected: true,
+      },
+      {
+        name: 'a keyless entry beside a real key spelled like the fallback key',
+        sides: [[], [keyedAsFallback, keyless], []],
+        expected: true,
+      },
+      {
+        name: 'a real key spelled like the fallback key beside a keyless entry',
+        sides: [[], [keyless, keyedAsFallback], []],
+        expected: true,
+      },
+      {
+        name: 'a keyless entry and a real key spelled like the fallback key on different sides',
+        sides: [[], [keyless], [keyedAsFallback]],
+        expected: false,
+      },
+      {
+        name: 'a real key spelled like the fallback key twice',
+        sides: [[], [keyedAsFallback, keyedAsFallback], []],
+        expected: false,
+      },
+    ])(
+      'given $name when checking then returns $expected',
+      ({ sides, expected }) => {
+        // Arrange
+        const arrays = sides as unknown as JsonArray[]
 
-      // Act
-      const result = hasKeylessCollision(arrays, keyOf)
+        // Act
+        const result = hasKeylessCollision(arrays, keyOf)
 
-      // Assert
-      expect(result).toBe(expected)
-    })
+        // Assert
+        expect(result).toBe(expected)
+      }
+    )
 
     it('given a collision on the first side when checking then stops reading', () => {
       // Arrange
