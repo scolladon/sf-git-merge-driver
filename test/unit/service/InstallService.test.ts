@@ -190,6 +190,16 @@ describe('InstallService', () => {
       }
     })
 
+    it('Given the attributes file does not exist, When installing, Then CustomMetadata records are mapped to the driver', async () => {
+      // Arrange
+      // Act
+      await sut.installMergeDriver()
+
+      // Assert
+      const [, content] = writeFileMocked.mock.calls[0] as [string, string]
+      expect(content).toContain(`*.md-meta.xml merge=${DRIVER_NAME}`)
+    })
+
     it('Given the attributes file does not exist, When installing, Then mkdir is called with the parent directory before writeFile', async () => {
       // Regression: Apple Git's `git init` doesn't create `.git/info/`,
       // so writeFile would ENOENT on a freshly-initialised repo. The

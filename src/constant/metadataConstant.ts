@@ -58,4 +58,5 @@ export const METADATA_TYPES_PATTERNS = [
   'objectTranslation', // CustomObjectTranslation
   'recordType', // RecordType
   'field', // CustomField
+  'md', // CustomMetadata
 ]
