@@ -55,6 +55,7 @@ const TEXT_ARRAY_ATTRIBUTES = new Set([
 ])
 
 const KEY_PART_SEPARATOR = '.'
+const KEY_PAIR_SEPARATOR = '-'
 
 // An object-shaped key field (element with attributes/children, built on
 // Object.create(null) by the parser) has no inherited toString and would
@@ -89,7 +90,7 @@ const joinPair = (
 ): string | undefined =>
   first === undefined && second === undefined
     ? undefined
-    : `${String(first)}-${String(second)}`
+    : `${first}${KEY_PAIR_SEPARATOR}${second}`
 
 const getFilterItemKey = (el: JsonValue) => {
   const field = getPropertyValue(el, 'field')
@@ -108,8 +109,6 @@ const getFilterItemKey = (el: JsonValue) => {
 const getPicklistValuesKey = (el: JsonValue) =>
   getPropertyValue(el, 'masterLabel') ?? getPropertyValue(el, 'picklist')
 
-// RecordType keys its picklist values by fullName; CustomMetadata reuses
-// the element name and keys by field.
 // The org does not store CustomMetadata values order; retrieve sorts them
 // by field.
 const isCustomMetadataValue = (el: JsonValue): boolean =>
@@ -120,6 +119,8 @@ const isCustomMetadataValue = (el: JsonValue): boolean =>
 const UNORDERED_VARIANTS: ReadonlyMap<string, (el: JsonValue) => boolean> =
   new Map([['values', isCustomMetadataValue]])
 
+// RecordType keys its picklist values by fullName; CustomMetadata reuses
+// the element name and keys by field.
 const getValuesKey = (el: JsonValue) =>
   getPropertyValue(el, 'fullName') ?? getPropertyValue(el, 'field')
 

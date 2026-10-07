@@ -165,7 +165,7 @@ export class KeyedArrayMergeNode implements MergeNode {
   ) {}
 
   merge(config: MergeConfig): MergeResult {
-    if (!this.keyField || this.hasKeylessCollision(this.keyField)) {
+    if (!this.keyField || this.anySideHasKeylessCollision(this.keyField)) {
       return new UnkeyedConflictStrategy(
         this.ancestor,
         this.local,
@@ -177,7 +177,7 @@ export class KeyedArrayMergeNode implements MergeNode {
     return this.keyedStrategy(toEntryKey(this.keyField)).merge(config)
   }
 
-  private hasKeylessCollision(keyField: KeyExtractor): boolean {
+  private anySideHasKeylessCollision(keyField: KeyExtractor): boolean {
     return hasKeylessCollision(
       [this.ancestor, this.local, this.other],
       keyField

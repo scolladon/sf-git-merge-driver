@@ -320,11 +320,11 @@ This means you might see a conflict block containing the entire array instead of
 
 ### Entries sharing a key
 
-When several entries of a list share the same key, the driver keeps the last one, which is what a deploy does.
+When several entries of a list share the same key, the driver keeps the last one's content, which is what a deploy does.
 
 ### Entries without their key
 
-When two or more entries of a list lack the field the driver uses as key, the driver merges the list as a whole. The merge is clean when only one branch changed the list. When both branches changed it, you get a conflict listing every entry. Nothing is dropped.
+When two or more entries of a list lack the field the driver uses as key, the driver merges the list as a whole. The same applies when one entry lacks its key and another entry's key is the text `undefined`. The merge is clean when only one branch changed the list, or both changed it the same way. Otherwise you get a conflict listing every entry. Nothing is dropped.
 
 ## Troubleshooting
 
