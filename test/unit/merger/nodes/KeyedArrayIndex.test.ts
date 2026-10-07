@@ -120,6 +120,16 @@ describe('KeyedArrayIndex', () => {
         expected: false,
       },
       {
+        name: 'a keyless entry beside an ordinary keyed entry on one side',
+        sides: [[], [keyless, keyed], []],
+        expected: false,
+      },
+      {
+        name: 'an ordinary keyed entry beside a keyless entry on one side',
+        sides: [[], [keyed, keyless], []],
+        expected: false,
+      },
+      {
         name: 'a real key spelled like the fallback key twice',
         sides: [[], [keyedAsFallback, keyedAsFallback], []],
         expected: false,
