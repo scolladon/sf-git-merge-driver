@@ -651,7 +651,8 @@ describe('KeyedArrayMergeNode', () => {
         const result = sut.merge(defaultConfig)
 
         // Assert
-        expect(result.output[0]).toMatchObject({ ancestor: [{}] })
+        const block = result.output.find(isConflictBlock)
+        expect(block?.ancestor).toEqual([{}])
       })
     })
   })
@@ -1031,7 +1032,9 @@ describe('KeyedArrayMergeNode', () => {
 
         // Assert
         expect(result.hasConflict).toBe(false)
-        expect(result.output).toHaveLength(1)
+        expect(result.output).toEqual([
+          { fieldPermissions: [{ editable: 'true' }, { readable: 'true' }] },
+        ])
       })
     })
   })

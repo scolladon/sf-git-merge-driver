@@ -7,8 +7,8 @@ Before the fix the merge ended in a conflict with four marker blocks, each
 repeating the collapsed C entry.
 
 Entries are now keyed by `field` and merged unordered, so concurrent
-additions of distinct fields do not conflict. A to E come out sorted by
-field and every `xsi:type` is intact.
+additions of distinct fields do not conflict. A to E come out in field
+order and every `xsi:type` is intact.
 
 Pins:
 - Unordered routing for entries keyed by `field` (an ordered merge would

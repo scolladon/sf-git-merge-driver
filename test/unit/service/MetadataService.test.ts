@@ -879,9 +879,8 @@ describe('MetadataService', () => {
 
     describe('given the picklistValues prefer-then-fallback extractor with an object-shaped masterLabel', () => {
       it('should fall back to picklist instead of throwing on String coercion', () => {
-        // Arrange - the object-shaped sentinel must be indistinguishable
-        // from "absent" so the existing `!== String(undefined)` fallback
-        // in getPicklistValuesKey still selects the picklist field
+        // Arrange - an object-shaped masterLabel reads as no key, so the
+        // `??` fallback in getPicklistValuesKey selects the picklist field
         const nullProtoMasterLabel = Object.create(null)
         const testObject = {
           masterLabel: nullProtoMasterLabel,

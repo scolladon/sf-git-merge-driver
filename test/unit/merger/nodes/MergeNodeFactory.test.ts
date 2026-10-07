@@ -677,6 +677,13 @@ describe('MergeNodeFactory', () => {
 
             // Assert
             expect(result.hasConflict).toBe(false)
+            const fields = result.output.map(
+              item =>
+                ([(item as JsonObject)['values']].flat()[0] as JsonObject)[
+                  'field'
+                ]
+            )
+            expect(fields).toEqual(['A__c', 'B__c', 'D__c', 'E__c'])
           })
         })
       })

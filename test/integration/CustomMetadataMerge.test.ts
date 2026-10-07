@@ -15,6 +15,8 @@ const str = (field: string, value: string): string =>
   typed(field, 'string', value)
 const nil = (field: string): string =>
   `<values><field>${field}</field><value xsi:nil="true"/></values>`
+const plain = (field: string, value: string): string =>
+  `<values><field>${field}</field><value>${value}</value></values>`
 const noValue = (field: string): string =>
   `<values><field>${field}</field></values>`
 const CONFLICT_SIDES =
@@ -37,13 +39,20 @@ describe('given a CustomMetadata record with values entries', () => {
       [
         'each side adds a different entry',
         doc(base),
-        doc(base + typed('D__c', 'boolean', 'true')),
         doc(base + typed('E__c', 'double', '1.5')),
+        doc(base + typed('D__c', 'boolean', 'true')),
         doc(
           base +
             typed('D__c', 'boolean', 'true') +
             typed('E__c', 'double', '1.5')
         ),
+      ],
+      [
+        'each side edits a different entry whose value carries no type',
+        doc(plain('P__c', 'p') + plain('Q__c', 'q')),
+        doc(plain('P__c', 'p2') + plain('Q__c', 'q')),
+        doc(plain('P__c', 'p') + plain('Q__c', 'q2')),
+        doc(plain('P__c', 'p2') + plain('Q__c', 'q2')),
       ],
       [
         'ours edits the label and values are untouched',
