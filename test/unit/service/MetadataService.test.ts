@@ -202,9 +202,9 @@ describe('MetadataService', () => {
           expected: 'TestFlow',
         },
         {
-          name: 'handles loginFlows with friendlyname',
+          name: 'handles loginFlows with friendlyName',
           metadataType: 'loginFlows',
-          testObject: { friendlyname: 'TestLoginFlow' },
+          testObject: { friendlyName: 'TestLoginFlow' },
           expected: 'TestLoginFlow',
         },
         {

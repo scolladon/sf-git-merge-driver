@@ -104,7 +104,7 @@ const METADATA_KEY_EXTRACTORS = {
     const recordType = getPropertyValue(el, 'recordType')
     return [layout, recordType].filter(x => x !== String(undefined)).join('.')
   }, // Profile
-  loginFlows: (el: JsonValue) => getPropertyValue(el, 'friendlyname'), // Profile
+  loginFlows: (el: JsonValue) => getPropertyValue(el, 'friendlyName'), // Profile
   loginHours: (el: JsonValue) =>
     typeof el === 'object' && el !== null ? Object.keys(el).join(',') : '', // Profile
   loginIpRanges: (el: JsonValue) => {
