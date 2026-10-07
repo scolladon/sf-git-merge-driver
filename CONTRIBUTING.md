@@ -296,7 +296,7 @@ The merge driver matches array elements across `ancestor` / `local` / `other` ve
 ### Where to add it
 
 1. Add the entry to `METADATA_KEY_EXTRACTORS` keyed by the XML element name.
-2. The value is a function `(el: JsonValue) => string` returning a stable key. Trailing comment should list the parent schema(s) the element belongs to (matching the existing convention).
+2. The value is a function `(el: JsonValue) => string | undefined` returning a stable key, or `undefined` when the key is absent. Trailing comment should list the parent schema(s) the element belongs to (matching the existing convention).
 
 ### Single-key extractor
 
@@ -306,20 +306,21 @@ foo: (el: JsonValue) => getPropertyValue(el, 'name'), // SomeMetadataType
 
 ### Composite-key extractor (multiple fields joined)
 
-When the key is a composite of multiple fields, use the `String(undefined)` sentinel idiom to filter out missing properties — see `getFilterItemKey`, `getCaseValuesKey`, etc. for canonical examples.
+When the key is a composite of multiple fields, return `undefined` when no part is present, and join only the parts that are — see `getFilterItemKey` and the `caseValues` entry for canonical examples.
 
 ### Element name reused across schemas (prefer-then-fallback)
 
 If the XML element name already exists in the table for a different parent schema with a different key field, **do not overwrite** — extract a named helper that prefers one key and falls back to the other. See `getPicklistValuesKey` for the canonical example, and the "Shared element names across schemas" subsection of [DESIGN.md](./DESIGN.md) for the list of currently-known cases.
 
-> **Why this matters:** if both schemas hit the single-key path with different field names, every block in the wrong-schema document will key to the literal string `"undefined"` and `buildKeyedMap` will silently retain only the last entry — a silent data-loss bug class.
+> **Why this matters:** if both schemas hit the single-key path with different field names, every block in the wrong-schema document will have no key and `buildKeyedMap` will silently retain only the last entry — a silent data-loss bug class. The keyless fail-safe turns such a collision into a whole-list merge or a conflict. It is a safety net, not a substitute for the right extractor.
 
 ### Required test layering
 
 Every new extractor must ship with:
 
 1. **Unit test** in `test/unit/service/MetadataService.test.ts` — at least one case per key path (including each fallback branch when applicable).
-2. **Integration test** in `test/integration/XmlMerger.test.ts` — at least one end-to-end three-way merge that would regress to data loss if the extractor returned `"undefined"`.
+2. **Integration test** in `test/integration/XmlMerger.test.ts` — at least one end-to-end three-way merge that would regress to data loss if the extractor returned no key.
+3. **Functional golden fixture** under `test/fixtures/xml/` when the extractor fixes a collision.
 
 ### Mutation testing
 
