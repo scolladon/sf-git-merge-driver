@@ -18,4 +18,4 @@ child edits merge.
 
 Pins:
 - `scanDocument` moving every root attribute, not just `xmlns*`, out of
-  `content` into the `namespaces` bucket.
+  `content` into the `rootAttributes` bucket.

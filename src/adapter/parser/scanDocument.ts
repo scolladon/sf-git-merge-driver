@@ -54,7 +54,7 @@ const hasQuoteChar = (text: string): boolean => {
 }
 
 // Moves every attribute of the document root into the root-attribute
-// bucket (`namespaces`, `@_`-prefixed): the xmlns declarations and any
+// bucket (`rootAttributes`, `@_`-prefixed): the xmlns declarations and any
 // other attribute alike (e.g. `xsi:schemaLocation`). XmlMerger resolves
 // that bucket key by key and the writer renders it back on the root open
 // tag. Left on the element, a root attribute would reach the
@@ -83,7 +83,7 @@ class DocumentScanner {
   private pos = 0
   private needsOracle = false
   private root: RootElement | undefined
-  private namespaces: JsonObject = {}
+  private rootAttributes: JsonObject = {}
 
   constructor(xml: string) {
     this.xml = xml
@@ -108,10 +108,10 @@ class DocumentScanner {
   private parsedResult(): ScanOutcome {
     const result: NormalisedParseResult =
       this.root === undefined
-        ? { content: {}, namespaces: {} }
+        ? { content: {}, rootAttributes: {} }
         : {
             content: { [this.root.name]: this.root.value },
-            namespaces: this.namespaces,
+            rootAttributes: this.rootAttributes,
           }
     return { kind: 'parsed', result, needsOracle: this.needsOracle }
   }
@@ -241,7 +241,7 @@ class DocumentScanner {
 
   private buildFrame(lexed: LexedOpenTag): ElementFrame {
     if (!this.isRootCandidate()) return new ElementFrame(lexed.name, lexed)
-    this.namespaces = bucketRootAttrs(lexed.attrs)
+    this.rootAttributes = bucketRootAttrs(lexed.attrs)
     return new ElementFrame(lexed.name, NO_ATTRS)
   }
 }

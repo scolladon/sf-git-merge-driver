@@ -22,7 +22,7 @@ import { JsonMerger } from './JsonMerger.js'
 // unlike the previous `Object.assign({}, ancestor, local, other)` which
 // always let `other` win even when only `local` had changed) and logs so
 // the discarded alternative isn't completely invisible.
-const resolveNamespaceValue = (
+const resolveRootAttributeValue = (
   key: string,
   ancestor: JsonValue | undefined,
   local: JsonValue | undefined,
@@ -42,7 +42,7 @@ const resolveNamespaceValue = (
   return local
 }
 
-const mergeNamespaces = (
+const mergeRootAttributes = (
   ancestor: JsonObject,
   local: JsonObject,
   other: JsonObject
@@ -54,7 +54,7 @@ const mergeNamespaces = (
   ])
   const result: JsonObject = {}
   for (const key of keys) {
-    const resolved = resolveNamespaceValue(
+    const resolved = resolveRootAttributeValue(
       key,
       ancestor[key],
       local[key],
@@ -65,18 +65,20 @@ const mergeNamespaces = (
   return result
 }
 
-// A side that dropped the whole file carries an empty namespaces bucket for
-// the trivial reason that it has no root element to carry them on — not
-// because it removed the xmlns. Reading that emptiness as a removal erases a
-// namespace the surviving side still declares. The ancestor is never
+// A side that dropped the whole file carries an empty root-attribute bucket
+// for the trivial reason that it has no root element to carry them on — not
+// because it removed them. Reading that emptiness as a removal erases an
+// attribute (typically the xmlns) the surviving side still declares. The ancestor is never
 // substituted: a rootless ancestor is the "file added on both sides" case,
-// where an empty bucket genuinely means the namespace did not exist before.
+// where an empty bucket genuinely means the attribute did not exist before.
 // `content` is empty exactly when the document has no root element.
-const namespacesOf = (
+const rootAttributesOf = (
   side: NormalisedParseResult,
   ancestor: NormalisedParseResult
 ): JsonObject =>
-  Object.keys(side.content).length > 0 ? side.namespaces : ancestor.namespaces
+  Object.keys(side.content).length > 0
+    ? side.rootAttributes
+    : ancestor.rootAttributes
 
 // When the JSON merge yields no output but BOTH live sides (ours and theirs)
 // still carry the root element, rebuild it as an empty element
@@ -131,10 +133,10 @@ export class XmlMerger {
       results as PromiseFulfilledResult<NormalisedParseResult>[]
     ).map(r => r.value)
 
-    const namespaces = mergeNamespaces(
-      anc!.namespaces,
-      namespacesOf(local!, anc!),
-      namespacesOf(other!, anc!)
+    const rootAttributes = mergeRootAttributes(
+      anc!.rootAttributes,
+      rootAttributesOf(local!, anc!),
+      rootAttributesOf(other!, anc!)
     )
 
     const mergedResult = this.jsonMerger.mergeThreeWay(
@@ -153,7 +155,7 @@ export class XmlMerger {
     await this.writer.writeTo(
       out,
       output,
-      namespaces,
+      rootAttributes,
       eol,
       mergedResult.hasConflict
     )

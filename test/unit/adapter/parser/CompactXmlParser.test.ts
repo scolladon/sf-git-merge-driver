@@ -11,7 +11,7 @@ describe('CompactXmlParser', () => {
     it('when parseString then it returns the scanned result untouched', () => {
       const result = sut.parseString('<r><v>1</v></r>')
       expect(result.content).toEqual({ r: { v: '1' } })
-      expect(result.namespaces).toEqual({})
+      expect(result.rootAttributes).toEqual({})
     })
   })
 
@@ -123,10 +123,10 @@ describe('CompactXmlParser', () => {
   })
 
   describe('given completely empty input', () => {
-    it('when parseString then content + namespaces are both empty objects', () => {
+    it('when parseString then content + rootAttributes are both empty objects', () => {
       const result = sut.parseString('')
       expect(result.content).toEqual({})
-      expect(result.namespaces).toEqual({})
+      expect(result.rootAttributes).toEqual({})
     })
   })
 
@@ -189,12 +189,12 @@ describe('CompactXmlParser', () => {
   })
 
   describe('given namespace attributes on the root element', () => {
-    it('when parseString then xmlns* are routed to the namespaces bucket', () => {
+    it('when parseString then xmlns* are routed to the rootAttributes bucket', () => {
       const result = sut.parseString(
         `<r xmlns="http://x" xmlns:xsi="http://y"><v>1</v></r>`
       )
       expect(result.content).toEqual({ r: { v: '1' } })
-      expect(result.namespaces).toEqual({
+      expect(result.rootAttributes).toEqual({
         '@_xmlns': 'http://x',
         '@_xmlns:xsi': 'http://y',
       })
@@ -209,7 +209,7 @@ describe('CompactXmlParser', () => {
       expect(result.content).toEqual({
         r: { inner: { '@_xmlns:y': 'http://y', v: '1' } },
       })
-      expect(result.namespaces).toEqual({ '@_xmlns': 'http://x' })
+      expect(result.rootAttributes).toEqual({ '@_xmlns': 'http://x' })
     })
   })
 
@@ -217,7 +217,7 @@ describe('CompactXmlParser', () => {
     it('when parseString then it round-trips without throwing', () => {
       const result = sut.parseString(`<r foo><v>1</v></r>`)
       expect(result.content).toEqual({ r: { v: '1' } })
-      expect(result.namespaces).toEqual({ '@_foo': null })
+      expect(result.rootAttributes).toEqual({ '@_foo': null })
     })
   })
 

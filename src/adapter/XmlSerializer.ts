@@ -5,7 +5,7 @@ export interface XmlSerializer {
   writeTo(
     out: Writable,
     ordered: JsonArray,
-    namespaces: JsonObject,
+    rootAttributes: JsonObject,
     eol?: '\n' | '\r\n',
     hasConflict?: boolean
   ): Promise<void>

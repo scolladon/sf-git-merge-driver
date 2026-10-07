@@ -57,7 +57,7 @@ classDiagram
 ```
 
 **Node Types:**
-- `TextMergeNode` - Handles scalar/primitive values, and any element carrying XML attributes (e.g. `<help xsi:nil="true"/>`, parsed as `{ '@_xsi:nil': 'true', '#text': '' }`). The factory routes single elements here; unordered keyed arrays match entries by key first, then route each attributed entry here too. An attribute belongs to its element's open tag, so the element is merged as one value, compared structurally because each side parses it into its own object; a property-by-property merge would emit each `@_name` key as a child element of its own. Concurrent different changes within one attributed entry produce a conflict containing the complete element on each side. Ordered keyed arrays already preserve complete entries.
+- `TextMergeNode` - Handles scalar/primitive values, and any element carrying XML attributes (e.g. `<help xsi:nil="true"/>`, parsed as `{ '@_xsi:nil': 'true', '#text': '' }`), merged as one value and compared structurally. The factory routes single elements here; unordered keyed arrays route each matched entry that carries attributes here too — see "An Element Carrying Attributes Merges as a Whole" under Known Limitations
 - `TextArrayMergeNode` - Handles arrays of primitive values (e.g., `members` in package.xml)
 - `KeyedArrayMergeNode` - Handles arrays of objects with key fields (e.g., `fieldPermissions` with `field` key)
 - `PropertyMergeNode` - Handles pure objects without key extractor (property-by-property merge). A side where the element is absent is normalised at the factory, before the node is constructed, to a shared frozen stand-in that contributes no properties, so additions and deletions propagate instead of crashing. That stand-in is built with `Object.create(null)` for the same reason the parser builds every node that way: an XML tag name is untrusted, and a plain `{}` would let a name such as `constructor` or `toString` resolve through `Object.prototype`, resurrecting an element the side had deleted. A side holding text rather than child elements is deliberately *not* normalised — see "Empty Text Is Indistinguishable From an Absent Tag" under Known Limitations
@@ -156,7 +156,7 @@ The writer expands these into zdiff3-style conflict markers in the XML output:
 >>>>>>> theirs
 ```
 
-Each conflict side's root element carries the merged root namespaces, so resolving the conflict by keeping either side yields a document whose root still declares them. All three sides receive the *merged* bucket, including `||||||| base` — the base side is rendered as a resolution source, not as a byte-faithful reproduction of the ancestor blob, so a namespace added or removed by a live side shows up there too.
+Each conflict side's root element carries the merged root attributes, so resolving the conflict by keeping either side yields a document whose root still declares them. All three sides receive the *merged* bucket, including `||||||| base` — the base side is rendered as a resolution source, not as a byte-faithful reproduction of the ancestor blob, so a root attribute added or removed by a live side shows up there too.
 
 Marker expansion happens inline as the writer walker visits each `ConflictBlock` — no separate post-processing pass. A two-pass `ConflictLineFilter` (strip horizontal whitespace before a marker, drop whitespace-only lines) keeps the byte layout identical to git's conventions; the filter runs only when the merger reports `hasConflict=true`.
 
@@ -174,7 +174,7 @@ classDiagram
 
     class XmlSerializer {
         <<interface>>
-        +writeTo(out, ordered, namespaces, eol, hasConflict) Promise~void~
+        +writeTo(out, ordered, rootAttributes, eol, hasConflict) Promise~void~
     }
 
     class CompactXmlParser {
@@ -183,7 +183,7 @@ classDiagram
     }
 
     class XmlStreamWriter {
-        +writeTo(out, ordered, namespaces, eol, hasConflict) Promise~void~
+        +writeTo(out, ordered, rootAttributes, eol, hasConflict) Promise~void~
     }
 
     XmlParser <|.. CompactXmlParser
@@ -203,8 +203,8 @@ classDiagram
     GitRepository <|.. TsgitRepository
 ```
 
-- **`XmlParser` port** — Reads XML from a `Readable` (or a string), returns `NormalisedParseResult = { content, namespaces }`.
-- **`XmlSerializer` port** — Writes the serialized document to a `Writable`: XML declaration, elements (open/close/cdata/comment), namespaces on the first top-level element, and inline conflict-block expansion. When the whole document is a single conflict block there is no first top-level element, so the root element of each non-blank side carries the namespaces instead. The optional `hasConflict` parameter (defaults to `true`) lets callers skip the conflict-line filter when the merge produced no `ConflictBlock` — the common case.
+- **`XmlParser` port** — Reads XML from a `Readable` (or a string), returns `NormalisedParseResult = { content, rootAttributes }`.
+- **`XmlSerializer` port** — Writes the serialized document to a `Writable`: XML declaration, elements (open/close/cdata/comment), root attributes on the first top-level element, and inline conflict-block expansion. When the whole document is a single conflict block there is no first top-level element, so the root element of each non-blank side carries the root attributes instead. The optional `hasConflict` parameter (defaults to `true`) lets callers skip the conflict-line filter when the merge produced no `ConflictBlock` — the common case.
 - **`CompactXmlParser`** — Adapter with no third-party XML library: `scanDocument` (`src/adapter/parser/scanDocument.ts`) makes one forward pass over the source string, pushing an `ElementFrame` accumulator on each open tag and popping it into its parent on the matching close, building the compact JsonObject shape the merger and writer expect directly — no intermediate DOM, no separate normalise walk. `<![CDATA[…]]>` sections are read natively into `__cdata` keys; there is no sentinel rewrite. The fast path resolves attributes, closes, comments and CDATA inline; when it meets a construct its lexer can't disambiguate on its own (a stray quote in a tag name, attribute name, unquoted attribute value, skipped position or close-tag text; a comment shorter than `<!---->`; or a close tag at top level) it sets a `needsOracle` flag instead of guessing, and `assertBalancedTags` (`src/adapter/parser/balanceOracle.ts`) re-walks the document quote-aware to settle it; a scan failure runs the oracle first, so its balance-family message wins when both passes reject the input. Contract: **byte-exact on Salesforce-shaped XML, XML-correct elsewhere**. Measured with paired A/B runs against the previous adapter: 25 % (medium), 28 % (large) and 40 % (xl) faster on the parse phase, with 32 % lower peak RSS on the xl tier, at a near-identical bundle size now that the external parser dependency is gone.
 - **`XmlStreamWriter`** — Single recursive walker (`writeRoot` → `writeElement` → `writeChildren`) that appends serialized XML directly to a mutable `WalkState.buf` string. No generators, no per-chunk object allocations, no `for...of` over generators. `getIndent` memoises the per-depth `\n + N×indent` prefix. The walker is sync; only `writeTo` is async, awaiting `out.write`'s drain signal once at the end (no-conflict path) or per 16 KiB filter window (conflict path). Child element tags and attributes within each node are emitted in **first-seen (source) order** — the insertion order of keys in the compact JSON object as set by the parser — rather than alphabetical order. Because `CompactXmlParser` preserves source tag order and `sf project retrieve` writes files in the Metadata API XSD `xs:sequence` order, the driver's output matches the canonical Salesforce order for retrieve-sourced files. This is a layout-only property: it does not affect merge decisions (see §6 below).
 - **`GitRepository` port** — Exposes `commonGitDir` (absolute path to the repository's shared git directory), `setConfig(key, value)`, and `removeSection(name)`. Keeps `gitAttributesPath.ts`, `InstallService`, and `UninstallService` free of any git-library import; the port throws `NotAGitRepositoryError` when the caller is not inside a git working tree.
@@ -302,7 +302,7 @@ flowchart TD
     end
 
     subgraph "Parser Adapter (single-pass scanner)"
-        Parse["CompactXmlParser.parseString: one forward pass builds the compact JsonObject directly — every root attribute (xmlns and others) into the namespaces bucket, CDATA read natively, repeated siblings grouped into arrays"]
+        Parse["CompactXmlParser.parseString: one forward pass builds the compact JsonObject directly — every root attribute (xmlns and others) into the rootAttributes bucket, CDATA read natively, repeated siblings grouped into arrays"]
     end
 
     subgraph "Domain (format-agnostic)"
@@ -355,7 +355,7 @@ flowchart TD
 XML is converted to a compact JSON format for easier manipulation. The domain operates on plain JSON objects without knowledge of any XML parser library's conventions:
 - Scalars are plain values: `{ field: "value" }`
 - Nested elements are child objects: `{ parent: { child: "value" } }`
-- Root attributes — the namespace declarations and any other, such as `xsi:schemaLocation` — are extracted by the parser adapter into a dedicated bucket (`namespaces`), not left on the root element, so the property-by-property merge never writes one back as a `<@_…>` child element
+- Root attributes — the namespace declarations and any other, such as `xsi:schemaLocation` — are extracted by the parser adapter into a dedicated bucket (`rootAttributes`), not left on the root element, so the property-by-property merge never writes one back as a `<@_…>` child element
 - The writer adapter walks the compact tree directly — splitting attributes (`@_`-prefixed keys) from children, expanding `ConflictBlock` objects inline into text markers, and appending bytes to a single growable buffer without materialising an intermediate ordered representation or generator chunk objects
 
 ### 2. Key-Based Array Merging
@@ -391,7 +391,7 @@ Conflict marker size and labels are configurable via Git's standard parameters (
 
 ### 6. Canonical (First-Seen) XML Tag Order
 
-Within every serialized node, child element tags and `xmlns*` attributes are emitted in **first-seen input order** — the order they appeared in the source XML — not alphabetical order. Alphabetical order enters only among the keys tied for the lowest residual indegree in the merge's precedence graph (below) — the genuinely unordered ones; every tag whose position any side determines outright keeps its first-seen position regardless. This is established at two points in the pipeline:
+Within every serialized node, child element tags and root attributes are emitted in **first-seen input order** — the order they appeared in the source XML — not alphabetical order. Alphabetical order enters only among the keys tied for the lowest residual indegree in the merge's precedence graph (below) — the genuinely unordered ones; every tag whose position any side determines outright keeps its first-seen position regardless. This is established at two points in the pipeline:
 
 - **Merge-time**: `mergePropertyOrder` (`src/merger/mergePropertyOrder.ts`) merges the three sides' key *sequences*, not a flat set. It derives precedence edges from each side's consecutive key pairs — ancestor, local and other alike — and takes a Kahn topological sort over the union of the three key sets. Whenever several keys are simultaneously ready (indegree zero), or a cycle in the precedence graph leaves none ready, the next key is chosen among the unemitted keys with the **lowest residual indegree**, breaking ties by a **lexicographic** ordering of the key names (a bare `Array.prototype.sort()`, never `localeCompare`). Scoping the repair to the lowest-indegree keys — rather than the entire remaining set — keeps it confined to the actual cycle: a key downstream of a cycle but not part of it, whose position every side agrees on, is never displaced by that cycle's repair. A fast path — `sameSequence(local, other) && isSubsequence(ancestor, local)` — returns `local`'s key sequence directly whenever both sides already agree on an order the ancestor is consistent with; that condition makes the topological order unique, so the result there does not depend on the tie-break rank at all.
 - **Write-time**: all three sort sites in `XmlStreamWriter` (`writeRoot`, `writeChildren`, `splitAttrsAndChildren`) preserve object key insertion order as returned by `Object.keys`, rather than calling `.sort()`.
@@ -620,9 +620,17 @@ This is **cosmetic and low-impact in practice**: `sf project retrieve` strips co
 
 ### Root Attribute Merge Resolves Three-Way, With One Tie It Can't Mark
 
-The root element's attributes — the `xmlns*` declarations and any other, such as `xsi:schemaLocation` — are extracted into a separate `namespaces` bucket by the parser adapter and never enter the JSON `content` tree (see "Compact JSON Intermediate Representation" above), so they never go through `MergeOrchestrator`/`ScenarioStrategy` — `XmlMerger`'s own `resolveNamespaceValue` gives them an equivalent three-way resolution instead (unchanged-on-one-side defers to the other side's change; both sides agreeing keeps that agreement). The one case with no clean answer is a genuine divergence — all three values different, no pair agreeing — because an XML attribute value has no way to carry zdiff3 markers without producing invalid XML (`xmlns="<<<<<<< ours..."`). That case keeps `local` and logs the discarded alternative via `Logger.warn` rather than raising a conflict, so it is the one remaining spot where a namespace change can be overridden without a marker in the file — check the log if a namespace value looks unexpected after a merge. Pinned by `test/unit/merger/XmlMerger.streaming.test.ts`. In practice this is rarely observable: the metadata types this driver targets all declare the same fixed `http://soap.sforce.com/2006/04/metadata` namespace, which is not something users hand-edit.
+The root element's attributes — the `xmlns*` declarations and any other, such as `xsi:schemaLocation` — are extracted into a separate `rootAttributes` bucket by the parser adapter and never enter the JSON `content` tree (see "Compact JSON Intermediate Representation" above), so they never go through `MergeOrchestrator`/`ScenarioStrategy` — `XmlMerger`'s own `resolveRootAttributeValue` gives them an equivalent three-way resolution instead (unchanged-on-one-side defers to the other side's change; both sides agreeing keeps that agreement). The one case with no clean answer is a genuine divergence — all three values different, no pair agreeing — because an XML attribute value has no way to carry zdiff3 markers without producing invalid XML (`xmlns="<<<<<<< ours..."`). That case keeps `local` and logs the discarded alternative via `Logger.warn` rather than raising a conflict, so it is the one remaining spot where a root attribute change can be overridden without a marker in the file — check the log if a root attribute value looks unexpected after a merge. Pinned by `test/unit/merger/XmlMerger.streaming.test.ts`. In practice this is rarely observable: the metadata types this driver targets all declare the same fixed `http://soap.sforce.com/2006/04/metadata` namespace, which is not something users hand-edit.
 
-Only a side that still has a root element gets a vote. `namespacesOf` makes a live side that dropped the whole file abstain: its empty bucket means "there is no root element to carry the attributes on", not "the xmlns was removed", so it borrows the ancestor's bucket and the surviving side's declaration is preserved instead of being resolved away. The ancestor is never substituted — a rootless ancestor is the "file added on both sides" case, where an empty bucket genuinely does mean the namespace did not exist before. A side that keeps its root and drops only the attribute still votes to remove it.
+Only a side that still has a root element gets a vote. `rootAttributesOf` makes a live side that dropped the whole file abstain: its empty bucket means "there is no root element to carry the attributes on", not "the xmlns was removed", so it borrows the ancestor's bucket and the surviving side's declaration is preserved instead of being resolved away. The ancestor is never substituted — a rootless ancestor is the "file added on both sides" case, where an empty bucket genuinely does mean the attribute did not exist before. A side that keeps its root and drops only the attribute still votes to remove it.
+
+### An Element Carrying Attributes Merges as a Whole
+
+An element that carries XML attributes is merged as one value, not child by child: `MergeNodeFactory` routes it to `TextMergeNode`, and the unordered keyed-array strategy does the same for each matched entry that carries attributes (the ordered strategy already merges entries whole). An attribute belongs to its element's open tag, and a property-by-property merge has nowhere to carry it: each `@_name` key would be written back as a child element of its own (`<@_xsi:nil>true</@_xsi:nil>`).
+
+What changes is concurrent edits to *different* children of one such element. If ours changes `<readable>` and theirs changes `<editable>` in the same attributed entry, the result is a conflict with each side's complete element between the markers, where the same edits on an element without attributes merge cleanly. A change made by one side only, or the same change made by both, still resolves without a conflict.
+
+This is acceptable for Salesforce metadata, which puts attributes only on leaf elements (e.g. `<description xsi:nil="true"/>`, `<value xsi:type="xsd:string">`). A leaf has no children to merge separately, and its attribute qualifies its value, so merging the two apart could pair `xsi:nil` with text, or an `xsi:type` with a value of another type. Root attributes are resolved separately, as described above. Pinned by fixture `58-attribute-element-divergent-edits` and `test/integration/AttributedKeyedElementMerge.test.ts`.
 
 ### Empty Text Is Indistinguishable From an Absent Tag
 

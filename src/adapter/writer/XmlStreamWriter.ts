@@ -158,7 +158,7 @@ const writeConflict = (
   block: ConflictBlock,
   markers: ConflictMarkers,
   // Only a conflict block occupying the whole document receives the root
-  // namespaces; nested conflict content is not a document root, so every
+  // attributes; nested conflict content is not a document root, so every
   // other call site falls back to the default.
   rootAttrs: ReadonlyArray<readonly [string, string]> = EMPTY_ATTRS
 ): void => {
@@ -179,18 +179,17 @@ const writeConflict = (
   writeText(st, markers.other)
 }
 
-// Root attributes (the namespaces bucket: xmlns* and every other attribute
-// of the source root) reach the wire on whichever element occupies the
-// root slot. Insertion order of the bucket is the
+// Root attributes (xmlns* and every other attribute of the source root)
+// reach the wire on whichever element occupies the root slot. Insertion order of the bucket is the
 // source order the parser saw, so it is preserved verbatim.
-const buildNamespaceAttrs = (
-  namespaces: JsonObject
+const buildRootAttrs = (
+  rootAttributes: JsonObject
 ): ReadonlyArray<readonly [string, string]> => {
-  const nsKeys = Object.keys(namespaces)
-  const built: Array<readonly [string, string]> = new Array(nsKeys.length)
-  for (let k = 0; k < nsKeys.length; k++) {
-    const nsKey = nsKeys[k]!
-    built[k] = [nsKey.slice(ATTR_PREFIX.length), String(namespaces[nsKey])]
+  const keys = Object.keys(rootAttributes)
+  const built: Array<readonly [string, string]> = new Array(keys.length)
+  for (let k = 0; k < keys.length; k++) {
+    const key = keys[k]!
+    built[k] = [key.slice(ATTR_PREFIX.length), String(rootAttributes[key])]
   }
   return built
 }
@@ -203,14 +202,14 @@ const buildNamespaceAttrs = (
 const writeRoot = (
   st: WalkState,
   compactRoot: JsonArray,
-  namespaces: JsonObject,
+  rootAttributes: JsonObject,
   markers: ConflictMarkers
 ): void => {
   st.buf += XML_DECL
   // The root slot: whichever element opens the document carries the
-  // namespaces, then the slot is spent. A whole-document ConflictBlock
+  // root attributes, then the slot is spent. A whole-document ConflictBlock
   // spends it too — each of its non-blank sides renders a document root.
-  let rootAttrs = buildNamespaceAttrs(namespaces)
+  let rootAttrs = buildRootAttrs(rootAttributes)
   for (let i = 0; i < compactRoot.length; i++) {
     const item = compactRoot[i] as JsonValue
     if (isConflictBlock(item)) {
@@ -523,7 +522,7 @@ export class XmlStreamWriter implements XmlSerializer {
   async writeTo(
     out: Writable,
     ordered: JsonArray,
-    namespaces: JsonObject,
+    rootAttributes: JsonObject,
     eol: '\n' | '\r\n' = '\n',
     hasConflict = true
   ): Promise<void> {
@@ -546,7 +545,7 @@ export class XmlStreamWriter implements XmlSerializer {
       endedWithGt: false,
       isFirstTopLevelAfterDecl: true,
     }
-    writeRoot(st, ordered, namespaces, markers)
+    writeRoot(st, ordered, rootAttributes, markers)
     // Trailing newline: `sf project retrieve` (via source-deploy-retrieve)
     // writes metadata XML ending in a newline, so we converge to that byte
     // shape (see TRAILING_NEWLINE). Appended to the finished document AFTER

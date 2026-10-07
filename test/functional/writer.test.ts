@@ -14,7 +14,7 @@ describe('writer parity — XmlStreamWriter vs current pipeline', () => {
         const out = await serializeToString(
           writer,
           fixture.inputs.ordered!,
-          fixture.inputs.namespaces ?? {}
+          fixture.inputs.rootAttributes ?? {}
         )
         const expected =
           fixture.parity.mode === 'divergence' && fixture.expectedNew

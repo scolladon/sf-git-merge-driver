@@ -2,5 +2,5 @@
   "ordered": [
     { "Root": ["text-item-1", "text-item-2"] }
   ],
-  "namespaces": {}
+  "rootAttributes": {}
 }

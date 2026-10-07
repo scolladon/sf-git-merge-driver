@@ -202,7 +202,7 @@ interface WriterLike {
   writeTo(
     out: Writable,
     ordered: JsonArray,
-    namespaces: JsonObject
+    rootAttributes: JsonObject
   ): Promise<void>
 }
 
@@ -594,8 +594,15 @@ const runMergePhase = async (
 
 // ---- phase: pipeline ----
 
-const mergeNamespaces = (...maps: JsonObject[]): JsonObject =>
+const mergeRootAttributes = (...maps: JsonObject[]): JsonObject =>
   Object.assign({}, ...maps)
+
+// The base ref may predate the `namespaces` → `rootAttributes` rename of
+// NormalisedParseResult, so read whichever field that side's parser returns.
+const rootAttributesOf = (result: object): JsonObject =>
+  (result as { rootAttributes?: JsonObject }).rootAttributes ??
+  (result as { namespaces?: JsonObject }).namespaces ??
+  {}
 
 const pipelineSampler =
   (
@@ -612,17 +619,17 @@ const pipelineSampler =
         local.content,
         other.content
       )
-      const namespaces = mergeNamespaces(
-        ancestor.namespaces,
-        local.namespaces,
-        other.namespaces
+      const rootAttributes = mergeRootAttributes(
+        rootAttributesOf(ancestor),
+        rootAttributesOf(local),
+        rootAttributesOf(other)
       )
       const sink = new PassThrough()
       sink.resume()
       await new side.Writer(side.config).writeTo(
         sink,
         merged.output,
-        namespaces
+        rootAttributes
       )
       sink.end()
     })

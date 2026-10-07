@@ -20,7 +20,7 @@ const config: MergeConfig = {
   otherConflictTag: DEFAULT_OTHER_CONFLICT_TAG,
 }
 
-const mergeNamespaces = (...maps: JsonObject[]): JsonObject =>
+const mergeRootAttributes = (...maps: JsonObject[]): JsonObject =>
   Object.assign({}, ...maps)
 
 const sizes = ['small', 'medium', 'large'] as const
@@ -34,10 +34,10 @@ for (const size of sizes) {
   const local = parser.parseString(fixtures.local)
   const other = parser.parseString(fixtures.other)
 
-  const namespaces = mergeNamespaces(
-    ancestor.namespaces,
-    local.namespaces,
-    other.namespaces
+  const rootAttributes = mergeRootAttributes(
+    ancestor.rootAttributes,
+    local.rootAttributes,
+    other.rootAttributes
   )
 
   const jsonMerger = new JsonMerger(config)
@@ -73,7 +73,7 @@ for (const size of sizes) {
         const w = new XmlStreamWriter(config)
         const sink = new PassThrough()
         sink.resume()
-        await w.writeTo(sink, mergedResult.output, namespaces)
+        await w.writeTo(sink, mergedResult.output, rootAttributes)
         sink.end()
       }).run()
     })

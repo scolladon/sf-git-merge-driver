@@ -20,7 +20,7 @@ interface Fixture {
     readonly ours?: string
     readonly theirs?: string
     readonly ordered?: JsonArray
-    readonly namespaces?: JsonObject
+    readonly rootAttributes?: JsonObject
   }
   readonly expectedCurrent: string
   readonly expectedNew?: string
@@ -96,7 +96,7 @@ const loadFixture = (id: string): Fixture => {
       : undefined
   const orderedInput = readJsonOptional<{
     ordered: JsonArray
-    namespaces?: JsonObject
+    rootAttributes?: JsonObject
   }>(join(dir, 'ordered-input.json'))
 
   // exactOptionalPropertyTypes requires that optional properties
@@ -108,7 +108,7 @@ const loadFixture = (id: string): Fixture => {
     ours?: string
     theirs?: string
     ordered?: JsonArray
-    namespaces?: JsonObject
+    rootAttributes?: JsonObject
   }
   const inputs: MutableInputs = {}
   const ancestor = readOptional(join(dir, 'ancestor.xml'))
@@ -119,8 +119,8 @@ const loadFixture = (id: string): Fixture => {
   if (theirs !== undefined) inputs.theirs = theirs
   if (orderedInput !== undefined) {
     inputs.ordered = orderedInput.ordered
-    if (orderedInput.namespaces !== undefined) {
-      inputs.namespaces = orderedInput.namespaces
+    if (orderedInput.rootAttributes !== undefined) {
+      inputs.rootAttributes = orderedInput.rootAttributes
     }
   }
 
