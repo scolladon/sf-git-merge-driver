@@ -9,6 +9,30 @@ const fieldPermissionsKey =
 const picklistValueKey = MetadataService.getKeyFieldExtractor('value')
 
 describe('KeyedArrayMergeNode', () => {
+  it('merges changes to separate attributed entries without decomposing their attributes', () => {
+    const item = (field: string, readable = 'false') => ({
+      '@_n1:nil': 'false',
+      field,
+      readable,
+    })
+    const node = new KeyedArrayMergeNode(
+      [item('Account.X__c'), item('Account.Y__c')],
+      [item('Account.X__c', 'true'), item('Account.Y__c')],
+      [item('Account.X__c'), item('Account.Y__c', 'true')],
+      'fieldPermissions',
+      fieldPermissionsKey,
+      false
+    )
+
+    expect(node.merge(defaultConfig)).toEqual({
+      output: [
+        { fieldPermissions: item('Account.X__c', 'true') },
+        { fieldPermissions: item('Account.Y__c', 'true') },
+      ],
+      hasConflict: false,
+    })
+  })
+
   describe('merge with key field (fieldPermissions)', () => {
     it('should merge arrays with same elements without conflict', () => {
       // Arrange

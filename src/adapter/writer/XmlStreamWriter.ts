@@ -179,8 +179,9 @@ const writeConflict = (
   writeText(st, markers.other)
 }
 
-// Root namespaces reach the wire as ordinary attributes on whichever
-// element occupies the root slot. Insertion order of the bucket is the
+// Root attributes (the namespaces bucket: xmlns* and every other attribute
+// of the source root) reach the wire on whichever element occupies the
+// root slot. Insertion order of the bucket is the
 // source order the parser saw, so it is preserved verbatim.
 const buildNamespaceAttrs = (
   namespaces: JsonObject

@@ -7,7 +7,7 @@ import type { JsonObject, JsonValue } from '../../types/jsonTypes.js'
 import type { NormalisedParseResult } from '../XmlParser.js'
 import { findTagEnd } from './balanceOracle.js'
 import { BANG, isQuote, LT, QMARK, SLASH } from './charCodes.js'
-import { type AttrSet, ElementFrame, NO_ATTRS } from './ElementFrame.js'
+import { ElementFrame, NO_ATTRS } from './ElementFrame.js'
 import {
   type LexedOpenTag,
   lexOpenTag,
@@ -41,7 +41,6 @@ export type ScanOutcome =
 
 // Stryker disable next-line StringLiteral: the sentinel's name is never read: a top-level close returns first
 const TOP_FRAME_NAME = ''
-const XMLNS_RE = /^xmlns(?::.+)?$/
 const SHORT_COMMENT_LIMIT = COMMENT_OPEN.length + COMMENT_CLOSE.length
 
 const failed = (message: string): ScanOutcome => ({ kind: 'failed', message })
@@ -54,27 +53,18 @@ const hasQuoteChar = (text: string): boolean => {
   return false
 }
 
-interface RootAttrSplit {
-  readonly rest: AttrSet
-  readonly namespaces: JsonObject
-}
-
-// Splits the root element's attrs into the xmlns* bucket (namespaces,
-// `@_`-prefixed) and the rest (rootAttrs). Only ever called for the
-// document root — a non-root element's xmlns attrs stay inline.
-const splitRootAttrs = (attrs: OpenTagAttrs): RootAttrSplit => {
-  const rootAttrs: Record<string, string | null> = Object.create(null)
-  const namespaces: JsonObject = {}
-  let hasRootAttrs = false
-  for (const key in attrs) {
-    if (XMLNS_RE.test(key)) {
-      namespaces[`${ATTR_PREFIX}${key}`] = attrs[key]
-    } else {
-      rootAttrs[key] = attrs[key]
-      hasRootAttrs = true
-    }
-  }
-  return { rest: { attrs: rootAttrs, hasAttrs: hasRootAttrs }, namespaces }
+// Moves every attribute of the document root into the root-attribute
+// bucket (`namespaces`, `@_`-prefixed): the xmlns declarations and any
+// other attribute alike (e.g. `xsi:schemaLocation`). XmlMerger resolves
+// that bucket key by key and the writer renders it back on the root open
+// tag. Left on the element, a root attribute would reach the
+// property-by-property merge, which writes it out as a child element
+// (`<@_xsi:schemaLocation>…</@_xsi:schemaLocation>`). Only ever called for
+// the document root — a non-root element's attributes stay inline.
+const bucketRootAttrs = (attrs: OpenTagAttrs): JsonObject => {
+  const bucket: JsonObject = {}
+  for (const key in attrs) bucket[`${ATTR_PREFIX}${key}`] = attrs[key]
+  return bucket
 }
 
 interface RootElement {
@@ -251,9 +241,8 @@ class DocumentScanner {
 
   private buildFrame(lexed: LexedOpenTag): ElementFrame {
     if (!this.isRootCandidate()) return new ElementFrame(lexed.name, lexed)
-    const { rest, namespaces } = splitRootAttrs(lexed.attrs)
-    this.namespaces = namespaces
-    return new ElementFrame(lexed.name, rest)
+    this.namespaces = bucketRootAttrs(lexed.attrs)
+    return new ElementFrame(lexed.name, NO_ATTRS)
   }
 }
 

@@ -24,8 +24,7 @@ export const PARSER_BEHAVIOUR_CHANGES: Readonly<
   },
   'cdata in attr': {
     xml: '<a x="<![CDATA[y]]>">t</a>',
-    outcome:
-      'ok:{"content":{"a":{"@_x":"<![CDATA[y]]>","#text":"t"}},"namespaces":{}}',
+    outcome: 'ok:{"content":{"a":"t"},"namespaces":{"@_x":"<![CDATA[y]]>"}}',
   },
   'style ws': {
     xml: '<a><style>  </style></a>',
@@ -149,7 +148,7 @@ export const PARSER_BEHAVIOUR_CHANGES: Readonly<
   'cdata attr escaped': {
     xml: '<a x="<![CDATA[a<b&c]]>">t</a>',
     outcome:
-      'ok:{"content":{"a":{"@_x":"<![CDATA[a<b&c]]>","#text":"t"}},"namespaces":{}}',
+      'ok:{"content":{"a":"t"},"namespaces":{"@_x":"<![CDATA[a<b&c]]>"}}',
   },
   'cdata comment': {
     xml: '<a><!-- <![CDATA[y]]> --></a>',
@@ -163,8 +162,7 @@ export const PARSER_BEHAVIOUR_CHANGES: Readonly<
   },
   'cdata overlap attr': {
     xml: '<a x="<![CDATA[">y]]></a>',
-    outcome:
-      'ok:{"content":{"a":{"@_x":"<![CDATA[","#text":"y]]>"}},"namespaces":{}}',
+    outcome: 'ok:{"content":{"a":"y]]>"},"namespaces":{"@_x":"<![CDATA["}}',
   },
   'cdata root': {
     xml: '<![CDATA[x]]><a>y</a>',
@@ -236,7 +234,7 @@ export const PARSER_BEHAVIOUR_CHANGES: Readonly<
   'fuzz CDATA inside a tag': {
     xml: '<a x="a>b"<![CDATA[!--x-->]]></a>',
     outcome:
-      'ok:{"content":{"a":{"@_x":"a>b","@_CDATA[!--x--":null,"#text":"]]>"}},"namespaces":{}}',
+      'ok:{"content":{"a":"]]>"},"namespaces":{"@_x":"a>b","@_CDATA[!--x--":null}}',
   },
   'fuzz top-level CDATA no root': {
     xml: 'b><![CDATA[>]]>',

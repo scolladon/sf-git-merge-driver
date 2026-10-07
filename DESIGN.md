@@ -57,7 +57,7 @@ classDiagram
 ```
 
 **Node Types:**
-- `TextMergeNode` - Handles scalar/primitive values
+- `TextMergeNode` - Handles scalar/primitive values, and any element carrying XML attributes (e.g. `<help xsi:nil="true"/>`, parsed as `{ '@_xsi:nil': 'true', '#text': '' }`). The factory routes single elements here; unordered keyed arrays match entries by key first, then route each attributed entry here too. An attribute belongs to its element's open tag, so the element is merged as one value, compared structurally because each side parses it into its own object; a property-by-property merge would emit each `@_name` key as a child element of its own. Concurrent different changes within one attributed entry produce a conflict containing the complete element on each side. Ordered keyed arrays already preserve complete entries.
 - `TextArrayMergeNode` - Handles arrays of primitive values (e.g., `members` in package.xml)
 - `KeyedArrayMergeNode` - Handles arrays of objects with key fields (e.g., `fieldPermissions` with `field` key)
 - `PropertyMergeNode` - Handles pure objects without key extractor (property-by-property merge). A side where the element is absent is normalised at the factory, before the node is constructed, to a shared frozen stand-in that contributes no properties, so additions and deletions propagate instead of crashing. That stand-in is built with `Object.create(null)` for the same reason the parser builds every node that way: an XML tag name is untrusted, and a plain `{}` would let a name such as `constructor` or `toString` resolve through `Object.prototype`, resurrecting an element the side had deleted. A side holding text rather than child elements is deliberately *not* normalised — see "Empty Text Is Indistinguishable From an Absent Tag" under Known Limitations
@@ -68,7 +68,9 @@ The `MergeNodeFactory` creates the appropriate node type based on the data struc
 
 ```mermaid
 flowchart TD
-    Start["createNode()"] --> IsStringArray{{"Is string array?"}}
+    Start["createNode()"] --> HasAttrs{{"Single element carrying XML attributes?"}}
+    HasAttrs -->|Yes| AttrText["TextMergeNode"]
+    HasAttrs -->|No| IsStringArray{{"Is string array?"}}
     IsStringArray -->|Yes| TextArray["TextArrayMergeNode"]
     IsStringArray -->|No| IsPureObject{{"Pure object without key extractor?"}}
     IsPureObject -->|Yes| Object["PropertyMergeNode"]
@@ -300,7 +302,7 @@ flowchart TD
     end
 
     subgraph "Parser Adapter (single-pass scanner)"
-        Parse["CompactXmlParser.parseString: one forward pass builds the compact JsonObject directly — root xmlns into the namespaces bucket, CDATA read natively, repeated siblings grouped into arrays"]
+        Parse["CompactXmlParser.parseString: one forward pass builds the compact JsonObject directly — every root attribute (xmlns and others) into the namespaces bucket, CDATA read natively, repeated siblings grouped into arrays"]
     end
 
     subgraph "Domain (format-agnostic)"
@@ -353,7 +355,7 @@ flowchart TD
 XML is converted to a compact JSON format for easier manipulation. The domain operates on plain JSON objects without knowledge of any XML parser library's conventions:
 - Scalars are plain values: `{ field: "value" }`
 - Nested elements are child objects: `{ parent: { child: "value" } }`
-- Namespace attributes are extracted by the parser adapter into a dedicated bucket, not left on the root element
+- Root attributes — the namespace declarations and any other, such as `xsi:schemaLocation` — are extracted by the parser adapter into a dedicated bucket (`namespaces`), not left on the root element, so the property-by-property merge never writes one back as a `<@_…>` child element
 - The writer adapter walks the compact tree directly — splitting attributes (`@_`-prefixed keys) from children, expanding `ConflictBlock` objects inline into text markers, and appending bytes to a single growable buffer without materialising an intermediate ordered representation or generator chunk objects
 
 ### 2. Key-Based Array Merging
@@ -616,9 +618,9 @@ XML comments are not guaranteed to keep their exact position relative to sibling
 
 This is **cosmetic and low-impact in practice**: `sf project retrieve` strips comments from retrieved metadata, so the only comments affected are hand-added ones in a working copy. Preserving comment position in all cases would require re-representing the compact tree as an order-preserving list (touching the parser, writer, and every merge node) and would change byte output broadly — a breaking change deliberately deferred to a future release with a version bump (see also `test/fixtures/xml/19-btb-comments`). The current behavior is pinned by `test/fixtures/xml/45-comment-positioning` and the `comment positioning` regression tests in `test/integration/XmlMerger.test.ts` so any future change is deliberate.
 
-### Root xmlns Merge Resolves Three-Way, With One Tie It Can't Mark
+### Root Attribute Merge Resolves Three-Way, With One Tie It Can't Mark
 
-The root element's `xmlns*` attributes are extracted into a separate `namespaces` bucket by the parser adapter and never enter the JSON `content` tree (see "Compact JSON Intermediate Representation" above), so they never go through `MergeOrchestrator`/`ScenarioStrategy` — `XmlMerger`'s own `resolveNamespaceValue` gives them an equivalent three-way resolution instead (unchanged-on-one-side defers to the other side's change; both sides agreeing keeps that agreement). The one case with no clean answer is a genuine divergence — all three values different, no pair agreeing — because an XML attribute value has no way to carry zdiff3 markers without producing invalid XML (`xmlns="<<<<<<< ours..."`). That case keeps `local` and logs the discarded alternative via `Logger.warn` rather than raising a conflict, so it is the one remaining spot where a namespace change can be overridden without a marker in the file — check the log if a namespace value looks unexpected after a merge. Pinned by `test/unit/merger/XmlMerger.streaming.test.ts`. In practice this is rarely observable: the metadata types this driver targets all declare the same fixed `http://soap.sforce.com/2006/04/metadata` namespace, which is not something users hand-edit.
+The root element's attributes — the `xmlns*` declarations and any other, such as `xsi:schemaLocation` — are extracted into a separate `namespaces` bucket by the parser adapter and never enter the JSON `content` tree (see "Compact JSON Intermediate Representation" above), so they never go through `MergeOrchestrator`/`ScenarioStrategy` — `XmlMerger`'s own `resolveNamespaceValue` gives them an equivalent three-way resolution instead (unchanged-on-one-side defers to the other side's change; both sides agreeing keeps that agreement). The one case with no clean answer is a genuine divergence — all three values different, no pair agreeing — because an XML attribute value has no way to carry zdiff3 markers without producing invalid XML (`xmlns="<<<<<<< ours..."`). That case keeps `local` and logs the discarded alternative via `Logger.warn` rather than raising a conflict, so it is the one remaining spot where a namespace change can be overridden without a marker in the file — check the log if a namespace value looks unexpected after a merge. Pinned by `test/unit/merger/XmlMerger.streaming.test.ts`. In practice this is rarely observable: the metadata types this driver targets all declare the same fixed `http://soap.sforce.com/2006/04/metadata` namespace, which is not something users hand-edit.
 
 Only a side that still has a root element gets a vote. `namespacesOf` makes a live side that dropped the whole file abstain: its empty bucket means "there is no root element to carry the attributes on", not "the xmlns was removed", so it borrows the ancestor's bucket and the surviving side's declaration is preserved instead of being resolved away. The ancestor is never substituted — a rootless ancestor is the "file added on both sides" case, where an empty bucket genuinely does mean the namespace did not exist before. A side that keeps its root and drops only the attribute still votes to remove it.
 

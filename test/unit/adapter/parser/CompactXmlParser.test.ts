@@ -216,7 +216,8 @@ describe('CompactXmlParser', () => {
   describe('given a valueless attribute on the root element', () => {
     it('when parseString then it round-trips without throwing', () => {
       const result = sut.parseString(`<r foo><v>1</v></r>`)
-      expect(result.content).toEqual({ r: { '@_foo': null, v: '1' } })
+      expect(result.content).toEqual({ r: { v: '1' } })
+      expect(result.namespaces).toEqual({ '@_foo': null })
     })
   })
 

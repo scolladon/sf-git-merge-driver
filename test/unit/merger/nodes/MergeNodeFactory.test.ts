@@ -5,6 +5,7 @@ import { PropertyMergeNode } from '../../../../src/merger/nodes/PropertyMergeNod
 import { TextArrayMergeNode } from '../../../../src/merger/nodes/TextArrayMergeNode.js'
 import { TextMergeNode } from '../../../../src/merger/nodes/TextMergeNode.js'
 import { MetadataService } from '../../../../src/service/MetadataService.js'
+import type { JsonObject, JsonValue } from '../../../../src/types/jsonTypes.js'
 import { defaultConfig } from '../../../utils/testConfig.js'
 
 describe('MergeNodeFactory', () => {
@@ -297,6 +298,154 @@ describe('MergeNodeFactory', () => {
 
         // Assert
         expect(node).toBeInstanceOf(KeyedArrayMergeNode)
+      })
+
+      describe('given an element carrying attributes', () => {
+        // Parser shape of `<help xsi:nil="true"/>`: prototype-free, with the
+        // attribute under its `@_` key and an empty `#text`.
+        const nil = (): JsonObject =>
+          Object.assign(Object.create(null), {
+            '@_xsi:nil': 'true',
+            '#text': '',
+          })
+        type Trio = [JsonValue, JsonValue, JsonValue]
+
+        it('should route the trio to TextMergeNode when every side carries the attribute', () => {
+          // Act
+          const node = factory.createNode(nil(), nil(), nil(), 'help')
+
+          // Assert
+          expect(node).toBeInstanceOf(TextMergeNode)
+        })
+
+        it.each<[string, Trio]>([
+          ['ancestor', [nil(), 'text', 'text']],
+          ['local', ['text', nil(), 'text']],
+          ['other', ['text', 'text', nil()]],
+        ])(
+          'should route the trio to TextMergeNode when only the %s side carries it beside text',
+          (_side, [ancestor, local, other]) => {
+            // Act
+            const node = factory.createNode(ancestor, local, other, 'help')
+
+            // Assert
+            expect(node).toBeInstanceOf(TextMergeNode)
+          }
+        )
+
+        it('should route the trio to TextMergeNode when the other sides are absent', () => {
+          // Act
+          const node = factory.createNode(
+            null,
+            nil(),
+            undefined as never,
+            'help'
+          )
+
+          // Assert
+          expect(node).toBeInstanceOf(TextMergeNode)
+        })
+
+        it('should route the trio to TextMergeNode even when the element also has child elements', () => {
+          // Arrange
+          const withChild = { '@_xsi:type': 'T', label: 'a' }
+
+          // Act
+          const node = factory.createNode(withChild, withChild, {}, 'help')
+
+          // Assert
+          expect(node).toBeInstanceOf(TextMergeNode)
+        })
+
+        it('should route the trio to TextMergeNode without consulting the key extractor', () => {
+          // Arrange
+          const spy = vi.spyOn(MetadataService, 'getKeyFieldExtractor')
+
+          // Act
+          const node = factory.createNode(nil(), nil(), nil(), 'value')
+
+          // Assert
+          expect(node).toBeInstanceOf(TextMergeNode)
+          expect(spy).not.toHaveBeenCalled()
+        })
+
+        it('should route the trio to TextMergeNode on a text-array attribute', () => {
+          // Act
+          const node = factory.createNode(nil(), nil(), 'Obj1', 'members')
+
+          // Assert
+          expect(node).toBeInstanceOf(TextMergeNode)
+        })
+
+        it.each<[string, Trio]>([
+          ['ancestor', [[nil()], nil(), nil()]],
+          ['local', [nil(), [nil()], nil()]],
+          ['other', [nil(), nil(), [nil()]]],
+        ])(
+          'should keep the array route when only the %s side is an array',
+          (_side, [ancestor, local, other]) => {
+            // Act
+            const node = factory.createNode(ancestor, local, other, 'help')
+
+            // Assert
+            expect(node).toBeInstanceOf(KeyedArrayMergeNode)
+          }
+        )
+
+        it('should route a child key that only contains the prefix to PropertyMergeNode', () => {
+          // Arrange
+          const notAnAttribute = { 'a@_b': '1' }
+
+          // Act
+          const node = factory.createNode(
+            notAnAttribute,
+            notAnAttribute,
+            { 'a@_b': '2' },
+            'help'
+          )
+
+          // Assert
+          expect(node).toBeInstanceOf(PropertyMergeNode)
+        })
+
+        it('should keep an untouched element whole when its parent is merged property by property', () => {
+          // Act
+          const result = factory
+            .createNode(nil(), nil(), nil(), 'help')
+            .merge(defaultConfig)
+
+          // Assert — the writer reads `@_` keys off the element's own body
+          expect(result).toEqual({
+            output: [{ help: { '@_xsi:nil': 'true', '#text': '' } }],
+            hasConflict: false,
+          })
+        })
+
+        it('should take the element whole when one side replaced text with it', () => {
+          // Act
+          const result = factory
+            .createNode('Enter the amount', nil(), 'Enter the amount', 'help')
+            .merge(defaultConfig)
+
+          // Assert
+          expect(result).toEqual({
+            output: [{ help: { '@_xsi:nil': 'true', '#text': '' } }],
+            hasConflict: false,
+          })
+        })
+
+        it('should take the text whole when one side replaced the element with it', () => {
+          // Act
+          const result = factory
+            .createNode(nil(), 'Enter the amount', nil(), 'help')
+            .merge(defaultConfig)
+
+          // Assert
+          expect(result).toEqual({
+            output: [{ help: 'Enter the amount' }],
+            hasConflict: false,
+          })
+        })
       })
 
       describe('given a side where the element is absent or not a pure object', () => {

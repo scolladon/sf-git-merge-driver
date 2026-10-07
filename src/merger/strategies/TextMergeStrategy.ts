@@ -3,6 +3,7 @@ import type { JsonObject } from '../../types/jsonTypes.js'
 import type { MergeResult } from '../../types/mergeResult.js'
 import { noConflict, withConflict } from '../../types/mergeResult.js'
 import { MergeScenario } from '../../types/mergeScenario.js'
+import { jsonEqual } from '../../utils/jsonEqual.js'
 import { buildConflictMarkers } from '../ConflictMarkerBuilder.js'
 
 interface TextMergeParams {
@@ -16,6 +17,14 @@ interface TextMergeParams {
 interface TextMergeStrategy {
   handle(params: TextMergeParams): MergeResult
 }
+
+// An attribute-bearing element reaches here as an object (see
+// MergeNodeFactory.isAttributedTrio), and each side parses it into a
+// distinct one, so values compare structurally. Scalars, the hot path,
+// settle on identity alone and never pay jsonEqual's stack allocation.
+const isSame = (a: unknown, b: unknown): boolean =>
+  // Stryker disable next-line ConditionalExpression,LogicalOperator: the identity and object guards only skip jsonEqual, which returns the same answer for any pair they filter out
+  a === b || (typeof a === 'object' && typeof b === 'object' && jsonEqual(a, b))
 
 const asProperty = (attribute: string, value: unknown): JsonObject =>
   ({ [attribute]: value }) as JsonObject
@@ -34,7 +43,7 @@ class LocalOnlyStrategy implements TextMergeStrategy {
 
 class LocalAndOtherStrategy implements TextMergeStrategy {
   handle({ attribute, local, other }: TextMergeParams): MergeResult {
-    if (local === other) {
+    if (isSame(local, other)) {
       return noConflict([asProperty(attribute, local)])
     }
     return withConflict([
@@ -49,7 +58,7 @@ class LocalAndOtherStrategy implements TextMergeStrategy {
 
 class AncestorAndOtherStrategy implements TextMergeStrategy {
   handle({ attribute, ancestor, other }: TextMergeParams): MergeResult {
-    if (ancestor !== other) {
+    if (!isSame(ancestor, other)) {
       return withConflict([
         buildConflictMarkers(
           {},
@@ -64,7 +73,7 @@ class AncestorAndOtherStrategy implements TextMergeStrategy {
 
 class AncestorAndLocalStrategy implements TextMergeStrategy {
   handle({ attribute, ancestor, local }: TextMergeParams): MergeResult {
-    if (ancestor !== local) {
+    if (!isSame(ancestor, local)) {
       return withConflict([
         buildConflictMarkers(
           asProperty(attribute, local),
@@ -79,13 +88,13 @@ class AncestorAndLocalStrategy implements TextMergeStrategy {
 
 class AllPresentStrategy implements TextMergeStrategy {
   handle({ attribute, ancestor, local, other }: TextMergeParams): MergeResult {
-    if (ancestor === local) {
+    if (isSame(ancestor, local)) {
       return noConflict([asProperty(attribute, other)])
     }
-    if (ancestor === other) {
+    if (isSame(ancestor, other)) {
       return noConflict([asProperty(attribute, local)])
     }
-    if (local === other) {
+    if (isSame(local, other)) {
       return noConflict([asProperty(attribute, local)])
     }
     return withConflict([

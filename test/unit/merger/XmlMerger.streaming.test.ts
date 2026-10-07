@@ -139,7 +139,7 @@ describe('XmlMerger.mergeThreeWay', () => {
       const theirs = `<?xml version="1.0"?><R xmlns="http://theirs"><v>a</v></R>`
       await runMergeStreams(sut, ancestor, ours, theirs)
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('xmlns divergence'),
+        expect.stringContaining('root attribute divergence'),
         expect.objectContaining({
           ancestor: 'http://anc',
           local: 'http://ours',

@@ -8,12 +8,13 @@ import { log } from '../utils/LoggingDecorator.js'
 import { Logger } from '../utils/LoggingService.js'
 import { JsonMerger } from './JsonMerger.js'
 
-// Root xmlns* attributes live in a bucket parsed separately from `content`
-// (see scanDocument's splitRootAttrs) and never reach MergeOrchestrator, so
-// they need their own three-way resolution instead of inheriting one for
+// Every root attribute — the xmlns* declarations and any other, such as
+// `xsi:schemaLocation` — lives in a bucket parsed separately from `content`
+// (see scanDocument's bucketRootAttrs) and never reaches MergeOrchestrator,
+// so it needs its own three-way resolution instead of inheriting one for
 // free. Per key: unchanged-on-one-side defers to whatever the other side
 // did (add, change or remove); both sides agreeing (including both
-// removing it) keeps that agreement. A namespace value has no way to carry
+// removing it) keeps that agreement. An attribute value has no way to carry
 // zdiff3 markers without producing invalid XML (`xmlns="<<<<<<< ours..."`),
 // so a genuine three-way divergence — all three different, no pair
 // agreeing — can't become a real conflict; it keeps `local` (protects the
@@ -33,7 +34,7 @@ const resolveNamespaceValue = (
   // Genuine three-way divergence, no pair agreeing: keep local and log —
   // see the function-level comment for why this can't become a real
   // conflict.
-  Logger.warn(`xmlns divergence on ${key}; keeping local`, {
+  Logger.warn(`root attribute divergence on ${key}; keeping local`, {
     ancestor,
     local,
     other,
