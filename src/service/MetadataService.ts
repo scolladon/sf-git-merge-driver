@@ -1,4 +1,4 @@
-import type { JsonValue } from '../types/jsonTypes.js'
+import type { JsonArray, JsonValue } from '../types/jsonTypes.js'
 
 export class MetadataService {
   public static getKeyFieldExtractor(
@@ -15,8 +15,14 @@ export class MetadataService {
       : undefined
   }
 
-  public static isOrderedAttribute(attribute: string): boolean {
-    return ORDERED_ATTRIBUTES.has(attribute)
+  public static isOrderedAttribute(
+    attribute: string,
+    sides: readonly JsonArray[]
+  ): boolean {
+    if (!ORDERED_ATTRIBUTES.has(attribute)) return false
+    const isUnorderedVariant = UNORDERED_VARIANTS.get(attribute)
+    if (isUnorderedVariant === undefined) return true
+    return !sides.some(side => side.some(isUnorderedVariant))
   }
 
   // MergeNodeFactory's own array-shape check (isStringArray) only sees an
@@ -101,6 +107,21 @@ const getFilterItemKey = (el: JsonValue) => {
 // would have no key.
 const getPicklistValuesKey = (el: JsonValue) =>
   getPropertyValue(el, 'masterLabel') ?? getPropertyValue(el, 'picklist')
+
+// RecordType keys its picklist values by fullName; CustomMetadata reuses
+// the element name and keys by field.
+// The org does not store CustomMetadata values order; retrieve sorts them
+// by field.
+const isCustomMetadataValue = (el: JsonValue): boolean =>
+  getPropertyValue(el, 'fullName') === undefined &&
+  getPropertyValue(el, 'field') !== undefined
+
+// A Map, not an object literal: the attribute is an untrusted tag name.
+const UNORDERED_VARIANTS: ReadonlyMap<string, (el: JsonValue) => boolean> =
+  new Map([['values', isCustomMetadataValue]])
+
+const getValuesKey = (el: JsonValue) =>
+  getPropertyValue(el, 'fullName') ?? getPropertyValue(el, 'field')
 
 const METADATA_KEY_EXTRACTORS = {
   labels: (el: JsonValue) => getPropertyValue(el, 'fullName'), // CustomLabels
@@ -226,7 +247,7 @@ const METADATA_KEY_EXTRACTORS = {
   fieldSets: (el: JsonValue) => getPropertyValue(el, 'name'), // CustomObjectTranslation
   fields: (el: JsonValue) => getPropertyValue(el, 'name'), // CustomObjectTranslation
   picklistValues: getPicklistValuesKey, // CustomObjectTranslation (masterLabel) | RecordType (picklist)
-  values: (el: JsonValue) => getPropertyValue(el, 'fullName'), // RecordType
+  values: getValuesKey, // RecordType (fullName) | CustomMetadata (field)
   value: (el: JsonValue) => getPropertyValue(el, 'fullName'), // CustomField
   layouts: (el: JsonValue) => getPropertyValue(el, 'layout'), // CustomObjectTranslation
   quickActionParametersTranslation: (el: JsonValue) =>

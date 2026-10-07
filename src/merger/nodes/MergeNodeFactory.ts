@@ -152,14 +152,15 @@ const toKeyedArrayNode = (
   attribute: string,
   keyField: ReturnType<typeof MetadataService.getKeyFieldExtractor>
 ): MergeNode => {
-  const [ancestorArr, localArr, otherArr] = toArrays(...sides)
+  const sideArrays = toArrays(...sides)
+  const [ancestorArr, localArr, otherArr] = sideArrays
   return new KeyedArrayMergeNode(
     ancestorArr,
     localArr,
     otherArr,
     attribute,
     keyField,
-    MetadataService.isOrderedAttribute(attribute)
+    MetadataService.isOrderedAttribute(attribute, sideArrays)
   )
 }
 

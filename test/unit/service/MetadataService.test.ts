@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MetadataService } from '../../../src/service/MetadataService.js'
-import { JsonValue } from '../../../src/types/jsonTypes.js'
+import type { JsonArray, JsonValue } from '../../../src/types/jsonTypes.js'
 
 describe('MetadataService', () => {
   describe('getKeyFieldExtractor', () => {
@@ -643,6 +643,18 @@ describe('MetadataService', () => {
           expected: 'TestRecordTypeValue',
         },
         {
+          name: 'handles values with field only (CustomMetadata)',
+          metadataType: 'values',
+          testObject: { field: 'A__c', value: 'a' },
+          expected: 'A__c',
+        },
+        {
+          name: 'prefers fullName over field for values',
+          metadataType: 'values',
+          testObject: { fullName: 'F', field: 'A__c' },
+          expected: 'F',
+        },
+        {
           name: 'handles value with fullName (CustomField)',
           metadataType: 'value',
           testObject: { fullName: 'TestCustomFieldValue' },
@@ -899,7 +911,7 @@ describe('MetadataService', () => {
       'promptVersions',
     ])('should return true for %s', attribute => {
       // Act
-      const result = MetadataService.isOrderedAttribute(attribute)
+      const result = MetadataService.isOrderedAttribute(attribute, [])
 
       // Assert
       expect(result).toBe(true)
@@ -920,10 +932,76 @@ describe('MetadataService', () => {
       'workflowTask',
     ])('should return false for %s', attribute => {
       // Act
-      const result = MetadataService.isOrderedAttribute(attribute)
+      const result = MetadataService.isOrderedAttribute(attribute, [])
 
       // Assert
       expect(result).toBe(false)
+    })
+
+    describe('given the values element shared by two schemas', () => {
+      const recordTypeEntry = { fullName: 'Agriculture', default: 'false' }
+      const customMetadataEntry = { field: 'A__c', value: 'a' }
+
+      it.each([
+        ['RecordType-shaped sides', [[recordTypeEntry], [], []]],
+        ['empty sides', [[], [], []]],
+        [
+          'an entry with both fullName and field',
+          [[{ fullName: 'F', field: 'A__c' }], [], []],
+        ],
+        ['an entry with neither', [[{ default: 'false' }], [], []]],
+      ] as [string, JsonArray[]][])(
+        'then it is ordered for %s',
+        (_name, sides) => {
+          // Act
+          const result = MetadataService.isOrderedAttribute('values', sides)
+
+          // Assert
+          expect(result).toBe(true)
+        }
+      )
+
+      it.each([
+        ['one side only', [[], [customMetadataEntry], []]],
+        [
+          'mixed with a RecordType-shaped side',
+          [[recordTypeEntry], [customMetadataEntry], []],
+        ],
+      ] as [string, JsonArray[]][])(
+        'then it is unordered for CustomMetadata-shaped entries on %s',
+        (_name, sides) => {
+          // Act
+          const result = MetadataService.isOrderedAttribute('values', sides)
+
+          // Assert
+          expect(result).toBe(false)
+        }
+      )
+
+      it('then an ordered attribute without a variant stays ordered', () => {
+        // Arrange
+        const sides: JsonArray[] = [[customMetadataEntry], [], []]
+
+        // Act
+        const result = MetadataService.isOrderedAttribute('customValue', sides)
+
+        // Assert
+        expect(result).toBe(true)
+      })
+
+      it.each(['__proto__', 'constructor'])(
+        'then %s is not ordered even with CustomMetadata-shaped sides',
+        attribute => {
+          // Arrange
+          const sides: JsonArray[] = [[customMetadataEntry], [], []]
+
+          // Act
+          const result = MetadataService.isOrderedAttribute(attribute, sides)
+
+          // Assert
+          expect(result).toBe(false)
+        }
+      )
     })
   })
 
