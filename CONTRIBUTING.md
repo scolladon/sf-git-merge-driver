@@ -310,7 +310,7 @@ When the key is a composite of multiple fields, return `undefined` when no part 
 
 ### Element name reused across schemas (prefer-then-fallback)
 
-If the XML element name already exists in the table for a different parent schema with a different key field, **do not overwrite** — extract a named helper that prefers one key and falls back to the other. See `getPicklistValuesKey` for the canonical example, and the "Shared element names across schemas" subsection of [DESIGN.md](./DESIGN.md) for the list of currently-known cases.
+If the XML element name already exists in the table for a different parent schema with a different key field, **do not overwrite** — build a named extractor with `firstPresentKey(...)` that prefers one key and falls back to the other. See `getPicklistValuesKey` for the canonical example, and the "Shared element names across schemas" subsection of [DESIGN.md](./DESIGN.md) for the list of currently-known cases.
 
 > **Why this matters:** if both schemas hit the single-key path with different field names, every block in the wrong-schema document will have no key and `buildKeyedMap` will silently retain only the last entry — a silent data-loss bug class. The keyless fail-safe turns such a collision into a whole-list merge or a conflict. It is a safety net, not a substitute for the right extractor.
 

@@ -100,14 +100,26 @@ const getFilterItemKey = (el: JsonValue) => {
   return joinPresentParts([field, operation, value, valueField])
 }
 
+// Lazy like `??`: later properties are read only when earlier ones are absent.
+const firstPresentKey =
+  (...properties: readonly string[]) =>
+  (el: JsonValue): string | undefined => {
+    for (const property of properties) {
+      const value = getPropertyValue(el, property)
+      if (value !== undefined) {
+        return value
+      }
+    }
+    return undefined
+  }
+
 // The `picklistValues` element name is reused across two metadata
 // schemas with different key fields:
 //   - CustomObjectTranslation.fields[].picklistValues → keyed by `masterLabel`
 //   - RecordType.picklistValues                       → keyed by `picklist`
 // Without the fallback, every RecordType `<picklistValues>` block
 // would have no key.
-const getPicklistValuesKey = (el: JsonValue) =>
-  getPropertyValue(el, 'masterLabel') ?? getPropertyValue(el, 'picklist')
+const getPicklistValuesKey = firstPresentKey('masterLabel', 'picklist')
 
 // The org does not store CustomMetadata values order; retrieve sorts them
 // by field.
@@ -121,8 +133,7 @@ const UNORDERED_VARIANTS: ReadonlyMap<string, (el: JsonValue) => boolean> =
 
 // RecordType keys its picklist values by fullName; CustomMetadata reuses
 // the element name and keys by field.
-const getValuesKey = (el: JsonValue) =>
-  getPropertyValue(el, 'fullName') ?? getPropertyValue(el, 'field')
+const getValuesKey = firstPresentKey('fullName', 'field')
 
 const METADATA_KEY_EXTRACTORS = {
   labels: (el: JsonValue) => getPropertyValue(el, 'fullName'), // CustomLabels
@@ -230,11 +241,7 @@ const METADATA_KEY_EXTRACTORS = {
   promptVersions: (el: JsonValue) => getPropertyValue(el, 'name'), // Translations
   quickActions: (el: JsonValue) => getPropertyValue(el, 'name'), // Translations
   reportTypes: (el: JsonValue) => getPropertyValue(el, 'name'), // Translations
-  sections: (el: JsonValue) => {
-    const name = getPropertyValue(el, 'name') // Translations
-    const section = getPropertyValue(el, 'section') // CustomObjectTranslation
-    return [name, section].find(isPresent)
-  }, // Special thing because of types different// Translations // CustomObjectTranslation
+  sections: firstPresentKey('name', 'section'), // Translations (name) | CustomObjectTranslation (section)
   columns: (el: JsonValue) => getPropertyValue(el, 'name'), // Translations
   scontrols: (el: JsonValue) => getPropertyValue(el, 'name'), // Translations
 
