@@ -52,15 +52,19 @@ class UnkeyedConflictStrategy implements KeyedArrayMergeStrategy {
 
     return withConflict([
       buildConflictMarkers(
-        { [this.attribute]: this.local },
-        { [this.attribute]: this.ancestor },
-        { [this.attribute]: this.other }
+        this.wrap(this.local),
+        this.wrap(this.ancestor),
+        this.wrap(this.other)
       ),
     ])
   }
 
   private resolved(value: JsonArray): MergeResult {
-    return noConflict(value.map(item => ({ [this.attribute]: item })))
+    return noConflict(this.wrap(value))
+  }
+
+  private wrap(entries: JsonArray): JsonArray {
+    return entries.map(item => ({ [this.attribute]: item }))
   }
 }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { KeyedArrayMergeNode } from '../../../../src/merger/nodes/KeyedArrayMergeNode.js'
 import { MetadataService } from '../../../../src/service/MetadataService.js'
+import { isConflictBlock } from '../../../../src/types/conflictBlock.js'
 import type { JsonArray } from '../../../../src/types/jsonTypes.js'
 import { defaultConfig } from '../../../utils/testConfig.js'
 
@@ -594,6 +595,64 @@ describe('KeyedArrayMergeNode', () => {
 
       // Assert
       expect(result.hasConflict).toBe(true)
+    })
+  })
+
+  describe('given an array without a key extractor', () => {
+    describe('when every side changed it differently', () => {
+      it('then each side of the conflict lists one element per entry', () => {
+        // Arrange
+        const sut = new KeyedArrayMergeNode(
+          [{ name: 'a' }, { name: 'b' }],
+          [{ name: 'c' }, { name: 'd' }],
+          [{ name: 'e' }, { name: 'f' }],
+          'unknownAttribute',
+          undefined,
+          false
+        )
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        const [block] = result.output
+        expect(result.output).toHaveLength(1)
+        expect(isConflictBlock(block)).toBe(true)
+        expect(block).toMatchObject({
+          local: [
+            { unknownAttribute: { name: 'c' } },
+            { unknownAttribute: { name: 'd' } },
+          ],
+          ancestor: [
+            { unknownAttribute: { name: 'a' } },
+            { unknownAttribute: { name: 'b' } },
+          ],
+          other: [
+            { unknownAttribute: { name: 'e' } },
+            { unknownAttribute: { name: 'f' } },
+          ],
+        })
+      })
+    })
+
+    describe('when the ancestor was empty', () => {
+      it('then the ancestor side is a single empty element', () => {
+        // Arrange
+        const sut = new KeyedArrayMergeNode(
+          [],
+          [{ name: 'c' }],
+          [{ name: 'e' }],
+          'unknownAttribute',
+          undefined,
+          false
+        )
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result.output[0]).toMatchObject({ ancestor: [{}] })
+      })
     })
   })
 
