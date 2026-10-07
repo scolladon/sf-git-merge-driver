@@ -702,6 +702,149 @@ describe('MetadataService', () => {
       })
     })
 
+    describe('given an entry carrying none of its key fields', () => {
+      it.each([
+        'labels',
+        'applicationVisibilities',
+        'categoryGroupVisibilities',
+        'classAccesses',
+        'customMetadataTypeAccesses',
+        'customPermissions',
+        'customSettingAccesses',
+        'externalDataSourceAccesses',
+        'fieldPermissions',
+        'flowAccesses',
+        'layoutAssignments',
+        'loginFlows',
+        'loginIpRanges',
+        'objectPermissions',
+        'pageAccesses',
+        'profileActionOverrides',
+        'recordTypeVisibilities',
+        'servicePresenceStatusAccesses',
+        'tabVisibilities',
+        'userPermissions',
+        'dataspaceScopes',
+        'emailRoutingAddressAccesses',
+        'externalCredentialPrincipalAccesses',
+        'tabSettings',
+        'sharingCriteriaRules',
+        'sharingGuestRules',
+        'sharingOwnerRules',
+        'sharingTerritoryRules',
+        'criteriaItems',
+        'filterItems',
+        'summaryFilterItems',
+        'valueSettings',
+        'alerts',
+        'recipients',
+        'fieldUpdates',
+        'flowActions',
+        'flowInputs',
+        'flowAutomation',
+        'knowledgePublishes',
+        'outboundMessages',
+        'rules',
+        'actions',
+        'send',
+        'tasks',
+        'assignmentRule',
+        'autoResponseRule',
+        'escalationRule',
+        'marketingAppExtActions',
+        'marketingAppExtActivities',
+        'matchingRules',
+        'matchingRuleItems',
+        'customValue',
+        'standardValue',
+        'valueTranslation',
+        'botBlocks',
+        'botBlockVersions',
+        'botDialogs',
+        'botSteps',
+        'botMessages',
+        'botVariableOperation',
+        'botTemplates',
+        'bots',
+        'botVersions',
+        'conversationMessageDefinitions',
+        'constantValueTranslations',
+        'customApplications',
+        'customLabels',
+        'customPageWebLinks',
+        'customTabs',
+        'desFieldTemplateMessages',
+        'flowDefinitions',
+        'flows',
+        'identityVerificationCustomFieldLabels',
+        'pipelineInspMetricConfigs',
+        'prompts',
+        'promptVersions',
+        'quickActions',
+        'reportTypes',
+        'sections',
+        'columns',
+        'scontrols',
+        'caseValues',
+        'fieldSets',
+        'fields',
+        'picklistValues',
+        'values',
+        'value',
+        'layouts',
+        'quickActionParametersTranslation',
+        'recordTypes',
+        'sharingReasons',
+        'standardFields',
+        'validationRules',
+        'webLinks',
+        'workflowTasks',
+        'types',
+      ])('then %s reports no key', name => {
+        // Arrange
+        const sut = MetadataService.getKeyFieldExtractor(name)
+
+        // Act
+        const result = sut!({} as JsonValue)
+
+        // Assert
+        expect(result).toBeUndefined()
+      })
+
+      it('then loginFlows ignores the old friendlyname spelling', () => {
+        // Arrange
+        const sut = MetadataService.getKeyFieldExtractor('loginFlows')
+
+        // Act
+        const result = sut!({ friendlyname: 'X' } as JsonValue)
+
+        // Assert
+        expect(result).toBeUndefined()
+      })
+    })
+
+    describe('given an entry carrying only part of a composite key', () => {
+      it.each([
+        ['criteriaItems', { value: 'v' }, 'v'],
+        ['caseValues', { plural: 'true' }, 'true'],
+        ['layoutAssignments', { recordType: 'R' }, 'R'],
+        ['loginIpRanges', { startAddress: '1.1.1.1' }, '1.1.1.1-undefined'],
+        ['matchingRuleItems', { matchingMethod: 'Exact' }, 'undefined-Exact'],
+        ['picklistValues', { masterLabel: '', picklist: 'P' }, ''],
+        ['fieldPermissions', { field: '' }, ''],
+        ['fieldPermissions', { field: null }, 'null'],
+      ])('then %s keeps its partial key', (name, entry, expected) => {
+        // Arrange
+        const sut = MetadataService.getKeyFieldExtractor(name)
+
+        // Act
+        const result = sut!(entry as unknown as JsonValue)
+
+        // Assert
+        expect(result).toBe(expected)
+      })
+    })
+
     describe('given a key field whose value is a null-prototype object (parser output shape)', () => {
       it('should treat it as absent instead of throwing on String coercion', () => {
         // Arrange - the parser builds compact nodes on Object.create(null), so
@@ -718,7 +861,7 @@ describe('MetadataService', () => {
         const result = extractor!(testObject as unknown as JsonValue)
 
         // Assert
-        expect(result).toBe(String(undefined))
+        expect(result).toBeUndefined()
       })
     })
 
@@ -752,6 +895,8 @@ describe('MetadataService', () => {
       'filterItems',
       'summaryFilterItems',
       'criteriaItems',
+      'prompts',
+      'promptVersions',
     ])('should return true for %s', attribute => {
       // Act
       const result = MetadataService.isOrderedAttribute(attribute)

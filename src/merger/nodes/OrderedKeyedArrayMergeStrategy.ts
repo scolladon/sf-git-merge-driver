@@ -10,7 +10,7 @@ import { hasSameOrder, lcs, pushAll } from '../../utils/arrayUtils.js'
 import { jsonEqual } from '../../utils/jsonEqual.js'
 import { setsEqual, setsIntersect } from '../../utils/setUtils.js'
 import { buildConflictMarkers } from '../ConflictMarkerBuilder.js'
-import type { KeyExtractor } from './KeyedArrayIndex.js'
+import type { EntryKey } from './KeyedArrayIndex.js'
 import { buildKeyedMap } from './KeyedArrayIndex.js'
 import type { KeyedArrayMergeStrategy } from './KeyedArrayMergeStrategy.js'
 
@@ -80,7 +80,7 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     private readonly local: JsonArray,
     private readonly other: JsonArray,
     private readonly attribute: string,
-    private readonly keyField: KeyExtractor
+    private readonly keyField: EntryKey
   ) {}
 
   merge(config: MergeConfig): MergeResult {

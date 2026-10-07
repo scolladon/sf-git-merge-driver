@@ -3,7 +3,7 @@ import type { JsonValue } from '../types/jsonTypes.js'
 export class MetadataService {
   public static getKeyFieldExtractor(
     metadataType: string
-  ): ((el: JsonValue) => string) | undefined {
+  ): ((el: JsonValue) => string | undefined) | undefined {
     // `in` walks the prototype chain, so `'__proto__' in {}` is true —
     // metadataType is an untrusted XML tag name, and `__proto__` would
     // resolve to the inherited Object.prototype accessor instead of
@@ -48,26 +48,49 @@ const TEXT_ARRAY_ATTRIBUTES = new Set([
   'members', // Package, DestructiveChanges — manifest member list
 ])
 
+const KEY_PART_SEPARATOR = '.'
+
 // An object-shaped key field (element with attributes/children, built on
 // Object.create(null) by the parser) has no inherited toString and would
-// throw on String(). Every extractor already treats String(undefined) as
-// "absent" — yield that same sentinel here so an unusable key field is
-// filtered out instead of crashing.
-const getPropertyValue = (el: JsonValue, property: string) => {
+// throw on String(). Report it as no key, like an absent one, so an
+// unusable key field is skipped instead of crashing.
+const getPropertyValue = (
+  el: JsonValue,
+  property: string
+): string | undefined => {
   const value = (el as Record<string, unknown>)[property]
-  return typeof value === 'object' && value !== null
-    ? String(undefined)
-    : String(value)
+  if (value === undefined || (typeof value === 'object' && value !== null)) {
+    return undefined
+  }
+  return String(value)
 }
+
+const isPresent = (part: string | undefined): part is string =>
+  part !== undefined
+
+const joinPresentParts = (
+  parts: readonly (string | undefined)[]
+): string | undefined => {
+  const present = parts.filter(isPresent)
+  return present.length === 0 ? undefined : present.join(KEY_PART_SEPARATOR)
+}
+
+// An absent half of a pair is still rendered as text so partial keys
+// stay stable.
+const joinPair = (
+  first: string | undefined,
+  second: string | undefined
+): string | undefined =>
+  first === undefined && second === undefined
+    ? undefined
+    : `${String(first)}-${String(second)}`
 
 const getFilterItemKey = (el: JsonValue) => {
   const field = getPropertyValue(el, 'field')
   const operation = getPropertyValue(el, 'operation')
   const value = getPropertyValue(el, 'value')
   const valueField = getPropertyValue(el, 'valueField')
-  return [field, operation, value, valueField]
-    .filter(x => x !== String(undefined))
-    .join('.')
+  return joinPresentParts([field, operation, value, valueField])
 }
 
 // The `picklistValues` element name is reused across two metadata
@@ -75,15 +98,9 @@ const getFilterItemKey = (el: JsonValue) => {
 //   - CustomObjectTranslation.fields[].picklistValues → keyed by `masterLabel`
 //   - RecordType.picklistValues                       → keyed by `picklist`
 // Without the fallback, every RecordType `<picklistValues>` block
-// keys to the literal string `"undefined"` (since `masterLabel`
-// doesn't exist on that schema), `buildKeyedMap` retains only the
-// last block, and the merge silently drops the rest.
-const getPicklistValuesKey = (el: JsonValue) => {
-  const masterLabel = getPropertyValue(el, 'masterLabel')
-  return masterLabel !== String(undefined)
-    ? masterLabel
-    : getPropertyValue(el, 'picklist')
-}
+// would have no key.
+const getPicklistValuesKey = (el: JsonValue) =>
+  getPropertyValue(el, 'masterLabel') ?? getPropertyValue(el, 'picklist')
 
 const METADATA_KEY_EXTRACTORS = {
   labels: (el: JsonValue) => getPropertyValue(el, 'fullName'), // CustomLabels
@@ -102,7 +119,7 @@ const METADATA_KEY_EXTRACTORS = {
   layoutAssignments: (el: JsonValue) => {
     const layout = getPropertyValue(el, 'layout')
     const recordType = getPropertyValue(el, 'recordType')
-    return [layout, recordType].filter(x => x !== String(undefined)).join('.')
+    return joinPresentParts([layout, recordType])
   }, // Profile
   loginFlows: (el: JsonValue) => getPropertyValue(el, 'friendlyName'), // Profile
   loginHours: (el: JsonValue) =>
@@ -110,7 +127,7 @@ const METADATA_KEY_EXTRACTORS = {
   loginIpRanges: (el: JsonValue) => {
     const startAddress = getPropertyValue(el, 'startAddress')
     const endAddress = getPropertyValue(el, 'endAddress')
-    return `${startAddress}-${endAddress}`
+    return joinPair(startAddress, endAddress)
   }, // Profile
   objectPermissions: (el: JsonValue) => getPropertyValue(el, 'object'), // Profile // PermissionSet
   pageAccesses: (el: JsonValue) => getPropertyValue(el, 'apexPage'), // Profile // PermissionSet
@@ -159,7 +176,7 @@ const METADATA_KEY_EXTRACTORS = {
   matchingRuleItems: (el: JsonValue) => {
     const fieldName = getPropertyValue(el, 'fieldName')
     const matchingMethod = getPropertyValue(el, 'matchingMethod')
-    return `${fieldName}-${matchingMethod}`
+    return joinPair(fieldName, matchingMethod)
   }, // MatchingRules
   customValue: (el: JsonValue) => getPropertyValue(el, 'fullName'), // GlobalValueSet
   standardValue: (el: JsonValue) => getPropertyValue(el, 'fullName'), // StandardValueSet
@@ -194,7 +211,7 @@ const METADATA_KEY_EXTRACTORS = {
   sections: (el: JsonValue) => {
     const name = getPropertyValue(el, 'name') // Translations
     const section = getPropertyValue(el, 'section') // CustomObjectTranslation
-    return [name, section].filter(x => x !== String(undefined))[0]
+    return [name, section].find(isPresent)
   }, // Special thing because of types different// Translations // CustomObjectTranslation
   columns: (el: JsonValue) => getPropertyValue(el, 'name'), // Translations
   scontrols: (el: JsonValue) => getPropertyValue(el, 'name'), // Translations
@@ -204,9 +221,7 @@ const METADATA_KEY_EXTRACTORS = {
     const caseType = getPropertyValue(el, 'caseType')
     const plural = getPropertyValue(el, 'plural')
     const possessive = getPropertyValue(el, 'possessive')
-    return [article, caseType, plural, possessive]
-      .filter(x => x !== String(undefined))
-      .join('.')
+    return joinPresentParts([article, caseType, plural, possessive])
   }, // CustomObjectTranslation
   fieldSets: (el: JsonValue) => getPropertyValue(el, 'name'), // CustomObjectTranslation
   fields: (el: JsonValue) => getPropertyValue(el, 'name'), // CustomObjectTranslation

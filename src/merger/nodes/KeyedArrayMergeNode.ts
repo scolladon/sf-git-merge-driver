@@ -9,8 +9,8 @@ import {
 import { jsonEqual } from '../../utils/jsonEqual.js'
 import { buildConflictMarkers } from '../ConflictMarkerBuilder.js'
 import { MergeOrchestrator } from '../MergeOrchestrator.js'
-import type { KeyExtractor } from './KeyedArrayIndex.js'
-import { indexKeyedArrays } from './KeyedArrayIndex.js'
+import type { EntryKey, KeyExtractor } from './KeyedArrayIndex.js'
+import { indexKeyedArrays, toEntryKey } from './KeyedArrayIndex.js'
 import type { KeyedArrayMergeStrategy } from './KeyedArrayMergeStrategy.js'
 import type { MergeNode } from './MergeNode.js'
 import { defaultNodeFactory, isAttributedTrio } from './MergeNodeFactory.js'
@@ -74,7 +74,7 @@ class UnorderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     private readonly local: JsonArray,
     private readonly other: JsonArray,
     private readonly attribute: string,
-    private readonly keyField: KeyExtractor
+    private readonly keyField: EntryKey
   ) {}
 
   merge(config: MergeConfig): MergeResult {
@@ -165,22 +165,19 @@ export class KeyedArrayMergeNode implements MergeNode {
       ).merge(config)
     }
 
-    const strategy: KeyedArrayMergeStrategy = this.isOrdered
-      ? new OrderedKeyedArrayMergeStrategy(
-          this.ancestor,
-          this.local,
-          this.other,
-          this.attribute,
-          this.keyField
-        )
-      : new UnorderedKeyedArrayMergeStrategy(
-          this.ancestor,
-          this.local,
-          this.other,
-          this.attribute,
-          this.keyField
-        )
+    return this.keyedStrategy(toEntryKey(this.keyField)).merge(config)
+  }
 
-    return strategy.merge(config)
+  private keyedStrategy(entryKey: EntryKey): KeyedArrayMergeStrategy {
+    const StrategyType = this.isOrdered
+      ? OrderedKeyedArrayMergeStrategy
+      : UnorderedKeyedArrayMergeStrategy
+    return new StrategyType(
+      this.ancestor,
+      this.local,
+      this.other,
+      this.attribute,
+      entryKey
+    )
   }
 }

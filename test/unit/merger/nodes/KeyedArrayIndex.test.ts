@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { TEXT_TAG } from '../../../../src/constant/parserConstant.js'
-import { buildKeyedMap } from '../../../../src/merger/nodes/KeyedArrayIndex.js'
+import {
+  buildKeyedMap,
+  toEntryKey,
+} from '../../../../src/merger/nodes/KeyedArrayIndex.js'
 
 describe('KeyedArrayIndex', () => {
   describe('buildKeyedMap', () => {
@@ -29,5 +32,25 @@ describe('KeyedArrayIndex', () => {
       // Assert
       expect(sut.size).toBe(0)
     })
+  })
+
+  describe('toEntryKey', () => {
+    it.each([
+      ['no key', undefined, 'undefined'],
+      ['a key', 'k', 'k'],
+      ['an empty key', '', ''],
+    ])(
+      'given an extractor returning %s when indexing then returns %s',
+      (_, key, expected) => {
+        // Arrange
+        const sut = toEntryKey(() => key)
+
+        // Act
+        const result = sut({})
+
+        // Assert
+        expect(result).toBe(expected)
+      }
+    )
   })
 })

@@ -1,10 +1,20 @@
 import type { JsonArray, JsonObject } from '../../types/jsonTypes.js'
 
-export type KeyExtractor = (item: JsonObject) => string
+export type KeyExtractor = (item: JsonObject) => string | undefined
+export type EntryKey = (item: JsonObject) => string
+
+// A lone entry without a key keeps the key it has always had, so it
+// merges and sorts as before.
+const LONE_KEYLESS_ENTRY_KEY = String(undefined)
+
+export const toEntryKey =
+  (keyOf: KeyExtractor): EntryKey =>
+  item =>
+    keyOf(item) ?? LONE_KEYLESS_ENTRY_KEY
 
 export const buildKeyedMap = (
   arr: JsonArray,
-  keyField: KeyExtractor
+  keyField: EntryKey
 ): Map<string, JsonObject> => {
   const map = new Map<string, JsonObject>()
   for (const item of arr) {
@@ -24,7 +34,7 @@ export const indexKeyedArrays = (
   ancestor: JsonArray,
   local: JsonArray,
   other: JsonArray,
-  keyField: KeyExtractor
+  keyField: EntryKey
 ): {
   keyedAncestor: Map<string, JsonObject>
   keyedLocal: Map<string, JsonObject>
