@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791439503768,
+  "lastUpdate": 1791487720083,
   "repoUrl": "https://github.com/scolladon/sf-git-merge-driver",
   "entries": {
     "Runtime Benchmark": [
@@ -3449,6 +3449,138 @@ window.BENCHMARK_DATA = {
             "name": "serialize-large",
             "value": 321,
             "range": "±3.35%",
+            "unit": "ops/sec"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "colladonsebastien@gmail.com",
+            "name": "Sebastien",
+            "username": "scolladon"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2a42a3f59b147fce4c6f3e67e68c2021d4e191b8",
+          "message": "feat(merger): merge CustomMetadata records and fail safe on keyless keyed entries (#224)\n\nBEGIN_COMMIT_OVERRIDE\nfeat(metadata): merge CustomMetadata records by field and map them to the driver by default\nfix(merger): merge keyed arrays whose entries share no key as a whole\nfix(merger): write each entry of an unkeyed array conflict as its own element\nfix(metadata): read the loginFlows key from friendlyName\nEND_COMMIT_OVERRIDE",
+          "timestamp": "2026-10-08T21:26:10+02:00",
+          "tree_id": "5cfeaa1f58229d5a4b5aaf60ed1b6da2e3ad65b5",
+          "url": "https://github.com/scolladon/sf-git-merge-driver/commit/2a42a3f59b147fce4c6f3e67e68c2021d4e191b8"
+        },
+        "date": 1791487719405,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "node bin/merge-driver.cjs --version",
+            "value": 30,
+            "range": "±1.94%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-small-no-conflict",
+            "value": 1004,
+            "range": "±1.56%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-small-with-conflict",
+            "value": 1033,
+            "range": "±1.72%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-medium-no-conflict",
+            "value": 146,
+            "range": "±1.11%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-medium-with-conflict",
+            "value": 146,
+            "range": "±1.37%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-large-no-conflict",
+            "value": 35,
+            "range": "±1.65%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-large-with-conflict",
+            "value": 36,
+            "range": "±1.47%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-ordered-globalvalueset",
+            "value": 1062,
+            "range": "±2.76%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-picklist-customfield",
+            "value": 1725,
+            "range": "±2.07%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "parse-small",
+            "value": 2933,
+            "range": "±0.35%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-small",
+            "value": 4388,
+            "range": "±2.17%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "serialize-small",
+            "value": 5258,
+            "range": "±0.69%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "parse-medium",
+            "value": 360,
+            "range": "±0.48%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-medium",
+            "value": 543,
+            "range": "±2.26%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "serialize-medium",
+            "value": 643,
+            "range": "±1.60%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "parse-large",
+            "value": 91,
+            "range": "±0.40%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "merge-large",
+            "value": 137,
+            "range": "±2.80%",
+            "unit": "ops/sec"
+          },
+          {
+            "name": "serialize-large",
+            "value": 165,
+            "range": "±1.52%",
             "unit": "ops/sec"
           }
         ]
