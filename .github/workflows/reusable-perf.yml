@@ -43,6 +43,9 @@ jobs:
         continue-on-error: true
         env:
           BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD~1' }}
+          # A cached result was measured on another runner instance, so the
+          # same-runner comparison would compare two machines.
+          WIREIT_CACHE: none
         run: |
           git checkout --detach "$BASE_REF"
           npm install
@@ -54,6 +57,8 @@ jobs:
           npm install
 
       - name: Run benchmarks
+        env:
+          WIREIT_CACHE: none
         run: npm run test:perf
 
       - name: Compare against baseline (same runner)

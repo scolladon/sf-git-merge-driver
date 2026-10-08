@@ -10,7 +10,7 @@ import { hasSameOrder, lcs, pushAll } from '../../utils/arrayUtils.js'
 import { jsonEqual } from '../../utils/jsonEqual.js'
 import { setsEqual, setsIntersect } from '../../utils/setUtils.js'
 import { buildConflictMarkers } from '../ConflictMarkerBuilder.js'
-import type { KeyExtractor } from './KeyedArrayIndex.js'
+import type { KeyedSides } from './KeyedArrayIndex.js'
 import { buildKeyedMap } from './KeyedArrayIndex.js'
 import type { KeyedArrayMergeStrategy } from './KeyedArrayMergeStrategy.js'
 
@@ -80,7 +80,7 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     private readonly local: JsonArray,
     private readonly other: JsonArray,
     private readonly attribute: string,
-    private readonly keyField: KeyExtractor
+    private readonly keys: KeyedSides
   ) {}
 
   merge(config: MergeConfig): MergeResult {
@@ -107,19 +107,19 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   // ============================================================================
 
   private buildArrayMergeState(): ArrayMergeState {
-    const ancestorKeys = this.ancestor.map(item =>
-      this.keyField(item as JsonObject)
-    )
-    const localKeys = this.local.map(item => this.keyField(item as JsonObject))
-    const otherKeys = this.other.map(item => this.keyField(item as JsonObject))
+    const {
+      ancestor: ancestorKeys,
+      local: localKeys,
+      other: otherKeys,
+    } = this.keys
 
     return {
       ancestorKeys,
       localKeys,
       otherKeys,
-      ancestorMap: buildKeyedMap(this.ancestor, this.keyField),
-      localMap: buildKeyedMap(this.local, this.keyField),
-      otherMap: buildKeyedMap(this.other, this.keyField),
+      ancestorMap: buildKeyedMap(this.ancestor, ancestorKeys),
+      localMap: buildKeyedMap(this.local, localKeys),
+      otherMap: buildKeyedMap(this.other, otherKeys),
       // Position maps computed once for O(1) lookups
       ancestorPos: new Map(ancestorKeys.map((k, i) => [k, i])),
       localPos: new Map(localKeys.map((k, i) => [k, i])),

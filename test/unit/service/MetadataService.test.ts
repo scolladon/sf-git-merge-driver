@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MetadataService } from '../../../src/service/MetadataService.js'
-import { JsonValue } from '../../../src/types/jsonTypes.js'
+import type { JsonArray, JsonValue } from '../../../src/types/jsonTypes.js'
 
 describe('MetadataService', () => {
   describe('getKeyFieldExtractor', () => {
@@ -202,9 +202,9 @@ describe('MetadataService', () => {
           expected: 'TestFlow',
         },
         {
-          name: 'handles loginFlows with friendlyname',
+          name: 'handles loginFlows with friendlyName',
           metadataType: 'loginFlows',
-          testObject: { friendlyname: 'TestLoginFlow' },
+          testObject: { friendlyName: 'TestLoginFlow' },
           expected: 'TestLoginFlow',
         },
         {
@@ -643,6 +643,18 @@ describe('MetadataService', () => {
           expected: 'TestRecordTypeValue',
         },
         {
+          name: 'handles values with field only (CustomMetadata)',
+          metadataType: 'values',
+          testObject: { field: 'A__c', value: 'a' },
+          expected: 'A__c',
+        },
+        {
+          name: 'prefers fullName over field for values',
+          metadataType: 'values',
+          testObject: { fullName: 'F', field: 'A__c' },
+          expected: 'F',
+        },
+        {
           name: 'handles value with fullName (CustomField)',
           metadataType: 'value',
           testObject: { fullName: 'TestCustomFieldValue' },
@@ -702,6 +714,149 @@ describe('MetadataService', () => {
       })
     })
 
+    describe('given an entry carrying none of its key fields', () => {
+      it.each([
+        'labels',
+        'applicationVisibilities',
+        'categoryGroupVisibilities',
+        'classAccesses',
+        'customMetadataTypeAccesses',
+        'customPermissions',
+        'customSettingAccesses',
+        'externalDataSourceAccesses',
+        'fieldPermissions',
+        'flowAccesses',
+        'layoutAssignments',
+        'loginFlows',
+        'loginIpRanges',
+        'objectPermissions',
+        'pageAccesses',
+        'profileActionOverrides',
+        'recordTypeVisibilities',
+        'servicePresenceStatusAccesses',
+        'tabVisibilities',
+        'userPermissions',
+        'dataspaceScopes',
+        'emailRoutingAddressAccesses',
+        'externalCredentialPrincipalAccesses',
+        'tabSettings',
+        'sharingCriteriaRules',
+        'sharingGuestRules',
+        'sharingOwnerRules',
+        'sharingTerritoryRules',
+        'criteriaItems',
+        'filterItems',
+        'summaryFilterItems',
+        'valueSettings',
+        'alerts',
+        'recipients',
+        'fieldUpdates',
+        'flowActions',
+        'flowInputs',
+        'flowAutomation',
+        'knowledgePublishes',
+        'outboundMessages',
+        'rules',
+        'actions',
+        'send',
+        'tasks',
+        'assignmentRule',
+        'autoResponseRule',
+        'escalationRule',
+        'marketingAppExtActions',
+        'marketingAppExtActivities',
+        'matchingRules',
+        'matchingRuleItems',
+        'customValue',
+        'standardValue',
+        'valueTranslation',
+        'botBlocks',
+        'botBlockVersions',
+        'botDialogs',
+        'botSteps',
+        'botMessages',
+        'botVariableOperation',
+        'botTemplates',
+        'bots',
+        'botVersions',
+        'conversationMessageDefinitions',
+        'constantValueTranslations',
+        'customApplications',
+        'customLabels',
+        'customPageWebLinks',
+        'customTabs',
+        'desFieldTemplateMessages',
+        'flowDefinitions',
+        'flows',
+        'identityVerificationCustomFieldLabels',
+        'pipelineInspMetricConfigs',
+        'prompts',
+        'promptVersions',
+        'quickActions',
+        'reportTypes',
+        'sections',
+        'columns',
+        'scontrols',
+        'caseValues',
+        'fieldSets',
+        'fields',
+        'picklistValues',
+        'values',
+        'value',
+        'layouts',
+        'quickActionParametersTranslation',
+        'recordTypes',
+        'sharingReasons',
+        'standardFields',
+        'validationRules',
+        'webLinks',
+        'workflowTasks',
+        'types',
+      ])('then %s reports no key', name => {
+        // Arrange
+        const sut = MetadataService.getKeyFieldExtractor(name)
+
+        // Act
+        const result = sut!({} as JsonValue)
+
+        // Assert
+        expect(result).toBeUndefined()
+      })
+
+      it('then loginFlows ignores the old friendlyname spelling', () => {
+        // Arrange
+        const sut = MetadataService.getKeyFieldExtractor('loginFlows')
+
+        // Act
+        const result = sut!({ friendlyname: 'X' } as JsonValue)
+
+        // Assert
+        expect(result).toBeUndefined()
+      })
+    })
+
+    describe('given an entry carrying only part of a composite key', () => {
+      it.each([
+        ['criteriaItems', { value: 'v' }, 'v'],
+        ['caseValues', { plural: 'true' }, 'true'],
+        ['layoutAssignments', { recordType: 'R' }, 'R'],
+        ['loginIpRanges', { startAddress: '1.1.1.1' }, '1.1.1.1-undefined'],
+        ['matchingRuleItems', { matchingMethod: 'Exact' }, 'undefined-Exact'],
+        ['picklistValues', { masterLabel: '', picklist: 'P' }, ''],
+        ['fieldPermissions', { field: '' }, ''],
+        ['fieldPermissions', { field: null }, 'null'],
+      ])('then %s keeps its partial key', (name, entry, expected) => {
+        // Arrange
+        const sut = MetadataService.getKeyFieldExtractor(name)
+
+        // Act
+        const result = sut!(entry as unknown as JsonValue)
+
+        // Assert
+        expect(result).toBe(expected)
+      })
+    })
+
     describe('given a key field whose value is a null-prototype object (parser output shape)', () => {
       it('should treat it as absent instead of throwing on String coercion', () => {
         // Arrange - the parser builds compact nodes on Object.create(null), so
@@ -718,15 +873,14 @@ describe('MetadataService', () => {
         const result = extractor!(testObject as unknown as JsonValue)
 
         // Assert
-        expect(result).toBe(String(undefined))
+        expect(result).toBeUndefined()
       })
     })
 
     describe('given the picklistValues prefer-then-fallback extractor with an object-shaped masterLabel', () => {
       it('should fall back to picklist instead of throwing on String coercion', () => {
-        // Arrange - the object-shaped sentinel must be indistinguishable
-        // from "absent" so the existing `!== String(undefined)` fallback
-        // in getPicklistValuesKey still selects the picklist field
+        // Arrange - an object-shaped masterLabel reads as no key, so the
+        // `??` fallback in getPicklistValuesKey selects the picklist field
         const nullProtoMasterLabel = Object.create(null)
         const testObject = {
           masterLabel: nullProtoMasterLabel,
@@ -752,9 +906,11 @@ describe('MetadataService', () => {
       'filterItems',
       'summaryFilterItems',
       'criteriaItems',
+      'prompts',
+      'promptVersions',
     ])('should return true for %s', attribute => {
       // Act
-      const result = MetadataService.isOrderedAttribute(attribute)
+      const result = MetadataService.isOrderedAttribute(attribute, [])
 
       // Assert
       expect(result).toBe(true)
@@ -775,10 +931,76 @@ describe('MetadataService', () => {
       'workflowTask',
     ])('should return false for %s', attribute => {
       // Act
-      const result = MetadataService.isOrderedAttribute(attribute)
+      const result = MetadataService.isOrderedAttribute(attribute, [])
 
       // Assert
       expect(result).toBe(false)
+    })
+
+    describe('given the values element shared by two schemas', () => {
+      const recordTypeEntry = { fullName: 'Agriculture', default: 'false' }
+      const customMetadataEntry = { field: 'A__c', value: 'a' }
+
+      it.each([
+        ['RecordType-shaped sides', [[recordTypeEntry], [], []]],
+        ['empty sides', [[], [], []]],
+        [
+          'an entry with both fullName and field',
+          [[{ fullName: 'F', field: 'A__c' }], [], []],
+        ],
+        ['an entry with neither', [[{ default: 'false' }], [], []]],
+      ] as [string, JsonArray[]][])(
+        'then it is ordered for %s',
+        (_name, sides) => {
+          // Act
+          const result = MetadataService.isOrderedAttribute('values', sides)
+
+          // Assert
+          expect(result).toBe(true)
+        }
+      )
+
+      it.each([
+        ['one side only', [[], [customMetadataEntry], []]],
+        [
+          'mixed with a RecordType-shaped side',
+          [[recordTypeEntry], [customMetadataEntry], []],
+        ],
+      ] as [string, JsonArray[]][])(
+        'then it is unordered for CustomMetadata-shaped entries on %s',
+        (_name, sides) => {
+          // Act
+          const result = MetadataService.isOrderedAttribute('values', sides)
+
+          // Assert
+          expect(result).toBe(false)
+        }
+      )
+
+      it('then an ordered attribute without a variant stays ordered', () => {
+        // Arrange
+        const sides: JsonArray[] = [[customMetadataEntry], [], []]
+
+        // Act
+        const result = MetadataService.isOrderedAttribute('customValue', sides)
+
+        // Assert
+        expect(result).toBe(true)
+      })
+
+      it.each(['__proto__', 'constructor'])(
+        'then %s is not ordered even with CustomMetadata-shaped sides',
+        attribute => {
+          // Arrange
+          const sides: JsonArray[] = [[customMetadataEntry], [], []]
+
+          // Act
+          const result = MetadataService.isOrderedAttribute(attribute, sides)
+
+          // Assert
+          expect(result).toBe(false)
+        }
+      )
     })
   })
 

@@ -503,31 +503,23 @@ describe('JsonMerger', () => {
           Profile: [
             {
               __conflict: true,
-              ancestor: [
-                {
-                  unknown: [],
-                },
-              ],
+              ancestor: [{}],
               local: [
                 {
-                  unknown: [
-                    {
-                      editable: 'true',
-                      field: 'Account.Name',
-                      readable: 'true',
-                    },
-                  ],
+                  unknown: {
+                    editable: 'true',
+                    field: 'Account.Name',
+                    readable: 'true',
+                  },
                 },
               ],
               other: [
                 {
-                  unknown: [
-                    {
-                      editable: 'false',
-                      field: 'Account.Name',
-                      readable: 'true',
-                    },
-                  ],
+                  unknown: {
+                    editable: 'false',
+                    field: 'Account.Name',
+                    readable: 'true',
+                  },
                 },
               ],
             },

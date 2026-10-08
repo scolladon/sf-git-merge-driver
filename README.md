@@ -79,6 +79,8 @@ For metadata types where **element order matters** (like picklist values), the m
 - `CustomField` → value set entries
 - `RecordType` → picklist value assignments
 
+`CustomMetadata` record `values` are the exception: they are merged by `field` and unordered, because the org does not store their order (a retrieve sorts them by field).
+
 This ensures picklist value ordering in your org matches what you expect after a merge.
 
 ### Tag order within an element
@@ -187,6 +189,9 @@ Configured for these metadata files by default:
 *.standardValueSetTranslation-meta.xml merge=salesforce-source
 *.translation-meta.xml merge=salesforce-source
 *.objectTranslation-meta.xml merge=salesforce-source
+*.recordType-meta.xml merge=salesforce-source
+*.field-meta.xml merge=salesforce-source
+*.md-meta.xml merge=salesforce-source
 ```
 
 ## How to disable it for a specific merge
@@ -312,6 +317,14 @@ This means you might see a conflict block containing the entire array instead of
 **If you encounter this behavior for a Salesforce metadata type the driver is supposed to handle, please open an issue!** We can add the missing key definition to support smart merging for that type.
 
 **If you encounter this behavior for a Salesforce metadata type the driver does not already handle, please open an issue!** We can evaluate how to support smart merging for that type.
+
+### Entries sharing a key
+
+When several entries of a list share the same key, the driver keeps the last one's content, which is what a deploy does.
+
+### Entries without their key
+
+When two or more entries of a list lack the field the driver uses as key, the driver merges the list as a whole. The same applies when one entry lacks its key and another entry's key is the text `undefined`. The merge is clean when only one branch changed the list, or both changed it the same way. Otherwise you get a conflict listing every entry. Nothing is dropped.
 
 ## Troubleshooting
 

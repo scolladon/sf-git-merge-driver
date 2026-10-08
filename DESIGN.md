@@ -59,7 +59,7 @@ classDiagram
 **Node Types:**
 - `TextMergeNode` - Handles scalar/primitive values, and any element carrying XML attributes (e.g. `<help xsi:nil="true"/>`, parsed as `{ '@_xsi:nil': 'true', '#text': '' }`), merged as one value and compared structurally. The factory routes single elements here; unordered keyed arrays route each matched entry that carries attributes here too — see "An Element Carrying Attributes Merges as a Whole" under Known Limitations
 - `TextArrayMergeNode` - Handles arrays of primitive values (e.g., `members` in package.xml)
-- `KeyedArrayMergeNode` - Handles arrays of objects with key fields (e.g., `fieldPermissions` with `field` key)
+- `KeyedArrayMergeNode` - Handles arrays of objects with key fields (e.g., `fieldPermissions` with `field` key). A keyed array with two or more entries lacking their key on one side goes whole to the unkeyed strategy (`UnkeyedConflictStrategy`), and unkeyed conflicts list each entry as its own element
 - `PropertyMergeNode` - Handles pure objects without key extractor (property-by-property merge). A side where the element is absent is normalised at the factory, before the node is constructed, to a shared frozen stand-in that contributes no properties, so additions and deletions propagate instead of crashing. That stand-in is built with `Object.create(null)` for the same reason the parser builds every node that way: an XML tag name is untrusted, and a plain `{}` would let a name such as `constructor` or `toString` resolve through `Object.prototype`, resurrecting an element the side had deleted. A side holding text rather than child elements is deliberately *not* normalised — see "Empty Text Is Indistinguishable From an Absent Tag" under Known Limitations
 
 ### Factory Pattern
@@ -80,6 +80,8 @@ flowchart TD
 ```
 
 Implementation: [MergeNodeFactory.ts](src/merger/nodes/MergeNodeFactory.ts)
+
+Whether a keyed array is ordered is decided by its element name plus the shape of its entries (`MetadataService.isOrderedAttribute(attribute, sides)`).
 
 ## Core Components
 
@@ -372,8 +374,16 @@ Salesforce reuses the same XML element name across unrelated parent schemas with
 | `picklistValues` | `RecordType` | `picklist` |
 | `sections` | `Translations` | `name` |
 | `sections` | `CustomObjectTranslation` | `section` |
+| `values` | `RecordType.picklistValues[]` | `fullName` (ordered) |
+| `values` | `CustomMetadata` | `field` (unordered) |
+| `value` | `CustomField.valueSet…` | `fullName` |
+| `value` | `Translations…inputParameters` | none (single element, matched by the lone-entry key) |
+| `value` | `CustomMetadata.values[]` | none (an `xsi:type`/`xsi:nil` leaf merged as one value by `TextMergeNode`) |
+| `loginFlows` | `Profile` | `friendlyName` |
 
-The convention for resolving the ambiguity is to read each candidate property via `getPropertyValue` (which returns the literal string `"undefined"` when absent — see `String(undefined)` sentinel idiom) and pick the first non-sentinel value. **Failing to do this causes silent data loss**: every block under the wrong-schema document keys to the same `"undefined"` string and `buildKeyedMap` retains only the last entry. New extractors that share an element name with an existing schema must follow the same prefer-then-fallback shape.
+The convention for resolving the ambiguity is to read each candidate property via `getPropertyValue`, which returns `undefined` for an absent or object-shaped field, and pick the first defined value with the `firstPresentKey` helper (`getPicklistValuesKey`, `getValuesKey`). Composite extractors return `undefined` only when no part is present. **Failing to do this leaves every entry under the wrong-schema document without a key**: the keyless fail-safe below then degrades the merge to a whole-array merge or conflict instead of a per-entry merge. New extractors that share an element name with an existing schema must follow the same prefer-then-fallback shape.
+
+**Keyless fail-safe.** `hasKeylessCollision` (`src/merger/nodes/KeyedArrayIndex.ts`) routes an array to `UnkeyedConflictStrategy` when any one side holds two or more entries sharing the fallback key and at least one of them is keyless (a real key spelled `undefined` shares it): the merge is clean when one side is unchanged or both sides are equal, otherwise it is a whole-array conflict. A lone keyless entry keeps the historical key through `toEntryKeys`. Duplicates of a real key keep last-wins: unordered arrays keep the last entry once, ordered arrays write the last entry's content once per occurrence. The fail-safe is a safety net, not a substitute for the right extractor.
 
 ### 3. Early Termination Optimization
 
@@ -401,7 +411,7 @@ Because `CompactXmlParser` preserves the source tag order (`ElementFrame.addChil
 **Parsed nodes are null-prototype**, and that is a pipeline-wide contract, not a parser-local detail. `ElementFrame.toCompact` builds each compact node with `Object.create(null)` because tag names come straight from untrusted XML and `__proto__` is a syntactically valid one: on a normal `{}`, `out['__proto__'] = value` invokes the inherited setter and rewrites the node's prototype instead of storing a child. Two obligations fall on every consumer of a parsed node:
 
 - `key in node` is an **own-key test** — but only for parsed nodes. Objects the driver builds itself (the parser's `content` wrapper, constant tables such as `METADATA_KEY_EXTRACTORS` and `LEVELS`) still inherit from `Object.prototype`, so a key named `constructor`, `toString` or `__proto__` answers `true` there. Those lookups use `Object.hasOwn`.
-- `String(node)` **throws** rather than coercing, because there is no inherited `toString`. Values that may be object-shaped are coerced through the local helpers in `MetadataService.getPropertyValue` (which yields the `String(undefined)` "absent" sentinel, so an unusable key field is filtered out) and `TextArrayMergeNode.toComparable` (which yields `JSON.stringify`, so distinct items stay distinguishable for sorting). The two differ deliberately: one needs the value to disappear, the other needs it to stay distinct.
+- `String(node)` **throws** rather than coercing, because there is no inherited `toString`. Values that may be object-shaped are coerced through the local helpers in `MetadataService.getPropertyValue` (which reports the field as absent (`undefined`), so an unusable key field is filtered out) and `TextArrayMergeNode.toComparable` (which yields `JSON.stringify`, so distinct items stay distinguishable for sorting). The two differ deliberately: one needs the value to disappear, the other needs it to stay distinct.
 
 This property is a **layout-only** concern: it does not affect which value wins a merge or whether a conflict fires. Determinism rests on two sources of order: `Object.keys` insertion order, which the parser already guarantees, and the tie-break's code-unit sort — bare `Array.prototype.sort()`, never `localeCompare` or `Intl.Collator` — so merged bytes never depend on the host machine's locale or ICU data. The "Deterministic Ordering Algorithm" section below is a separate axis: it governs the order of **array elements** (repeated same-name siblings) in ordered metadata types such as `GlobalValueSet`, and is orthogonal to within-node tag sequence.
 
@@ -609,6 +619,8 @@ Ordered merging applies to metadata with position-significant arrays:
 - `StandardValueSet` → `standardValue` (key: `fullName`)
 - `CustomField` → `valueSet.customValue` (key: `fullName`)
 - `RecordType` → `picklistValues.values` (key: `fullName`)
+
+CustomMetadata `values` shares the element name with `RecordType` but is excluded by entry shape (an entry with `field` and no `fullName`): it is merged by `field`, unordered.
 
 ## Known Limitations
 

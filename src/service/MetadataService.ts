@@ -1,9 +1,9 @@
-import type { JsonValue } from '../types/jsonTypes.js'
+import type { JsonArray, JsonValue } from '../types/jsonTypes.js'
 
 export class MetadataService {
   public static getKeyFieldExtractor(
     metadataType: string
-  ): ((el: JsonValue) => string) | undefined {
+  ): ((el: JsonValue) => string | undefined) | undefined {
     // `in` walks the prototype chain, so `'__proto__' in {}` is true —
     // metadataType is an untrusted XML tag name, and `__proto__` would
     // resolve to the inherited Object.prototype accessor instead of
@@ -15,8 +15,14 @@ export class MetadataService {
       : undefined
   }
 
-  public static isOrderedAttribute(attribute: string): boolean {
-    return ORDERED_ATTRIBUTES.has(attribute)
+  public static isOrderedAttribute(
+    attribute: string,
+    sides: readonly JsonArray[]
+  ): boolean {
+    if (!ORDERED_ATTRIBUTES.has(attribute)) return false
+    const isUnorderedVariant = UNORDERED_VARIANTS.get(attribute)
+    if (isUnorderedVariant === undefined) return true
+    return !sides.some(side => side.some(isUnorderedVariant))
   }
 
   // MergeNodeFactory's own array-shape check (isStringArray) only sees an
@@ -48,42 +54,86 @@ const TEXT_ARRAY_ATTRIBUTES = new Set([
   'members', // Package, DestructiveChanges — manifest member list
 ])
 
+const KEY_PART_SEPARATOR = '.'
+const KEY_PAIR_SEPARATOR = '-'
+
 // An object-shaped key field (element with attributes/children, built on
 // Object.create(null) by the parser) has no inherited toString and would
-// throw on String(). Every extractor already treats String(undefined) as
-// "absent" — yield that same sentinel here so an unusable key field is
-// filtered out instead of crashing.
-const getPropertyValue = (el: JsonValue, property: string) => {
+// throw on String(). Report it as no key, like an absent one, so an
+// unusable key field is skipped instead of crashing.
+const getPropertyValue = (
+  el: JsonValue,
+  property: string
+): string | undefined => {
   const value = (el as Record<string, unknown>)[property]
-  return typeof value === 'object' && value !== null
-    ? String(undefined)
-    : String(value)
+  if (value === undefined || (typeof value === 'object' && value !== null)) {
+    return undefined
+  }
+  return String(value)
 }
+
+const isPresent = (part: string | undefined): part is string =>
+  part !== undefined
+
+const joinPresentParts = (
+  parts: readonly (string | undefined)[]
+): string | undefined => {
+  const present = parts.filter(isPresent)
+  return present.length === 0 ? undefined : present.join(KEY_PART_SEPARATOR)
+}
+
+// An absent half of a pair is still rendered as text so partial keys
+// stay stable.
+const joinPair = (
+  first: string | undefined,
+  second: string | undefined
+): string | undefined =>
+  first === undefined && second === undefined
+    ? undefined
+    : `${first}${KEY_PAIR_SEPARATOR}${second}`
 
 const getFilterItemKey = (el: JsonValue) => {
   const field = getPropertyValue(el, 'field')
   const operation = getPropertyValue(el, 'operation')
   const value = getPropertyValue(el, 'value')
   const valueField = getPropertyValue(el, 'valueField')
-  return [field, operation, value, valueField]
-    .filter(x => x !== String(undefined))
-    .join('.')
+  return joinPresentParts([field, operation, value, valueField])
 }
+
+// Lazy like `??`: later properties are read only when earlier ones are absent.
+const firstPresentKey =
+  (...properties: readonly string[]) =>
+  (el: JsonValue): string | undefined => {
+    for (const property of properties) {
+      const value = getPropertyValue(el, property)
+      if (value !== undefined) {
+        return value
+      }
+    }
+    return undefined
+  }
 
 // The `picklistValues` element name is reused across two metadata
 // schemas with different key fields:
 //   - CustomObjectTranslation.fields[].picklistValues → keyed by `masterLabel`
 //   - RecordType.picklistValues                       → keyed by `picklist`
 // Without the fallback, every RecordType `<picklistValues>` block
-// keys to the literal string `"undefined"` (since `masterLabel`
-// doesn't exist on that schema), `buildKeyedMap` retains only the
-// last block, and the merge silently drops the rest.
-const getPicklistValuesKey = (el: JsonValue) => {
-  const masterLabel = getPropertyValue(el, 'masterLabel')
-  return masterLabel !== String(undefined)
-    ? masterLabel
-    : getPropertyValue(el, 'picklist')
-}
+// would have no key.
+const getPicklistValuesKey = firstPresentKey('masterLabel', 'picklist')
+
+// The org does not store CustomMetadata values order; retrieve sorts them
+// by field.
+const isCustomMetadataValue = (el: JsonValue): boolean =>
+  getPropertyValue(el, 'fullName') === undefined &&
+  getPropertyValue(el, 'field') !== undefined
+
+// A Map, not an object literal: the attribute is an untrusted tag name.
+const UNORDERED_VARIANTS: ReadonlyMap<string, (el: JsonValue) => boolean> =
+  new Map([['values', isCustomMetadataValue]])
+
+// RecordType keys its picklist values by fullName; CustomMetadata reuses
+// the element name and keys by field.
+const getValuesKey = firstPresentKey('fullName', 'field')
 
 const METADATA_KEY_EXTRACTORS = {
   labels: (el: JsonValue) => getPropertyValue(el, 'fullName'), // CustomLabels
@@ -102,15 +152,15 @@ const METADATA_KEY_EXTRACTORS = {
   layoutAssignments: (el: JsonValue) => {
     const layout = getPropertyValue(el, 'layout')
     const recordType = getPropertyValue(el, 'recordType')
-    return [layout, recordType].filter(x => x !== String(undefined)).join('.')
+    return joinPresentParts([layout, recordType])
   }, // Profile
-  loginFlows: (el: JsonValue) => getPropertyValue(el, 'friendlyname'), // Profile
+  loginFlows: (el: JsonValue) => getPropertyValue(el, 'friendlyName'), // Profile
   loginHours: (el: JsonValue) =>
     typeof el === 'object' && el !== null ? Object.keys(el).join(',') : '', // Profile
   loginIpRanges: (el: JsonValue) => {
     const startAddress = getPropertyValue(el, 'startAddress')
     const endAddress = getPropertyValue(el, 'endAddress')
-    return `${startAddress}-${endAddress}`
+    return joinPair(startAddress, endAddress)
   }, // Profile
   objectPermissions: (el: JsonValue) => getPropertyValue(el, 'object'), // Profile // PermissionSet
   pageAccesses: (el: JsonValue) => getPropertyValue(el, 'apexPage'), // Profile // PermissionSet
@@ -159,7 +209,7 @@ const METADATA_KEY_EXTRACTORS = {
   matchingRuleItems: (el: JsonValue) => {
     const fieldName = getPropertyValue(el, 'fieldName')
     const matchingMethod = getPropertyValue(el, 'matchingMethod')
-    return `${fieldName}-${matchingMethod}`
+    return joinPair(fieldName, matchingMethod)
   }, // MatchingRules
   customValue: (el: JsonValue) => getPropertyValue(el, 'fullName'), // GlobalValueSet
   standardValue: (el: JsonValue) => getPropertyValue(el, 'fullName'), // StandardValueSet
@@ -191,11 +241,7 @@ const METADATA_KEY_EXTRACTORS = {
   promptVersions: (el: JsonValue) => getPropertyValue(el, 'name'), // Translations
   quickActions: (el: JsonValue) => getPropertyValue(el, 'name'), // Translations
   reportTypes: (el: JsonValue) => getPropertyValue(el, 'name'), // Translations
-  sections: (el: JsonValue) => {
-    const name = getPropertyValue(el, 'name') // Translations
-    const section = getPropertyValue(el, 'section') // CustomObjectTranslation
-    return [name, section].filter(x => x !== String(undefined))[0]
-  }, // Special thing because of types different// Translations // CustomObjectTranslation
+  sections: firstPresentKey('name', 'section'), // Translations (name) | CustomObjectTranslation (section)
   columns: (el: JsonValue) => getPropertyValue(el, 'name'), // Translations
   scontrols: (el: JsonValue) => getPropertyValue(el, 'name'), // Translations
 
@@ -204,14 +250,12 @@ const METADATA_KEY_EXTRACTORS = {
     const caseType = getPropertyValue(el, 'caseType')
     const plural = getPropertyValue(el, 'plural')
     const possessive = getPropertyValue(el, 'possessive')
-    return [article, caseType, plural, possessive]
-      .filter(x => x !== String(undefined))
-      .join('.')
+    return joinPresentParts([article, caseType, plural, possessive])
   }, // CustomObjectTranslation
   fieldSets: (el: JsonValue) => getPropertyValue(el, 'name'), // CustomObjectTranslation
   fields: (el: JsonValue) => getPropertyValue(el, 'name'), // CustomObjectTranslation
   picklistValues: getPicklistValuesKey, // CustomObjectTranslation (masterLabel) | RecordType (picklist)
-  values: (el: JsonValue) => getPropertyValue(el, 'fullName'), // RecordType
+  values: getValuesKey, // RecordType (fullName) | CustomMetadata (field)
   value: (el: JsonValue) => getPropertyValue(el, 'fullName'), // CustomField
   layouts: (el: JsonValue) => getPropertyValue(el, 'layout'), // CustomObjectTranslation
   quickActionParametersTranslation: (el: JsonValue) =>

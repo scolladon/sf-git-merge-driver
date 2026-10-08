@@ -632,6 +632,61 @@ describe('MergeNodeFactory', () => {
           })
         })
       })
+
+      describe('given repeated values entries', () => {
+        const entry = (field: string, value: string): JsonObject => ({
+          field,
+          value: { '@_xsi:type': 'xsd:string', '#text': value },
+        })
+        const a = entry('A__c', 'a')
+        const b = entry('B__c', 'b')
+
+        describe('when the entries are keyed by field', () => {
+          it('then the ordered flag is decided from the three sides', () => {
+            // Arrange
+            const isOrderedAttribute = vi.spyOn(
+              MetadataService,
+              'isOrderedAttribute'
+            )
+            const ancestor = [a]
+            const local = [a, b]
+            const other = [a]
+
+            // Act
+            factory.createNode(ancestor, local, other, 'values')
+
+            // Assert
+            expect(isOrderedAttribute).toHaveBeenCalledWith('values', [
+              ancestor,
+              local,
+              other,
+            ])
+          })
+
+          it('then concurrent additions of different fields merge cleanly', () => {
+            // Arrange
+            const sut = factory.createNode(
+              [a, b],
+              [a, b, entry('D__c', 'd')],
+              [a, b, entry('E__c', 'e')],
+              'values'
+            )
+
+            // Act
+            const result = sut.merge(defaultConfig)
+
+            // Assert
+            expect(result.hasConflict).toBe(false)
+            const fields = result.output.map(
+              item =>
+                ([(item as JsonObject)['values']].flat()[0] as JsonObject)[
+                  'field'
+                ]
+            )
+            expect(fields).toEqual(['A__c', 'B__c', 'D__c', 'E__c'])
+          })
+        })
+      })
     })
   })
 

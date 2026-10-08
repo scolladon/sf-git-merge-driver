@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { KeyedArrayMergeNode } from '../../../../src/merger/nodes/KeyedArrayMergeNode.js'
 import { MetadataService } from '../../../../src/service/MetadataService.js'
+import { isConflictBlock } from '../../../../src/types/conflictBlock.js'
 import type { JsonArray } from '../../../../src/types/jsonTypes.js'
 import { defaultConfig } from '../../../utils/testConfig.js'
 
@@ -597,6 +598,65 @@ describe('KeyedArrayMergeNode', () => {
     })
   })
 
+  describe('given an array without a key extractor', () => {
+    describe('when every side changed it differently', () => {
+      it('then each side of the conflict lists one element per entry', () => {
+        // Arrange
+        const sut = new KeyedArrayMergeNode(
+          [{ name: 'a' }, { name: 'b' }],
+          [{ name: 'c' }, { name: 'd' }],
+          [{ name: 'e' }, { name: 'f' }],
+          'unknownAttribute',
+          undefined,
+          false
+        )
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        const [block] = result.output
+        expect(result.output).toHaveLength(1)
+        expect(isConflictBlock(block)).toBe(true)
+        expect(block).toMatchObject({
+          local: [
+            { unknownAttribute: { name: 'c' } },
+            { unknownAttribute: { name: 'd' } },
+          ],
+          ancestor: [
+            { unknownAttribute: { name: 'a' } },
+            { unknownAttribute: { name: 'b' } },
+          ],
+          other: [
+            { unknownAttribute: { name: 'e' } },
+            { unknownAttribute: { name: 'f' } },
+          ],
+        })
+      })
+    })
+
+    describe('when the ancestor was empty', () => {
+      it('then the ancestor side is a single empty element', () => {
+        // Arrange
+        const sut = new KeyedArrayMergeNode(
+          [],
+          [{ name: 'c' }],
+          [{ name: 'e' }],
+          'unknownAttribute',
+          undefined,
+          false
+        )
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        const block = result.output.find(isConflictBlock)
+        expect(block?.ancestor).toEqual([{}])
+      })
+    })
+  })
+
   describe('merge without key field (unknown attribute)', () => {
     it('should create conflict for arrays without key extractor', () => {
       // Arrange
@@ -827,6 +887,210 @@ describe('KeyedArrayMergeNode', () => {
       // Assert - deletion in both branches should not cause conflict
       expect(result.hasConflict).toBe(false)
       expect(result.output.length).toBe(1)
+    })
+  })
+
+  describe('given keyed entries without their key field', () => {
+    const entry1 = { editable: 'false', readable: 'false' }
+    const entry2 = { editable: 'false', readable: 'true' }
+    const edited1 = { editable: 'true', readable: 'false' }
+    const edited2 = { editable: 'true', readable: 'true' }
+    const build = (ancestor: JsonArray, local: JsonArray, other: JsonArray) =>
+      new KeyedArrayMergeNode(
+        ancestor,
+        local,
+        other,
+        'fieldPermissions',
+        fieldPermissionsKey,
+        false
+      )
+    const wrap = (...entries: JsonArray) =>
+      entries.map(item => ({ fieldPermissions: item }))
+
+    describe('when two entries share no key and only local edits one', () => {
+      it('then it keeps both entries with the edit and no conflict', () => {
+        // Arrange
+        const sut = build([entry1, entry2], [edited1, entry2], [entry1, entry2])
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(result.output).toEqual(wrap(edited1, entry2))
+      })
+    })
+
+    describe('when two entries share no key and each side edits another', () => {
+      it('then it conflicts on the whole array with both entries per side', () => {
+        // Arrange
+        const sut = build(
+          [entry1, entry2],
+          [edited1, entry2],
+          [entry1, edited2]
+        )
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result.hasConflict).toBe(true)
+        const block = result.output.find(isConflictBlock)
+        expect(block?.local).toEqual(wrap(edited1, entry2))
+        expect(block?.ancestor).toEqual(wrap(entry1, entry2))
+        expect(block?.other).toEqual(wrap(entry1, edited2))
+      })
+    })
+
+    describe('when only the ancestor holds the colliding entries', () => {
+      it('then it resolves to the keyless entry both sides share', () => {
+        // Arrange
+        const sut = build([entry1, entry2], [entry1], [entry1])
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(result.output).toEqual(wrap(entry1))
+      })
+    })
+
+    describe('when local deleted the array and other edits an entry', () => {
+      it('then it conflicts with an empty local side', () => {
+        // Arrange
+        const sut = build([entry1, entry2], [], [edited1, entry2])
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result.hasConflict).toBe(true)
+        const block = result.output.find(isConflictBlock)
+        expect(block?.local).toEqual([{}])
+      })
+    })
+
+    describe('when ordered entries share no key', () => {
+      const buildOrdered = (
+        ancestor: JsonArray,
+        local: JsonArray,
+        other: JsonArray
+      ) =>
+        new KeyedArrayMergeNode(
+          ancestor,
+          local,
+          other,
+          'value',
+          picklistValueKey,
+          true
+        )
+      const x = { label: 'x' }
+      const y = { label: 'y' }
+      const xEdited = { label: 'x2' }
+      const yEdited = { label: 'y2' }
+
+      it('then divergent edits conflict on the whole array', () => {
+        // Arrange
+        const sut = buildOrdered([x, y], [xEdited, y], [x, yEdited])
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result.hasConflict).toBe(true)
+        const block = result.output.find(isConflictBlock)
+        expect(block?.local).toHaveLength(2)
+        expect(block?.ancestor).toHaveLength(2)
+        expect(block?.other).toHaveLength(2)
+      })
+
+      it('then a one-sided edit resolves with both entries', () => {
+        // Arrange
+        const sut = buildOrdered([x, y], [xEdited, y], [x, y])
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(result.output).toEqual([{ value: xEdited }, { value: y }])
+      })
+    })
+
+    describe('when each side holds a lone keyless entry', () => {
+      it('then it matches them by the lone key without conflict', () => {
+        // Arrange
+        const sut = build(
+          [entry1],
+          [edited1],
+          [{ ...entry1, readable: 'true' }]
+        )
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(result.output).toEqual([
+          { fieldPermissions: [{ editable: 'true' }, { readable: 'true' }] },
+        ])
+      })
+    })
+  })
+
+  describe('given entries sharing a real key', () => {
+    describe('when unordered', () => {
+      it('then the last entry wins once and nothing conflicts', () => {
+        // Arrange
+        const first = { field: 'Account.X__c', editable: 'false' }
+        const last = { field: 'Account.X__c', editable: 'true' }
+        const added = { field: 'Account.Y__c', editable: 'false' }
+        const sut = new KeyedArrayMergeNode(
+          [first, last],
+          [first, last],
+          [first, last, added],
+          'fieldPermissions',
+          fieldPermissionsKey,
+          false
+        )
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(result.output[0]).toEqual({ fieldPermissions: last })
+        expect(result.output).toHaveLength(2)
+      })
+    })
+
+    describe('when ordered', () => {
+      it('then the last entry is written once per occurrence', () => {
+        // Arrange
+        const a1 = { fullName: 'A', label: 'A1' }
+        const a2 = { fullName: 'A', label: 'A2' }
+        const b = { fullName: 'B', label: 'B' }
+        const sut = new KeyedArrayMergeNode(
+          [a1, a2, b],
+          [a1, a2, b],
+          [a1, a2, b],
+          'customValue',
+          MetadataService.getKeyFieldExtractor('customValue'),
+          true
+        )
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(result.output).toEqual([
+          { customValue: a2 },
+          { customValue: a2 },
+          { customValue: b },
+        ])
+      })
     })
   })
 })

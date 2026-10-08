@@ -9,8 +9,17 @@ import {
 import { jsonEqual } from '../../utils/jsonEqual.js'
 import { buildConflictMarkers } from '../ConflictMarkerBuilder.js'
 import { MergeOrchestrator } from '../MergeOrchestrator.js'
-import type { KeyExtractor } from './KeyedArrayIndex.js'
-import { indexKeyedArrays } from './KeyedArrayIndex.js'
+import type {
+  ExtractedKeys,
+  KeyExtractor,
+  KeyedSides,
+} from './KeyedArrayIndex.js'
+import {
+  extractKeys,
+  hasKeylessCollision,
+  indexKeyedArrays,
+  toEntryKeys,
+} from './KeyedArrayIndex.js'
 import type { KeyedArrayMergeStrategy } from './KeyedArrayMergeStrategy.js'
 import type { MergeNode } from './MergeNode.js'
 import { defaultNodeFactory, isAttributedTrio } from './MergeNodeFactory.js'
@@ -21,7 +30,8 @@ import { TextMergeNode } from './TextMergeNode.js'
 // Unkeyed Conflict Strategy
 // ============================================================================
 
-// No key extractor means individual elements can't be matched across
+// No key extractor, or entries sharing no key (a collision would silently
+// drop all but one), means individual elements can't be matched across
 // versions, so a genuine divergence still falls back to a whole-array
 // conflict (documented in the README). But without a same-as-every-other-
 // node-type equality check first, this used to conflict unconditionally —
@@ -52,15 +62,19 @@ class UnkeyedConflictStrategy implements KeyedArrayMergeStrategy {
 
     return withConflict([
       buildConflictMarkers(
-        { [this.attribute]: this.local },
-        { [this.attribute]: this.ancestor },
-        { [this.attribute]: this.other }
+        this.wrap(this.local),
+        this.wrap(this.ancestor),
+        this.wrap(this.other)
       ),
     ])
   }
 
   private resolved(value: JsonArray): MergeResult {
-    return noConflict(value.map(item => ({ [this.attribute]: item })))
+    return noConflict(this.wrap(value))
+  }
+
+  private wrap(entries: JsonArray): JsonArray {
+    return entries.map(item => ({ [this.attribute]: item }))
   }
 }
 
@@ -74,17 +88,15 @@ class UnorderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     private readonly local: JsonArray,
     private readonly other: JsonArray,
     private readonly attribute: string,
-    private readonly keyField: KeyExtractor
+    private readonly keys: KeyedSides
   ) {}
 
   merge(config: MergeConfig): MergeResult {
-    // Fused single-pass traversal — one keyField() call per item instead of
-    // two (previously: collectAllKeys + buildKeyedMap both invoked keyField).
     const { keyedAncestor, keyedLocal, keyedOther, allKeys } = indexKeyedArrays(
       this.ancestor,
       this.local,
       this.other,
-      this.keyField
+      this.keys
     )
 
     const results: MergeResult[] = []
@@ -145,6 +157,8 @@ class UnorderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
 // KeyedArrayMergeNode
 // ============================================================================
 
+type SideTrio<T> = readonly [ancestor: T, local: T, other: T]
+
 export class KeyedArrayMergeNode implements MergeNode {
   constructor(
     private readonly ancestor: JsonArray,
@@ -156,7 +170,8 @@ export class KeyedArrayMergeNode implements MergeNode {
   ) {}
 
   merge(config: MergeConfig): MergeResult {
-    if (!this.keyField) {
+    const extracted = this.extractSideKeys()
+    if (extracted === undefined || hasKeylessCollision(extracted)) {
       return new UnkeyedConflictStrategy(
         this.ancestor,
         this.local,
@@ -165,22 +180,32 @@ export class KeyedArrayMergeNode implements MergeNode {
       ).merge(config)
     }
 
-    const strategy: KeyedArrayMergeStrategy = this.isOrdered
-      ? new OrderedKeyedArrayMergeStrategy(
-          this.ancestor,
-          this.local,
-          this.other,
-          this.attribute,
-          this.keyField
-        )
-      : new UnorderedKeyedArrayMergeStrategy(
-          this.ancestor,
-          this.local,
-          this.other,
-          this.attribute,
-          this.keyField
-        )
+    const [ancestor, local, other] = extracted.map(toEntryKeys)
+    return this.keyedStrategy({ ancestor, local, other }).merge(config)
+  }
 
-    return strategy.merge(config)
+  // Read once per side: the collision check and the chosen strategy all
+  // work from these keys, so the extractor runs once per entry.
+  private extractSideKeys(): SideTrio<ExtractedKeys> | undefined {
+    const keyOf = this.keyField
+    if (keyOf === undefined) return undefined
+    return [
+      extractKeys(this.ancestor, keyOf),
+      extractKeys(this.local, keyOf),
+      extractKeys(this.other, keyOf),
+    ]
+  }
+
+  private keyedStrategy(keys: KeyedSides): KeyedArrayMergeStrategy {
+    const StrategyType = this.isOrdered
+      ? OrderedKeyedArrayMergeStrategy
+      : UnorderedKeyedArrayMergeStrategy
+    return new StrategyType(
+      this.ancestor,
+      this.local,
+      this.other,
+      this.attribute,
+      keys
+    )
   }
 }
