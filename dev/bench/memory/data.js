@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791439505088,
+  "lastUpdate": 1791487722429,
   "repoUrl": "https://github.com/scolladon/sf-git-merge-driver",
   "entries": {
     "Memory Benchmark": [
@@ -3175,6 +3175,138 @@ window.BENCHMARK_DATA = {
             "name": "serialize-large",
             "value": 3.1113,
             "range": "±3.35%",
+            "unit": "ms"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "colladonsebastien@gmail.com",
+            "name": "Sebastien",
+            "username": "scolladon"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2a42a3f59b147fce4c6f3e67e68c2021d4e191b8",
+          "message": "feat(merger): merge CustomMetadata records and fail safe on keyless keyed entries (#224)\n\nBEGIN_COMMIT_OVERRIDE\nfeat(metadata): merge CustomMetadata records by field and map them to the driver by default\nfix(merger): merge keyed arrays whose entries share no key as a whole\nfix(merger): write each entry of an unkeyed array conflict as its own element\nfix(metadata): read the loginFlows key from friendlyName\nEND_COMMIT_OVERRIDE",
+          "timestamp": "2026-10-08T21:26:10+02:00",
+          "tree_id": "5cfeaa1f58229d5a4b5aaf60ed1b6da2e3ad65b5",
+          "url": "https://github.com/scolladon/sf-git-merge-driver/commit/2a42a3f59b147fce4c6f3e67e68c2021d4e191b8"
+        },
+        "date": 1791487722356,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "node bin/merge-driver.cjs --version",
+            "value": 33.2125,
+            "range": "±1.94%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-small-no-conflict",
+            "value": 0.9961,
+            "range": "±1.56%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-small-with-conflict",
+            "value": 0.9678,
+            "range": "±1.72%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-medium-no-conflict",
+            "value": 6.8531,
+            "range": "±1.11%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-medium-with-conflict",
+            "value": 6.872,
+            "range": "±1.37%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-large-no-conflict",
+            "value": 28.208,
+            "range": "±1.65%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-large-with-conflict",
+            "value": 28.0157,
+            "range": "±1.47%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-ordered-globalvalueset",
+            "value": 0.9419,
+            "range": "±2.76%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-picklist-customfield",
+            "value": 0.5798,
+            "range": "±2.07%",
+            "unit": "ms"
+          },
+          {
+            "name": "parse-small",
+            "value": 0.341,
+            "range": "±0.35%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-small",
+            "value": 0.2279,
+            "range": "±2.17%",
+            "unit": "ms"
+          },
+          {
+            "name": "serialize-small",
+            "value": 0.1902,
+            "range": "±0.69%",
+            "unit": "ms"
+          },
+          {
+            "name": "parse-medium",
+            "value": 2.7764,
+            "range": "±0.48%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-medium",
+            "value": 1.8426,
+            "range": "±2.26%",
+            "unit": "ms"
+          },
+          {
+            "name": "serialize-medium",
+            "value": 1.5542,
+            "range": "±1.60%",
+            "unit": "ms"
+          },
+          {
+            "name": "parse-large",
+            "value": 11.0008,
+            "range": "±0.40%",
+            "unit": "ms"
+          },
+          {
+            "name": "merge-large",
+            "value": 7.274,
+            "range": "±2.80%",
+            "unit": "ms"
+          },
+          {
+            "name": "serialize-large",
+            "value": 6.0563,
+            "range": "±1.52%",
             "unit": "ms"
           }
         ]
