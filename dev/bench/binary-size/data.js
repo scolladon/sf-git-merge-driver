@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791439506492,
+  "lastUpdate": 1791487724724,
   "repoUrl": "https://github.com/scolladon/sf-git-merge-driver",
   "entries": {
     "Binary Size Benchmark": [
@@ -579,6 +579,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "bin/merge-driver.cjs",
             "value": 39154,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "colladonsebastien@gmail.com",
+            "name": "Sebastien",
+            "username": "scolladon"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2a42a3f59b147fce4c6f3e67e68c2021d4e191b8",
+          "message": "feat(merger): merge CustomMetadata records and fail safe on keyless keyed entries (#224)\n\nBEGIN_COMMIT_OVERRIDE\nfeat(metadata): merge CustomMetadata records by field and map them to the driver by default\nfix(merger): merge keyed arrays whose entries share no key as a whole\nfix(merger): write each entry of an unkeyed array conflict as its own element\nfix(metadata): read the loginFlows key from friendlyName\nEND_COMMIT_OVERRIDE",
+          "timestamp": "2026-10-08T21:26:10+02:00",
+          "tree_id": "5cfeaa1f58229d5a4b5aaf60ed1b6da2e3ad65b5",
+          "url": "https://github.com/scolladon/sf-git-merge-driver/commit/2a42a3f59b147fce4c6f3e67e68c2021d4e191b8"
+        },
+        "date": 1791487724650,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "bin/merge-driver.cjs",
+            "value": 39623,
             "unit": "bytes"
           }
         ]
