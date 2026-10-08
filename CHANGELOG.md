@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.1.0](https://github.com/scolladon/sf-git-merge-driver/compare/v2.0.2...v2.1.0) (2026-10-08)
+
+
+### Features
+
+* **metadata:** merge CustomMetadata records by field and map them to the driver by default ([2a42a3f](https://github.com/scolladon/sf-git-merge-driver/commit/2a42a3f59b147fce4c6f3e67e68c2021d4e191b8))
+
+
+### Bug Fixes
+
+* keep XML attributes on their element when merging ([#221](https://github.com/scolladon/sf-git-merge-driver/issues/221)) ([5391fe3](https://github.com/scolladon/sf-git-merge-driver/commit/5391fe3d8b09a8aa1bccfb6e957cc70988ab03cd))
+* **merger:** merge keyed arrays whose entries share no key as a whole ([2a42a3f](https://github.com/scolladon/sf-git-merge-driver/commit/2a42a3f59b147fce4c6f3e67e68c2021d4e191b8))
+* **merger:** write each entry of an unkeyed array conflict as its own element ([2a42a3f](https://github.com/scolladon/sf-git-merge-driver/commit/2a42a3f59b147fce4c6f3e67e68c2021d4e191b8))
+* **metadata:** read the loginFlows key from friendlyName ([2a42a3f](https://github.com/scolladon/sf-git-merge-driver/commit/2a42a3f59b147fce4c6f3e67e68c2021d4e191b8))
+
 ## [2.0.2](https://github.com/scolladon/sf-git-merge-driver/compare/v2.0.1...v2.0.2) (2026-09-25)
 
 
