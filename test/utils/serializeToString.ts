@@ -9,11 +9,11 @@ import type { JsonArray, JsonObject } from '../../src/types/jsonTypes.js'
 export const serializeToString = async (
   writer: XmlStreamWriter,
   ordered: JsonArray,
-  namespaces: JsonObject
+  rootAttributes: JsonObject
 ): Promise<string> => {
   const sink = new PassThrough()
   const chunks: Buffer[] = []
   sink.on('data', (c: Buffer) => chunks.push(c))
-  await writer.writeTo(sink, ordered, namespaces)
+  await writer.writeTo(sink, ordered, rootAttributes)
   return Buffer.concat(chunks).toString('utf8')
 }

@@ -13,7 +13,7 @@ describe('scanDocument', () => {
       // Assert
       expect(outcome).toEqual({
         kind: 'parsed',
-        result: { content: { r: { v: '1' } }, namespaces: {} },
+        result: { content: { r: { v: '1' } }, rootAttributes: {} },
         needsOracle: false,
       })
     })
@@ -120,7 +120,7 @@ describe('scanDocument', () => {
       // Assert
       expect(outcome).toEqual({
         kind: 'parsed',
-        result: { content: {}, namespaces: {} },
+        result: { content: {}, rootAttributes: {} },
         needsOracle: true,
       })
     })
@@ -137,7 +137,7 @@ describe('scanDocument', () => {
       // Assert
       expect(outcome).toEqual({
         kind: 'parsed',
-        result: { content: { a: '' }, namespaces: {} },
+        result: { content: { a: '' }, rootAttributes: {} },
         needsOracle: true,
       })
     })
@@ -579,7 +579,8 @@ describe('scanDocument', () => {
 
       // Assert
       if (outcome.kind !== 'parsed') throw new Error('expected parsed')
-      expect(outcome.result.content).toEqual({ a: { '@_x': '1', '#text': '' } })
+      expect(outcome.result.content).toEqual({ a: '' })
+      expect(outcome.result.rootAttributes).toEqual({ '@_x': '1' })
     })
   })
 
@@ -664,7 +665,7 @@ describe('scanDocument', () => {
 
       // Assert
       if (outcome.kind !== 'parsed') throw new Error('expected parsed')
-      expect(outcome.result.namespaces).toEqual({ '@_xmlns': 'http://a' })
+      expect(outcome.result.rootAttributes).toEqual({ '@_xmlns': 'http://a' })
     })
   })
 
@@ -682,19 +683,23 @@ describe('scanDocument', () => {
   })
 
   describe('given namespace attributes mixed with an ordinary attribute on the root', () => {
-    it('when scanning then xmlns* is split out and the rest stays on the element', () => {
-      // Arrange
-      const xml = '<r foo="x" xmlns="http://x"><v>1</v></r>'
+    it('when scanning then every root attribute moves to the bucket in source order', () => {
+      // Arrange — left on the element, `xsi:schemaLocation` would reach the
+      // property-by-property merge and be written back as a child element.
+      const xml =
+        '<r xsi:schemaLocation="urn:x x.xsd" xmlns="http://x" xmlns:xsi="http://y"><v>1</v></r>'
 
       // Act
       const outcome = scanDocument(xml)
 
       // Assert
       if (outcome.kind !== 'parsed') throw new Error('expected parsed')
-      expect(outcome.result.content).toEqual({
-        r: { '@_foo': 'x', v: '1' },
-      })
-      expect(outcome.result.namespaces).toEqual({ '@_xmlns': 'http://x' })
+      expect(outcome.result.content).toEqual({ r: { v: '1' } })
+      expect(Object.entries(outcome.result.rootAttributes)).toEqual([
+        ['@_xsi:schemaLocation', 'urn:x x.xsd'],
+        ['@_xmlns', 'http://x'],
+        ['@_xmlns:xsi', 'http://y'],
+      ])
     })
   })
 
@@ -709,44 +714,10 @@ describe('scanDocument', () => {
       // Assert
       if (outcome.kind !== 'parsed') throw new Error('expected parsed')
       expect(outcome.result.content).toEqual({ r: { v: '1' } })
-      expect(outcome.result.namespaces).toEqual({
+      expect(outcome.result.rootAttributes).toEqual({
         '@_xmlns': 'http://x',
         '@_xmlns:xsi': 'http://y',
       })
-    })
-  })
-
-  describe('given a root attribute name that ends with xmlns but is not it', () => {
-    it('when scanning then the ^ anchor keeps it out of the namespaces bucket', () => {
-      // Arrange
-      const xml = '<r data-xmlns="x"><v>1</v></r>'
-
-      // Act
-      const outcome = scanDocument(xml)
-
-      // Assert
-      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
-      expect(outcome.result.content).toEqual({
-        r: { '@_data-xmlns': 'x', v: '1' },
-      })
-      expect(outcome.result.namespaces).toEqual({})
-    })
-  })
-
-  describe('given a root attribute name that starts with xmlns but has trailing chars', () => {
-    it('when scanning then the $ anchor keeps it out of the namespaces bucket', () => {
-      // Arrange
-      const xml = '<r xmlnsfoo="x"><v>1</v></r>'
-
-      // Act
-      const outcome = scanDocument(xml)
-
-      // Assert
-      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
-      expect(outcome.result.content).toEqual({
-        r: { '@_xmlnsfoo': 'x', v: '1' },
-      })
-      expect(outcome.result.namespaces).toEqual({})
     })
   })
 
@@ -767,7 +738,7 @@ describe('scanDocument', () => {
   })
 
   describe('given no root element at all', () => {
-    it('when scanning then content and namespaces are both empty', () => {
+    it('when scanning then content and rootAttributes are both empty', () => {
       // Arrange
       const xml = 'hello'
 
@@ -777,14 +748,14 @@ describe('scanDocument', () => {
       // Assert
       expect(outcome).toEqual({
         kind: 'parsed',
-        result: { content: {}, namespaces: {} },
+        result: { content: {}, rootAttributes: {} },
         needsOracle: false,
       })
     })
   })
 
   describe('given completely empty input', () => {
-    it('when scanning then content and namespaces are both empty', () => {
+    it('when scanning then content and rootAttributes are both empty', () => {
       // Arrange
       const xml = ''
 
@@ -794,7 +765,7 @@ describe('scanDocument', () => {
       // Assert
       expect(outcome).toEqual({
         kind: 'parsed',
-        result: { content: {}, namespaces: {} },
+        result: { content: {}, rootAttributes: {} },
         needsOracle: false,
       })
     })
@@ -859,7 +830,7 @@ describe('scanDocument', () => {
           needsOracle: false,
           result: {
             content: { r: { v: { '@_attr': 'a>b', '#text': '' } } },
-            namespaces: {},
+            rootAttributes: {},
           },
         })
       })

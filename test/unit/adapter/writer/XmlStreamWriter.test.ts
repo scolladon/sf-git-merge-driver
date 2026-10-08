@@ -209,7 +209,7 @@ describe('XmlStreamWriter', () => {
 
     it('when several namespaces are passed in non-alphabetical insertion order then attributes emit in source/insertion order', async () => {
       // Pins first-seen namespace order in writeRoot — the writer must
-      // preserve the insertion order of Object.keys(namespaces) so that
+      // preserve the insertion order of Object.keys(rootAttributes) so that
       // the source order from the parser round-trips unchanged.
       const out = await serializeToString(sut, [{ Root: [{ v: '1' }] }], {
         '@_xmlns:zb': 'http://z',

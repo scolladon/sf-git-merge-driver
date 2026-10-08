@@ -1,3 +1,4 @@
+import { ATTR_PREFIX } from '../../constant/parserConstant.js'
 import { MetadataService } from '../../service/MetadataService.js'
 import type { JsonArray, JsonObject, JsonValue } from '../../types/jsonTypes.js'
 import { KeyedArrayMergeNode } from './KeyedArrayMergeNode.js'
@@ -81,6 +82,33 @@ const isScalarTrio = (
   isScalar(other) &&
   !MetadataService.isTextArrayAttribute(attribute)
 
+const hasAttributes = (val: Side): boolean => {
+  // Stryker disable next-line ConditionalExpression: for-in over a scalar only yields index keys, never an `@_` one; the guard skips that walk
+  if (!isPureObject(val)) return false
+  for (const key in val as JsonObject) {
+    if (key.startsWith(ATTR_PREFIX)) return true
+  }
+  return false
+}
+
+// An attribute only exists on its own element's open tag, so an element
+// carrying one (e.g. `<label xsi:nil="true"/>`, parsed as
+// `{ '@_xsi:nil': 'true', '#text': '' }`) is merged as one value. A
+// property-by-property merge would hand each `@_name` key back to the
+// writer as a child element of its own (`<@_xsi:nil>true</@_xsi:nil>`),
+// and a text-bodied side would be indexed character by character. A
+// repeated element (array side) keeps the array routes below; after matching
+// keys, the unordered array strategy applies this rule to each entry too.
+export const isAttributedTrio = (
+  ancestor: Side,
+  local: Side,
+  other: Side
+): boolean =>
+  !Array.isArray(ancestor) &&
+  !Array.isArray(local) &&
+  !Array.isArray(other) &&
+  (hasAttributes(ancestor) || hasAttributes(local) || hasAttributes(other))
+
 // The schema override defeats an incidental cardinality check, not the
 // shape checks: TextArrayMergeNode compares items by reference and sorts
 // them by JSON.stringify, so it only ever holds for scalars.
@@ -142,7 +170,10 @@ class DefaultMergeNodeFactory implements MergeNodeFactory {
     other: Side,
     attribute: string
   ): MergeNode {
-    if (isScalarTrio(ancestor, local, other, attribute)) {
+    if (
+      isScalarTrio(ancestor, local, other, attribute) ||
+      isAttributedTrio(ancestor, local, other)
+    ) {
       return new TextMergeNode(ancestor, local, other, attribute)
     }
     if (isTextArray(ancestor, local, other, attribute)) {

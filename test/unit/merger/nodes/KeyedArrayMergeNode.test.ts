@@ -224,6 +224,39 @@ describe('KeyedArrayMergeNode', () => {
       // Assert
       expect(result.hasConflict).toBe(false)
     })
+
+    describe('given entries carrying attributes', () => {
+      describe('when each side edits a different entry', () => {
+        it('then both edits merge and the attributes stay on their entries', () => {
+          // Arrange
+          const item = (field: string, readable = 'false') => ({
+            '@_n1:nil': 'false',
+            field,
+            readable,
+          })
+          const sut = new KeyedArrayMergeNode(
+            [item('Account.X__c'), item('Account.Y__c')],
+            [item('Account.X__c', 'true'), item('Account.Y__c')],
+            [item('Account.X__c'), item('Account.Y__c', 'true')],
+            'fieldPermissions',
+            fieldPermissionsKey,
+            false
+          )
+
+          // Act
+          const result = sut.merge(defaultConfig)
+
+          // Assert
+          expect(result).toEqual({
+            output: [
+              { fieldPermissions: item('Account.X__c', 'true') },
+              { fieldPermissions: item('Account.Y__c', 'true') },
+            ],
+            hasConflict: false,
+          })
+        })
+      })
+    })
   })
 
   describe('merge with key field and isOrdered=true (picklist value)', () => {

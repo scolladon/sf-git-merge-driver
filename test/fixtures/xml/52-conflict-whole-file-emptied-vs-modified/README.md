@@ -20,7 +20,7 @@ Before the fix, this shape hit three compounding bugs at once:
 3. Both rendered sides lost the root `xmlns`, so resolving the conflict
    by keeping either side yielded a root that dropped an attribute the
    input carried. Two causes compounded, and fixing either alone left
-   the bytes unchanged: `mergeNamespaces` read `ours`'s empty namespace
+   the bytes unchanged: `mergeRootAttributes` read `ours`'s empty root-attribute
    bucket as "this side removed the xmlns" when it only means "this
    side has no root element to carry attributes on", emptying the
    merged map; and `writeRoot` attached namespaces only to the first
@@ -40,7 +40,7 @@ Pins:
   `writeConflictContent`.
 - `writeConflict` consuming `isFirstTopLevelAfterDecl` before writing
   any conflict-side content.
-- `namespacesOf` letting a side with no root element abstain from
-  namespace resolution instead of voting to remove the declaration.
+- `rootAttributesOf` letting a side with no root element abstain from
+  root-attribute resolution instead of voting to remove the declaration.
 - `writeRoot` handing the root namespace attributes to a top-level
   `ConflictBlock`, so each non-blank side's root element carries them.

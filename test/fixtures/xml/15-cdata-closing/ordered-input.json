@@ -2,5 +2,5 @@
   "ordered": [
     { "Root": [{ "v": { "__cdata": "a ]]> b" } }] }
   ],
-  "namespaces": {}
+  "rootAttributes": {}
 }

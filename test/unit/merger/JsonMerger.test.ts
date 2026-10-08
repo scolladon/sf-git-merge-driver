@@ -1252,16 +1252,16 @@ describe('JsonMerger', () => {
         {
           Profile: [
             {
-              loginHours: [{ fridayEnd: 400, fridayStart: 300 }],
+              loginHours: { fridayEnd: 400, fridayStart: 300 },
             },
             {
               loginHours: [{ mondayStart: 200 }, { mondayEnd: 400 }],
             },
             {
-              loginHours: [{ thursdayEnd: 400, thursdayStart: 300 }],
+              loginHours: { thursdayEnd: 400, thursdayStart: 300 },
             },
             {
-              loginHours: [{ tuesdayEnd: 400, tuesdayStart: 300 }],
+              loginHours: { tuesdayEnd: 400, tuesdayStart: 300 },
             },
             {
               loginHours: [{ wednesdayStart: 300 }, { wednesdayEnd: 500 }],
@@ -1377,16 +1377,16 @@ describe('JsonMerger', () => {
               loginHours: [{ fridayEnd: 400, fridayStart: 300 }],
             },
             {
-              loginHours: [{ mondayEnd: 400, mondayStart: 300 }],
+              loginHours: { mondayEnd: 400, mondayStart: 300 },
             },
             {
               loginHours: [{ thursdayEnd: 400, thursdayStart: 300 }],
             },
             {
-              loginHours: [{ tuesdayEnd: 400, tuesdayStart: 300 }],
+              loginHours: { tuesdayEnd: 400, tuesdayStart: 300 },
             },
             {
-              loginHours: [{ wednesdayEnd: 400, wednesdayStart: 300 }],
+              loginHours: { wednesdayEnd: 400, wednesdayStart: 300 },
             },
           ],
         },
@@ -1443,7 +1443,7 @@ describe('JsonMerger', () => {
               loginHours: [{ thursdayEnd: 400, thursdayStart: 300 }],
             },
             {
-              loginHours: [{ tuesdayEnd: 400, tuesdayStart: 300 }],
+              loginHours: { tuesdayEnd: 400, tuesdayStart: 300 },
             },
             {
               loginHours: [{ wednesdayEnd: 400, wednesdayStart: 300 }],

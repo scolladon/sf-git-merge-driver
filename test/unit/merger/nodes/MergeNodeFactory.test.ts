@@ -5,6 +5,7 @@ import { PropertyMergeNode } from '../../../../src/merger/nodes/PropertyMergeNod
 import { TextArrayMergeNode } from '../../../../src/merger/nodes/TextArrayMergeNode.js'
 import { TextMergeNode } from '../../../../src/merger/nodes/TextMergeNode.js'
 import { MetadataService } from '../../../../src/service/MetadataService.js'
+import type { JsonObject, JsonValue } from '../../../../src/types/jsonTypes.js'
 import { defaultConfig } from '../../../utils/testConfig.js'
 
 describe('MergeNodeFactory', () => {
@@ -297,6 +298,186 @@ describe('MergeNodeFactory', () => {
 
         // Assert
         expect(node).toBeInstanceOf(KeyedArrayMergeNode)
+      })
+
+      describe('given an element carrying attributes', () => {
+        const sut = defaultNodeFactory
+        // Parser shape of `<help xsi:nil="true"/>`: prototype-free, with the
+        // attribute under its `@_` key and an empty `#text`.
+        const nil = (): JsonObject =>
+          Object.assign(Object.create(null), {
+            '@_xsi:nil': 'true',
+            '#text': '',
+          })
+        type Trio = [JsonValue, JsonValue, JsonValue]
+
+        describe('when creating the node', () => {
+          it('then every side carrying the attribute routes to TextMergeNode', () => {
+            // Arrange
+            const [ancestor, local, other] = [nil(), nil(), nil()]
+
+            // Act
+            const node = sut.createNode(ancestor, local, other, 'help')
+
+            // Assert
+            expect(node).toBeInstanceOf(TextMergeNode)
+          })
+
+          it.each<[string, Trio]>([
+            ['ancestor', [nil(), 'text', 'text']],
+            ['local', ['text', nil(), 'text']],
+            ['other', ['text', 'text', nil()]],
+          ])(
+            'then only the %s side carrying it beside text still routes to TextMergeNode',
+            (_side, [ancestor, local, other]) => {
+              // Arrange — the trio comes from the table row
+
+              // Act
+              const node = sut.createNode(ancestor, local, other, 'help')
+
+              // Assert
+              expect(node).toBeInstanceOf(TextMergeNode)
+            }
+          )
+
+          it('then a side carrying it with the other sides absent routes to TextMergeNode', () => {
+            // Arrange
+            const ancestor = null
+            const local = nil()
+            const other = undefined as never
+
+            // Act
+            const node = sut.createNode(ancestor, local, other, 'help')
+
+            // Assert
+            expect(node).toBeInstanceOf(TextMergeNode)
+          })
+
+          it('then an element that also has child elements routes to TextMergeNode', () => {
+            // Arrange
+            const withChild = { '@_xsi:type': 'T', label: 'a' }
+
+            // Act
+            const node = sut.createNode(withChild, withChild, {}, 'help')
+
+            // Assert
+            expect(node).toBeInstanceOf(TextMergeNode)
+          })
+
+          it('then it routes to TextMergeNode without consulting the key extractor', () => {
+            // Arrange
+            const spy = vi.spyOn(MetadataService, 'getKeyFieldExtractor')
+            const [ancestor, local, other] = [nil(), nil(), nil()]
+
+            // Act
+            const node = sut.createNode(ancestor, local, other, 'value')
+
+            // Assert
+            expect(node).toBeInstanceOf(TextMergeNode)
+            expect(spy).not.toHaveBeenCalled()
+          })
+
+          it('then a text-array attribute still routes to TextMergeNode', () => {
+            // Arrange
+            const [ancestor, local, other] = [nil(), nil(), 'Obj1']
+
+            // Act
+            const node = sut.createNode(ancestor, local, other, 'members')
+
+            // Assert
+            expect(node).toBeInstanceOf(TextMergeNode)
+          })
+
+          it.each<[string, Trio]>([
+            ['ancestor', [[nil()], nil(), nil()]],
+            ['local', [nil(), [nil()], nil()]],
+            ['other', [nil(), nil(), [nil()]]],
+          ])(
+            'then an array on the %s side keeps the array route',
+            (_side, [ancestor, local, other]) => {
+              // Arrange — the trio comes from the table row
+
+              // Act
+              const node = sut.createNode(ancestor, local, other, 'help')
+
+              // Assert
+              expect(node).toBeInstanceOf(KeyedArrayMergeNode)
+            }
+          )
+        })
+
+        describe('when merging the created node', () => {
+          it('then an untouched element is kept whole', () => {
+            // Arrange
+            const node = sut.createNode(nil(), nil(), nil(), 'help')
+
+            // Act
+            const result = node.merge(defaultConfig)
+
+            // Assert — the writer reads `@_` keys off the element's own body
+            expect(result).toEqual({
+              output: [{ help: { '@_xsi:nil': 'true', '#text': '' } }],
+              hasConflict: false,
+            })
+          })
+
+          it('then an element that replaced text on one side is taken whole', () => {
+            // Arrange
+            const text = 'Enter the amount'
+            const node = sut.createNode(text, nil(), text, 'help')
+
+            // Act
+            const result = node.merge(defaultConfig)
+
+            // Assert
+            expect(result).toEqual({
+              output: [{ help: { '@_xsi:nil': 'true', '#text': '' } }],
+              hasConflict: false,
+            })
+          })
+
+          it('then text that replaced the element on one side is taken whole', () => {
+            // Arrange
+            const node = sut.createNode(
+              nil(),
+              'Enter the amount',
+              nil(),
+              'help'
+            )
+
+            // Act
+            const result = node.merge(defaultConfig)
+
+            // Assert
+            expect(result).toEqual({
+              output: [{ help: 'Enter the amount' }],
+              hasConflict: false,
+            })
+          })
+        })
+      })
+
+      describe('given a child key that only contains the attribute prefix', () => {
+        const sut = defaultNodeFactory
+
+        describe('when creating the node', () => {
+          it('then it is not treated as an attribute and routes to PropertyMergeNode', () => {
+            // Arrange
+            const notAnAttribute = { 'a@_b': '1' }
+            const changed = { 'a@_b': '2' }
+
+            // Act
+            const node = sut.createNode(
+              notAnAttribute,
+              notAnAttribute,
+              changed,
+              'help'
+            )
+
+            // Assert
+            expect(node).toBeInstanceOf(PropertyMergeNode)
+          })
+        })
       })
 
       describe('given a side where the element is absent or not a pure object', () => {

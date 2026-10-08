@@ -139,7 +139,7 @@ describe('XmlMerger.mergeThreeWay', () => {
       const theirs = `<?xml version="1.0"?><R xmlns="http://theirs"><v>a</v></R>`
       await runMergeStreams(sut, ancestor, ours, theirs)
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('xmlns divergence'),
+        expect.stringContaining('root attribute divergence'),
         expect.objectContaining({
           ancestor: 'http://anc',
           local: 'http://ours',
@@ -163,7 +163,7 @@ describe('XmlMerger.mergeThreeWay', () => {
   describe('given ours drops the whole file while theirs edits it', () => {
     it('when merged then both conflict side roots keep the namespace ours had no root to carry', async () => {
       // An emptied side has no root element to hang xmlns on, so its
-      // namespace bucket is empty for a trivial reason — not because it
+      // root-attribute bucket is empty for a trivial reason — not because it
       // removed the declaration. Both rendered sides must keep it.
       const ancestor = `<?xml version="1.0"?><PermissionSet xmlns="${METADATA_NS}"><label>Base</label></PermissionSet>`
       const theirs = `<?xml version="1.0"?><PermissionSet xmlns="${METADATA_NS}"><label>Theirs</label></PermissionSet>`
@@ -217,7 +217,7 @@ describe('XmlMerger.mergeThreeWay', () => {
     it('when merged then the three-way resolution still runs on declaration order, not resolution order', async () => {
       // Promise.allSettled results[] is indexed by declaration order, so
       // even if ancestor's parse completes AFTER ours and theirs,
-      // mergeNamespaces must still compare the value at each side's fixed
+      // mergeRootAttributes must still compare the value at each side's fixed
       // slot — not whichever value happened to resolve first. This guards
       // against a regression that accidentally indexes by resolution order.
       const ancXml = `<?xml version="1.0"?><R xmlns="http://anc"><v>a</v></R>`

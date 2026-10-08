@@ -2,5 +2,5 @@
   "ordered": [
     { "Root": [{ "p": [{ "__cdata": "x" }] }] }
   ],
-  "namespaces": {}
+  "rootAttributes": {}
 }

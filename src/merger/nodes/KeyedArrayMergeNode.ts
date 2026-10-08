@@ -13,8 +13,9 @@ import type { KeyExtractor } from './KeyedArrayIndex.js'
 import { indexKeyedArrays } from './KeyedArrayIndex.js'
 import type { KeyedArrayMergeStrategy } from './KeyedArrayMergeStrategy.js'
 import type { MergeNode } from './MergeNode.js'
-import { defaultNodeFactory } from './MergeNodeFactory.js'
+import { defaultNodeFactory, isAttributedTrio } from './MergeNodeFactory.js'
 import { OrderedKeyedArrayMergeStrategy } from './OrderedKeyedArrayMergeStrategy.js'
+import { TextMergeNode } from './TextMergeNode.js'
 
 // ============================================================================
 // Unkeyed Conflict Strategy
@@ -90,10 +91,41 @@ class UnorderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     const orchestrator = new MergeOrchestrator(config, defaultNodeFactory)
 
     for (const key of Array.from(allKeys).sort()) {
+      const ancestor = keyedAncestor.get(key)
+      const local = keyedLocal.get(key)
+      const other = keyedOther.get(key)
+
+      // Most entries are untouched on every side: emit the entry whole, as
+      // its own body, which also keeps any attributes on its tag. This
+      // skips both the attribute probe below (a key walk per side) and the
+      // orchestrator, which would reach the same result.
+      if (
+        // Stryker disable next-line ConditionalExpression: narrows `local` for the type checker; jsonEqual(ancestor, undefined) && jsonEqual(undefined, other) is always false for a key present on some side
+        local !== undefined &&
+        jsonEqual(ancestor, local) &&
+        jsonEqual(local, other)
+      ) {
+        results.push(noConflict([{ [this.attribute]: local }]))
+        continue
+      }
+
+      // Match repeated entries by key first, then preserve any attributed
+      // entry as a whole element, just like the factory's singleton route.
+      // TextMergeNode already wraps its value (and each conflict side) with
+      // the element name. Absent entries stay undefined so deletions work.
+      if (isAttributedTrio(ancestor, local, other)) {
+        results.push(
+          new TextMergeNode(ancestor, local, other, this.attribute).merge(
+            config
+          )
+        )
+        continue
+      }
+
       const result = orchestrator.merge(
-        keyedAncestor.get(key) ?? {},
-        keyedLocal.get(key) ?? {},
-        keyedOther.get(key) ?? {},
+        ancestor ?? {},
+        local ?? {},
+        other ?? {},
         this.attribute
       )
 

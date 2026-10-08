@@ -334,4 +334,147 @@ describe('TextMergeStrategy', () => {
       expect(result.output).toEqual([objLocal])
     })
   })
+
+  describe('given attribute-bearing elements parsed separately on each side', () => {
+    // `<help xsi:nil="true"/>` parses into a fresh object per side, so equal
+    // elements are never the same reference.
+    const nil = () => ({ '@_xsi:nil': 'true', '#text': '' })
+    const params = (ancestor: unknown, local: unknown, other: unknown) => ({
+      config: defaultConfig,
+      attribute: 'help',
+      ancestor,
+      local,
+      other,
+    })
+
+    describe('when all three sides are equal', () => {
+      it('then it returns the element without conflict', () => {
+        // Arrange
+        const strategy = getTextMergeStrategy(MergeScenario.ALL)
+
+        // Act
+        const result = strategy.handle(params(nil(), nil(), nil()))
+
+        // Assert
+        expect(result).toEqual({
+          output: [{ help: nil() }],
+          hasConflict: false,
+        })
+      })
+    })
+
+    describe('when only other changed the element', () => {
+      it('then it returns other', () => {
+        // Arrange
+        const strategy = getTextMergeStrategy(MergeScenario.ALL)
+
+        // Act
+        const result = strategy.handle(params(nil(), nil(), 'Enter the amount'))
+
+        // Assert
+        expect(result).toEqual({
+          output: [{ help: 'Enter the amount' }],
+          hasConflict: false,
+        })
+      })
+    })
+
+    describe('when only local changed the element', () => {
+      it('then it returns local', () => {
+        // Arrange
+        const strategy = getTextMergeStrategy(MergeScenario.ALL)
+
+        // Act
+        const result = strategy.handle(params(nil(), 'Enter the amount', nil()))
+
+        // Assert
+        expect(result).toEqual({
+          output: [{ help: 'Enter the amount' }],
+          hasConflict: false,
+        })
+      })
+    })
+
+    describe('when both sides made the same change', () => {
+      it('then it returns local without conflict', () => {
+        // Arrange
+        const strategy = getTextMergeStrategy(MergeScenario.ALL)
+
+        // Act
+        const result = strategy.handle(params('Enter the amount', nil(), nil()))
+
+        // Assert
+        expect(result).toEqual({
+          output: [{ help: nil() }],
+          hasConflict: false,
+        })
+      })
+    })
+
+    describe('when the elements differ in an attribute value', () => {
+      it('then it returns a conflict holding each whole element', () => {
+        // Arrange
+        const strategy = getTextMergeStrategy(MergeScenario.ALL)
+        const ancestor = nil()
+        const local = { '@_xsi:nil': 'false', '#text': '' }
+        const other = { '@_xsi:nil': 'true', '#text': 'x' }
+
+        // Act
+        const result = strategy.handle(params(ancestor, local, other))
+
+        // Assert
+        expect(result.hasConflict).toBe(true)
+        expect(result.output).toEqual([
+          {
+            __conflict: true,
+            local: [{ help: local }],
+            ancestor: [{ help: ancestor }],
+            other: [{ help: other }],
+          },
+        ])
+      })
+    })
+
+    describe('when both sides added the same element', () => {
+      it('then it returns the element without conflict', () => {
+        // Arrange
+        const strategy = getTextMergeStrategy(MergeScenario.LOCAL_AND_OTHER)
+
+        // Act
+        const result = strategy.handle(params(null, nil(), nil()))
+
+        // Assert
+        expect(result).toEqual({
+          output: [{ help: nil() }],
+          hasConflict: false,
+        })
+      })
+    })
+
+    describe('when other deleted an element local left unchanged', () => {
+      it('then it returns an empty result', () => {
+        // Arrange
+        const strategy = getTextMergeStrategy(MergeScenario.ANCESTOR_AND_LOCAL)
+
+        // Act
+        const result = strategy.handle(params(nil(), nil(), null))
+
+        // Assert
+        expect(result).toEqual({ output: [], hasConflict: false })
+      })
+    })
+
+    describe('when local deleted an element other left unchanged', () => {
+      it('then it returns an empty result', () => {
+        // Arrange
+        const strategy = getTextMergeStrategy(MergeScenario.ANCESTOR_AND_OTHER)
+
+        // Act
+        const result = strategy.handle(params(nil(), null, nil()))
+
+        // Assert
+        expect(result).toEqual({ output: [], hasConflict: false })
+      })
+    })
+  })
 })

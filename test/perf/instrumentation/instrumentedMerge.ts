@@ -13,7 +13,7 @@ export interface InstrumentedResult {
   readonly outputSizeBytes: number
 }
 
-const mergeNamespaces = (...maps: JsonObject[]): JsonObject =>
+const mergeRootAttributes = (...maps: JsonObject[]): JsonObject =>
   Object.assign({}, ...maps)
 
 export const instrumentedMerge = async (
@@ -46,10 +46,10 @@ export const instrumentedMerge = async (
     local.content,
     other.content
   )
-  const namespaces = mergeNamespaces(
-    ancestor.namespaces,
-    local.namespaces,
-    other.namespaces
+  const rootAttributes = mergeRootAttributes(
+    ancestor.rootAttributes,
+    local.rootAttributes,
+    other.rootAttributes
   )
   timer.endPhase('json-merge')
 
@@ -58,7 +58,7 @@ export const instrumentedMerge = async (
   const chunks: Buffer[] = []
   sink.on('data', (c: Buffer) => chunks.push(c))
   if (mergedResult.output.length) {
-    await writer.writeTo(sink, mergedResult.output, namespaces)
+    await writer.writeTo(sink, mergedResult.output, rootAttributes)
   }
   sink.end()
   const output = Buffer.concat(chunks).toString('utf8')
