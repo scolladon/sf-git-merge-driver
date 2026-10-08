@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790353313423,
+  "lastUpdate": 1791439506492,
   "repoUrl": "https://github.com/scolladon/sf-git-merge-driver",
   "entries": {
     "Binary Size Benchmark": [
@@ -550,6 +550,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "bin/merge-driver.cjs",
             "value": 38842,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "916747+tom-gangemi@users.noreply.github.com",
+            "name": "tom-gangemi",
+            "username": "tom-gangemi"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5391fe3d8b09a8aa1bccfb6e957cc70988ab03cd",
+          "message": "fix: keep XML attributes on their element when merging (#221)",
+          "timestamp": "2026-10-08T08:02:15+02:00",
+          "tree_id": "55dcefe4ea40ae06cdd105c96e48697aba84c019",
+          "url": "https://github.com/scolladon/sf-git-merge-driver/commit/5391fe3d8b09a8aa1bccfb6e957cc70988ab03cd"
+        },
+        "date": 1791439506441,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "bin/merge-driver.cjs",
+            "value": 39154,
             "unit": "bytes"
           }
         ]
