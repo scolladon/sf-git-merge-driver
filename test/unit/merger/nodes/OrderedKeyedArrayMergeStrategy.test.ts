@@ -1,10 +1,24 @@
 import { describe, expect, it } from 'vitest'
+import type { KeyedSides } from '../../../../src/merger/nodes/KeyedArrayIndex.js'
 import { OrderedKeyedArrayMergeStrategy } from '../../../../src/merger/nodes/OrderedKeyedArrayMergeStrategy.js'
 import { isConflictBlock } from '../../../../src/types/conflictBlock.js'
 import type { JsonArray, JsonObject } from '../../../../src/types/jsonTypes.js'
 import { defaultConfig } from '../../../utils/testConfig.js'
 
 const keyExtractor = (item: JsonObject): string => item['fullName'] as string
+
+const keysOf = (side: JsonArray): string[] =>
+  side.map(item => keyExtractor(item as JsonObject))
+
+const toKeyedSides = (
+  ancestor: JsonArray,
+  local: JsonArray,
+  other: JsonArray
+): KeyedSides => ({
+  ancestor: keysOf(ancestor),
+  local: keysOf(local),
+  other: keysOf(other),
+})
 
 const getLabel = (obj: JsonObject): string | undefined => {
   const label = obj['label'] ?? obj['fullName']
@@ -65,7 +79,7 @@ const createStrategy = (
     local,
     other,
     'customValue',
-    keyExtractor
+    toKeyedSides(ancestor, local, other)
   )
 
 // Helper: 'A' -> { fullName: 'A', label: 'A' }, 'A:A_MOD' -> { fullName: 'A', label: 'A_MOD' }

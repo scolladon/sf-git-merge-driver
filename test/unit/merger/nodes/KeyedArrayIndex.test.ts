@@ -1,25 +1,27 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { TEXT_TAG } from '../../../../src/constant/parserConstant.js'
 import {
   buildKeyedMap,
+  extractKeys,
   hasKeylessCollision,
-  toEntryKey,
+  toEntryKeys,
 } from '../../../../src/merger/nodes/KeyedArrayIndex.js'
-import type { JsonArray } from '../../../../src/types/jsonTypes.js'
+import type { JsonArray, JsonObject } from '../../../../src/types/jsonTypes.js'
 
 describe('KeyedArrayIndex', () => {
   describe('buildKeyedMap', () => {
-    it('given array of objects when building map then keys by extractor', () => {
+    it('given array of objects when building map then keys by extracted key', () => {
       // Arrange
       const arr = [
         { name: [{ [TEXT_TAG]: 'a' }], value: 'x' },
         { name: [{ [TEXT_TAG]: 'b' }], value: 'y' },
       ]
-      const keyField = (item: Record<string, unknown>) =>
+      const keyField = (item: JsonObject) =>
         String((item['name'] as Array<Record<string, unknown>>)[0][TEXT_TAG])
+      const keys = toEntryKeys(extractKeys(arr, keyField))
 
       // Act
-      const sut = buildKeyedMap(arr, keyField)
+      const sut = buildKeyedMap(arr, keys)
 
       // Assert
       expect(sut.size).toBe(2)
@@ -29,14 +31,14 @@ describe('KeyedArrayIndex', () => {
 
     it('given empty array when building map then returns empty map', () => {
       // Arrange & Act
-      const sut = buildKeyedMap([], () => '')
+      const sut = buildKeyedMap([], [])
 
       // Assert
       expect(sut.size).toBe(0)
     })
   })
 
-  describe('toEntryKey', () => {
+  describe('toEntryKeys', () => {
     it.each([
       { name: 'no key', key: undefined, expected: 'undefined' },
       { name: 'a key', key: 'k', expected: 'k' },
@@ -45,20 +47,19 @@ describe('KeyedArrayIndex', () => {
       'given an extractor returning $name when indexing then returns "$expected"',
       ({ key, expected }) => {
         // Arrange
-        const sut = toEntryKey(() => key)
+        const extracted = extractKeys([{}], () => key)
 
         // Act
-        const result = sut({})
+        const result = toEntryKeys(extracted)
 
         // Assert
-        expect(result).toBe(expected)
+        expect(result).toEqual([expected])
       }
     )
   })
 
   describe('hasKeylessCollision', () => {
-    const keyOf = (item: Record<string, unknown>) =>
-      item['k'] as string | undefined
+    const keyOf = (item: JsonObject) => item['k'] as string | undefined
     const keyed = { k: 'a' }
     const keyless = { v: '1' }
     const keyedAsFallback = { k: 'undefined' }
@@ -139,28 +140,14 @@ describe('KeyedArrayIndex', () => {
       ({ sides, expected }) => {
         // Arrange
         const arrays = sides as unknown as JsonArray[]
+        const extracted = arrays.map(side => extractKeys(side, keyOf))
 
         // Act
-        const result = hasKeylessCollision(arrays, keyOf)
+        const result = hasKeylessCollision(extracted)
 
         // Assert
         expect(result).toBe(expected)
       }
     )
-
-    it('given a collision on the first side when checking then stops reading', () => {
-      // Arrange
-      const extractor = vi.fn(keyOf)
-
-      // Act
-      const result = hasKeylessCollision(
-        [[keyless, keyless, keyless], [keyed], [keyed]],
-        extractor
-      )
-
-      // Assert
-      expect(result).toBe(true)
-      expect(extractor).toHaveBeenCalledTimes(2)
-    })
   })
 })
