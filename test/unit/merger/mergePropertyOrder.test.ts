@@ -1,3 +1,4 @@
+import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import { mergePropertyOrder } from '../../../src/merger/mergePropertyOrder.js'
 import type { JsonObject } from '../../../src/types/jsonTypes.js'
@@ -22,20 +23,6 @@ import type { JsonObject } from '../../../src/types/jsonTypes.js'
 // ever runs, so the input shape this residual depends on does not occur
 // in practice.
 
-const LCG_MULTIPLIER = 1664525
-const LCG_INCREMENT = 1013904223
-const LCG_MODULUS = 0xffffffff
-
-// Hand-rolled seeded LCG — deterministic across CI runs, no new dependency
-// for a single property-test file (the repo has no fast-check).
-const createLcg = (seed: number): (() => number) => {
-  let state = seed >>> 0
-  return (): number => {
-    state = (Math.imul(LCG_MULTIPLIER, state) + LCG_INCREMENT) >>> 0
-    return state / LCG_MODULUS
-  }
-}
-
 const KEY_POOL = [
   'a',
   'b',
@@ -49,36 +36,11 @@ const KEY_POOL = [
   '@_a',
 ]
 
-const shuffled = (keys: string[], rng: () => number): string[] => {
-  const copy = [...keys]
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1))
-    const swap = copy[i]
-    copy[i] = copy[j]
-    copy[j] = swap
-  }
-  return copy
-}
-
-const randomKeyList = (rng: () => number): string[] => {
-  const pool = shuffled(KEY_POOL, rng)
-  const length = Math.floor(rng() * (pool.length + 1))
-  return pool.slice(0, length)
-}
+const keyList = fc.shuffledSubarray(KEY_POOL)
+const keyTrio = fc.tuple(keyList, keyList, keyList)
 
 const toObject = (keys: string[]): JsonObject =>
   Object.fromEntries(keys.map(key => [key, key]))
-
-// Reproduces a property-test failure from the CI log alone, without
-// re-running the seeded generator locally.
-const describeCase = (
-  i: number,
-  ancestorKeys: string[],
-  localKeys: string[],
-  otherKeys: string[]
-): string =>
-  `iteration ${i}: ancestor=${JSON.stringify(ancestorKeys)} ` +
-  `local=${JSON.stringify(localKeys)} other=${JSON.stringify(otherKeys)}`
 
 // Independent oracle for the 4th property: derives the same kind of
 // precedence edges mergePropertyOrder derives (consecutive pairs per
@@ -509,112 +471,88 @@ describe('mergePropertyOrder', () => {
   })
 
   describe('property lens', () => {
-    const RANDOM_CASE_COUNT = 500
-    const ACYCLIC_PROPERTY_CASE_COUNT = 3000
-
     it('given randomised key sequences when mergePropertyOrder then the result is a permutation of the key union', () => {
-      // Arrange
-      const rng = createLcg(1)
+      fc.assert(
+        fc.property(keyTrio, ([ancestorKeys, localKeys, otherKeys]) => {
+          // Arrange
+          const union = new Set([...ancestorKeys, ...localKeys, ...otherKeys])
 
-      for (let i = 0; i < RANDOM_CASE_COUNT; i++) {
-        const ancestorKeys = randomKeyList(rng)
-        const localKeys = randomKeyList(rng)
-        const otherKeys = randomKeyList(rng)
+          // Act
+          const sut = mergePropertyOrder(
+            toObject(ancestorKeys),
+            toObject(localKeys),
+            toObject(otherKeys)
+          )
 
-        // Act
-        const sut = mergePropertyOrder(
-          toObject(ancestorKeys),
-          toObject(localKeys),
-          toObject(otherKeys)
-        )
-
-        // Assert
-        const union = new Set([...ancestorKeys, ...localKeys, ...otherKeys])
-        const message = describeCase(i, ancestorKeys, localKeys, otherKeys)
-        expect([...sut].sort(), message).toEqual([...union].sort())
-      }
+          // Assert
+          expect([...sut].sort()).toEqual([...union].sort())
+        })
+      )
     })
 
     it('given randomised key sequences when mergePropertyOrder is invoked twice on the same inputs then the results are identical', () => {
-      // Arrange
-      const rng = createLcg(2)
+      fc.assert(
+        fc.property(keyTrio, ([ancestorKeys, localKeys, otherKeys]) => {
+          // Arrange
+          const ancestor = toObject(ancestorKeys)
+          const local = toObject(localKeys)
+          const other = toObject(otherKeys)
 
-      for (let i = 0; i < RANDOM_CASE_COUNT; i++) {
-        const ancestorKeys = randomKeyList(rng)
-        const localKeys = randomKeyList(rng)
-        const otherKeys = randomKeyList(rng)
-        const ancestor = toObject(ancestorKeys)
-        const local = toObject(localKeys)
-        const other = toObject(otherKeys)
+          // Act
+          const first = mergePropertyOrder(ancestor, local, other)
+          const second = mergePropertyOrder(ancestor, local, other)
 
-        // Act
-        const first = mergePropertyOrder(ancestor, local, other)
-        const second = mergePropertyOrder(ancestor, local, other)
-
-        // Assert
-        const message = describeCase(i, ancestorKeys, localKeys, otherKeys)
-        expect(second, message).toEqual(first)
-      }
+          // Assert
+          expect(second).toEqual(first)
+        })
+      )
     })
 
     it('given randomised key sequences when local and other are swapped then mergePropertyOrder returns the same order', () => {
-      // Arrange
-      const rng = createLcg(3)
+      fc.assert(
+        fc.property(keyTrio, ([ancestorKeys, localKeys, otherKeys]) => {
+          // Arrange
+          const ancestor = toObject(ancestorKeys)
+          const local = toObject(localKeys)
+          const other = toObject(otherKeys)
 
-      for (let i = 0; i < RANDOM_CASE_COUNT; i++) {
-        const ancestorKeys = randomKeyList(rng)
-        const localKeys = randomKeyList(rng)
-        const otherKeys = randomKeyList(rng)
-        const ancestor = toObject(ancestorKeys)
-        const local = toObject(localKeys)
-        const other = toObject(otherKeys)
+          // Act
+          const forward = mergePropertyOrder(ancestor, local, other)
+          const swapped = mergePropertyOrder(ancestor, other, local)
 
-        // Act
-        const forward = mergePropertyOrder(ancestor, local, other)
-        const swapped = mergePropertyOrder(ancestor, other, local)
-
-        // Assert
-        const message = describeCase(i, ancestorKeys, localKeys, otherKeys)
-        expect(swapped, message).toEqual(forward)
-      }
+          // Assert
+          expect(swapped).toEqual(forward)
+        })
+      )
     })
 
     it('given randomised acyclic key sequences when mergePropertyOrder then the result is a valid topological order of the union precedence graph', () => {
-      // Arrange — restricted to acyclic graphs: a cycle repair emission
-      // can cascade past a downstream acyclic edge, so "every edge
-      // respected" is not an invariant of cyclic inputs even for a
-      // correct implementation
-      const rng = createLcg(4)
-      let acyclicCases = 0
+      fc.assert(
+        fc.property(keyTrio, ([ancestorKeys, localKeys, otherKeys]) => {
+          // Arrange — restricted to acyclic graphs: a cycle repair emission
+          // can cascade past a downstream acyclic edge, so "every edge
+          // respected" is not an invariant of cyclic inputs even for a
+          // correct implementation
+          const lists = [ancestorKeys, localKeys, otherKeys]
+          const nodes = [...new Set(lists.flat())]
+          const edges = collectEdges(lists)
+          fc.pre(isAcyclic(nodes, edges))
 
-      for (let i = 0; i < ACYCLIC_PROPERTY_CASE_COUNT; i++) {
-        const ancestorKeys = randomKeyList(rng)
-        const localKeys = randomKeyList(rng)
-        const otherKeys = randomKeyList(rng)
-        const lists = [ancestorKeys, localKeys, otherKeys]
-        const nodes = [...new Set(lists.flat())]
-        const edges = collectEdges(lists)
+          // Act
+          const sut = mergePropertyOrder(
+            toObject(ancestorKeys),
+            toObject(localKeys),
+            toObject(otherKeys)
+          )
 
-        if (!isAcyclic(nodes, edges)) continue
-        acyclicCases++
-
-        // Act
-        const sut = mergePropertyOrder(
-          toObject(ancestorKeys),
-          toObject(localKeys),
-          toObject(otherKeys)
-        )
-
-        // Assert — every node in `edges` is guaranteed present in `sut`
-        // by the permutation property above, so the lookups are total
-        const position = new Map(sut.map((key, index) => [key, index]))
-        const message = describeCase(i, ancestorKeys, localKeys, otherKeys)
-        for (const [from, to] of edges) {
-          expect(position.get(from)!, message).toBeLessThan(position.get(to)!)
-        }
-      }
-
-      expect(acyclicCases).toBeGreaterThan(0)
+          // Assert — every node in `edges` is guaranteed present in `sut`
+          // by the permutation property above, so the lookups are total
+          const position = new Map(sut.map((key, index) => [key, index]))
+          for (const [from, to] of edges) {
+            expect(position.get(from)!).toBeLessThan(position.get(to)!)
+          }
+        })
+      )
     })
   })
 })

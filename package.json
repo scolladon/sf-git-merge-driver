@@ -32,6 +32,7 @@
     "@vitest/coverage-v8": "5.0.3",
     "chai": "6.3.0",
     "esbuild": "0.28.2",
+    "fast-check": "4.10.2",
     "husky": "9.1.7",
     "knip": "6.40.0",
     "ls-engines": "0.10.1",

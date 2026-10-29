@@ -79,6 +79,10 @@ To execute a particular test file, use the following command:
 npx vitest run <path_to_test>
 ```
 
+#### Property-based tests
+
+Property tests use [fast-check](https://fast-check.dev/) with a pinned seed (`20261029`) and 100 runs, set once in `test/utils/fastCheckSetup.ts`. A failure prints the seed, the replay path and the shrunk counterexample, and reruns identically with `npx vitest run <path_to_test>`. To explore other seeds, use `FC_SEED=<seed> npx vitest run <path_to_test>` (an integer; anything else throws). Never add a per-assert `seed` or `numRuns`.
+
 ### Mutation Testing
 
 Run Stryker to validate that tests actually catch mutations:
