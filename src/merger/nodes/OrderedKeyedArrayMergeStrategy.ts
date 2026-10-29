@@ -292,22 +292,16 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   ): string[] {
     const localGroup = ctx.localKeys.filter(k => localMoved.has(k))
     const otherGroup = ctx.otherKeys.filter(k => otherMoved.has(k))
-    const result: string[] = []
-    let localInserted = false
-    let otherInserted = false
+    const firstLocal = ctx.ancestorKeys.findIndex(k => localMoved.has(k))
+    const firstOther = ctx.ancestorKeys.findIndex(
+      k => !localMoved.has(k) && otherMoved.has(k)
+    )
 
-    for (const key of ctx.ancestorKeys) {
-      if (localMoved.has(key)) {
-        if (!localInserted) pushAll(result, localGroup)
-        localInserted = true
-      } else if (otherMoved.has(key)) {
-        if (!otherInserted) pushAll(result, otherGroup)
-        otherInserted = true
-      } else {
-        result.push(key)
-      }
-    }
-    return result
+    return ctx.ancestorKeys.flatMap((key, i) => {
+      if (i === firstLocal) return localGroup
+      if (i === firstOther) return otherGroup
+      return localMoved.has(key) || otherMoved.has(key) ? [] : [key]
+    })
   }
 
   // ============================================================================
