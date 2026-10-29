@@ -305,6 +305,20 @@ describe('OrderedKeyedArrayMergeStrategy', () => {
   // Additional scenarios to exercise gap analysis and spine processing branches
   const additionalGracefulScenarios: GracefulMergeScenario[] = [
     [
+      'Local reorders and adds; other adds the same entry and one more',
+      ['A', 'B'],
+      ['B', 'A', 'X'],
+      ['A', 'B', 'X', 'Y'],
+      ['B', 'A', 'X', 'Y'],
+    ],
+    [
+      'Other reorders and adds; local adds the same entry and one more',
+      ['A', 'B'],
+      ['A', 'B', 'X', 'Y'],
+      ['B', 'A', 'X'],
+      ['B', 'A', 'X', 'Y'],
+    ],
+    [
       'Only the other side reorders and adds',
       ['A', 'B'],
       ['A', 'B'],

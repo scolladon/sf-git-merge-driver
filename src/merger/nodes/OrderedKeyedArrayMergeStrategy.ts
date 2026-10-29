@@ -100,6 +100,11 @@ interface OrderingAnalysis {
   otherMoved: Set<string>
 }
 
+const hasOneSidedAdditions = (
+  additions: readonly string[],
+  opposite: ReadonlyMap<string, JsonObject>
+): boolean => additions.some(k => !opposite.has(k))
+
 export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   constructor(
     private readonly ancestor: JsonArray,
@@ -246,51 +251,49 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   /**
    * Computes merged key order by combining disjoint reorderings.
    * Also includes elements added in local or other (not in ancestor).
-   * Returns null if concurrent disjoint additions are detected (conflict).
+   * Returns null when each side adds an entry the other lacks (conflict).
    */
   private computeMergedKeyOrder(
     ctx: ArrayMergeState,
     analysis: OrderingAnalysis
   ): string[] | null {
-    const { localMoved, otherMoved } = analysis
+    const localAdditions = ctx.localKeys.filter(k => !ctx.ancestorSet.has(k))
+    const otherAdditions = ctx.otherKeys.filter(k => !ctx.ancestorSet.has(k))
 
-    const localMovedOrdered = ctx.localKeys.filter(k => localMoved.has(k))
-    const otherMovedOrdered = ctx.otherKeys.filter(k => otherMoved.has(k))
-    const localAdditions = ctx.localKeys.filter(
-      k => !localMoved.has(k) && !ctx.ancestorSet.has(k)
-    )
-    const otherAdditions = ctx.otherKeys.filter(
-      k => !otherMoved.has(k) && !ctx.ancestorSet.has(k) && !ctx.localMap.has(k)
-    )
-
-    // Conflict: both sides added different elements - ambiguous ordering
-    if (localAdditions.length > 0 && otherAdditions.length > 0) {
-      return null
+    // Shared additions have a symmetric order; one-sided ones on both sides
+    // have no defensible relative order.
+    if (hasOneSidedAdditions(localAdditions, ctx.otherMap)) {
+      if (hasOneSidedAdditions(otherAdditions, ctx.localMap)) {
+        return null
+      }
     }
 
-    // Build result by traversing ancestor and inserting moved groups
+    const result = this.placeMovedGroups(ctx, analysis)
+    pushAll(result, mergeKeyOrder([], localAdditions, otherAdditions))
+    return result
+  }
+
+  private placeMovedGroups(
+    ctx: ArrayMergeState,
+    { localMoved, otherMoved }: OrderingAnalysis
+  ): string[] {
+    const localGroup = ctx.localKeys.filter(k => localMoved.has(k))
+    const otherGroup = ctx.otherKeys.filter(k => otherMoved.has(k))
     const result: string[] = []
-    let localMovedInserted = false
-    let otherMovedInserted = false
+    let localInserted = false
+    let otherInserted = false
 
     for (const key of ctx.ancestorKeys) {
       if (localMoved.has(key)) {
-        if (!localMovedInserted) {
-          pushAll(result, localMovedOrdered)
-          localMovedInserted = true
-        }
+        if (!localInserted) pushAll(result, localGroup)
+        localInserted = true
       } else if (otherMoved.has(key)) {
-        if (!otherMovedInserted) {
-          pushAll(result, otherMovedOrdered)
-          otherMovedInserted = true
-        }
+        if (!otherInserted) pushAll(result, otherGroup)
+        otherInserted = true
       } else {
         result.push(key)
       }
     }
-
-    // Append additions at the end (preserving their relative order)
-    pushAll(result, localAdditions, otherAdditions)
     return result
   }
 

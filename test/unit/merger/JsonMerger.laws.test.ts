@@ -355,6 +355,10 @@ describe('JsonMerger laws', () => {
       await assertLaw(sameChange(ordered))
     })
 
+    it('when local and other are swapped then the merge mirrors', async () => {
+      await assertLaw(symmetry(ordered))
+    })
+
     it('when the merge is clean then no key is lost or duplicated', async () => {
       await assertLaw(noLossNoDuplication(ordered))
     })
