@@ -47,6 +47,7 @@ interface GapSets {
   readonly allKeys: readonly string[]
   readonly settled: ReadonlySet<string>
   readonly localSlice: ReadonlySet<string>
+  readonly otherSlice: ReadonlySet<string>
 }
 
 const isOnAllSides = (ctx: ArrayMergeState, key: string): boolean =>
@@ -54,13 +55,14 @@ const isOnAllSides = (ctx: ArrayMergeState, key: string): boolean =>
 
 const absentFrom = (
   keys: string[],
-  slice: ReadonlySet<string>,
-  settled: ReadonlySet<string>
-): Set<string> => new Set(keys.filter(k => !slice.has(k) && !settled.has(k)))
+  side: ReadonlyMap<string, JsonObject>
+): Set<string> => new Set(keys.filter(k => !side.has(k)))
 
-// A key present on all three sides is never deleted or added: leaving or
-// entering a gap slice is a move, which the merged order already settles.
-// Spine anchors are excluded because a duplicated key can reappear in a gap.
+// Deletions and additions are judged against the whole side, never the gap
+// slice: leaving or entering a slice is a move, which the merged order
+// already settles. A key present on all three sides is merged once, in the
+// gap whose local slice holds it; spine anchors are excluded because a
+// duplicated key can reappear in a gap.
 // Live keys are ordered by the side-symmetric property-order rule; keys only
 // the ancestor still holds follow in ancestor order.
 const orderGapKeys = (gaps: GapKeys): string[] => {
@@ -71,24 +73,33 @@ const orderGapKeys = (gaps: GapKeys): string[] => {
 
 const computeGapSets = (
   gaps: GapKeys,
-  isSettled: (key: string) => boolean
+  isSettled: (key: string) => boolean,
+  ctx: ArrayMergeState
 ): GapSets => {
   const allKeys = orderGapKeys(gaps)
-  const settled = new Set(allKeys.filter(isSettled))
-  const ancestorSet = new Set(gaps.ancestor)
-  const localSet = new Set(gaps.local)
-  const otherSet = new Set(gaps.other)
 
   return {
-    localDeleted: absentFrom(gaps.ancestor, localSet, settled),
-    otherDeleted: absentFrom(gaps.ancestor, otherSet, settled),
-    localAdded: absentFrom(gaps.local, ancestorSet, settled),
-    otherAdded: absentFrom(gaps.other, ancestorSet, settled),
+    localDeleted: absentFrom(gaps.ancestor, ctx.localMap),
+    otherDeleted: absentFrom(gaps.ancestor, ctx.otherMap),
+    localAdded: absentFrom(gaps.local, ctx.ancestorMap),
+    otherAdded: absentFrom(gaps.other, ctx.ancestorMap),
     allKeys,
-    settled,
-    localSlice: localSet,
+    settled: new Set(allKeys.filter(isSettled)),
+    localSlice: new Set(gaps.local),
+    otherSlice: new Set(gaps.other),
   }
 }
+
+// A key a live side still holds outside this gap is merged in the gap that
+// holds it, so it is never emitted twice
+const isPlacedInAnotherGap = (
+  sets: GapSets,
+  key: string,
+  ctx: ArrayMergeState
+): boolean =>
+  !sets.localSlice.has(key) &&
+  !sets.otherSlice.has(key) &&
+  (ctx.localMap.has(key) || ctx.otherMap.has(key))
 
 // ============================================================================
 // Ordering Analysis
@@ -440,7 +451,8 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   ): MergeResult {
     const sets = computeGapSets(
       gaps,
-      key => isOnAllSides(ctx, key) && !anchors.has(key)
+      key => isOnAllSides(ctx, key) && !anchors.has(key),
+      ctx
     )
 
     const gapConflict = this.detectGapConflict(config, gaps, sets, ctx)
@@ -513,11 +525,15 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     key: string,
     ctx: ArrayMergeState
   ): MergeResult | null {
-    if (!sets.settled.has(key)) {
-      return this.mergeGapElement(config, key, ctx)
+    if (sets.settled.has(key)) {
+      return sets.localSlice.has(key)
+        ? this.mergeElement(config, key, ctx)
+        : null
     }
-    // Emitted once, in the gap where the live sides place it
-    return sets.localSlice.has(key) ? this.mergeElement(config, key, ctx) : null
+    if (isPlacedInAnotherGap(sets, key, ctx)) {
+      return null
+    }
+    return this.mergeGapElement(config, key, ctx)
   }
 
   /**

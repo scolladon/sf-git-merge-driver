@@ -300,6 +300,20 @@ describe('OrderedKeyedArrayMergeStrategy', () => {
       ['B', 'Y', 'K'],
       ['B', conflict(['X', 'K'], [], ['Y', 'K'])],
     ],
+    [
+      'Local deletes an entry other moves to another gap and edits',
+      ['K', 'B', 'C'],
+      ['B', 'C'],
+      ['B', 'C', 'K:K_MOD'],
+      ['B', 'C', conflict([], ['K'], ['K_MOD'])],
+    ],
+    [
+      'Other deletes an entry local moves to another gap and edits',
+      ['K', 'B', 'C'],
+      ['B', 'C', 'K:K_MOD'],
+      ['B', 'C'],
+      ['B', 'C', conflict(['K_MOD'], ['K'], [])],
+    ],
   ]
 
   // Additional scenarios to exercise gap analysis and spine processing branches
@@ -485,6 +499,20 @@ describe('OrderedKeyedArrayMergeStrategy', () => {
       ['P', 'B', 'D'],
       ['P', 'D'],
       ['P', 'B', 'D'],
+    ],
+    [
+      'Local deletes an entry other only moves, and adds another',
+      ['K', 'B', 'C'],
+      ['B', 'C', 'Z'],
+      ['B', 'C', 'K'],
+      ['B', 'C', 'Z'],
+    ],
+    [
+      'Other deletes an entry local only moves, and adds another',
+      ['K', 'B', 'C'],
+      ['B', 'C', 'K'],
+      ['B', 'C', 'Z'],
+      ['B', 'C', 'Z'],
     ],
   ]
 
