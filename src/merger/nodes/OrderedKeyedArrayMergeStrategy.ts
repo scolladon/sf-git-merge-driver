@@ -58,11 +58,6 @@ const absentFrom = (
   side: ReadonlyMap<string, JsonObject>
 ): Set<string> => new Set(keys.filter(k => !side.has(k)))
 
-// Deletions and additions are judged against the whole side, never the gap
-// slice: leaving or entering a slice is a move, which the merged order
-// already settles. A key present on all three sides is merged once, in the
-// gap whose local slice holds it; spine anchors are excluded because a
-// duplicated key can reappear in a gap.
 // Live keys are ordered by the side-symmetric property-order rule; keys only
 // the ancestor still holds follow in ancestor order.
 const orderGapKeys = (gaps: GapKeys): string[] => {
@@ -71,6 +66,11 @@ const orderGapKeys = (gaps: GapKeys): string[] => {
   return [...live, ...gaps.ancestor.filter(k => !liveSet.has(k))]
 }
 
+// Deletions and additions are judged against the whole side, never the gap
+// slice: leaving or entering a slice is a move, which the merged order
+// already settles. A key present on all three sides is merged once, in the
+// gap whose local slice holds it; spine anchors are excluded because a
+// duplicated key can reappear in a gap.
 const computeGapSets = (
   gaps: GapKeys,
   isSettled: (key: string) => boolean,
