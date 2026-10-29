@@ -434,7 +434,7 @@ For ordered metadata types (e.g., `GlobalValueSet`, `StandardValueSet`), the dri
 3. **Disjoint change detection** — non-overlapping reorderings can be merged automatically
 4. **Conflict on overlap** — when both sides move the same elements differently, conflict
 5. **Positional conflict detection** — concurrent additions at different positions trigger conflict
-6. **An entry present on all three sides is never treated as added or deleted by a gap** — leaving or entering a gap is a move, which the merged order already settles. The entry is merged once, in the gap whose local slice holds it
+6. **An entry present on all three sides is never treated as added or deleted by a gap** — leaving or entering a gap is a move, which the merged order already settles. The entry is merged once, in the gap both live sides place it in (they share one order on the spine path)
 7. **A side that changed nothing defers** — when one side's array equals the ancestor, the other side's array is taken verbatim; when both sides are equal, that array is taken verbatim
 8. **Role symmetry** — swapping local and other yields the same array, and the same conflicts with their local and other sides swapped; live entries of a gap, and additions, are ordered by `mergeKeyOrder`
 
@@ -574,10 +574,8 @@ Key methods in `OrderedKeyedArrayMergeStrategy` ([OrderedKeyedArrayMergeStrategy
 | `placeMovedGroups(ctx, analysis)` | Places each side's moved group at its first ancestor slot |
 | `takeWholeSide()` | Returns a side verbatim, every entry as written, when the other side equals the ancestor or both sides are equal |
 | `mergeGap(config, gaps, anchors, ctx)` | Detects gap conflicts, then merges the gap's keys through `mergeGapElements` |
-| `mergeGapKey(config, sets, key, ctx)` | Merges an entry present on all sides once, in the gap whose local slice holds it; defers to `mergeGapElement` otherwise |
-| `computeGapSets(gaps, isSettled, ctx)` | Judges deletions and additions against the whole side, not the gap slice |
-| `orderGapKeys(gaps)` | Orders live gap keys with `mergeKeyOrder`, then ancestor-only keys in ancestor order |
-| `isPlacedInAnotherGap(sets, key, ctx)` | Skips a key a live side holds in another gap so it is never emitted twice |
+| `mergeGapKey(config, sets, key, ctx)` | Merges an entry present on all sides with `mergeElement`; defers to `mergeGapElement` otherwise |
+| `computeGapSets(gaps, isSettled, ctx)` | Judges deletions and additions against the whole side, not the gap slice; iterates only keys a live side holds in the gap, ordered by `mergeKeyOrder` |
 | `processDivergedOrderings(config, ctx, analysis)` | Handles disjoint reorderings |
 | `processWithSpine(config, ctx)` | Uses LCS for spine-based merge |
 | `processSpine(config, spine, ctx)` | Iterates spine anchors, processes gaps between them |
