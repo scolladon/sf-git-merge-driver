@@ -126,16 +126,17 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   ) {}
 
   merge(config: MergeConfig): MergeResult {
-    const ctx = this.buildArrayMergeState()
-    const oneSided = this.takeOneSidedChange(ctx)
+    const oneSided = this.takeOneSidedChange()
     if (oneSided) {
       return oneSided
     }
 
+    const ctx = this.buildArrayMergeState()
+
     const orderingAnalysis = this.analyzeOrderings(ctx)
 
     if (!orderingAnalysis.canMerge) {
-      return this.buildFullArrayConflict(config, ctx)
+      return this.buildFullArrayConflict()
     }
 
     const hasDivergedOrderings =
@@ -253,7 +254,7 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     const mergedKeys = this.computeMergedKeyOrder(ctx, analysis)
 
     if (mergedKeys === null) {
-      return this.buildFullArrayConflict(config, ctx)
+      return this.buildFullArrayConflict()
     }
 
     return this.processKeyOrder(config, ctx, mergedKeys)
@@ -367,14 +368,19 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     return this.mergeGapElement(config, key, ctx)
   }
 
-  private takeOneSidedChange(ctx: ArrayMergeState): MergeResult | null {
+  private takeOneSidedChange(): MergeResult | null {
     if (jsonEqual(this.ancestor, this.local)) {
-      return noConflict(this.wrapKeys(ctx.otherKeys, ctx.otherMap))
+      return noConflict(this.wrapSide(this.other))
     }
     if (jsonEqual(this.ancestor, this.other)) {
-      return noConflict(this.wrapKeys(ctx.localKeys, ctx.localMap))
+      return noConflict(this.wrapSide(this.local))
     }
     return null
+  }
+
+  // Raw entries, not a key lookup: a repeated key keeps every entry
+  private wrapSide(side: JsonArray): JsonArray {
+    return side.map(entry => this.wrapElement(entry as JsonObject))
   }
 
   private wrapKeys(
@@ -386,15 +392,12 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     }))
   }
 
-  private buildFullArrayConflict(
-    _config: MergeConfig,
-    ctx: ArrayMergeState
-  ): MergeResult {
+  private buildFullArrayConflict(): MergeResult {
     return withConflict([
       buildConflictMarkers(
-        this.wrapKeys(ctx.localKeys, ctx.localMap),
-        this.wrapKeys(ctx.ancestorKeys, ctx.ancestorMap),
-        this.wrapKeys(ctx.otherKeys, ctx.otherMap)
+        this.wrapSide(this.local),
+        this.wrapSide(this.ancestor),
+        this.wrapSide(this.other)
       ),
     ])
   }

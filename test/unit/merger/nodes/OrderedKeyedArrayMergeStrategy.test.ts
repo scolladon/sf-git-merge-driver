@@ -577,6 +577,62 @@ describe('OrderedKeyedArrayMergeStrategy', () => {
     })
   })
 
+  describe('given a side that repeats a key', () => {
+    it('when only other changed then every repeated entry is kept', () => {
+      // Arrange
+      const sut = createStrategy(
+        toElements(['A', 'B']),
+        toElements(['A', 'B']),
+        toElements(['A:A_FIRST', 'A:A_SECOND', 'B'])
+      )
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      expect(extractLabels(result.output)).toEqual(['A_FIRST', 'A_SECOND', 'B'])
+    })
+
+    it('when only local changed then every repeated entry is kept', () => {
+      // Arrange
+      const sut = createStrategy(
+        toElements(['A', 'B']),
+        toElements(['A:A_FIRST', 'A:A_SECOND', 'B']),
+        toElements(['A', 'B'])
+      )
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      expect(extractLabels(result.output)).toEqual(['A_FIRST', 'A_SECOND', 'B'])
+    })
+
+    it('when orderings diverge then the conflict shows every repeated entry', () => {
+      // Arrange
+      const sut = createStrategy(
+        toElements(['A', 'B', 'C']),
+        toElements(['B', 'A', 'C']),
+        toElements(['A:A_FIRST', 'A:A_SECOND', 'C', 'B'])
+      )
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(true)
+      expect(extractConflictStructure(result.output)).toEqual([
+        conflict(
+          ['B', 'A', 'C'],
+          ['A', 'B', 'C'],
+          ['A_FIRST', 'A_SECOND', 'C', 'B']
+        ),
+      ])
+    })
+  })
+
   describe('computeGapSets filtering', () => {
     it('given gap where ancestor has keys not in local or other then computes correct deleted sets', () => {
       // Arrange - A,B,C in ancestor; local has only A; other has only A
