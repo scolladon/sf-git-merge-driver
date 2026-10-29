@@ -480,11 +480,32 @@ describe('OrderedKeyedArrayMergeStrategy', () => {
       ['B', 'C'],
     ],
     [
-      'One side reorders while the other edits an entry and deletes another',
+      'Local reorders while other edits an entry and deletes another',
       ['C', 'D'],
       ['D', 'C'],
       ['C:C_MOD'],
       ['C_MOD'],
+    ],
+    [
+      'Other reorders while local edits an entry and deletes another',
+      ['C', 'D'],
+      ['C:C_MOD'],
+      ['D', 'C'],
+      ['C_MOD'],
+    ],
+    [
+      'Local reorders and adds two entries other adds in the reverse order',
+      ['A', 'B'],
+      ['B', 'A', 'X', 'Y'],
+      ['A', 'B', 'Y', 'X'],
+      ['B', 'A', 'X', 'Y'],
+    ],
+    [
+      'Other reorders and adds two entries local adds in the reverse order',
+      ['A', 'B'],
+      ['A', 'B', 'Y', 'X'],
+      ['B', 'A', 'X', 'Y'],
+      ['B', 'A', 'X', 'Y'],
     ],
     [
       'Other inserts before the entry both sides add after a shared anchor',
@@ -578,6 +599,22 @@ describe('OrderedKeyedArrayMergeStrategy', () => {
   })
 
   describe('given a side that repeats a key', () => {
+    it('when a repeated key anchors the shared order then each occurrence is written once', () => {
+      // Arrange
+      const sut = createStrategy(
+        toElements(['A', 'B', 'A']),
+        toElements(['A', 'B', 'A', 'X']),
+        toElements(['A', 'B:B_MOD', 'A'])
+      )
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      expect(extractLabels(result.output)).toEqual(['A', 'B_MOD', 'A', 'X'])
+    })
+
     it('when only other changed then every repeated entry is kept', () => {
       // Arrange
       const sut = createStrategy(

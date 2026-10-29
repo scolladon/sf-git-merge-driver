@@ -31,8 +31,9 @@ interface MergeOutcome {
 
 const KEYS = ['A', 'B', 'C', 'D', 'E']
 const BOOLEAN_TEXT = fc.constantFrom('true', 'false')
-// Three values, so local and other can edit one field to different values
-// and reach the field-level conflict a two-value alphabet never produces
+// Three values, so local and other can edit one field to different values:
+// the symmetry law then covers conflicting edits a two-value alphabet never
+// produces
 const FIELD_TEXT = fc.constantFrom('true', 'false', 'unset')
 const LABEL_TEXT = fc.constantFrom('x', 'y', 'z')
 const KEEP_WEIGHT = 3
