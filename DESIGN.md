@@ -383,7 +383,7 @@ Salesforce reuses the same XML element name across unrelated parent schemas with
 
 The convention for resolving the ambiguity is to read each candidate property via `getPropertyValue`, which returns `undefined` for an absent or object-shaped field, and pick the first defined value with the `firstPresentKey` helper (`getPicklistValuesKey`, `getValuesKey`). Composite extractors return `undefined` only when no part is present. **Failing to do this leaves every entry under the wrong-schema document without a key**: the keyless fail-safe below then degrades the merge to a whole-array merge or conflict instead of a per-entry merge. New extractors that share an element name with an existing schema must follow the same prefer-then-fallback shape.
 
-**Keyless fail-safe.** `hasKeylessCollision` (`src/merger/nodes/KeyedArrayIndex.ts`) routes an array to `UnkeyedConflictStrategy` when any one side holds two or more entries sharing the fallback key and at least one of them is keyless (a real key spelled `undefined` shares it): the merge is clean when one side is unchanged or both sides are equal, otherwise it is a whole-array conflict. A lone keyless entry keeps the historical key through `toEntryKeys`. Duplicates of a real key keep last-wins: unordered arrays keep the last entry once, ordered arrays write the last entry's content once per occurrence, except that a side taken whole (the other side equals the ancestor) and a whole-array conflict keep every entry as written. The fail-safe is a safety net, not a substitute for the right extractor.
+**Keyless fail-safe.** `hasKeylessCollision` (`src/merger/nodes/KeyedArrayIndex.ts`) routes an array to `UnkeyedConflictStrategy` when any one side holds two or more entries sharing the fallback key and at least one of them is keyless (a real key spelled `undefined` shares it): the merge is clean when one side is unchanged or both sides are equal, otherwise it is a whole-array conflict. A lone keyless entry keeps the historical key through `toEntryKeys`. Duplicates of a real key keep last-wins: unordered arrays keep the last entry once, ordered arrays write the last entry's content once per occurrence, except that a side taken whole (the other side equals the ancestor, or both sides are equal) and a whole-array conflict keep every entry as written. The fail-safe is a safety net, not a substitute for the right extractor.
 
 ### 3. Early Termination Optimization
 
@@ -435,7 +435,7 @@ For ordered metadata types (e.g., `GlobalValueSet`, `StandardValueSet`), the dri
 4. **Conflict on overlap** — when both sides move the same elements differently, conflict
 5. **Positional conflict detection** — concurrent additions at different positions trigger conflict
 6. **An entry present on all three sides is never treated as added or deleted by a gap** — leaving or entering a gap is a move, which the merged order already settles. The entry is merged once, in the gap whose local slice holds it
-7. **A side that changed nothing defers** — when one side's array equals the ancestor, the other side's array is taken verbatim
+7. **A side that changed nothing defers** — when one side's array equals the ancestor, the other side's array is taken verbatim; when both sides are equal, that array is taken verbatim
 8. **Role symmetry** — swapping local and other yields the same array, and the same conflicts with their local and other sides swapped; live entries of a gap, and additions, are ordered by `mergeKeyOrder`
 
 ### Algorithm Overview
@@ -444,6 +444,11 @@ The `OrderedKeyedArrayMergeStrategy` handles ordered arrays through these steps:
 
 ```mermaid
 flowchart TD
+    WholeSide{{"One side equals ancestor, or both sides equal?"}}
+    TakeSide["Take that side verbatim"]
+    WholeSide -->|Yes| TakeSide
+    WholeSide -->|No| Build
+
     subgraph Build["Build Merge Context"]
         Extract["Extract keys: ancestorKeys, localKeys, otherKeys"]
         Maps["Build position maps: ancestorPos, localPos, otherPos"]
@@ -452,17 +457,13 @@ flowchart TD
     end
 
     subgraph Analyze["Analyze Orderings"]
-        OneSided{{"One side equals ancestor?"}}
-        TakeOther["Take the other side verbatim"]
         FastPath{{"Same order in local & other?"}}
         Moved["Detect moved elements vs ancestor"]
         Overlap{{"Overlapping moves? (C4)"}}
         Position{{"Positional conflict? (C6/C7)"}}
     end
 
-    Build --> OneSided
-    OneSided -->|Yes| TakeOther
-    OneSided -->|No| FastPath
+    Build --> FastPath
     FastPath -->|Yes| Spine["Use LCS spine algorithm"]
     FastPath -->|No| Moved
     Moved --> Overlap
@@ -510,7 +511,7 @@ if (addedLocalPos < keyLocalPos !== addedOtherPos < keyOtherPos) {
 | C6 | Positional conflict | Both sides add same element at different positions → conflict |
 | C7 | Concurrent addition with diverged orderings | Each side adds an element the other lacks while orderings diverge → conflict. An addition both sides share is not concurrent |
 | M11 | Same reorder on both sides | Both sides reorder identically → every entry kept, once |
-| M12 | One-sided change | One side equals the ancestor → the other side is taken verbatim |
+| M12 | One-sided or shared change | One side equals the ancestor → the other side is taken verbatim; both sides equal → that side is taken verbatim |
 | M13 | Shared addition plus one-sided addition | Both sides add `X`, one side also adds `Y` while orderings diverge → merges, additions ordered by `mergeKeyOrder` |
 
 ### Example: M10 Disjoint Swaps
@@ -571,7 +572,7 @@ Key methods in `OrderedKeyedArrayMergeStrategy` ([OrderedKeyedArrayMergeStrategy
 | `getMovedElements(ctx, modifiedPos)` | Finds elements that changed relative order |
 | `computeMergedKeyOrder(ctx, analysis)` | Builds merged key order; returns null when both sides have one-sided additions (C7); shared additions are appended in `mergeKeyOrder` order |
 | `placeMovedGroups(ctx, analysis)` | Places each side's moved group at its first ancestor slot |
-| `takeOneSidedChange(ctx)` | Returns the other side verbatim when one side equals the ancestor |
+| `takeWholeSide()` | Returns a side verbatim, every entry as written, when the other side equals the ancestor or both sides are equal |
 | `mergeGap(config, gaps, anchors, ctx)` | Detects gap conflicts, then merges the gap's keys through `mergeGapElements` |
 | `mergeGapKey(config, sets, key, ctx)` | Merges an entry present on all sides once, in the gap whose local slice holds it; defers to `mergeGapElement` otherwise |
 | `computeGapSets(gaps, isSettled, ctx)` | Judges deletions and additions against the whole side, not the gap slice |

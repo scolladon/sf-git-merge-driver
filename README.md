@@ -320,7 +320,7 @@ This means you might see a conflict block containing the entire array instead of
 
 ### Entries sharing a key
 
-When several entries of a list share the same key, the driver keeps the last one's content, which is what a deploy does. Two exceptions on ordered lists (picklist values, value set entries): when only one side changed the list, that side is kept as written, and when the whole list conflicts, the conflict shows every entry as written.
+When several entries of a list share the same key, the driver keeps the last one's content, which is what a deploy does. Two exceptions on ordered lists (picklist values, value set entries): when only one side changed the list, or both sides made the same change, that side is kept as written, and when the whole list conflicts, the conflict shows every entry as written.
 
 ### Entries without their key
 

@@ -126,9 +126,9 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   ) {}
 
   merge(config: MergeConfig): MergeResult {
-    const oneSided = this.takeOneSidedChange()
-    if (oneSided) {
-      return oneSided
+    const wholeSide = this.takeWholeSide()
+    if (wholeSide) {
+      return wholeSide
     }
 
     const ctx = this.buildArrayMergeState()
@@ -368,11 +368,14 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     return this.mergeGapElement(config, key, ctx)
   }
 
-  private takeOneSidedChange(): MergeResult | null {
+  private takeWholeSide(): MergeResult | null {
     if (jsonEqual(this.ancestor, this.local)) {
       return noConflict(this.wrapSide(this.other))
     }
-    if (jsonEqual(this.ancestor, this.other)) {
+    if (
+      jsonEqual(this.ancestor, this.other) ||
+      jsonEqual(this.local, this.other)
+    ) {
       return noConflict(this.wrapSide(this.local))
     }
     return null

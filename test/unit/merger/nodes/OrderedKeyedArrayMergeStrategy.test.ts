@@ -599,6 +599,22 @@ describe('OrderedKeyedArrayMergeStrategy', () => {
   })
 
   describe('given a side that repeats a key', () => {
+    it('when both sides make the same change then every repeated entry is kept', () => {
+      // Arrange
+      const sut = createStrategy(
+        toElements(['A', 'B']),
+        toElements(['A:A_FIRST', 'A:A_SECOND', 'B']),
+        toElements(['A:A_FIRST', 'A:A_SECOND', 'B'])
+      )
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      expect(extractLabels(result.output)).toEqual(['A_FIRST', 'A_SECOND', 'B'])
+    })
+
     it('when a repeated key anchors the shared order then each occurrence is written once', () => {
       // Arrange
       const sut = createStrategy(
