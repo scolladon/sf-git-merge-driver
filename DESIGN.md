@@ -417,7 +417,7 @@ This property is a **layout-only** concern: it does not affect which value wins 
 
 Five further properties of the tie-break are worth stating explicitly:
 
-- **Role symmetry.** `mergePropertyOrder(ancestor, local, other)` always equals `mergePropertyOrder(ancestor, other, local)`, so a `git merge` and the `git rebase` that swaps the same two branches produce identical layout. This is what the lexicographic tie-break buys — a rank keyed on argument position could not make this guarantee.
+- **Role symmetry.** `mergePropertyOrder(ancestor, local, other)` always equals `mergePropertyOrder(ancestor, other, local)`, so a `git merge` and the `git rebase` that swaps the same two branches produce identical layout. This is what the lexicographic tie-break buys — a rank keyed on argument position could not make this guarantee. The same rule (`mergeKeyOrder`, code-unit tie-break) also orders ordered-array gap entries and diverged-path additions, so `merge(a, l, o)` and `merge(a, o, l)` emit the same ordered array (conflict sides swapped): role symmetry holds for ordered arrays too.
 - **Deliberate divergence from `diff3`.** Where git's own three-way merge raises a conflict on incompatible tag insertions — two sides inserting the same new tags in opposite relative order — this driver resolves the order deterministically instead, because tag order carries no conflict channel: it never decides which value wins or whether a conflict fires. Fixture `49-permissionset-incompatible-group-order` pins this so the divergence is not mistaken for a bug and "fixed" later.
 - **What is not preserved.** A pure reorder of tags that the other two sides leave in the ancestor's order is not carried over — from the merge's point of view it is a cycle (the reordering side asserts one edge, the ancestor-agreeing side asserts the reverse), and cycles are repaired by rank, not by "whichever side moved it". This matches the driver's pre-existing behaviour; it is stated here so the limit is documented rather than rediscovered.
 - **The rank tie-break does not recover XSD order for concurrently-introduced tags.** When two sides introduce different new tags at the identical anchor, no input constrains their relative order, so the rank decides. For `Profile` and `PermissionSet` the canonical Metadata API top-level group order happens to be alphabetical, so the rank agrees with it; for types whose canonical order is not alphabetical (`fullName` first, as in `38-canonical-order-merge-name-label` → `fullName, name, label`, or `39-canonical-order-merge-criteria-items` → `fullName, active, criteriaItems`), the rank may disagree with the XSD sequence in that specific tie case. Recovering the XSD order there would require a schema table the driver deliberately does not maintain.
@@ -434,6 +434,9 @@ For ordered metadata types (e.g., `GlobalValueSet`, `StandardValueSet`), the dri
 3. **Disjoint change detection** — non-overlapping reorderings can be merged automatically
 4. **Conflict on overlap** — when both sides move the same elements differently, conflict
 5. **Positional conflict detection** — concurrent additions at different positions trigger conflict
+6. **An entry present on all three sides is never treated as added or deleted by a gap** — leaving or entering a gap is a move, which the merged order already settles. The entry is merged once, in the gap whose local slice holds it
+7. **A side that changed nothing defers** — when one side's array equals the ancestor, the other side's array is taken verbatim
+8. **Role symmetry** — swapping local and other yields the same array; live entries of a gap, and additions, are ordered by `mergeKeyOrder`
 
 ### Algorithm Overview
 
@@ -449,13 +452,17 @@ flowchart TD
     end
 
     subgraph Analyze["Analyze Orderings"]
+        OneSided{{"One side equals ancestor?"}}
+        TakeOther["Take the other side verbatim"]
         FastPath{{"Same order in local & other?"}}
         Moved["Detect moved elements vs ancestor"]
         Overlap{{"Overlapping moves? (C4)"}}
         Position{{"Positional conflict? (C6/C7)"}}
     end
 
-    Build --> FastPath
+    Build --> OneSided
+    OneSided -->|Yes| TakeOther
+    OneSided -->|No| FastPath
     FastPath -->|Yes| Spine["Use LCS spine algorithm"]
     FastPath -->|No| Moved
     Moved --> Overlap
@@ -501,7 +508,10 @@ if (addedLocalPos < keyLocalPos !== addedOtherPos < keyOtherPos) {
 | M10 | Disjoint swaps | Local swaps {A,B}, other swaps {C,D} → merge both |
 | C4 | Divergent moves | Both sides move same element differently → conflict |
 | C6 | Positional conflict | Both sides add same element at different positions → conflict |
-| C7 | Concurrent addition with diverged orderings | Both sides add different elements while orderings diverge → conflict |
+| C7 | Concurrent addition with diverged orderings | Each side adds an element the other lacks while orderings diverge → conflict. An addition both sides share is not concurrent |
+| M11 | Same reorder on both sides | Both sides reorder identically → every entry kept, once |
+| M12 | One-sided change | One side equals the ancestor → the other side is taken verbatim |
+| M13 | Shared addition plus one-sided addition | Both sides add `X`, one side also adds `Y` while orderings diverge → merges, additions ordered by `mergeKeyOrder` |
 
 ### Example: M10 Disjoint Swaps
 
@@ -547,6 +557,7 @@ Analysis:
 - Both sides added different elements (X vs Y)
 - Ambiguous: should result be [B, A, X, Y] or [B, A, Y, X]?
 - Concurrent additions with diverged orderings → full array conflict
+- A shared addition (`X` on both sides) would not count: only an addition the other side lacks is concurrent
 ```
 
 ### Implementation
@@ -558,10 +569,19 @@ Key methods in `OrderedKeyedArrayMergeStrategy` ([OrderedKeyedArrayMergeStrategy
 | `buildArrayMergeState()` | Extracts keys and builds position/object maps for O(1) lookups |
 | `analyzeOrderings(ctx)` | Returns `{canMerge, localMoved, otherMoved}` — detects C4 (overlapping moves) and C6 (positional conflicts) |
 | `getMovedElements(ctx, modifiedPos)` | Finds elements that changed relative order |
-| `computeMergedKeyOrder(ctx, analysis)` | Builds merged key order; returns null for C7 conflict |
+| `computeMergedKeyOrder(ctx, analysis)` | Builds merged key order; returns null when both sides have one-sided additions (C7); shared additions are appended in `mergeKeyOrder` order |
+| `placeMovedGroups(ctx, analysis)` | Places each side's moved group at its first ancestor slot |
+| `takeOneSidedChange(ctx)` | Returns the other side verbatim when one side equals the ancestor |
+| `mergeGap(config, gaps, anchors, ctx)` | Detects gap conflicts, then merges the gap's keys through `mergeGapElements` |
+| `mergeGapKey(config, sets, key, ctx)` | Merges an entry present on all sides once, in the gap whose local slice holds it; defers to `mergeGapElement` otherwise |
+| `computeGapSets(gaps, isSettled, ctx)` | Judges deletions and additions against the whole side, not the gap slice |
+| `orderGapKeys(gaps)` | Orders live gap keys with `mergeKeyOrder`, then ancestor-only keys in ancestor order |
+| `isPlacedInAnotherGap(sets, key, ctx)` | Skips a key a live side holds in another gap so it is never emitted twice |
 | `processDivergedOrderings(config, ctx, analysis)` | Handles disjoint reorderings |
 | `processWithSpine(config, ctx)` | Uses LCS for spine-based merge |
 | `processSpine(config, spine, ctx)` | Iterates spine anchors, processes gaps between them |
+
+Gap ordering relies on `mergeKeyOrder` ([mergePropertyOrder.ts](src/merger/mergePropertyOrder.ts)), the side-symmetric, code-unit tie-break rule also used for tag order.
 
 ### Spine-Based Merge Algorithm
 
@@ -586,7 +606,7 @@ flowchart TD
 
     Process --> ForEach["For each anchor in spine"]
     ForEach --> CollectGaps["Collect gaps before anchor"]
-    CollectGaps --> MergeGap["mergeGap(): additions/deletions"]
+    CollectGaps --> MergeGap["mergeGap(): additions/deletions, entries on all sides merged where live sides place them, keys ordered by mergeKeyOrder over local/other slices"]
     MergeGap --> MergeAnchor["mergeElement(): merge anchor"]
     MergeAnchor --> ForEach
 
