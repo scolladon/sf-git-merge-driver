@@ -44,23 +44,40 @@ interface GapSets {
   readonly localAdded: ReadonlySet<string>
   readonly otherAdded: ReadonlySet<string>
   readonly allKeys: ReadonlySet<string>
+  readonly settled: ReadonlySet<string>
+  readonly localSlice: ReadonlySet<string>
 }
 
+const isOnAllSides = (ctx: ArrayMergeState, key: string): boolean =>
+  ctx.ancestorMap.has(key) && ctx.localMap.has(key) && ctx.otherMap.has(key)
+
+const absentFrom = (
+  keys: string[],
+  slice: ReadonlySet<string>,
+  settled: ReadonlySet<string>
+): Set<string> => new Set(keys.filter(k => !slice.has(k) && !settled.has(k)))
+
+// A key present on all three sides is never deleted or added: leaving or
+// entering a gap slice is a move, which the merged order already settles.
+// Spine anchors are excluded because a duplicated key can reappear in a gap.
 const computeGapSets = (
-  gapA: string[],
-  gapL: string[],
-  gapO: string[]
+  gaps: GapKeys,
+  isSettled: (key: string) => boolean
 ): GapSets => {
-  const ancestorSet = new Set(gapA)
-  const localSet = new Set(gapL)
-  const otherSet = new Set(gapO)
+  const allKeys = new Set([...gaps.ancestor, ...gaps.local, ...gaps.other])
+  const settled = new Set([...allKeys].filter(isSettled))
+  const ancestorSet = new Set(gaps.ancestor)
+  const localSet = new Set(gaps.local)
+  const otherSet = new Set(gaps.other)
 
   return {
-    localDeleted: new Set(gapA.filter(k => !localSet.has(k))),
-    otherDeleted: new Set(gapA.filter(k => !otherSet.has(k))),
-    localAdded: new Set(gapL.filter(k => !ancestorSet.has(k))),
-    otherAdded: new Set(gapO.filter(k => !ancestorSet.has(k))),
-    allKeys: new Set([...gapA, ...gapL, ...gapO]),
+    localDeleted: absentFrom(gaps.ancestor, localSet, settled),
+    otherDeleted: absentFrom(gaps.ancestor, otherSet, settled),
+    localAdded: absentFrom(gaps.local, ancestorSet, settled),
+    otherAdded: absentFrom(gaps.other, ancestorSet, settled),
+    allKeys,
+    settled,
+    localSlice: localSet,
   }
 }
 
@@ -313,12 +330,8 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     key: string,
     ctx: ArrayMergeState
   ): MergeResult | null {
-    const inA = ctx.ancestorMap.has(key)
-    const inL = ctx.localMap.has(key)
-    const inO = ctx.otherMap.has(key)
-
     // Element exists in all three - standard merge
-    if (inA && inL && inO) {
+    if (isOnAllSides(ctx, key)) {
       return this.mergeElement(config, key, ctx)
     }
 
@@ -360,6 +373,8 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     let lIdx = 0
     let oIdx = 0
 
+    const anchors = new Set(spine)
+
     for (const anchor of spine) {
       const aEnd = ctx.ancestorPos.get(anchor)!
       const lEnd = ctx.localPos.get(anchor)!
@@ -370,7 +385,7 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
         local: ctx.localKeys.slice(lIdx, lEnd),
         other: ctx.otherKeys.slice(oIdx, oEnd),
       }
-      results.push(this.mergeGap(config, gaps, ctx))
+      results.push(this.mergeGap(config, gaps, anchors, ctx))
       results.push(this.mergeElement(config, anchor, ctx))
 
       aIdx = aEnd + 1
@@ -383,7 +398,7 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
       local: ctx.localKeys.slice(lIdx),
       other: ctx.otherKeys.slice(oIdx),
     }
-    results.push(this.mergeGap(config, finalGaps, ctx))
+    results.push(this.mergeGap(config, finalGaps, anchors, ctx))
 
     return combineResults(results)
   }
@@ -393,9 +408,13 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   private mergeGap(
     config: MergeConfig,
     gaps: GapKeys,
+    anchors: ReadonlySet<string>,
     ctx: ArrayMergeState
   ): MergeResult {
-    const sets = computeGapSets(gaps.ancestor, gaps.local, gaps.other)
+    const sets = computeGapSets(
+      gaps,
+      key => isOnAllSides(ctx, key) && !anchors.has(key)
+    )
 
     const gapConflict = this.detectGapConflict(config, gaps, sets, ctx)
     if (gapConflict) {
@@ -453,12 +472,25 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   ): MergeResult {
     const results: MergeResult[] = []
     for (const key of sets.allKeys) {
-      const result = this.mergeGapElement(config, key, ctx)
+      const result = this.mergeGapKey(config, sets, key, ctx)
       if (result) {
         results.push(result)
       }
     }
     return combineResults(results)
+  }
+
+  private mergeGapKey(
+    config: MergeConfig,
+    sets: GapSets,
+    key: string,
+    ctx: ArrayMergeState
+  ): MergeResult | null {
+    if (!sets.settled.has(key)) {
+      return this.mergeGapElement(config, key, ctx)
+    }
+    // Emitted once, in the gap where the live sides place it
+    return sets.localSlice.has(key) ? this.mergeElement(config, key, ctx) : null
   }
 
   /**

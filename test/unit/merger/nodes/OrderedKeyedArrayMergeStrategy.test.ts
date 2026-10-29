@@ -293,6 +293,13 @@ describe('OrderedKeyedArrayMergeStrategy', () => {
       ['A', 'B', 'Y'],
       ['A', 'B', conflict(['X'], [], ['Y'])],
     ],
+    [
+      'Both sides move an entry next to different additions',
+      ['K', 'B'],
+      ['B', 'X', 'K'],
+      ['B', 'Y', 'K'],
+      ['B', conflict(['X', 'K'], [], ['Y', 'K'])],
+    ],
   ]
 
   // Additional scenarios to exercise gap analysis and spine processing branches
@@ -422,6 +429,20 @@ describe('OrderedKeyedArrayMergeStrategy', () => {
       ['A', 'B'],
       ['A', 'B'],
       ['A', 'B'],
+    ],
+    [
+      'Both sides apply the same reorder of an entry kept on all sides',
+      ['C', 'B'],
+      ['B', 'C'],
+      ['B', 'C'],
+      ['B', 'C'],
+    ],
+    [
+      'One side reorders while the other edits an entry and deletes another',
+      ['C', 'D'],
+      ['D', 'C'],
+      ['C:C_MOD'],
+      ['C_MOD'],
     ],
   ]
 

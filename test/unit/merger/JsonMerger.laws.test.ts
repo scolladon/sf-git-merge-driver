@@ -346,5 +346,13 @@ describe('JsonMerger laws', () => {
     it('when merging identical sides then the merge is clean and unchanged', async () => {
       await assertLaw(idempotence(ordered))
     })
+
+    it('when both sides make the same change then the merge renders as that change merged with itself', async () => {
+      await assertLaw(sameChange(ordered))
+    })
+
+    it('when the merge is clean then no key is lost or duplicated', async () => {
+      await assertLaw(noLossNoDuplication(ordered))
+    })
   })
 })
