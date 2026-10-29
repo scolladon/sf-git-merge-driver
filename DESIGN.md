@@ -436,7 +436,7 @@ For ordered metadata types (e.g., `GlobalValueSet`, `StandardValueSet`), the dri
 5. **Positional conflict detection** — concurrent additions at different positions trigger conflict
 6. **An entry present on all three sides is never treated as added or deleted by a gap** — leaving or entering a gap is a move, which the merged order already settles. The entry is merged once, in the gap whose local slice holds it
 7. **A side that changed nothing defers** — when one side's array equals the ancestor, the other side's array is taken verbatim
-8. **Role symmetry** — swapping local and other yields the same array; live entries of a gap, and additions, are ordered by `mergeKeyOrder`
+8. **Role symmetry** — swapping local and other yields the same array, and the same conflicts with their local and other sides swapped; live entries of a gap, and additions, are ordered by `mergeKeyOrder`
 
 ### Algorithm Overview
 
