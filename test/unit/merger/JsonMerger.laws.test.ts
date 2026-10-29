@@ -31,6 +31,10 @@ interface MergeOutcome {
 
 const KEYS = ['A', 'B', 'C', 'D', 'E']
 const BOOLEAN_TEXT = fc.constantFrom('true', 'false')
+// Three values, so local and other can edit one field to different values
+// and reach the field-level conflict a two-value alphabet never produces
+const FIELD_TEXT = fc.constantFrom('true', 'false', 'unset')
+const LABEL_TEXT = fc.constantFrom('x', 'y', 'z')
 const KEEP_WEIGHT = 3
 const DROP_WEIGHT = 1
 const MODIFY_WEIGHT = 1
@@ -44,9 +48,9 @@ const keyed: KindSpec = {
   sibling: { custom: 'false' },
   entry: key =>
     fc.record({
-      editable: BOOLEAN_TEXT,
+      editable: FIELD_TEXT,
       field: fc.constant(key),
-      readable: BOOLEAN_TEXT,
+      readable: FIELD_TEXT,
     }),
   keyOf: entry => fieldOf(entry, 'field'),
   emission: 'sorted',
@@ -60,7 +64,7 @@ const ordered: KindSpec = {
     fc.record({
       fullName: fc.constant(key),
       default: BOOLEAN_TEXT,
-      label: fc.constantFrom('x', 'y'),
+      label: LABEL_TEXT,
     }),
   keyOf: entry => fieldOf(entry, 'fullName'),
   emission: 'positional',
