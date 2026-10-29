@@ -101,6 +101,34 @@ const isPlacedInAnotherGap = (
   !sets.otherSlice.has(key) &&
   (ctx.localMap.has(key) || ctx.otherMap.has(key))
 
+interface SpineCursor {
+  readonly ancestor: number
+  readonly local: number
+  readonly other: number
+}
+
+const positionOf = (ctx: ArrayMergeState, anchor: string): SpineCursor => ({
+  ancestor: ctx.ancestorPos.get(anchor)!,
+  local: ctx.localPos.get(anchor)!,
+  other: ctx.otherPos.get(anchor)!,
+})
+
+const after = ({ ancestor, local, other }: SpineCursor): SpineCursor => ({
+  ancestor: ancestor + 1,
+  local: local + 1,
+  other: other + 1,
+})
+
+const gapBetween = (
+  ctx: ArrayMergeState,
+  start: SpineCursor,
+  end?: SpineCursor
+): GapKeys => ({
+  ancestor: ctx.ancestorKeys.slice(start.ancestor, end?.ancestor),
+  local: ctx.localKeys.slice(start.local, end?.local),
+  other: ctx.otherKeys.slice(start.other, end?.other),
+})
+
 // ============================================================================
 // Ordering Analysis
 // ============================================================================
@@ -408,36 +436,18 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     ctx: ArrayMergeState
   ): MergeResult {
     const results: MergeResult[] = []
-    let aIdx = 0
-    let lIdx = 0
-    let oIdx = 0
-
     const anchors = new Set(spine)
+    let start: SpineCursor = { ancestor: 0, local: 0, other: 0 }
 
     for (const anchor of spine) {
-      const aEnd = ctx.ancestorPos.get(anchor)!
-      const lEnd = ctx.localPos.get(anchor)!
-      const oEnd = ctx.otherPos.get(anchor)!
-
-      const gaps: GapKeys = {
-        ancestor: ctx.ancestorKeys.slice(aIdx, aEnd),
-        local: ctx.localKeys.slice(lIdx, lEnd),
-        other: ctx.otherKeys.slice(oIdx, oEnd),
-      }
+      const end = positionOf(ctx, anchor)
+      const gaps = gapBetween(ctx, start, end)
       results.push(this.mergeGap(config, gaps, anchors, ctx))
       results.push(this.mergeElement(config, anchor, ctx))
-
-      aIdx = aEnd + 1
-      lIdx = lEnd + 1
-      oIdx = oEnd + 1
+      start = after(end)
     }
 
-    const finalGaps: GapKeys = {
-      ancestor: ctx.ancestorKeys.slice(aIdx),
-      local: ctx.localKeys.slice(lIdx),
-      other: ctx.otherKeys.slice(oIdx),
-    }
-    results.push(this.mergeGap(config, finalGaps, anchors, ctx))
+    results.push(this.mergeGap(config, gapBetween(ctx, start), anchors, ctx))
 
     return combineResults(results)
   }
