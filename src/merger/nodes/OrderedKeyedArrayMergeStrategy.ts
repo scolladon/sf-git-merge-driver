@@ -111,6 +111,11 @@ interface OrderingAnalysis {
   otherMoved: Set<string>
 }
 
+const hasDivergedOrderings = ({
+  localMoved,
+  otherMoved,
+}: OrderingAnalysis): boolean => localMoved.size > 0 || otherMoved.size > 0
+
 const hasOneSidedAdditions = (
   additions: readonly string[],
   opposite: ReadonlyMap<string, JsonObject>
@@ -139,11 +144,7 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
       return this.buildFullArrayConflict()
     }
 
-    const hasDivergedOrderings =
-      orderingAnalysis.localMoved.size > 0 ||
-      orderingAnalysis.otherMoved.size > 0
-
-    if (hasDivergedOrderings) {
+    if (hasDivergedOrderings(orderingAnalysis)) {
       return this.processDivergedOrderings(config, ctx, orderingAnalysis)
     }
 
