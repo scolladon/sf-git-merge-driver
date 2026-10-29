@@ -458,6 +458,20 @@ describe('OrderedKeyedArrayMergeStrategy', () => {
       ['C:C_MOD'],
       ['C_MOD'],
     ],
+    [
+      'Other inserts before the entry both sides add after a shared anchor',
+      ['P'],
+      ['P', 'D'],
+      ['P', 'B', 'D'],
+      ['P', 'B', 'D'],
+    ],
+    [
+      'Local inserts before the entry both sides add after a shared anchor',
+      ['P'],
+      ['P', 'B', 'D'],
+      ['P', 'D'],
+      ['P', 'B', 'D'],
+    ],
   ]
 
   describe('Additional Graceful Merges', () => {

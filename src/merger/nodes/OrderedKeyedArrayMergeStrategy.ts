@@ -10,6 +10,7 @@ import { hasSameOrder, lcs, pushAll } from '../../utils/arrayUtils.js'
 import { jsonEqual } from '../../utils/jsonEqual.js'
 import { setsEqual, setsIntersect } from '../../utils/setUtils.js'
 import { buildConflictMarkers } from '../ConflictMarkerBuilder.js'
+import { mergeKeyOrder } from '../mergePropertyOrder.js'
 import type { KeyedSides } from './KeyedArrayIndex.js'
 import { buildKeyedMap } from './KeyedArrayIndex.js'
 import type { KeyedArrayMergeStrategy } from './KeyedArrayMergeStrategy.js'
@@ -43,7 +44,7 @@ interface GapSets {
   readonly otherDeleted: ReadonlySet<string>
   readonly localAdded: ReadonlySet<string>
   readonly otherAdded: ReadonlySet<string>
-  readonly allKeys: ReadonlySet<string>
+  readonly allKeys: readonly string[]
   readonly settled: ReadonlySet<string>
   readonly localSlice: ReadonlySet<string>
 }
@@ -60,12 +61,20 @@ const absentFrom = (
 // A key present on all three sides is never deleted or added: leaving or
 // entering a gap slice is a move, which the merged order already settles.
 // Spine anchors are excluded because a duplicated key can reappear in a gap.
+// Live keys are ordered by the side-symmetric property-order rule; keys only
+// the ancestor still holds follow in ancestor order.
+const orderGapKeys = (gaps: GapKeys): string[] => {
+  const live = mergeKeyOrder([], gaps.local, gaps.other)
+  const liveSet = new Set(live)
+  return [...live, ...gaps.ancestor.filter(k => !liveSet.has(k))]
+}
+
 const computeGapSets = (
   gaps: GapKeys,
   isSettled: (key: string) => boolean
 ): GapSets => {
-  const allKeys = new Set([...gaps.ancestor, ...gaps.local, ...gaps.other])
-  const settled = new Set([...allKeys].filter(isSettled))
+  const allKeys = orderGapKeys(gaps)
+  const settled = new Set(allKeys.filter(isSettled))
   const ancestorSet = new Set(gaps.ancestor)
   const localSet = new Set(gaps.local)
   const otherSet = new Set(gaps.other)
