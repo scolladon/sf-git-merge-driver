@@ -343,6 +343,10 @@ describe('JsonMerger laws', () => {
   })
 
   describe('given ordered-keyed arrays', () => {
+    it('when one side changes then the merge renders as that change', async () => {
+      await assertLaw(oneSidedChange(ordered))
+    })
+
     it('when merging identical sides then the merge is clean and unchanged', async () => {
       await assertLaw(idempotence(ordered))
     })

@@ -102,6 +102,11 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
 
   merge(config: MergeConfig): MergeResult {
     const ctx = this.buildArrayMergeState()
+    const oneSided = this.takeOneSidedChange(ctx)
+    if (oneSided) {
+      return oneSided
+    }
+
     const orderingAnalysis = this.analyzeOrderings(ctx)
 
     if (!orderingAnalysis.canMerge) {
@@ -337,6 +342,16 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
 
     // Handle additions and deletions
     return this.mergeGapElement(config, key, ctx)
+  }
+
+  private takeOneSidedChange(ctx: ArrayMergeState): MergeResult | null {
+    if (jsonEqual(this.ancestor, this.local)) {
+      return noConflict(this.wrapKeys(ctx.otherKeys, ctx.otherMap))
+    }
+    if (jsonEqual(this.ancestor, this.other)) {
+      return noConflict(this.wrapKeys(ctx.localKeys, ctx.localMap))
+    }
+    return null
   }
 
   private wrapKeys(

@@ -305,6 +305,20 @@ describe('OrderedKeyedArrayMergeStrategy', () => {
   // Additional scenarios to exercise gap analysis and spine processing branches
   const additionalGracefulScenarios: GracefulMergeScenario[] = [
     [
+      'Only the other side reorders and adds',
+      ['A', 'B'],
+      ['A', 'B'],
+      ['X', 'B', 'A'],
+      ['X', 'B', 'A'],
+    ],
+    [
+      'Only the local side reorders and adds',
+      ['A', 'B'],
+      ['X', 'B', 'A'],
+      ['A', 'B'],
+      ['X', 'B', 'A'],
+    ],
+    [
       'M13: Other-only move (local unchanged)',
       ['A', 'B', 'C'],
       ['A', 'B', 'C'],
@@ -490,12 +504,12 @@ describe('OrderedKeyedArrayMergeStrategy', () => {
 
   describe('processKeyOrder with deleted elements', () => {
     it('given diverged ordering with one side deleting an element then filters out empty results', () => {
-      // Arrange - local moves A,B and local deletes C (not in other),
-      // processKeyOrder iterates keys and some produce null/empty results
+      // Arrange - local swaps A and B and deletes D; other edits C, so the
+      // diverged path runs and D merges to nothing
       const strategy = createStrategy(
-        toElements(['A', 'B', 'C']),
-        toElements(['B', 'A']),
-        toElements(['A', 'B', 'C'])
+        toElements(['A', 'B', 'C', 'D']),
+        toElements(['B', 'A', 'C']),
+        toElements(['A', 'B', 'C:C_MOD', 'D'])
       )
 
       // Act
@@ -503,7 +517,7 @@ describe('OrderedKeyedArrayMergeStrategy', () => {
 
       // Assert
       expect(result.hasConflict).toBe(false)
-      expect(extractLabels(result.output)).toEqual(['B', 'A'])
+      expect(extractLabels(result.output)).toEqual(['B', 'A', 'C_MOD'])
     })
   })
 
