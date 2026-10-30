@@ -99,6 +99,31 @@ const after = ({ ancestor, local, other }: SpineCursor): SpineCursor => ({
   other: other + 1,
 })
 
+const isOnBothLiveSides = (ctx: ArrayMergeState, key: string): boolean =>
+  ctx.localMap.has(key) && ctx.otherMap.has(key)
+
+// On the spine path both live sides share one order. When they moved entries
+// the same way, the ancestor slots of those entries take that order, so an
+// agreed move anchors the spine instead of widening a gap. Unmoved entries
+// leave the ancestor unchanged.
+const alignAncestorToLiveOrder = (ctx: ArrayMergeState): ArrayMergeState => {
+  const isShared = (key: string) =>
+    ctx.ancestorMap.has(key) && isOnBothLiveSides(ctx, key)
+  const liveOrder = ctx.localKeys.filter(isShared)
+  const slots = ctx.ancestorKeys.filter(isShared)
+  if (liveOrder.length !== slots.length) return ctx
+
+  const live = liveOrder.values()
+  const ancestorKeys = ctx.ancestorKeys.map(key =>
+    isShared(key) ? live.next().value! : key
+  )
+  return {
+    ...ctx,
+    ancestorKeys,
+    ancestorPos: new Map(ancestorKeys.map((k, i) => [k, i])),
+  }
+}
+
 const gapBetween = (
   ctx: ArrayMergeState,
   start: SpineCursor,
@@ -327,12 +352,13 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     config: MergeConfig,
     ctx: ArrayMergeState
   ): MergeResult {
+    const aligned = alignAncestorToLiveOrder(ctx)
     const spine = lcs(
-      lcs(ctx.ancestorKeys, ctx.localKeys),
-      lcs(ctx.ancestorKeys, ctx.otherKeys)
+      lcs(aligned.ancestorKeys, aligned.localKeys),
+      lcs(aligned.ancestorKeys, aligned.otherKeys)
     )
 
-    return this.processSpine(config, spine, ctx)
+    return this.processSpine(config, spine, aligned)
   }
 
   // ============================================================================

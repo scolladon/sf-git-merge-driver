@@ -434,7 +434,7 @@ For ordered metadata types (e.g., `GlobalValueSet`, `StandardValueSet`), the dri
 3. **Disjoint change detection** — non-overlapping reorderings can be merged automatically
 4. **Conflict on overlap** — when both sides move the same elements differently, conflict
 5. **Positional conflict detection** — concurrent additions at different positions trigger conflict
-6. **An entry present on all three sides is never treated as added or deleted by a gap** — leaving or entering a gap is a move, which the merged order already settles. The entry is merged once, in the gap both live sides place it in (they share one order on the spine path)
+6. **An entry present on all three sides is never treated as added or deleted by a gap** — leaving or entering a gap is a move, which the merged order already settles. The entry is merged once, in the gap both live sides place it in (they share one order on the spine path). When both sides moved such entries the same way, the move is agreed: the entries anchor the spine in their new order, and only the remaining differences can conflict
 7. **A side that changed nothing defers** — when one side's array equals the ancestor, the other side's array is taken verbatim; when both sides are equal, that array is taken verbatim
 8. **Role symmetry** — swapping local and other yields the same array, and the same conflicts with their local and other sides swapped; live entries of a gap, and additions, are ordered by `mergeKeyOrder`
 
@@ -577,7 +577,8 @@ Key methods in `OrderedKeyedArrayMergeStrategy` ([OrderedKeyedArrayMergeStrategy
 | `mergeGapKey(config, sets, key, ctx)` | Merges an entry present on all sides with `mergeElement`; defers to `mergeGapElement` otherwise |
 | `computeGapSets(gaps, isSettled, ctx)` | Judges deletions and additions against the whole side, not the gap slice; iterates only keys a live side holds in the gap, ordered by `mergeKeyOrder` |
 | `processDivergedOrderings(config, ctx, analysis)` | Handles disjoint reorderings |
-| `processWithSpine(config, ctx)` | Uses LCS for spine-based merge |
+| `processWithSpine(config, ctx)` | Aligns the ancestor to the live sides' shared order, then uses LCS for spine-based merge |
+| `alignAncestorToLiveOrder(ctx)` | When both sides moved entries the same way, gives the ancestor slots of entries kept on all sides the live order, so an agreed move anchors the spine; keeps the ancestor when a live side repeats such a key |
 | `processSpine(config, spine, ctx)` | Iterates spine anchors, processes gaps between them |
 
 Gap ordering relies on `mergeKeyOrder` ([mergePropertyOrder.ts](src/merger/mergePropertyOrder.ts)), the side-symmetric, code-unit tie-break rule also used for tag order.
@@ -600,7 +601,7 @@ Implementation: [OrderedKeyedArrayMergeStrategy.ts](src/merger/nodes/OrderedKeye
 
 ```mermaid
 flowchart TD
-    Start["processWithSpine()"] --> Compute["Compute spine via double-LCS"]
+    Start["processWithSpine()"] --> Align["Align ancestor to the live sides' shared order"] --> Compute["Compute spine via double-LCS"]
     Compute --> Process["processSpine()"]
 
     Process --> ForEach["For each anchor in spine"]

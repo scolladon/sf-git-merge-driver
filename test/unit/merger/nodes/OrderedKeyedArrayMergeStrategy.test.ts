@@ -294,11 +294,11 @@ describe('OrderedKeyedArrayMergeStrategy', () => {
       ['A', 'B', conflict(['X'], [], ['Y'])],
     ],
     [
-      'Both sides move an entry next to different additions',
+      'Both sides make the same move next to different additions',
       ['K', 'B'],
       ['B', 'X', 'K'],
       ['B', 'Y', 'K'],
-      ['B', conflict(['X', 'K'], [], ['Y', 'K'])],
+      ['B', conflict(['X'], [], ['Y']), 'K'],
     ],
     [
       'Local reorders and adds two entries other adds in the reverse order',
@@ -613,6 +613,29 @@ describe('OrderedKeyedArrayMergeStrategy', () => {
   })
 
   describe('given a side that repeats a key', () => {
+    it('when both live sides repeat a key then the ancestor is not realigned', () => {
+      // Arrange
+      const sut = createStrategy(
+        toElements(['A', 'B', 'C']),
+        toElements(['A', 'B', 'A:A_SECOND', 'C', 'X']),
+        toElements(['A', 'B', 'A:A_SECOND', 'C:C_MOD'])
+      )
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(true)
+      expect(extractConflictStructure(result.output)).toEqual([
+        conflict(['A_SECOND'], ['A'], []),
+        'A_SECOND',
+        'B',
+        conflict(['A_SECOND'], ['A'], []),
+        'C_MOD',
+        'X',
+      ])
+    })
+
     it('when both sides make the same change then every repeated entry is kept', () => {
       // Arrange
       const sut = createStrategy(
