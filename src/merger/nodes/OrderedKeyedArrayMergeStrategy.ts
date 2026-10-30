@@ -129,6 +129,17 @@ const hasOneSidedAdditions = (
   opposite: ReadonlyMap<string, JsonObject>
 ): boolean => additions.some(k => !opposite.has(k))
 
+// No defensible relative order exists when each side adds an entry the other
+// lacks, or when the sides place the entries they both add in opposite orders
+const hasAmbiguousAdditions = (
+  localAdditions: readonly string[],
+  otherAdditions: readonly string[],
+  ctx: ArrayMergeState
+): boolean =>
+  (hasOneSidedAdditions(localAdditions, ctx.otherMap) &&
+    hasOneSidedAdditions(otherAdditions, ctx.localMap)) ||
+  !hasSameOrder(localAdditions, otherAdditions)
+
 export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   constructor(
     private readonly ancestor: JsonArray,
@@ -281,12 +292,8 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     const localAdditions = ctx.localKeys.filter(k => !ctx.ancestorSet.has(k))
     const otherAdditions = ctx.otherKeys.filter(k => !ctx.ancestorSet.has(k))
 
-    // Shared additions have a symmetric order; one-sided ones on both sides
-    // have no defensible relative order.
-    if (hasOneSidedAdditions(localAdditions, ctx.otherMap)) {
-      if (hasOneSidedAdditions(otherAdditions, ctx.localMap)) {
-        return null
-      }
+    if (hasAmbiguousAdditions(localAdditions, otherAdditions, ctx)) {
+      return null
     }
 
     const result = this.placeMovedGroups(ctx, analysis)

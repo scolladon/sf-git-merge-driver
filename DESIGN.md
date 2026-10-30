@@ -509,7 +509,7 @@ if (addedLocalPos < keyLocalPos !== addedOtherPos < keyOtherPos) {
 | M10 | Disjoint swaps | Local swaps {A,B}, other swaps {C,D} → merge both |
 | C4 | Divergent moves | Both sides move same element differently → conflict |
 | C6 | Positional conflict | Both sides add same element at different positions → conflict |
-| C7 | Concurrent addition with diverged orderings | Each side adds an element the other lacks while orderings diverge → conflict. An addition both sides share is not concurrent |
+| C7 | Concurrent addition with diverged orderings | Each side adds an element the other lacks, or both sides add the same elements in opposite orders, while orderings diverge → conflict. An addition both sides share, in the same order, is not concurrent |
 | M11 | Same reorder on both sides | Both sides reorder identically → every entry kept, once |
 | M12 | One-sided or shared change | One side equals the ancestor → the other side is taken verbatim; both sides equal → that side is taken verbatim |
 | M13 | Shared addition plus one-sided addition | Both sides add `X`, one side also adds `Y` while orderings diverge → merges, additions ordered by `mergeKeyOrder` |
@@ -570,7 +570,7 @@ Key methods in `OrderedKeyedArrayMergeStrategy` ([OrderedKeyedArrayMergeStrategy
 | `buildArrayMergeState()` | Extracts keys and builds position/object maps for O(1) lookups |
 | `analyzeOrderings(ctx)` | Returns `{canMerge, localMoved, otherMoved}` — detects C4 (overlapping moves) and C6 (positional conflicts) |
 | `getMovedElements(ctx, modifiedPos)` | Finds elements that changed relative order |
-| `computeMergedKeyOrder(ctx, analysis)` | Builds merged key order; returns null when both sides have one-sided additions (C7); shared additions are appended in `mergeKeyOrder` order |
+| `computeMergedKeyOrder(ctx, analysis)` | Builds merged key order; returns null when both sides have one-sided additions or place shared additions in opposite orders (C7); otherwise additions are appended in `mergeKeyOrder` order |
 | `placeMovedGroups(ctx, analysis)` | Places each side's moved group at its first ancestor slot |
 | `takeWholeSide()` | Returns a side verbatim, every entry as written, when the other side equals the ancestor or both sides are equal |
 | `mergeGap(config, gaps, anchors, ctx)` | Detects gap conflicts, then merges the gap's keys through `mergeGapElements` |
