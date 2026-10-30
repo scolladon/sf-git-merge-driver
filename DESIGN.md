@@ -383,7 +383,7 @@ Salesforce reuses the same XML element name across unrelated parent schemas with
 
 The convention for resolving the ambiguity is to read each candidate property via `getPropertyValue`, which returns `undefined` for an absent or object-shaped field, and pick the first defined value with the `firstPresentKey` helper (`getPicklistValuesKey`, `getValuesKey`). Composite extractors return `undefined` only when no part is present. **Failing to do this leaves every entry under the wrong-schema document without a key**: the keyless fail-safe below then degrades the merge to a whole-array merge or conflict instead of a per-entry merge. New extractors that share an element name with an existing schema must follow the same prefer-then-fallback shape.
 
-**Keyless fail-safe.** `hasKeylessCollision` (`src/merger/nodes/KeyedArrayIndex.ts`) routes an array to `UnkeyedConflictStrategy` when any one side holds two or more entries sharing the fallback key and at least one of them is keyless (a real key spelled `undefined` shares it): the merge is clean when one side is unchanged or both sides are equal, otherwise it is a whole-array conflict. A lone keyless entry keeps the historical key through `toEntryKeys`. Duplicates of a real key keep last-wins: unordered arrays keep the last entry once, ordered arrays write the last entry's content once per occurrence. The fail-safe is a safety net, not a substitute for the right extractor.
+**Keyless fail-safe.** `hasKeylessCollision` (`src/merger/nodes/KeyedArrayIndex.ts`) routes an array to `UnkeyedConflictStrategy` when any one side holds two or more entries sharing the fallback key and at least one of them is keyless (a real key spelled `undefined` shares it): the merge is clean when one side is unchanged or both sides are equal, otherwise it is a whole-array conflict. A lone keyless entry keeps the historical key through `toEntryKeys`. Duplicates of a real key keep last-wins: unordered arrays keep the last entry once, ordered arrays write the last entry's content once per occurrence, except that a side taken whole (the other side equals the ancestor, or both sides are equal) and a whole-array conflict keep every entry as written. The fail-safe is a safety net, not a substitute for the right extractor.
 
 ### 3. Early Termination Optimization
 
@@ -417,7 +417,7 @@ This property is a **layout-only** concern: it does not affect which value wins 
 
 Five further properties of the tie-break are worth stating explicitly:
 
-- **Role symmetry.** `mergePropertyOrder(ancestor, local, other)` always equals `mergePropertyOrder(ancestor, other, local)`, so a `git merge` and the `git rebase` that swaps the same two branches produce identical layout. This is what the lexicographic tie-break buys — a rank keyed on argument position could not make this guarantee.
+- **Role symmetry.** `mergePropertyOrder(ancestor, local, other)` always equals `mergePropertyOrder(ancestor, other, local)`, so a `git merge` and the `git rebase` that swaps the same two branches produce identical layout. This is what the lexicographic tie-break buys — a rank keyed on argument position could not make this guarantee. The same rule (`mergeKeyOrder`, code-unit tie-break) also orders ordered-array gap entries and diverged-path additions, so `merge(a, l, o)` and `merge(a, o, l)` emit the same ordered array (conflict sides swapped): role symmetry holds for ordered arrays too.
 - **Deliberate divergence from `diff3`.** Where git's own three-way merge raises a conflict on incompatible tag insertions — two sides inserting the same new tags in opposite relative order — this driver resolves the order deterministically instead, because tag order carries no conflict channel: it never decides which value wins or whether a conflict fires. Fixture `49-permissionset-incompatible-group-order` pins this so the divergence is not mistaken for a bug and "fixed" later.
 - **What is not preserved.** A pure reorder of tags that the other two sides leave in the ancestor's order is not carried over — from the merge's point of view it is a cycle (the reordering side asserts one edge, the ancestor-agreeing side asserts the reverse), and cycles are repaired by rank, not by "whichever side moved it". This matches the driver's pre-existing behaviour; it is stated here so the limit is documented rather than rediscovered.
 - **The rank tie-break does not recover XSD order for concurrently-introduced tags.** When two sides introduce different new tags at the identical anchor, no input constrains their relative order, so the rank decides. For `Profile` and `PermissionSet` the canonical Metadata API top-level group order happens to be alphabetical, so the rank agrees with it; for types whose canonical order is not alphabetical (`fullName` first, as in `38-canonical-order-merge-name-label` → `fullName, name, label`, or `39-canonical-order-merge-criteria-items` → `fullName, active, criteriaItems`), the rank may disagree with the XSD sequence in that specific tie case. Recovering the XSD order there would require a schema table the driver deliberately does not maintain.
@@ -434,6 +434,9 @@ For ordered metadata types (e.g., `GlobalValueSet`, `StandardValueSet`), the dri
 3. **Disjoint change detection** — non-overlapping reorderings can be merged automatically
 4. **Conflict on overlap** — when both sides move the same elements differently, conflict
 5. **Positional conflict detection** — concurrent additions at different positions trigger conflict
+6. **An entry present on all three sides is never treated as added or deleted by a gap** — leaving or entering a gap is a move, which the merged order already settles. The entry is merged once, in the gap both live sides place it in (they share one order on the spine path). When both sides moved such entries the same way, the move is agreed: the entries anchor the spine in their new order, and only the remaining differences can conflict
+7. **A side that changed nothing defers** — when one side's array equals the ancestor, the other side's array is taken verbatim; when both sides are equal, that array is taken verbatim
+8. **Role symmetry** — swapping local and other yields the same array, and the same conflicts with their local and other sides swapped; live entries of a gap, and additions, are ordered by `mergeKeyOrder`
 
 ### Algorithm Overview
 
@@ -441,6 +444,11 @@ The `OrderedKeyedArrayMergeStrategy` handles ordered arrays through these steps:
 
 ```mermaid
 flowchart TD
+    WholeSide{{"One side equals ancestor, or both sides equal?"}}
+    TakeSide["Take that side verbatim"]
+    WholeSide -->|Yes| TakeSide
+    WholeSide -->|No| Build
+
     subgraph Build["Build Merge Context"]
         Extract["Extract keys: ancestorKeys, localKeys, otherKeys"]
         Maps["Build position maps: ancestorPos, localPos, otherPos"]
@@ -501,7 +509,10 @@ if (addedLocalPos < keyLocalPos !== addedOtherPos < keyOtherPos) {
 | M10 | Disjoint swaps | Local swaps {A,B}, other swaps {C,D} → merge both |
 | C4 | Divergent moves | Both sides move same element differently → conflict |
 | C6 | Positional conflict | Both sides add same element at different positions → conflict |
-| C7 | Concurrent addition with diverged orderings | Both sides add different elements while orderings diverge → conflict |
+| C7 | Concurrent addition with diverged orderings | Each side adds an element the other lacks, or both sides add the same elements in opposite orders, while orderings diverge → conflict. An addition both sides share, in the same order, is not concurrent |
+| M11 | Same reorder on both sides | Both sides reorder identically → every entry kept, once |
+| M12 | One-sided or shared change | One side equals the ancestor → the other side is taken verbatim; both sides equal → that side is taken verbatim |
+| M13 | Shared addition plus one-sided addition | Both sides add `X`, one side also adds `Y` while orderings diverge → merges, additions ordered by `mergeKeyOrder` |
 
 ### Example: M10 Disjoint Swaps
 
@@ -547,6 +558,7 @@ Analysis:
 - Both sides added different elements (X vs Y)
 - Ambiguous: should result be [B, A, X, Y] or [B, A, Y, X]?
 - Concurrent additions with diverged orderings → full array conflict
+- A shared addition (`X` on both sides) would not count: only an addition the other side lacks is concurrent
 ```
 
 ### Implementation
@@ -558,10 +570,18 @@ Key methods in `OrderedKeyedArrayMergeStrategy` ([OrderedKeyedArrayMergeStrategy
 | `buildArrayMergeState()` | Extracts keys and builds position/object maps for O(1) lookups |
 | `analyzeOrderings(ctx)` | Returns `{canMerge, localMoved, otherMoved}` — detects C4 (overlapping moves) and C6 (positional conflicts) |
 | `getMovedElements(ctx, modifiedPos)` | Finds elements that changed relative order |
-| `computeMergedKeyOrder(ctx, analysis)` | Builds merged key order; returns null for C7 conflict |
+| `computeMergedKeyOrder(ctx, analysis)` | Builds merged key order; returns null when both sides have one-sided additions or place shared additions in opposite orders (C7); otherwise additions are appended in `mergeKeyOrder` order |
+| `placeMovedGroups(ctx, analysis)` | Places each side's moved group at its first ancestor slot |
+| `takeWholeSide()` | Returns a side verbatim, every entry as written, when the other side equals the ancestor or both sides are equal |
+| `mergeGap(config, gaps, anchors, ctx)` | Detects gap conflicts, then merges the gap's keys through `mergeGapElements` |
+| `mergeGapKey(config, sets, key, ctx)` | Merges an entry present on all sides with `mergeElement`; defers to `mergeGapElement` otherwise |
+| `computeGapSets(gaps, isSettled, ctx)` | Judges deletions and additions against the whole side, not the gap slice; iterates only keys a live side holds in the gap, ordered by `mergeKeyOrder` |
 | `processDivergedOrderings(config, ctx, analysis)` | Handles disjoint reorderings |
-| `processWithSpine(config, ctx)` | Uses LCS for spine-based merge |
+| `processWithSpine(config, ctx)` | Aligns the ancestor to the live sides' shared order, then uses LCS for spine-based merge |
+| `alignAncestorToLiveOrder(ctx)` | When both sides moved entries the same way, gives the ancestor slots of entries kept on all sides the live order, so an agreed move anchors the spine; keeps the ancestor when a live side repeats such a key |
 | `processSpine(config, spine, ctx)` | Iterates spine anchors, processes gaps between them |
+
+Gap ordering relies on `mergeKeyOrder` ([mergePropertyOrder.ts](src/merger/mergePropertyOrder.ts)), the side-symmetric, code-unit tie-break rule also used for tag order.
 
 ### Spine-Based Merge Algorithm
 
@@ -581,12 +601,12 @@ Implementation: [OrderedKeyedArrayMergeStrategy.ts](src/merger/nodes/OrderedKeye
 
 ```mermaid
 flowchart TD
-    Start["processWithSpine()"] --> Compute["Compute spine via double-LCS"]
+    Start["processWithSpine()"] --> Align["Align ancestor to the live sides' shared order"] --> Compute["Compute spine via double-LCS"]
     Compute --> Process["processSpine()"]
 
     Process --> ForEach["For each anchor in spine"]
     ForEach --> CollectGaps["Collect gaps before anchor"]
-    CollectGaps --> MergeGap["mergeGap(): additions/deletions"]
+    CollectGaps --> MergeGap["mergeGap(): additions/deletions, entries on all sides merged where live sides place them, keys ordered by mergeKeyOrder over local/other slices"]
     MergeGap --> MergeAnchor["mergeElement(): merge anchor"]
     MergeAnchor --> ForEach
 

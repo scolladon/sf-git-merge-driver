@@ -14,6 +14,7 @@ export default defineConfig({
       '.stryker-tmp',
     ],
     clearMocks: true,
+    setupFiles: ['test/utils/fastCheckSetup.ts'],
     coverage: {
       provider: 'v8',
       reportsDirectory: 'reports/coverage',

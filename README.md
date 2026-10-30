@@ -72,6 +72,9 @@ For metadata types where **element order matters** (like picklist values), the m
 - **Disjoint reorderings merge automatically**: If one branch reorders elements A↔B and another reorders C↔D, both changes are preserved
 - **Conflicting reorderings trigger conflict**: If both branches move the same element to different positions, a conflict is raised for manual resolution
 - **Additions respect position**: New elements are inserted at their intended position
+- **One-sided changes are kept as written**: If only one branch changed the list, or both branches made the same change, that list is kept exactly as written
+- **Branch roles do not matter**: Swapping which branch is merged into which gives the same list, and the same conflicts with their sides swapped
+- **Nothing is dropped silently**: An entry one branch edited is either kept or shown in a conflict, never lost from a clean merge (entries sharing a key follow the rule in [Entries sharing a key](#entries-sharing-a-key))
 
 **Supported ordered metadata:**
 
@@ -320,7 +323,7 @@ This means you might see a conflict block containing the entire array instead of
 
 ### Entries sharing a key
 
-When several entries of a list share the same key, the driver keeps the last one's content, which is what a deploy does.
+When several entries of a list share the same key, the driver keeps the last one's content, which is what a deploy does. Two exceptions on ordered lists (picklist values, value set entries): when only one side changed the list, or both sides made the same change, that side is kept as written, and when the whole list conflicts, the conflict shows every entry as written.
 
 ### Entries without their key
 

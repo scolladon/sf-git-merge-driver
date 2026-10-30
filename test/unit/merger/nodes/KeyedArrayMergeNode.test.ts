@@ -1066,7 +1066,7 @@ describe('KeyedArrayMergeNode', () => {
     })
 
     describe('when ordered', () => {
-      it('then the last entry is written once per occurrence', () => {
+      it('then every entry is written as given', () => {
         // Arrange
         const a1 = { fullName: 'A', label: 'A1' }
         const a2 = { fullName: 'A', label: 'A2' }
@@ -1086,7 +1086,7 @@ describe('KeyedArrayMergeNode', () => {
         // Assert
         expect(result.hasConflict).toBe(false)
         expect(result.output).toEqual([
-          { customValue: a2 },
+          { customValue: a1 },
           { customValue: a2 },
           { customValue: b },
         ])

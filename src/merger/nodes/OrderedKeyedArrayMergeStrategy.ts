@@ -10,6 +10,7 @@ import { hasSameOrder, lcs, pushAll } from '../../utils/arrayUtils.js'
 import { jsonEqual } from '../../utils/jsonEqual.js'
 import { setsEqual, setsIntersect } from '../../utils/setUtils.js'
 import { buildConflictMarkers } from '../ConflictMarkerBuilder.js'
+import { mergeKeyOrder } from '../mergePropertyOrder.js'
 import type { KeyedSides } from './KeyedArrayIndex.js'
 import { buildKeyedMap } from './KeyedArrayIndex.js'
 import type { KeyedArrayMergeStrategy } from './KeyedArrayMergeStrategy.js'
@@ -43,26 +44,95 @@ interface GapSets {
   readonly otherDeleted: ReadonlySet<string>
   readonly localAdded: ReadonlySet<string>
   readonly otherAdded: ReadonlySet<string>
-  readonly allKeys: ReadonlySet<string>
+  readonly allKeys: readonly string[]
+  readonly settled: ReadonlySet<string>
 }
 
+const isOnAllSides = (ctx: ArrayMergeState, key: string): boolean =>
+  ctx.ancestorMap.has(key) && ctx.localMap.has(key) && ctx.otherMap.has(key)
+
+const absentFrom = (
+  keys: string[],
+  side: ReadonlyMap<string, JsonObject>
+): Set<string> => new Set(keys.filter(k => !side.has(k)))
+
+// Deletions and additions are judged against the whole side, never the gap
+// slice: leaving or entering a slice is a move, which the merged order
+// already settles. A key present on all three sides sits in the same gap on
+// both live sides, since they share one order, and is merged there; spine
+// anchors are excluded because a duplicated key can reappear in a gap.
+// Only keys a live side holds in this gap are merged here, ordered by the
+// side-symmetric property-order rule: a key only the ancestor holds in this
+// gap is either deleted on both sides or merged where a live side holds it.
 const computeGapSets = (
-  gapA: string[],
-  gapL: string[],
-  gapO: string[]
+  gaps: GapKeys,
+  isSettled: (key: string) => boolean,
+  ctx: ArrayMergeState
 ): GapSets => {
-  const ancestorSet = new Set(gapA)
-  const localSet = new Set(gapL)
-  const otherSet = new Set(gapO)
+  const allKeys = mergeKeyOrder([], gaps.local, gaps.other)
 
   return {
-    localDeleted: new Set(gapA.filter(k => !localSet.has(k))),
-    otherDeleted: new Set(gapA.filter(k => !otherSet.has(k))),
-    localAdded: new Set(gapL.filter(k => !ancestorSet.has(k))),
-    otherAdded: new Set(gapO.filter(k => !ancestorSet.has(k))),
-    allKeys: new Set([...gapA, ...gapL, ...gapO]),
+    localDeleted: absentFrom(gaps.ancestor, ctx.localMap),
+    otherDeleted: absentFrom(gaps.ancestor, ctx.otherMap),
+    localAdded: absentFrom(gaps.local, ctx.ancestorMap),
+    otherAdded: absentFrom(gaps.other, ctx.ancestorMap),
+    allKeys,
+    settled: new Set(allKeys.filter(isSettled)),
   }
 }
+
+interface SpineCursor {
+  readonly ancestor: number
+  readonly local: number
+  readonly other: number
+}
+
+const positionOf = (ctx: ArrayMergeState, anchor: string): SpineCursor => ({
+  ancestor: ctx.ancestorPos.get(anchor)!,
+  local: ctx.localPos.get(anchor)!,
+  other: ctx.otherPos.get(anchor)!,
+})
+
+const after = ({ ancestor, local, other }: SpineCursor): SpineCursor => ({
+  ancestor: ancestor + 1,
+  local: local + 1,
+  other: other + 1,
+})
+
+const isOnBothLiveSides = (ctx: ArrayMergeState, key: string): boolean =>
+  ctx.localMap.has(key) && ctx.otherMap.has(key)
+
+// On the spine path both live sides share one order. When they moved entries
+// the same way, the ancestor slots of those entries take that order, so an
+// agreed move anchors the spine instead of widening a gap. Unmoved entries
+// leave the ancestor unchanged.
+const alignAncestorToLiveOrder = (ctx: ArrayMergeState): ArrayMergeState => {
+  const isShared = (key: string) =>
+    ctx.ancestorMap.has(key) && isOnBothLiveSides(ctx, key)
+  const liveOrder = ctx.localKeys.filter(isShared)
+  const slots = ctx.ancestorKeys.filter(isShared)
+  if (liveOrder.length !== slots.length) return ctx
+
+  const live = liveOrder.values()
+  const ancestorKeys = ctx.ancestorKeys.map(key =>
+    isShared(key) ? live.next().value! : key
+  )
+  return {
+    ...ctx,
+    ancestorKeys,
+    ancestorPos: new Map(ancestorKeys.map((k, i) => [k, i])),
+  }
+}
+
+const gapBetween = (
+  ctx: ArrayMergeState,
+  start: SpineCursor,
+  end?: SpineCursor
+): GapKeys => ({
+  ancestor: ctx.ancestorKeys.slice(start.ancestor, end?.ancestor),
+  local: ctx.localKeys.slice(start.local, end?.local),
+  other: ctx.otherKeys.slice(start.other, end?.other),
+})
 
 // ============================================================================
 // Ordering Analysis
@@ -74,6 +144,27 @@ interface OrderingAnalysis {
   otherMoved: Set<string>
 }
 
+const hasDivergedOrderings = ({
+  localMoved,
+  otherMoved,
+}: OrderingAnalysis): boolean => localMoved.size > 0 || otherMoved.size > 0
+
+const hasOneSidedAdditions = (
+  additions: readonly string[],
+  opposite: ReadonlyMap<string, JsonObject>
+): boolean => additions.some(k => !opposite.has(k))
+
+// No defensible relative order exists when each side adds an entry the other
+// lacks, or when the sides place the entries they both add in opposite orders
+const hasAmbiguousAdditions = (
+  localAdditions: readonly string[],
+  otherAdditions: readonly string[],
+  ctx: ArrayMergeState
+): boolean =>
+  (hasOneSidedAdditions(localAdditions, ctx.otherMap) &&
+    hasOneSidedAdditions(otherAdditions, ctx.localMap)) ||
+  !hasSameOrder(localAdditions, otherAdditions)
+
 export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   constructor(
     private readonly ancestor: JsonArray,
@@ -84,18 +175,20 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   ) {}
 
   merge(config: MergeConfig): MergeResult {
+    const wholeSide = this.takeWholeSide()
+    if (wholeSide) {
+      return wholeSide
+    }
+
     const ctx = this.buildArrayMergeState()
+
     const orderingAnalysis = this.analyzeOrderings(ctx)
 
     if (!orderingAnalysis.canMerge) {
-      return this.buildFullArrayConflict(config, ctx)
+      return this.buildFullArrayConflict()
     }
 
-    const hasDivergedOrderings =
-      orderingAnalysis.localMoved.size > 0 ||
-      orderingAnalysis.otherMoved.size > 0
-
-    if (hasDivergedOrderings) {
+    if (hasDivergedOrderings(orderingAnalysis)) {
       return this.processDivergedOrderings(config, ctx, orderingAnalysis)
     }
 
@@ -206,7 +299,7 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     const mergedKeys = this.computeMergedKeyOrder(ctx, analysis)
 
     if (mergedKeys === null) {
-      return this.buildFullArrayConflict(config, ctx)
+      return this.buildFullArrayConflict()
     }
 
     return this.processKeyOrder(config, ctx, mergedKeys)
@@ -215,52 +308,40 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   /**
    * Computes merged key order by combining disjoint reorderings.
    * Also includes elements added in local or other (not in ancestor).
-   * Returns null if concurrent disjoint additions are detected (conflict).
+   * Returns null when each side adds an entry the other lacks (conflict).
    */
   private computeMergedKeyOrder(
     ctx: ArrayMergeState,
     analysis: OrderingAnalysis
   ): string[] | null {
-    const { localMoved, otherMoved } = analysis
+    const localAdditions = ctx.localKeys.filter(k => !ctx.ancestorSet.has(k))
+    const otherAdditions = ctx.otherKeys.filter(k => !ctx.ancestorSet.has(k))
 
-    const localMovedOrdered = ctx.localKeys.filter(k => localMoved.has(k))
-    const otherMovedOrdered = ctx.otherKeys.filter(k => otherMoved.has(k))
-    const localAdditions = ctx.localKeys.filter(
-      k => !localMoved.has(k) && !ctx.ancestorSet.has(k)
-    )
-    const otherAdditions = ctx.otherKeys.filter(
-      k => !otherMoved.has(k) && !ctx.ancestorSet.has(k) && !ctx.localMap.has(k)
-    )
-
-    // Conflict: both sides added different elements - ambiguous ordering
-    if (localAdditions.length > 0 && otherAdditions.length > 0) {
+    if (hasAmbiguousAdditions(localAdditions, otherAdditions, ctx)) {
       return null
     }
 
-    // Build result by traversing ancestor and inserting moved groups
-    const result: string[] = []
-    let localMovedInserted = false
-    let otherMovedInserted = false
-
-    for (const key of ctx.ancestorKeys) {
-      if (localMoved.has(key)) {
-        if (!localMovedInserted) {
-          pushAll(result, localMovedOrdered)
-          localMovedInserted = true
-        }
-      } else if (otherMoved.has(key)) {
-        if (!otherMovedInserted) {
-          pushAll(result, otherMovedOrdered)
-          otherMovedInserted = true
-        }
-      } else {
-        result.push(key)
-      }
-    }
-
-    // Append additions at the end (preserving their relative order)
-    pushAll(result, localAdditions, otherAdditions)
+    const result = this.placeMovedGroups(ctx, analysis)
+    pushAll(result, mergeKeyOrder([], localAdditions, otherAdditions))
     return result
+  }
+
+  private placeMovedGroups(
+    ctx: ArrayMergeState,
+    { localMoved, otherMoved }: OrderingAnalysis
+  ): string[] {
+    const localGroup = ctx.localKeys.filter(k => localMoved.has(k))
+    const otherGroup = ctx.otherKeys.filter(k => otherMoved.has(k))
+    const firstLocal = ctx.ancestorKeys.findIndex(k => localMoved.has(k))
+    const firstOther = ctx.ancestorKeys.findIndex(
+      k => !localMoved.has(k) && otherMoved.has(k)
+    )
+
+    return ctx.ancestorKeys.flatMap((key, i) => {
+      if (i === firstLocal) return localGroup
+      if (i === firstOther) return otherGroup
+      return localMoved.has(key) || otherMoved.has(key) ? [] : [key]
+    })
   }
 
   // ============================================================================
@@ -271,12 +352,13 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     config: MergeConfig,
     ctx: ArrayMergeState
   ): MergeResult {
+    const aligned = alignAncestorToLiveOrder(ctx)
     const spine = lcs(
-      lcs(ctx.ancestorKeys, ctx.localKeys),
-      lcs(ctx.ancestorKeys, ctx.otherKeys)
+      lcs(aligned.ancestorKeys, aligned.localKeys),
+      lcs(aligned.ancestorKeys, aligned.otherKeys)
     )
 
-    return this.processSpine(config, spine, ctx)
+    return this.processSpine(config, spine, aligned)
   }
 
   // ============================================================================
@@ -313,17 +395,31 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     key: string,
     ctx: ArrayMergeState
   ): MergeResult | null {
-    const inA = ctx.ancestorMap.has(key)
-    const inL = ctx.localMap.has(key)
-    const inO = ctx.otherMap.has(key)
-
     // Element exists in all three - standard merge
-    if (inA && inL && inO) {
+    if (isOnAllSides(ctx, key)) {
       return this.mergeElement(config, key, ctx)
     }
 
     // Handle additions and deletions
     return this.mergeGapElement(config, key, ctx)
+  }
+
+  private takeWholeSide(): MergeResult | null {
+    if (jsonEqual(this.ancestor, this.local)) {
+      return noConflict(this.wrapSide(this.other))
+    }
+    if (
+      jsonEqual(this.ancestor, this.other) ||
+      jsonEqual(this.local, this.other)
+    ) {
+      return noConflict(this.wrapSide(this.local))
+    }
+    return null
+  }
+
+  // Raw entries, not a key lookup: a repeated key keeps every entry
+  private wrapSide(side: JsonArray): JsonArray {
+    return side.map(entry => this.wrapElement(entry as JsonObject))
   }
 
   private wrapKeys(
@@ -335,15 +431,12 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     }))
   }
 
-  private buildFullArrayConflict(
-    _config: MergeConfig,
-    ctx: ArrayMergeState
-  ): MergeResult {
+  private buildFullArrayConflict(): MergeResult {
     return withConflict([
       buildConflictMarkers(
-        this.wrapKeys(ctx.localKeys, ctx.localMap),
-        this.wrapKeys(ctx.ancestorKeys, ctx.ancestorMap),
-        this.wrapKeys(ctx.otherKeys, ctx.otherMap)
+        this.wrapSide(this.local),
+        this.wrapSide(this.ancestor),
+        this.wrapSide(this.other)
       ),
     ])
   }
@@ -356,34 +449,18 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
     ctx: ArrayMergeState
   ): MergeResult {
     const results: MergeResult[] = []
-    let aIdx = 0
-    let lIdx = 0
-    let oIdx = 0
+    const anchors = new Set(spine)
+    let start: SpineCursor = { ancestor: 0, local: 0, other: 0 }
 
     for (const anchor of spine) {
-      const aEnd = ctx.ancestorPos.get(anchor)!
-      const lEnd = ctx.localPos.get(anchor)!
-      const oEnd = ctx.otherPos.get(anchor)!
-
-      const gaps: GapKeys = {
-        ancestor: ctx.ancestorKeys.slice(aIdx, aEnd),
-        local: ctx.localKeys.slice(lIdx, lEnd),
-        other: ctx.otherKeys.slice(oIdx, oEnd),
-      }
-      results.push(this.mergeGap(config, gaps, ctx))
+      const end = positionOf(ctx, anchor)
+      const gaps = gapBetween(ctx, start, end)
+      results.push(this.mergeGap(config, gaps, anchors, ctx))
       results.push(this.mergeElement(config, anchor, ctx))
-
-      aIdx = aEnd + 1
-      lIdx = lEnd + 1
-      oIdx = oEnd + 1
+      start = after(end)
     }
 
-    const finalGaps: GapKeys = {
-      ancestor: ctx.ancestorKeys.slice(aIdx),
-      local: ctx.localKeys.slice(lIdx),
-      other: ctx.otherKeys.slice(oIdx),
-    }
-    results.push(this.mergeGap(config, finalGaps, ctx))
+    results.push(this.mergeGap(config, gapBetween(ctx, start), anchors, ctx))
 
     return combineResults(results)
   }
@@ -393,9 +470,14 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   private mergeGap(
     config: MergeConfig,
     gaps: GapKeys,
+    anchors: ReadonlySet<string>,
     ctx: ArrayMergeState
   ): MergeResult {
-    const sets = computeGapSets(gaps.ancestor, gaps.local, gaps.other)
+    const sets = computeGapSets(
+      gaps,
+      key => isOnAllSides(ctx, key) && !anchors.has(key),
+      ctx
+    )
 
     const gapConflict = this.detectGapConflict(config, gaps, sets, ctx)
     if (gapConflict) {
@@ -453,12 +535,24 @@ export class OrderedKeyedArrayMergeStrategy implements KeyedArrayMergeStrategy {
   ): MergeResult {
     const results: MergeResult[] = []
     for (const key of sets.allKeys) {
-      const result = this.mergeGapElement(config, key, ctx)
+      const result = this.mergeGapKey(config, sets, key, ctx)
       if (result) {
         results.push(result)
       }
     }
     return combineResults(results)
+  }
+
+  private mergeGapKey(
+    config: MergeConfig,
+    sets: GapSets,
+    key: string,
+    ctx: ArrayMergeState
+  ): MergeResult | null {
+    if (sets.settled.has(key)) {
+      return this.mergeElement(config, key, ctx)
+    }
+    return this.mergeGapElement(config, key, ctx)
   }
 
   /**

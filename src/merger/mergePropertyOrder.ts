@@ -90,15 +90,11 @@ const topologicalOrder = (
   return order
 }
 
-export const mergePropertyOrder = (
-  ancestor: JsonObject | JsonArray | null | undefined,
-  local: JsonObject | JsonArray,
-  other: JsonObject | JsonArray
+export const mergeKeyOrder = (
+  ancestorKeys: string[],
+  localKeys: string[],
+  otherKeys: string[]
 ): string[] => {
-  const ancestorKeys = keysOf(ancestor)
-  const localKeys = keysOf(local)
-  const otherKeys = keysOf(other)
-
   if (
     sameSequence(localKeys, otherKeys) &&
     isSubsequence(ancestorKeys, localKeys)
@@ -111,3 +107,9 @@ export const mergePropertyOrder = (
   const { indegree, successors } = buildEdges(lists, index, keys.length)
   return topologicalOrder(keys, indegree, successors)
 }
+
+export const mergePropertyOrder = (
+  ancestor: JsonObject | JsonArray | null | undefined,
+  local: JsonObject | JsonArray,
+  other: JsonObject | JsonArray
+): string[] => mergeKeyOrder(keysOf(ancestor), keysOf(local), keysOf(other))
