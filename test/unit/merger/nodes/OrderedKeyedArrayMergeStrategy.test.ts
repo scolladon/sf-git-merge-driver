@@ -301,6 +301,13 @@ describe('OrderedKeyedArrayMergeStrategy', () => {
       ['B', conflict(['X'], [], ['Y']), 'K'],
     ],
     [
+      'Both sides make the same move and delete the same entry next to different additions',
+      ['K', 'B', 'D'],
+      ['B', 'X', 'K'],
+      ['B', 'Y', 'K'],
+      ['B', conflict(['X'], [], ['Y']), 'K'],
+    ],
+    [
       'Local reorders and adds two entries other adds in the reverse order',
       ['A', 'B'],
       ['B', 'A', 'X', 'Y'],
