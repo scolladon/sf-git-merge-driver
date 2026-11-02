@@ -7,6 +7,16 @@ export const UNTERMINATED_DECLARATION = 'XML parse error: unterminated <! ... >'
 export const UNTERMINATED_PROCESSING_INSTRUCTION =
   'XML parse error: unterminated <? ?>'
 export const UNTERMINATED_TAG = 'XML parse error: unterminated tag'
+export const MALFORMED_ATTRIBUTE = 'XML parse error: malformed attribute'
+export const MALFORMED_ELEMENT_NAME = 'XML parse error: invalid element name'
+export const CONTENT_OUTSIDE_ROOT =
+  'XML parse error: content outside the single root element'
+export const DECLARATION_IN_ROOT =
+  'XML parse error: <! declaration inside the root element'
+export const PROCESSING_INSTRUCTION_IN_ROOT =
+  'XML parse error: processing instruction inside the root element'
+export const MISPLACED_XML_DECLARATION =
+  'XML parse error: XML declaration not at the start of the document'
 
 export const unbalancedTags = (finalDepth: number): string =>
   `XML parse error: tags unbalanced (final depth ${finalDepth})`

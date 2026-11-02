@@ -176,11 +176,10 @@ describe('CompactXmlParser', () => {
   })
 
   describe('given a DOCTYPE prologue', () => {
-    it('when parseString then the DOCTYPE is skipped and the root is parsed normally', () => {
-      const result = sut.parseString(
-        `<!DOCTYPE r SYSTEM "x.dtd"><r><v>1</v></r>`
-      )
-      expect(result.content).toEqual({ r: { v: '1' } })
+    it('when parseString then it throws as content outside the root', () => {
+      expect(() =>
+        sut.parseString(`<!DOCTYPE r SYSTEM "x.dtd"><r><v>1</v></r>`)
+      ).toThrow(/content outside the single root element/)
     })
 
     it('when parseString and the DOCTYPE itself is unterminated then it throws with the <! ... > message', () => {
@@ -214,10 +213,26 @@ describe('CompactXmlParser', () => {
   })
 
   describe('given a valueless attribute on the root element', () => {
-    it('when parseString then it round-trips without throwing', () => {
-      const result = sut.parseString(`<r foo><v>1</v></r>`)
-      expect(result.content).toEqual({ r: { v: '1' } })
-      expect(result.rootAttributes).toEqual({ '@_foo': null })
+    it('when parseString then it is refused', () => {
+      expect(() => sut.parseString(`<r foo><v>1</v></r>`)).toThrow(
+        'XML parse error: malformed attribute'
+      )
+    })
+  })
+
+  describe('given a text line that opens with a less-than run (the local marker)', () => {
+    it('when parseString then it never reaches the tree as text', () => {
+      expect(() =>
+        sut.parseString('<r><v>x\n<<<<<<< ours\nz</v></r>')
+      ).toThrow()
+    })
+  })
+
+  describe('given an attribute name the lexer would truncate', () => {
+    it('when parseString then it is refused rather than renamed', () => {
+      expect(() =>
+        sut.parseString(`<r __proto__="1"><v __proto__="2">1</v></r>`)
+      ).toThrow('XML parse error: malformed attribute')
     })
   })
 
@@ -238,9 +253,10 @@ describe('CompactXmlParser', () => {
   })
 
   describe('given a comment that precedes the root element', () => {
-    it('when parseString then the comment is skipped and the root is still found', () => {
-      const result = sut.parseString(`<!-- preamble --><r><v>1</v></r>`)
-      expect(result.content).toEqual({ r: { v: '1' } })
+    it('when parseString then it throws, the comment being outside the root', () => {
+      expect(() => sut.parseString(`<!-- preamble --><r><v>1</v></r>`)).toThrow(
+        'content outside the single root element'
+      )
     })
   })
 
