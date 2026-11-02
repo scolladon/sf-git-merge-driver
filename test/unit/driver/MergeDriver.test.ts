@@ -46,9 +46,10 @@ vi.mock('node:fs/promises', async () => {
   }
 })
 
-const mockPeekEol = vi.fn<() => Promise<'\n' | '\r\n'>>()
+const mockPeekEol =
+  vi.fn<(paths: readonly string[]) => Promise<'\n' | '\r\n'>>()
 vi.mock('../../../src/utils/peekEol.js', () => ({
-  peekEol: () => mockPeekEol(),
+  peekDocumentEol: (paths: readonly string[]) => mockPeekEol(paths),
 }))
 
 const mockMergeThreeWay =
@@ -97,7 +98,7 @@ describe('MergeDriver (unit — mock-required edge cases only)', () => {
     mockUnlink.mockResolvedValue(undefined)
   })
 
-  describe('given peekEol reports CRLF', () => {
+  describe('given the document eol is CRLF', () => {
     it('when merged then mergeThreeWay is called with eol=\\r\\n', async () => {
       mockPeekEol.mockResolvedValue('\r\n')
       await sut.mergeFiles('a', 'o', 't')
@@ -107,7 +108,14 @@ describe('MergeDriver (unit — mock-required edge cases only)', () => {
     })
   })
 
-  describe('given peekEol reports LF', () => {
+  describe('given three input paths', () => {
+    it('when merged then the eol is read from ours, then theirs, then the ancestor', async () => {
+      await sut.mergeFiles('anc', 'ours', 'theirs')
+      expect(mockPeekEol).toHaveBeenCalledWith(['ours', 'theirs', 'anc'])
+    })
+  })
+
+  describe('given the document eol is LF', () => {
     it('when merged then mergeThreeWay is called with eol=\\n', async () => {
       mockPeekEol.mockResolvedValue('\n')
       await sut.mergeFiles('a', 'o', 't')
@@ -174,7 +182,7 @@ describe('MergeDriver (unit — mock-required edge cases only)', () => {
     })
   })
 
-  describe('given peekEol itself rejects (ours file unreadable)', () => {
+  describe('given the eol detection itself rejects (a side unreadable)', () => {
     it('when merged then the error propagates', async () => {
       mockPeekEol.mockRejectedValue(new Error('ENOENT ours'))
       await expect(sut.mergeFiles('a', 'o', 't')).rejects.toThrow('ENOENT ours')

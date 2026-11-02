@@ -3,6 +3,8 @@ import { MergeOrchestrator } from '../../../src/merger/MergeOrchestrator.js'
 import { getScenario } from '../../../src/merger/MergeScenarioFactory.js'
 import { defaultNodeFactory } from '../../../src/merger/nodes/MergeNodeFactory.js'
 import { getScenarioStrategy } from '../../../src/merger/strategies/ScenarioStrategy.js'
+import { ContestedTagOrder } from '../../../src/merger/tagOrder/contestedTagOrder.js'
+import { TagOrderCache } from '../../../src/merger/tagOrder/tagOrderCache.js'
 import type { MergeResult } from '../../../src/types/mergeResult.js'
 import { MergeScenario } from '../../../src/types/mergeScenario.js'
 import { defaultConfig } from '../../utils/testConfig.js'
@@ -32,7 +34,6 @@ describe('MergeOrchestrator', () => {
       const ancestor = { key: 'ancestor' }
       const local = { key: 'local' }
       const other = { key: 'other' }
-      const attribute = 'testAttr'
       const rootKey = {
         name: 'testKey',
         existsInLocal: true,
@@ -43,13 +44,7 @@ describe('MergeOrchestrator', () => {
       mockedGetScenario.mockReturnValue(scenario)
 
       // Act
-      const result = orchestrator.merge(
-        ancestor,
-        local,
-        other,
-        attribute,
-        rootKey
-      )
+      const result = orchestrator.merge(ancestor, local, other, rootKey)
 
       // Assert
       expect(mockedGetScenario).toHaveBeenCalledWith(ancestor, local, other)
@@ -59,11 +54,63 @@ describe('MergeOrchestrator', () => {
         ancestor,
         local,
         other,
-        attribute,
         nodeFactory: defaultNodeFactory,
         rootKey,
+        contestedTagOrder: ContestedTagOrder.CONFLICT,
+        tagOrders: expect.any(TagOrderCache),
       })
       expect(result).toBe(mockResult)
+    })
+
+    it('should hand the same order cache to every merge it runs', () => {
+      // Arrange
+      const sut = new MergeOrchestrator(defaultConfig)
+      mockedGetScenario.mockReturnValue(MergeScenario.ALL)
+
+      // Act
+      sut.merge({}, {}, {})
+      sut.merge({}, {}, {})
+
+      // Assert
+      const [first, second] = mockStrategy.execute.mock.calls.map(
+        ([context]) => context.tagOrders
+      )
+      expect(first).toBe(second)
+    })
+
+    it('should not share its order cache with another orchestrator', () => {
+      // Arrange
+      mockedGetScenario.mockReturnValue(MergeScenario.ALL)
+
+      // Act
+      new MergeOrchestrator(defaultConfig).merge({}, {}, {})
+      new MergeOrchestrator(defaultConfig).merge({}, {}, {})
+
+      // Assert
+      const [first, second] = mockStrategy.execute.mock.calls.map(
+        ([context]) => context.tagOrders
+      )
+      expect(first).not.toBe(second)
+    })
+
+    it('should hand the order of contested tags it was given to the strategy', () => {
+      // Arrange
+      const sut = new MergeOrchestrator(
+        defaultConfig,
+        defaultNodeFactory,
+        ContestedTagOrder.CANONICAL
+      )
+      mockedGetScenario.mockReturnValue(MergeScenario.ALL)
+
+      // Act
+      sut.merge({}, {}, {})
+
+      // Assert
+      expect(mockStrategy.execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contestedTagOrder: ContestedTagOrder.CANONICAL,
+        })
+      )
     })
 
     it('should use provided nodeFactory in context', () => {

@@ -2,68 +2,13 @@ import type { Readable, Writable } from 'node:stream'
 import { CompactXmlParser } from '../adapter/parser/CompactXmlParser.js'
 import { XmlStreamWriter } from '../adapter/writer/XmlStreamWriter.js'
 import type { NormalisedParseResult, XmlParser } from '../adapter/XmlParser.js'
+import type { RootAttributeSides } from '../adapter/XmlSerializer.js'
 import type { MergeConfig } from '../types/conflictTypes.js'
-import type { JsonArray, JsonObject, JsonValue } from '../types/jsonTypes.js'
+import type { JsonArray, JsonObject } from '../types/jsonTypes.js'
 import { log } from '../utils/LoggingDecorator.js'
-import { Logger } from '../utils/LoggingService.js'
+import { isDeleteVersusEdit, wholeFileConflict } from './fileDeletion.js'
 import { JsonMerger } from './JsonMerger.js'
-
-// Every root attribute — the xmlns* declarations and any other, such as
-// `xsi:schemaLocation` — lives in a bucket parsed separately from `content`
-// (see scanDocument's bucketRootAttrs) and never reaches MergeOrchestrator,
-// so it needs its own three-way resolution instead of inheriting one for
-// free. Per key: unchanged-on-one-side defers to whatever the other side
-// did (add, change or remove); both sides agreeing (including both
-// removing it) keeps that agreement. An attribute value has no way to carry
-// zdiff3 markers without producing invalid XML (`xmlns="<<<<<<< ours..."`),
-// so a genuine three-way divergence — all three different, no pair
-// agreeing — can't become a real conflict; it keeps `local` (protects the
-// developer's own change from being silently overwritten by `other`,
-// unlike the previous `Object.assign({}, ancestor, local, other)` which
-// always let `other` win even when only `local` had changed) and logs so
-// the discarded alternative isn't completely invisible.
-const resolveRootAttributeValue = (
-  key: string,
-  ancestor: JsonValue | undefined,
-  local: JsonValue | undefined,
-  other: JsonValue | undefined
-): JsonValue | undefined => {
-  if (ancestor === local) return other // only other changed (added/edited/removed)
-  if (ancestor === other) return local // only local changed
-  if (local === other) return local // both changed to the same value
-  // Genuine three-way divergence, no pair agreeing: keep local and log —
-  // see the function-level comment for why this can't become a real
-  // conflict.
-  Logger.warn(`root attribute divergence on ${key}; keeping local`, {
-    ancestor,
-    local,
-    other,
-  })
-  return local
-}
-
-const mergeRootAttributes = (
-  ancestor: JsonObject,
-  local: JsonObject,
-  other: JsonObject
-): JsonObject => {
-  const keys = new Set([
-    ...Object.keys(ancestor),
-    ...Object.keys(local),
-    ...Object.keys(other),
-  ])
-  const result: JsonObject = {}
-  for (const key of keys) {
-    const resolved = resolveRootAttributeValue(
-      key,
-      ancestor[key],
-      local[key],
-      other[key]
-    )
-    if (resolved !== undefined) result[key] = resolved
-  }
-  return result
-}
+import { mergeRootAttributes } from './rootAttributes.js'
 
 // A side that dropped the whole file carries an empty root-attribute bucket
 // for the trivial reason that it has no root element to carry them on — not
@@ -80,23 +25,24 @@ const rootAttributesOf = (
     ? side.rootAttributes
     : ancestor.rootAttributes
 
-// When the JSON merge yields no output but BOTH live sides (ours and theirs)
-// still carry the root element, rebuild it as an empty element
-// (<Root/>) so an empty-bodied root round-trips instead of blanking the
-// file — a blank file is never valid Salesforce metadata (e.g. an identity
-// merge of <SharingRules xmlns="..."/>, which parses to { SharingRules: '' }
-// and collapses to no output). Requiring the root on BOTH live sides is
-// deliberate: if either side dropped the file entirely (empty document, no
-// root key) the deletion stands and nothing is emitted — the driver must
-// never resurrect a file a side deleted, nor invent a root from the side
-// that left it untouched. The parser guarantees each content object holds at
-// most the single root key, so the two live sides' root tags match.
-const preserveEmptyRoot = (local: JsonObject, other: JsonObject): JsonArray => {
-  const [localRoot] = Object.keys(local)
-  const [otherRoot] = Object.keys(other)
-  return localRoot !== undefined && otherRoot !== undefined
-    ? [{ [localRoot]: '' }]
-    : []
+// The root tag is the metadata type: Salesforce never renames it. A rename
+// would merge into a second root or a side no marker can show, so the merge
+// is refused, which leaves ours untouched. A side without a root dropped the
+// file and renames nothing.
+const ONE_ROOT_TAG = 1
+const assertOneRootTag = (...sides: NormalisedParseResult[]): void => {
+  const tags = new Set(sides.flatMap(side => Object.keys(side.content)))
+  if (tags.size <= ONE_ROOT_TAG) return
+  throw new Error(
+    'XML merge error: the documents do not share one root element'
+  )
+}
+
+interface Resolution {
+  readonly output: JsonArray
+  readonly attributes: JsonObject
+  readonly contested?: RootAttributeSides | undefined
+  readonly hasConflict: boolean
 }
 
 export class XmlMerger {
@@ -108,6 +54,35 @@ export class XmlMerger {
     this.parser = new CompactXmlParser()
     this.writer = new XmlStreamWriter(config)
     this.jsonMerger = new JsonMerger(config)
+  }
+
+  // A deletion against an edit is decided on the whole file, before the body
+  // and the root attributes get a say: neither can absorb the other side.
+  private resolve(
+    anc: NormalisedParseResult,
+    local: NormalisedParseResult,
+    other: NormalisedParseResult
+  ): Resolution {
+    if (isDeleteVersusEdit(anc, local, other)) {
+      const { output, hasConflict } = wholeFileConflict(anc, local, other)
+      return { output, attributes: anc.rootAttributes, hasConflict }
+    }
+    const { attributes, contested } = mergeRootAttributes(
+      anc.rootAttributes,
+      rootAttributesOf(local, anc),
+      rootAttributesOf(other, anc)
+    )
+    const merged = this.jsonMerger.mergeThreeWay(
+      anc.content,
+      local.content,
+      other.content
+    )
+    return {
+      output: merged.output,
+      attributes,
+      contested,
+      hasConflict: merged.hasConflict || contested !== undefined,
+    }
   }
 
   @log('XmlMerger')
@@ -132,34 +107,27 @@ export class XmlMerger {
     const [anc, local, other] = (
       results as PromiseFulfilledResult<NormalisedParseResult>[]
     ).map(r => r.value)
+    assertOneRootTag(anc!, local!, other!)
 
-    const rootAttributes = mergeRootAttributes(
-      anc!.rootAttributes,
-      rootAttributesOf(local!, anc!),
-      rootAttributesOf(other!, anc!)
+    const { output, attributes, contested, hasConflict } = this.resolve(
+      anc!,
+      local!,
+      other!
     )
-
-    const mergedResult = this.jsonMerger.mergeThreeWay(
-      anc!.content,
-      local!.content,
-      other!.content
-    )
-
-    const output =
-      mergedResult.output.length > 0
-        ? mergedResult.output
-        : preserveEmptyRoot(local!.content, other!.content)
 
     // writeTo short-circuits on an empty array, so no guard is needed here:
     // an empty merge result emits zero bytes either way.
-    await this.writer.writeTo(
-      out,
-      output,
-      rootAttributes,
+    await this.writer.writeTo(out, output, attributes, {
       eol,
-      mergedResult.hasConflict
-    )
+      hasConflict,
+      contested,
+      sides: {
+        local: rootAttributesOf(local!, anc!),
+        ancestor: anc!.rootAttributes,
+        other: rootAttributesOf(other!, anc!),
+      },
+    })
 
-    return { hasConflict: mergedResult.hasConflict }
+    return { hasConflict }
   }
 }

@@ -1,4 +1,4 @@
-import { open } from 'node:fs/promises'
+import { open, stat } from 'node:fs/promises'
 
 const CRLF = '\r\n'
 const LF = '\n'
@@ -29,4 +29,20 @@ export const peekEol = async (path: string): Promise<'\n' | '\r\n'> => {
   } finally {
     await handle.close()
   }
+}
+
+const holdsContent = async (path: string): Promise<boolean> =>
+  (await stat(path)).size > 0
+
+// A deleted or empty side has no line endings to speak of, so the
+// document takes them from the first side, in the order given, that
+// holds bytes. Every path is stat-ed lazily: a later side is only
+// touched when the earlier ones are empty.
+export const peekDocumentEol = async (
+  paths: readonly string[]
+): Promise<'\n' | '\r\n'> => {
+  for (const path of paths) {
+    if (await holdsContent(path)) return peekEol(path)
+  }
+  return LF
 }
