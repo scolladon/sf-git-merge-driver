@@ -80,20 +80,15 @@ describe('lexOpenTag', () => {
   })
 
   describe('given a tag ending in `?>`', () => {
-    it('when lexOpenTag then it is not self-closing', () => {
-      // Arrange — the old parser self-closed here; the scanner drops that.
+    it('when lexOpenTag then the stray `?` makes it malformed', () => {
+      // Arrange
       const xml = '<b x="1"?>'
 
       // Act
       const sut = lexOpenTag(xml, 0)
 
       // Assert
-      expect(sut).toMatchObject({
-        name: 'b',
-        attrs: { x: '1' },
-        selfClosing: false,
-        end: 10,
-      })
+      expect(sut).toEqual({ kind: 'malformed' })
     })
   })
 
@@ -107,32 +102,6 @@ describe('lexOpenTag', () => {
 
       // Assert
       expect(sut).toMatchObject({ name: 'b?', selfClosing: false, end: 4 })
-    })
-  })
-
-  describe('given an attribute name starting with a digit', () => {
-    it('when lexOpenTag then the digit is skipped', () => {
-      // Arrange
-      const xml = '<a 1x="1">'
-
-      // Act
-      const sut = lexOpenTag(xml, 0)
-
-      // Assert
-      expect(sut).toMatchObject({ attrs: { x: '1' }, hasAttrs: true })
-    })
-  })
-
-  describe('given an attribute name shadowing __proto__', () => {
-    it('when lexOpenTag then only an ASCII letter starts the name', () => {
-      // Arrange
-      const xml = '<a __proto__="1">'
-
-      // Act
-      const sut = lexOpenTag(xml, 0)
-
-      // Assert
-      expect(sut).toMatchObject({ attrs: { proto__: '1' } })
     })
   })
 
@@ -215,17 +184,16 @@ describe('lexOpenTag', () => {
   })
 
   describe('given attribute names at the ASCII-letter range boundaries', () => {
-    it('when lexOpenTag then only A-Z and a-z start an attribute', () => {
-      // Arrange — 'A', 'Z', 'a', 'z' sit exactly on the isAsciiLetter
-      // boundaries; '{' sits one past 'z' and must stay a skipped char.
-      const xml = '<a A="1" Z="2" a="3" z="4" {x="5">'
+    it('when lexOpenTag then A-Z and a-z all start an attribute', () => {
+      // Arrange
+      const xml = '<a A="1" Z="2" a="3" z="4">'
 
       // Act
       const sut = lexOpenTag(xml, 0)
 
       // Assert
       expect(sut).toMatchObject({
-        attrs: { A: '1', Z: '2', a: '3', z: '4', x: '5' },
+        attrs: { A: '1', Z: '2', a: '3', z: '4' },
       })
     })
   })
@@ -256,29 +224,46 @@ describe('lexOpenTag', () => {
     })
   })
 
-  describe('given a valueless attribute', () => {
-    it('when lexOpenTag then its value is null', () => {
-      // Arrange
-      const xml = '<a x>'
-
+  describe.each([
+    ['a valueless attribute', '<a x>'],
+    ['a valueless attribute before a self-close', '<a x/>'],
+    ['`=` immediately followed by `>`', '<a x=>'],
+    ['a stray char before an attribute', '<a k="2" !k="9">'],
+    ['a char one past `z` before an attribute', '<a {x="5">'],
+    ['a stray `=` before an attribute', '<a ==x="5">'],
+    ['a slash that does not precede `>`', '<a /x="5">'],
+    ['a slash split from `>` by whitespace', '<a / >'],
+    ['an attribute name shadowing __proto__', '<a __proto__="1">'],
+    ...['0', '9', '_', ':', '-', '.', '\u0080'].map(
+      (start): [string, string] => [
+        `an attribute name starting with U+${start.charCodeAt(0).toString(16)}`,
+        `<a ${start}x="1">`,
+      ]
+    ),
+  ])('given %s', (_, xml) => {
+    it('when lexOpenTag then the tag is malformed', () => {
       // Act
       const sut = lexOpenTag(xml, 0)
 
       // Assert
-      expect(sut).toMatchObject({ attrs: { x: null } })
+      expect(sut).toEqual({ kind: 'malformed' })
     })
   })
 
-  describe('given `=` immediately followed by `>`', () => {
-    it('when lexOpenTag then the value is null', () => {
-      // Arrange
-      const xml = '<a x=>'
-
+  describe.each([
+    ['an empty element name', '<>x'],
+    ['an element name made of `=` signs', '<=======>'],
+    ...['0', '9', '-', '.', '!', '{', '"'].map((start): [string, string] => [
+      `an element name starting with U+${start.charCodeAt(0).toString(16)}`,
+      `<${start}x>`,
+    ]),
+  ])('given %s', (_, xml) => {
+    it('when lexOpenTag then the name is malformed, apart from a malformed attribute', () => {
       // Act
       const sut = lexOpenTag(xml, 0)
 
       // Assert
-      expect(sut).toMatchObject({ attrs: { x: null }, strayQuote: false })
+      expect(sut).toEqual({ kind: 'malformed-name' })
     })
   })
 
@@ -310,16 +295,26 @@ describe('lexOpenTag', () => {
     })
   })
 
-  describe('given an empty element name', () => {
-    it('when lexOpenTag then the name is an empty string', () => {
-      // Arrange
-      const xml = '<>x'
+  describe.each(['_', ':', '\u00e9'])(
+    'given an element name starting with %s',
+    start => {
+      it('when lexOpenTag then the name is kept', () => {
+        // Act
+        const sut = lexOpenTag(`<${start}x>`, 0)
 
+        // Assert
+        expect(sut).toMatchObject({ kind: 'tag', name: `${start}x` })
+      })
+    }
+  )
+
+  describe('given whitespace and a slash before the closing `>`', () => {
+    it('when lexOpenTag then the tag is self-closing', () => {
       // Act
-      const sut = lexOpenTag(xml, 0)
+      const sut = lexOpenTag('<a x="1" \n/>', 0)
 
       // Assert
-      expect(sut).toMatchObject({ name: '', end: 2 })
+      expect(sut).toMatchObject({ attrs: { x: '1' }, selfClosing: true })
     })
   })
 

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { buildConflictMarkers } from '../../../../src/merger/ConflictMarkerBuilder.js'
 import { PropertyMergeNode } from '../../../../src/merger/nodes/PropertyMergeNode.js'
+import type { JsonObject } from '../../../../src/types/jsonTypes.js'
 import { defaultConfig } from '../../../utils/testConfig.js'
 
 describe('PropertyMergeNode', () => {
@@ -50,7 +52,10 @@ describe('PropertyMergeNode', () => {
 
   it('should omit container when all children resolve to nothing', () => {
     // Arrange
-    const node = new PropertyMergeNode({}, {}, {}, 'container')
+    const ancestor = { child: 'value' }
+    const local = { child: null }
+    const other = { child: null }
+    const node = new PropertyMergeNode(ancestor, local, other, 'container')
 
     // Act
     const result = node.merge(defaultConfig)
@@ -91,7 +96,7 @@ describe('PropertyMergeNode', () => {
 
     // Assert
     expect(result.hasConflict).toBe(false)
-    expect(result.output).toEqual([{ wrapper: [{ added: 'newValue' }] }])
+    expect(result.output).toEqual([{ wrapper: { added: 'newValue' } }])
   })
 
   it('should include property only in other', () => {
@@ -106,7 +111,7 @@ describe('PropertyMergeNode', () => {
 
     // Assert
     expect(result.hasConflict).toBe(false)
-    expect(result.output).toEqual([{ wrapper: [{ added: 'otherValue' }] }])
+    expect(result.output).toEqual([{ wrapper: { added: 'otherValue' } }])
   })
 
   it('should return empty when property deleted in both', () => {
@@ -157,5 +162,280 @@ describe('PropertyMergeNode', () => {
         wrapper: [{ nested: [{ inner: 'changed' }] }],
       },
     ])
+  })
+
+  describe('given local deleted the element', () => {
+    const ancestor = { label: 'x', type: 'Text' }
+
+    describe('when other edited a child', () => {
+      it('then one element block conflicts', () => {
+        // Arrange
+        const other = { label: 'y', type: 'Text' }
+        const sut = new PropertyMergeNode(ancestor, {}, other, 'nameField')
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result).toEqual({
+          output: [
+            buildConflictMarkers(
+              [],
+              [{ nameField: ancestor }],
+              [{ nameField: other }]
+            ),
+          ],
+          hasConflict: true,
+        })
+      })
+    })
+
+    describe('when other added a child', () => {
+      it('then it conflicts', () => {
+        // Arrange
+        const other = { ...ancestor, trackHistory: 'true' }
+        const sut = new PropertyMergeNode(ancestor, {}, other, 'nameField')
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result.hasConflict).toBe(true)
+        expect(result.output).toHaveLength(1)
+      })
+    })
+
+    describe('when other left it unchanged', () => {
+      it('then it stays deleted', () => {
+        // Arrange
+        const sut = new PropertyMergeNode(ancestor, {}, { ...ancestor }, 'f')
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result).toEqual({ output: [], hasConflict: false })
+      })
+    })
+  })
+
+  describe('given other deleted the element', () => {
+    describe('when local edited a child', () => {
+      it('then one element block conflicts', () => {
+        // Arrange
+        const ancestor = { label: 'x', type: 'Text' }
+        const local = { label: 'y', type: 'Text' }
+        const sut = new PropertyMergeNode(ancestor, local, {}, 'nameField')
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result).toEqual({
+          output: [
+            buildConflictMarkers(
+              [{ nameField: local }],
+              [{ nameField: ancestor }],
+              []
+            ),
+          ],
+          hasConflict: true,
+        })
+      })
+    })
+  })
+
+  describe('given both sides added the element', () => {
+    describe('when they gave different labels', () => {
+      it('then the property-wise field block conflicts', () => {
+        // Arrange
+        const local = { label: 'a' }
+        const other = { label: 'o' }
+        const sut = new PropertyMergeNode({}, local, other, 'nameField')
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result.hasConflict).toBe(true)
+        expect(JSON.stringify(result.output)).toContain('"nameField"')
+      })
+    })
+  })
+
+  describe('given a deleted element carrying a constructor child', () => {
+    describe('when both live sides dropped it', () => {
+      it('then it stays deleted', () => {
+        // Arrange
+        const ancestor = { constructor: 'A' }
+        const sut = new PropertyMergeNode(ancestor, {}, {}, 'wrapper')
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result).toEqual({ output: [], hasConflict: false })
+      })
+    })
+  })
+
+  describe('given both sides added the element with an inherited key name', () => {
+    describe('when the ancestor lacks the element', () => {
+      it('then the child conflict carries no inherited ancestor', () => {
+        // Arrange
+        const local = { constructor: 'A' }
+        const other = { constructor: 'B' }
+        const sut = new PropertyMergeNode({}, local, other, 'wrapper')
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result).toEqual({
+          output: [
+            {
+              wrapper: [
+                buildConflictMarkers(
+                  [{ constructor: 'A' }],
+                  [],
+                  [{ constructor: 'B' }]
+                ),
+              ],
+            },
+          ],
+          hasConflict: true,
+        })
+      })
+    })
+  })
+
+  describe('given objects nested 1900 levels deep', () => {
+    const DEPTH = 1900
+    const nested = (leaf: string): JsonObject =>
+      Array.from({ length: DEPTH }).reduce<JsonObject>(
+        (inner: JsonObject) => ({ level: inner }),
+        { leaf }
+      )
+
+    it('when merging an edit at the deepest level then the stack holds', () => {
+      // Arrange
+      const sut = new PropertyMergeNode(
+        nested('base'),
+        nested('edited'),
+        nested('base'),
+        'wrapper'
+      )
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+    })
+  })
+
+  describe('given sides reordering the child tags of one element', () => {
+    const body = (text: string): JsonObject =>
+      Object.fromEntries([...text].map(key => [key, key]))
+
+    it.each([
+      ['local first', 'bac', 'acb'],
+      ['other first', 'acb', 'bac'],
+    ])(
+      'given %s: a cycle among the pairwise orders when merging then the element holds one block with each side as written',
+      (_side, local, other) => {
+        // Arrange
+        const sut = new PropertyMergeNode(
+          body('abc'),
+          body(local),
+          body(other),
+          'wrapper'
+        )
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result.hasConflict).toBe(true)
+        expect(result.output).toEqual([
+          {
+            wrapper: [
+              buildConflictMarkers(body(local), body('abc'), body(other)),
+            ],
+          },
+        ])
+      }
+    )
+
+    it('given a cycle and a value one side also changed when merging then the block holds each side verbatim', () => {
+      // Arrange
+      const local = { ...body('bac'), c: 'changed' }
+      const sut = new PropertyMergeNode(
+        body('abc'),
+        local,
+        body('acb'),
+        'wrapper'
+      )
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.output).toEqual([
+        {
+          wrapper: [buildConflictMarkers(local, body('abc'), body('acb'))],
+        },
+      ])
+    })
+
+    it.each([
+      ['local first', 'bacd', 'abdc'],
+      ['other first', 'abdc', 'bacd'],
+    ])(
+      'given %s: swaps on disjoint pairs when merging then both swaps hold without conflict',
+      (_side, local, other) => {
+        // Arrange
+        const sut = new PropertyMergeNode(
+          body('abcd'),
+          body(local),
+          body(other),
+          'wrapper'
+        )
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(result.output).toEqual([
+          { wrapper: [{ b: 'b' }, { a: 'a' }, { d: 'd' }, { c: 'c' }] },
+        ])
+      }
+    )
+
+    it.each([
+      ['local', 'bac', 'abc'],
+      ['other', 'abc', 'bac'],
+    ])(
+      'given only %s reordering when merging then the reorder holds without conflict',
+      (_side, local, other) => {
+        // Arrange
+        const sut = new PropertyMergeNode(
+          body('abc'),
+          body(local),
+          body(other),
+          'wrapper'
+        )
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(result.output).toEqual([
+          { wrapper: [{ b: 'b' }, { a: 'a' }, { c: 'c' }] },
+        ])
+      }
+    )
   })
 })

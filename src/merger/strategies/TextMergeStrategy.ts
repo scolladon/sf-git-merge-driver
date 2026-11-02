@@ -18,9 +18,9 @@ interface TextMergeStrategy {
   handle(params: TextMergeParams): MergeResult
 }
 
-// An attribute-bearing element reaches here as an object (see
-// MergeNodeFactory.isAttributedTrio), and each side parses it into a
-// distinct one, so values compare structurally. Scalars, the hot path,
+// An attribute-bearing element, or an element against text, reaches here as
+// an object (see valueKind.isWholeValueTrio), and each side parses it
+// into a distinct one, so values compare structurally. Scalars, the hot path,
 // settle on identity alone and never pay jsonEqual's stack allocation.
 const isSame = (a: unknown, b: unknown): boolean =>
   // Stryker disable next-line ConditionalExpression,LogicalOperator: the identity and object guards only skip jsonEqual, which returns the same answer for any pair they filter out

@@ -217,4 +217,135 @@ describe('MergeDriver (integration — real filesystem, no mocks)', () => {
     })
     expect(readFileSync(local, 'utf8')).toBe(localBytes)
   })
+
+  describe.each([
+    {
+      shape: 'each side renames the root element differently',
+      ancestor: '<Profile xmlns="A"><custom>false</custom></Profile>',
+      ours: '<PermA xmlns="A"><custom>false</custom></PermA>',
+      theirs: '<PermB xmlns="A"><custom>false</custom></PermB>',
+    },
+    {
+      shape: 'theirs renames the root element',
+      ancestor: '<Profile xmlns="A"><custom>false</custom></Profile>',
+      ours: '<Profile xmlns="A"><custom>true</custom></Profile>',
+      theirs: '<PermA xmlns="C"/>',
+    },
+    {
+      shape: 'an attribute named __proto__ on the root',
+      ancestor: '<Profile xmlns="N" a="1"><custom>false</custom></Profile>',
+      ours: '<Profile xmlns="N" __proto__="2" a="1"><custom>false</custom></Profile>',
+      theirs: '<Profile xmlns="N" a="1"><custom>false</custom></Profile>',
+    },
+    {
+      shape: 'an attribute named __proto__ below the root',
+      ancestor: '<Profile xmlns="N"><b a="1">x</b></Profile>',
+      ours: '<Profile xmlns="N"><b __proto__="2" a="1">x</b></Profile>',
+      theirs: '<Profile xmlns="N"><b a="1">y</b></Profile>',
+    },
+    {
+      shape: 'a valueless attribute',
+      ancestor: '<Profile xmlns="A" flag><custom>false</custom></Profile>',
+      ours: '<Profile xmlns="A" flag><custom>false</custom></Profile>',
+      theirs: '<Profile xmlns="A" flag><custom>true</custom></Profile>',
+    },
+  ])('Given $shape', ({ ancestor, ours, theirs }) => {
+    it('When running mergeFiles, Then rejects and leaves local byte-identical', async () => {
+      // Arrange
+      const declaration = '<?xml version="1.0" encoding="UTF-8"?>\n'
+      const localBytes = `${declaration}${ours}`
+      const base = writeFixture('base.xml', `${declaration}${ancestor}`)
+      const local = writeFixture('local.xml', localBytes)
+      const other = writeFixture('other.xml', `${declaration}${theirs}`)
+      const sut = new MergeDriver(defaultConfig)
+
+      // Act & Assert
+      await expect(sut.mergeFiles(base, local, other)).rejects.toThrow()
+      expect(readFileSync(local, 'utf8')).toBe(localBytes)
+    })
+  })
+
+  describe('Given a side declared ISO-8859-1 with a non-ASCII byte', () => {
+    it('When running mergeFiles, Then it rejects and ours stays byte-identical', async () => {
+      // Arrange
+      const latin1 = Buffer.concat([
+        Buffer.from(PROFILE_LOCAL.replace('UTF-8', 'ISO-8859-1')),
+        Buffer.from([0x0a]),
+      ])
+      const oursBytes = Buffer.concat([latin1, Buffer.from([0xe9])])
+      const local = join(workDir, 'local.xml')
+      writeFileSync(local, oursBytes)
+      const ancestor = writeFixture('base.xml', PROFILE_BASE)
+      const other = writeFixture('other.xml', PROFILE_OTHER)
+      const sut = new MergeDriver(defaultConfig)
+
+      // Act
+      const run = sut.mergeFiles(ancestor, local, other)
+
+      // Assert
+      await expect(run).rejects.toThrow('declared encoding "ISO-8859-1"')
+      expect(readFileSync(local).equals(oursBytes)).toBe(true)
+    })
+  })
+
+  describe('Given theirs holds bytes that are not valid UTF-8', () => {
+    it('When running mergeFiles, Then it rejects and ours stays byte-identical', async () => {
+      // Arrange
+      const local = writeFixture('local.xml', PROFILE_LOCAL)
+      const ancestor = writeFixture('base.xml', PROFILE_BASE)
+      const other = join(workDir, 'other.xml')
+      writeFileSync(
+        other,
+        Buffer.concat([Buffer.from(PROFILE_OTHER), Buffer.from([0xff, 0xfe])])
+      )
+      const sut = new MergeDriver(defaultConfig)
+
+      // Act
+      const run = sut.mergeFiles(ancestor, local, other)
+
+      // Assert
+      await expect(run).rejects.toThrow('not valid UTF-8')
+      expect(readFileSync(local, 'utf8')).toBe(PROFILE_LOCAL)
+    })
+  })
+
+  describe('Given ours has no content and theirs adds a CRLF file', () => {
+    it('When running mergeFiles, Then the output uses CRLF', async () => {
+      // Arrange
+      const local = writeFixture('local.xml', '')
+      const ancestor = writeFixture('base.xml', '')
+      const other = writeFixture(
+        'other.xml',
+        PROFILE_OTHER.replace(/\n/g, '\r\n')
+      )
+      const sut = new MergeDriver(defaultConfig)
+
+      // Act
+      await sut.mergeFiles(ancestor, local, other)
+
+      // Assert
+      const merged = readFileSync(local, 'utf8')
+      expect(merged).toContain('\r\n')
+      expect(merged.replace(/\r\n/g, '')).not.toContain('\n')
+    })
+  })
+
+  describe('Given both sides hold content with different line endings', () => {
+    it('When running mergeFiles, Then ours decides the line endings', async () => {
+      // Arrange
+      const local = writeFixture('local.xml', PROFILE_LOCAL)
+      const ancestor = writeFixture('base.xml', PROFILE_BASE)
+      const other = writeFixture(
+        'other.xml',
+        PROFILE_OTHER.replace(/\n/g, '\r\n')
+      )
+      const sut = new MergeDriver(defaultConfig)
+
+      // Act
+      await sut.mergeFiles(ancestor, local, other)
+
+      // Assert
+      expect(readFileSync(local, 'utf8')).not.toContain('\r')
+    })
+  })
 })

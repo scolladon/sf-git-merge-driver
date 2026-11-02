@@ -3,6 +3,7 @@ import {
   EQ,
   GT,
   isAsciiLetter,
+  isNameStartChar,
   isNameStop,
   isQuote,
   LF,
@@ -27,7 +28,33 @@ interface UnterminatedOpenTag {
   readonly kind: 'unterminated'
 }
 
-export type LexOpenTagResult = LexedOpenTag | UnterminatedOpenTag
+// A tag the writer could not round-trip: an attribute with no value, or
+// whose name does not start with an ASCII letter (the lexer would truncate
+// it to its first letter, `__proto__` read as `proto__`), or a stray char
+// between attributes.
+interface MalformedOpenTag {
+  readonly kind: 'malformed'
+}
+
+const MALFORMED: MalformedOpenTag = Object.freeze({ kind: 'malformed' })
+
+const isMalformed = (outcome: object | null): outcome is MalformedOpenTag =>
+  outcome === MALFORMED
+
+// An element name that cannot start a name (`<=======>`).
+interface MalformedElementName {
+  readonly kind: 'malformed-name'
+}
+
+const MALFORMED_NAME: MalformedElementName = Object.freeze({
+  kind: 'malformed-name',
+})
+
+export type LexOpenTagResult =
+  | LexedOpenTag
+  | UnterminatedOpenTag
+  | MalformedOpenTag
+  | MalformedElementName
 
 interface StopRun {
   readonly end: number
@@ -82,7 +109,10 @@ interface AttrValue {
 // `pos` is the position right after `=`. A quoted value keeps its
 // interior quotes and `>` as data — only an unquoted run is checked
 // for a stray quote.
-const lexAttrValue = (xml: string, pos: number): AttrValue | null => {
+const lexAttrValue = (
+  xml: string,
+  pos: number
+): AttrValue | MalformedOpenTag | null => {
   const afterEq = skipWhitespace(xml, pos)
   const quoteCode = xml.charCodeAt(afterEq)
   if (isQuote(quoteCode)) {
@@ -90,9 +120,7 @@ const lexAttrValue = (xml: string, pos: number): AttrValue | null => {
     if (quoted === null) return null
     return { end: quoted.end, value: quoted.value, strayQuote: false }
   }
-  if (quoteCode === GT) {
-    return { end: afterEq, value: null, strayQuote: false }
-  }
+  if (quoteCode === GT) return MALFORMED
   const run = scanStopRun(xml, afterEq)
   return {
     end: run.end,
@@ -110,15 +138,16 @@ interface AttrStep {
 
 // One attribute, starting at an ASCII letter. `null` means an
 // unterminated quoted value forced a bail-out.
-const lexAttr = (xml: string, start: number): AttrStep | null => {
+const lexAttr = (
+  xml: string,
+  start: number
+): AttrStep | MalformedOpenTag | null => {
   const nameRun = scanStopRun(xml, start)
   const name = xml.slice(start, nameRun.end)
   const afterName = skipWhitespace(xml, nameRun.end)
-  if (xml.charCodeAt(afterName) !== EQ) {
-    return { end: afterName, name, value: null, strayQuote: nameRun.strayQuote }
-  }
+  if (xml.charCodeAt(afterName) !== EQ) return MALFORMED
   const attrValue = lexAttrValue(xml, afterName + 1)
-  if (attrValue === null) return null
+  if (attrValue === null || isMalformed(attrValue)) return attrValue
   return {
     end: attrValue.end,
     name,
@@ -127,20 +156,33 @@ const lexAttr = (xml: string, start: number): AttrStep | null => {
   }
 }
 
+const skipped = (pos: number, strayQuote: boolean): AttrStep => ({
+  end: pos + 1,
+  name: null,
+  value: null,
+  strayQuote,
+})
+
+// A `/` is only tolerated as the self-close slash right before `>`.
+const isSelfCloseSlash = (xml: string, pos: number): boolean =>
+  xml.charCodeAt(pos) === SLASH && xml.charCodeAt(pos + 1) === GT
+
 // One step of the attribute loop at `pos`: either one attribute (when
-// `pos` is an ASCII letter) or one skipped char — a quote there is the
-// "skipped position" stray-quote raiser.
-const stepAttrs = (xml: string, pos: number): AttrStep | null => {
+// `pos` is an ASCII letter) or one skipped char. Only whitespace, the
+// self-close slash and a quote (the "skipped position" stray-quote raiser)
+// may be skipped: any other char would be dropped silently, or glue
+// the following name onto a stray prefix, so the tag is refused.
+const stepAttrs = (
+  xml: string,
+  pos: number
+): AttrStep | MalformedOpenTag | null => {
   const charCode = xml.charCodeAt(pos)
-  if (!isAsciiLetter(charCode)) {
-    return {
-      end: pos + 1,
-      name: null,
-      value: null,
-      strayQuote: isQuote(charCode),
-    }
+  if (isAsciiLetter(charCode)) return lexAttr(xml, pos)
+  if (isQuote(charCode)) return skipped(pos, true)
+  if (isEqWhitespace(charCode) || isSelfCloseSlash(xml, pos)) {
+    return skipped(pos, false)
   }
-  return lexAttr(xml, pos)
+  return MALFORMED
 }
 
 interface AttrLoopResult {
@@ -150,7 +192,10 @@ interface AttrLoopResult {
   readonly strayQuote: boolean
 }
 
-const lexAttrs = (xml: string, start: number): AttrLoopResult | null => {
+const lexAttrs = (
+  xml: string,
+  start: number
+): AttrLoopResult | MalformedOpenTag | null => {
   const attrs: Record<string, string | null> = Object.create(null)
   let hasAttrs = false
   let strayQuote = false
@@ -158,7 +203,7 @@ const lexAttrs = (xml: string, start: number): AttrLoopResult | null => {
   // Stryker disable next-line EqualityOperator: one step past EOF ends at length + 1, still reported unterminated
   while (pos < xml.length && xml.charCodeAt(pos) !== GT) {
     const step = stepAttrs(xml, pos)
-    if (step === null) return null
+    if (step === null || isMalformed(step)) return step
     if (step.name !== null) {
       attrs[step.name] = step.value
       hasAttrs = true
@@ -174,8 +219,11 @@ const lexAttrs = (xml: string, start: number): AttrLoopResult | null => {
 // when no `>` or no closing quote is found before EOF.
 export const lexOpenTag = (xml: string, pos: number): LexOpenTagResult => {
   const nameRun = scanStopRun(xml, pos + 1)
+  if (!isNameStartChar(xml.charCodeAt(pos + 1))) return MALFORMED_NAME
   const name = xml.slice(pos + 1, nameRun.end)
   const attrsResult = lexAttrs(xml, nameRun.end)
+  // Stryker disable next-line ConditionalExpression: isMalformed(null) is false, the null check only narrows the type
+  if (attrsResult !== null && isMalformed(attrsResult)) return MALFORMED
   if (attrsResult === null || attrsResult.end >= xml.length) {
     return { kind: 'unterminated' }
   }

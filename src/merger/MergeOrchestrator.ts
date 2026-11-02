@@ -8,18 +8,22 @@ import {
   type MergeNodeFactory,
 } from './nodes/MergeNodeFactory.js'
 import { getScenarioStrategy } from './strategies/ScenarioStrategy.js'
+import { ContestedTagOrder } from './tagOrder/contestedTagOrder.js'
+import { TagOrderCache } from './tagOrder/tagOrderCache.js'
 
 export class MergeOrchestrator {
+  private readonly tagOrders = new TagOrderCache()
+
   constructor(
     private readonly config: MergeConfig,
-    private readonly nodeFactory: MergeNodeFactory = defaultNodeFactory
+    private readonly nodeFactory: MergeNodeFactory = defaultNodeFactory,
+    private readonly contestedTagOrder: ContestedTagOrder = ContestedTagOrder.CONFLICT
   ) {}
 
   merge(
     ancestor: JsonValue | undefined,
     local: JsonValue | undefined,
     other: JsonValue | undefined,
-    attribute?: string,
     rootKey?: RootKeyInfo
   ): MergeResult {
     const scenario = getScenario(ancestor, local, other)
@@ -30,9 +34,10 @@ export class MergeOrchestrator {
       ancestor,
       local,
       other,
-      attribute,
       nodeFactory: this.nodeFactory,
       rootKey,
+      contestedTagOrder: this.contestedTagOrder,
+      tagOrders: this.tagOrders,
     }
 
     return strategy.execute(context)

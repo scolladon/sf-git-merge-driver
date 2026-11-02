@@ -73,6 +73,23 @@ const expandGroupedRepeats = (value: JsonValue): JsonArray => {
   return inner.map(entry => ({ [key]: entry })) as JsonArray
 }
 
+const FUSABLE_REPEATS = 2
+
+// Only a body that is exactly several repeats of one child is written as one
+// element by mistake; any other value stays what it was, as the sides of a
+// conflict block are.
+export const expandRepeatedChild = (value: JsonValue): JsonValue => {
+  // Stryker disable next-line ConditionalExpression: a scalar has no keys, or index keys holding strings, so it never reaches the array test and comes back as it came
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return value
+  }
+  const keys = Object.keys(value)
+  const inner = keys.length === 1 ? value[keys[0]!] : undefined
+  return Array.isArray(inner) && inner.length >= FUSABLE_REPEATS
+    ? expandGroupedRepeats(value)
+    : value
+}
+
 export const buildEarlyResult = (
   value: JsonValue | undefined,
   rootKeyName?: string

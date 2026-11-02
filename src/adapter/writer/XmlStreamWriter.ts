@@ -20,7 +20,12 @@ import {
 } from '../../types/conflictBlock.js'
 import type { MergeConfig } from '../../types/conflictTypes.js'
 import type { JsonArray, JsonObject, JsonValue } from '../../types/jsonTypes.js'
-import type { XmlSerializer } from '../XmlSerializer.js'
+import { rootElementsIn } from '../../types/rootElements.js'
+import type {
+  RootAttributeSides,
+  WriteOptions,
+  XmlSerializer,
+} from '../XmlSerializer.js'
 
 const TEXT_KEY = '#text'
 const ATTR_PREFIX = '@_'
@@ -32,6 +37,9 @@ const isObject = (v: unknown): v is JsonObject =>
 // fixtures and mirror the current pipeline (orderedJs2Xml.js:86, 94-95).
 const escapeCommentBody = (value: string): string =>
   value.replace(/--/g, '- -').replace(/-$/, '- ')
+
+// Adjacent sections are the parts of one text: they stay on one line, in order
+const CDATA_PART_JOIN = ']]><![CDATA['
 
 const escapeCdataBody = (value: string): string =>
   value.replace(/\]\]>/g, ']]]]><![CDATA[>')
@@ -71,15 +79,31 @@ const EMPTY_ATTRS: ReadonlyArray<readonly [string, string]> = []
 // element chunks that render as git-style conflict markers. Matches
 // FxpXmlSerializer.expandConflict at src/adapter/FxpXmlSerializer.ts:58.
 interface ConflictMarkers {
+  // A line whose first non-indent characters form a marker sequence
+  readonly markerLine: RegExp
   readonly local: string
   readonly ancestor: string
   readonly separator: string
   readonly other: string
 }
 
+// Git splits lines on line feeds only: `^` with the `m` flag would also start
+// a line after a carriage return, U+2028 or U+2029
+const LINE_START = '(?<![^\\n])'
+
 const buildConflictMarkers = (config: MergeConfig): ConflictMarkers => {
   const size = config.conflictMarkerSize
+  const markerChars = [
+    LOCAL_CONFLICT_MARKER,
+    ANCESTOR_CONFLICT_MARKER,
+    SEPARATOR,
+    OTHER_CONFLICT_MARKER,
+  ].join('')
   return {
+    markerLine: new RegExp(
+      `${LINE_START}([ \\t]*)([${markerChars}])(?=\\2{${size - 1}})`,
+      'g'
+    ),
     local: `${SALESFORCE_EOL}${LOCAL_CONFLICT_MARKER.repeat(size)} ${config.localConflictTag}`,
     ancestor: `${ANCESTOR_CONFLICT_MARKER.repeat(size)} ${config.ancestorConflictTag}`,
     separator: SEPARATOR.repeat(size),
@@ -100,30 +124,185 @@ interface WalkState {
   // the very first top-level open tag receives no leading indent (it
   // immediately follows the XML declaration)
   isFirstTopLevelAfterDecl: boolean
+  // whether the merge produced a conflict, anywhere in the document: a content
+  // line reading as a marker would split a block, or pass for one, wherever
+  // it sits
+  hasConflict: boolean
+  // whether the buffer ends on a conflict marker. Kept apart from the buffer:
+  // reading the end of a string built by appends flattens it each time
+  endedOnMarker: boolean
+  // [start, end) offsets in `buf` of the lines that belong to a value (text,
+  // CDATA, comment, attribute value) spanning several lines: the conflict
+  // filter must keep them whatever they hold
+  valueLines: Array<readonly [number, number]>
 }
 
-const writeText = (st: WalkState, value: string): void => {
-  st.buf += st.endedWithGt ? `${getIndent(st.depth)}${value}` : value
+type Attributes = ReadonlyArray<readonly [string, string]>
+
+interface StartTagSides {
+  readonly local: Attributes
+  readonly ancestor: Attributes
+  readonly other: Attributes
+}
+
+// What the element occupying the root slot opens with: the root attributes,
+// and the start tags it is written as when those attributes conflict.
+interface RootSlot {
+  readonly attrs: Attributes
+  readonly contested?: StartTagSides | undefined
+  // Where a conflict occupying the whole document takes each side's own
+  readonly sides?: StartTagSides | undefined
+}
+
+const NO_ROOT: RootSlot = { attrs: EMPTY_ATTRS }
+
+const START_TAG_END = '>'
+const EMPTY_TAG_END = '/>'
+
+// Markers cannot go inside a start tag, so contested root attributes put the
+// whole start tag, each side as it stands, between the markers: whichever side
+// is kept leaves a well-formed file.
+const startTagConflict = (
+  markers: ConflictMarkers,
+  sides: StartTagSides,
+  tagOf: (attrs: Attributes) => string
+): string =>
+  [
+    markers.local,
+    tagOf(sides.local),
+    markers.ancestor,
+    tagOf(sides.ancestor),
+    markers.separator,
+    tagOf(sides.other),
+    markers.other,
+  ].join('\n')
+
+// The opening of an element, which only the root slot's element can have as a
+// conflict of its own
+const openingOf = (
+  sides: StartTagSides | undefined,
+  markers: ConflictMarkers,
+  indent: string,
+  name: string,
+  attrStr: string,
+  terminator: string
+): string => {
+  if (sides === undefined) return `${indent}<${name}${attrStr}${terminator}`
+  const tagOf = (attrs: Attributes): string =>
+    `<${name}${attrsToString(attrs)}${terminator}`
+  const lineEnd = terminator === START_TAG_END ? '\n' : ''
+  return `${startTagConflict(markers, sides, tagOf)}${lineEnd}`
+}
+
+// A text line that reads as a marker is written with its first character as a
+// numeric character reference, which XML reads as the same text.
+const escapeMarkerLines = (value: string, markers: ConflictMarkers): string =>
+  value.replace(
+    markers.markerLine,
+    (_, indent: string, char: string) => `${indent}&#${char.charCodeAt(0)};`
+  )
+
+// The first line of a value that follows an opening tag or an `="` never
+// starts an output line, so only the lines after a line break can read as
+// a marker.
+const escapeLinesAfterBreak = (
+  value: string,
+  markers: ConflictMarkers
+): string => {
+  const firstBreak = value.indexOf('\n')
+  if (firstBreak === -1) return value
+  return (
+    value.slice(0, firstBreak) +
+    escapeMarkerLines(value.slice(firstBreak), markers)
+  )
+}
+
+// Text written after a `>` starts on a fresh line of its own: its first line
+// can read as a marker like any other.
+const contentOf = (
+  st: WalkState,
+  markers: ConflictMarkers,
+  value: string
+): string => {
+  if (!st.hasConflict) return value
+  return st.endedWithGt
+    ? escapeMarkerLines(value, markers)
+    : escapeLinesAfterBreak(value, markers)
+}
+
+// Comments and CDATA hold no character references, so a marker-like line in
+// them cannot be told apart from a real marker once the file holds a
+// conflict. The first line follows the opening delimiter and cannot be one.
+const assertNoMarkerLine = (
+  st: WalkState,
+  markers: ConflictMarkers,
+  value: string
+): void => {
+  const firstLineEnd = value.indexOf('\n')
+  if (!st.hasConflict || firstLineEnd === -1) return
+  if (value.slice(firstLineEnd).search(markers.markerLine) === -1) return
+  throw new Error(
+    'XML merge error: a comment or CDATA line in a file holding a conflict reads as a conflict marker'
+  )
+}
+
+const append = (st: WalkState, chunk: string): void => {
+  st.buf += chunk
+  st.endedOnMarker = false
+}
+
+const leadOf = (st: WalkState): string =>
+  st.endedWithGt ? getIndent(st.depth) : ''
+
+// The lines of `chunk` that follow the first line break at or after
+// `valueFrom` are lines of a value, not lines the writer laid out
+const appendValue = (st: WalkState, chunk: string, valueFrom: number): void => {
+  // Stryker disable next-line StringLiteral: an empty search finds valueFrom, so a chunk with no break gets a range that starts past its own line starts and ends where the next line starts or later, which no line start falls inside
+  const firstBreak = chunk.indexOf('\n', valueFrom)
+  if (firstBreak !== -1) {
+    st.valueLines.push([
+      st.buf.length + firstBreak + 1,
+      st.buf.length + chunk.length,
+    ])
+  }
+  append(st, chunk)
+}
+
+const writeLayout = (st: WalkState, text: string): void => {
+  append(st, `${leadOf(st)}${text}`)
+  // Stryker disable next-line BooleanLiteral: every caller sets the flag again before reading it, save the blank side after a marker, where the lead is a whitespace-only line the conflict filter drops
   st.endedWithGt = false
 }
 
+const writeText = (st: WalkState, value: string): void => {
+  const lead = leadOf(st)
+  appendValue(st, `${lead}${value}`, lead.length)
+  st.endedWithGt = false
+}
+
+const writeMarker = (st: WalkState, marker: string): void => {
+  writeLayout(st, marker)
+  st.endedOnMarker = true
+}
+
 const writeCdata = (st: WalkState, value: string): void => {
-  st.buf += st.endedWithGt
-    ? `${getIndent(st.depth)}<![CDATA[${value}]]>`
-    : `<![CDATA[${value}]]>`
+  const head = `${leadOf(st)}<![CDATA[`
+  appendValue(st, `${head}${value}]]>`, head.length)
   st.endedWithGt = true
 }
 
+// A marker must stay alone on its line, so a comment never follows one
+// there. After any other `>` it keeps following it on the same line.
 const writeComment = (st: WalkState, value: string): void => {
-  st.buf += `<!--${value}-->`
+  const head = st.endedOnMarker ? `${getIndent(st.depth)}<!--` : '<!--'
+  appendValue(st, `${head}${value}-->`, head.length)
   st.endedWithGt = true
 }
 
-// `buildConflictMarkers` normalises a side with no content to a bare `{}`
-// (see ConflictMarkerBuilder's `hasNoContent`), and `buildConflictBlock`
-// wraps a non-array value as a single-element array — so "no content" on
-// a conflict side is `[{}]`, not `[]`. Without this check, `[{}]` fell
-// through to `writeChildren`, which iterates one object with zero own
+// `buildConflictMarkers` renders a side with no content as `[]`. `[{}]` still
+// reaches the writer from a text-array `null` item (TextArrayMergeNode wraps
+// `null` as `{}`), which is why the `.every` check stays. Without it, `[{}]`
+// fell through to `writeChildren`, which iterates one object with zero own
 // keys and appends nothing — leaving the marker for that side glued to
 // the very next line with no newline in between (e.g. `||||||| base=======`).
 // No separate `content.length === 0` check: `[].every(...)` is vacuously
@@ -136,13 +315,13 @@ const writeConflictContent = (
   st: WalkState,
   content: JsonArray,
   markers: ConflictMarkers,
-  rootAttrs: ReadonlyArray<readonly [string, string]>
+  slot: RootSlot
 ): void => {
   // Empty side: emit the EOL placeholder so the marker pair stays on
   // its own line, matching the byte layout of the previous pipeline.
-  // A blank side opens no element, so it never carries rootAttrs.
+  // A blank side opens no element, so it never carries the root slot.
   if (isBlankConflictSide(content)) {
-    writeText(st, SALESFORCE_EOL)
+    writeLayout(st, SALESFORCE_EOL)
     return
   }
   // Non-empty: iteration is identical to writeChildren (first-seen /
@@ -150,7 +329,11 @@ const writeConflictContent = (
   // inlining the same loop — the two paths produce byte-equivalent
   // output; the conflict path inherits first-seen order through the
   // shared writeChildren.
-  writeChildren(st, content, markers, rootAttrs)
+  // Text, comments and CDATA open no line of their own: starting the content
+  // on a fresh line, and ending it so, keeps every marker alone on its line.
+  st.endedWithGt = true
+  writeChildren(st, content, markers, slot)
+  st.endedWithGt = true
 }
 
 const writeConflict = (
@@ -160,8 +343,11 @@ const writeConflict = (
   // Only a conflict block occupying the whole document receives the root
   // attributes; nested conflict content is not a document root, so every
   // other call site falls back to the default.
-  rootAttrs: ReadonlyArray<readonly [string, string]> = EMPTY_ATTRS
+  slot: RootSlot = NO_ROOT
 ): void => {
+  const sideSlot = (side: keyof StartTagSides): RootSlot => ({
+    attrs: slot.sides?.[side] ?? slot.attrs,
+  })
   // A conflict block can be the very first thing ever written (e.g. one
   // side deletes the whole file while the other edits it). The "first
   // top-level element" indent suppression is meant for a normal open tag
@@ -170,13 +356,16 @@ const writeConflict = (
   // block.ancestor/other still gets its newline+indent instead of gluing
   // onto the marker line above it.
   st.isFirstTopLevelAfterDecl = false
-  writeText(st, markers.local)
-  writeConflictContent(st, block.local, markers, rootAttrs)
-  writeText(st, markers.ancestor)
-  writeConflictContent(st, block.ancestor, markers, rootAttrs)
-  writeText(st, markers.separator)
-  writeConflictContent(st, block.other, markers, rootAttrs)
-  writeText(st, markers.other)
+  writeMarker(st, markers.local)
+  writeConflictContent(st, block.local, markers, sideSlot('local'))
+  writeMarker(st, markers.ancestor)
+  writeConflictContent(st, block.ancestor, markers, sideSlot('ancestor'))
+  writeMarker(st, markers.separator)
+  writeConflictContent(st, block.other, markers, sideSlot('other'))
+  writeMarker(st, markers.other)
+  // The closing marker must stay alone on its line: whatever follows (a
+  // close tag, a sibling) starts on a fresh indented line, as after any `>`.
+  st.endedWithGt = true
 }
 
 // Root attributes (xmlns* and every other attribute of the source root)
@@ -194,6 +383,67 @@ const buildRootAttrs = (
   return built
 }
 
+// A line break inside a value would let one of its lines stand alone between
+// the markers and read as a marker itself.
+const LINE_BREAK = /\n/g
+const LINE_BREAK_REFERENCE = '&#10;'
+
+const inConflict = (attrs: Attributes): Attributes =>
+  attrs.map(([name, value]) => [
+    name,
+    value.replace(LINE_BREAK, LINE_BREAK_REFERENCE),
+  ])
+
+const startTagSidesOf = (sides: RootAttributeSides): StartTagSides => ({
+  local: inConflict(buildRootAttrs(sides.local)),
+  ancestor: inConflict(buildRootAttrs(sides.ancestor)),
+  other: inConflict(buildRootAttrs(sides.other)),
+})
+
+const rootSlotOf = (
+  rootAttributes: JsonObject,
+  { contested, sides }: WriteOptions
+): RootSlot => ({
+  attrs: buildRootAttrs(rootAttributes),
+  contested: contested && startTagSidesOf(contested),
+  sides: sides && startTagSidesOf(sides),
+})
+
+// Whichever element opens the document carries the root attributes, then the
+// slot is spent. A whole-document ConflictBlock spends it too — each of its
+// non-blank sides renders a document root. A top-level scalar or a bare
+// namespace key opens no element, so it leaves the slot for the next item.
+const opensRootSlot = (item: JsonValue): boolean => rootElementsIn(item) > 0
+
+const writeRootObject = (
+  st: WalkState,
+  item: JsonObject,
+  slot: RootSlot,
+  markers: ConflictMarkers
+): void => {
+  const tags = Object.keys(item).filter(key => key !== NAMESPACE_ROOT)
+  tags.forEach((tagName, index) =>
+    writeElement(
+      st,
+      tagName,
+      item[tagName] as JsonValue,
+      index === 0 ? slot : NO_ROOT,
+      markers
+    )
+  )
+}
+
+const writeRootItem = (
+  st: WalkState,
+  item: JsonValue,
+  slot: RootSlot,
+  markers: ConflictMarkers
+): void => {
+  if (isConflictBlock(item)) return writeConflict(st, item, markers, slot)
+  if (!isObject(item)) return writeText(st, String(item))
+  writeRootObject(st, item, slot, markers)
+}
+
 // Walk the compact merged tree and append serialized XML directly into
 // `st.buf`. Replaces the old `emit()` + `formatChunks()` generator pair:
 // one recursive function, no chunk objects, no generator state machines,
@@ -202,35 +452,21 @@ const buildRootAttrs = (
 const writeRoot = (
   st: WalkState,
   compactRoot: JsonArray,
-  rootAttributes: JsonObject,
+  slot: RootSlot,
   markers: ConflictMarkers
 ): void => {
-  st.buf += XML_DECL
-  // The root slot: whichever element opens the document carries the
-  // root attributes, then the slot is spent. A whole-document ConflictBlock
-  // spends it too — each of its non-blank sides renders a document root.
-  let rootAttrs = buildRootAttrs(rootAttributes)
-  for (let i = 0; i < compactRoot.length; i++) {
-    const item = compactRoot[i] as JsonValue
-    if (isConflictBlock(item)) {
-      writeConflict(st, item, markers, rootAttrs)
-      rootAttrs = EMPTY_ATTRS
-      continue
-    }
-    // A top-level scalar opens no element, so it leaves the slot unspent
-    // for the element that follows it.
-    if (!isObject(item)) {
-      writeText(st, String(item))
-      continue
-    }
-    const keys = Object.keys(item)
-    for (let j = 0; j < keys.length; j++) {
-      const tagName = keys[j]!
-      if (tagName === NAMESPACE_ROOT) continue
-      writeElement(st, tagName, item[tagName] as JsonValue, rootAttrs, markers)
-      rootAttrs = EMPTY_ATTRS
-    }
-  }
+  append(st, XML_DECL)
+  const slotIndex = compactRoot.findIndex(item =>
+    opensRootSlot(item as JsonValue)
+  )
+  compactRoot.forEach((item, index) =>
+    writeRootItem(
+      st,
+      item as JsonValue,
+      index === slotIndex ? slot : NO_ROOT,
+      markers
+    )
+  )
 }
 
 // An element renders empty when every child produces no output. The only
@@ -242,70 +478,124 @@ const writeRoot = (
 const isEmptyElementBody = (children: JsonArray): boolean =>
   children.every(child => isObject(child) && child[TEXT_KEY] === '')
 
-const writeElement = (
+const attributesOf = (
+  st: WalkState,
+  markers: ConflictMarkers,
+  attrs: Attributes
+): Attributes =>
+  st.hasConflict
+    ? attrs.map(([name, value]) => [
+        name,
+        escapeLinesAfterBreak(value, markers),
+      ])
+    : attrs
+
+const CONTENT_NAMES: ReadonlySet<string> = new Set([
+  TEXT_KEY,
+  XML_COMMENT_PROP_NAME,
+  CDATA_PROP_NAME,
+])
+
+// Two comments under one parent are an array of comments: each one is a
+// comment of its own, where CDATA sections are one text.
+const writeComments = (
+  st: WalkState,
+  markers: ConflictMarkers,
+  body: JsonValue
+): void => {
+  for (const comment of Array.isArray(body) ? body : [body]) {
+    const text = String(comment)
+    assertNoMarkerLine(st, markers, text)
+    writeComment(st, escapeCommentBody(text))
+  }
+}
+
+const writeContent = (
   st: WalkState,
   name: string,
   body: JsonValue,
-  extraAttrs: ReadonlyArray<readonly [string, string]>,
   markers: ConflictMarkers
 ): void => {
   if (name === TEXT_KEY) {
-    writeText(st, String(body))
-    return
+    return writeText(st, contentOf(st, markers, String(body)))
   }
-  if (name === XML_COMMENT_PROP_NAME) {
-    writeComment(st, escapeCommentBody(String(body)))
-    return
-  }
-  if (name === CDATA_PROP_NAME) {
-    const cdataStr = Array.isArray(body) ? body.join('') : String(body)
-    writeCdata(st, escapeCdataBody(cdataStr))
-    return
-  }
+  if (name === XML_COMMENT_PROP_NAME) return writeComments(st, markers, body)
+  const parts = (Array.isArray(body) ? body : [body]).map(String)
+  for (const part of parts) assertNoMarkerLine(st, markers, part)
+  writeCdata(st, parts.map(escapeCdataBody).join(CDATA_PART_JOIN))
+}
 
-  if (body !== null && typeof body === 'object' && !Array.isArray(body)) {
-    if (isConflictBlock(body as JsonObject as JsonValue)) {
-      writeConflict(st, body as ConflictBlock, markers)
-      return
-    }
-  }
+// Avoid the [...extraAttrs, ...attrs] allocation when extraAttrs is
+// empty (the common case — only the first top-level open tag carries
+// any extras). attrsToString itself handles concatenation.
+const attributeString = (slot: RootSlot, attrs: Attributes): string =>
+  // Stryker disable next-line ConditionalExpression: a shortcut, the root attributes of an empty slot add the empty string
+  slot.attrs === EMPTY_ATTRS
+    ? attrsToString(attrs)
+    : attrsToString(slot.attrs) + attrsToString(attrs)
 
-  const { attrs, children } = splitAttrsAndChildren(body)
-  // Avoid the [...extraAttrs, ...attrs] allocation when extraAttrs is
-  // empty (the common case — only the first top-level open tag carries
-  // any extras). attrsToString itself handles concatenation.
-  const attrStr =
-    extraAttrs === EMPTY_ATTRS
-      ? attrsToString(attrs)
-      : attrsToString(extraAttrs) + attrsToString(attrs)
-
+const writeOpening = (
+  st: WalkState,
+  name: string,
+  slot: RootSlot,
+  markers: ConflictMarkers,
+  attrs: Attributes,
+  terminator: string
+): void => {
   const indent = st.isFirstTopLevelAfterDecl ? '' : getIndent(st.depth)
   st.isFirstTopLevelAfterDecl = false
+  const opening = openingOf(
+    slot.contested,
+    markers,
+    indent,
+    name,
+    attributeString(
+      { ...slot, attrs: attributesOf(st, markers, slot.attrs) },
+      attrs
+    ),
+    terminator
+  )
+  appendValue(st, opening, indent.length)
+}
 
-  // Empty elements self-close (`<tag/>`): `sf project retrieve` never emits
-  // the expanded `<tag></tag>` form, so the merge output converges to its
-  // byte shape. The trailing `>` leaves endedWithGt=true for the parent,
-  // identical to the close-tag path below.
-  if (isEmptyElementBody(children)) {
-    st.buf += `${indent}<${name}${attrStr}/>`
-    st.endedWithGt = true
-    return
-  }
-
-  st.buf += `${indent}<${name}${attrStr}>`
+const writeBody = (
+  st: WalkState,
+  name: string,
+  children: JsonArray,
+  markers: ConflictMarkers
+): void => {
   const parentDepth = st.depth
   st.depth = parentDepth + 1
   st.endedWithGt = false
   writeChildren(st, children, markers)
-  if (st.endedWithGt) {
-    st.buf += `${getIndent(parentDepth)}</${name}>`
-  } else {
-    st.buf += `</${name}>`
-  }
+  append(
+    st,
+    st.endedWithGt ? `${getIndent(parentDepth)}</${name}>` : `</${name}>`
+  )
   st.depth = parentDepth
-  // Close-tag emission always leaves endedWithGt=true for the parent
-  // frame regardless of the body's terminating chunk, so there is no
-  // need to capture-and-restore the caller's value here.
+}
+
+const writeElement = (
+  st: WalkState,
+  name: string,
+  body: JsonValue,
+  slot: RootSlot,
+  markers: ConflictMarkers
+): void => {
+  if (CONTENT_NAMES.has(name)) return writeContent(st, name, body, markers)
+  if (isConflictBlock(body)) return writeConflict(st, body, markers)
+
+  const { attrs: sourceAttrs, children } = splitAttrsAndChildren(body)
+  const attrs = attributesOf(st, markers, sourceAttrs)
+  // Empty elements self-close (`<tag/>`): `sf project retrieve` never emits
+  // the expanded `<tag></tag>` form, so the merge output converges to its
+  // byte shape.
+  const isEmpty = isEmptyElementBody(children)
+  const terminator = isEmpty ? EMPTY_TAG_END : START_TAG_END
+  writeOpening(st, name, slot, markers, attrs, terminator)
+  if (!isEmpty) writeBody(st, name, children, markers)
+  // Both forms end on a `>`, so the parent frame always sees
+  // endedWithGt=true, whatever the body's terminating chunk was.
   st.endedWithGt = true
 }
 
@@ -334,11 +624,11 @@ const writeUnfoldedChild = (
     tagName !== XML_COMMENT_PROP_NAME
   ) {
     for (let i = 0; i < value.length; i++) {
-      writeElement(st, tagName, value[i] as JsonValue, EMPTY_ATTRS, markers)
+      writeElement(st, tagName, value[i] as JsonValue, NO_ROOT, markers)
     }
     return
   }
-  writeElement(st, tagName, value, EMPTY_ATTRS, markers)
+  writeElement(st, tagName, value, NO_ROOT, markers)
 }
 
 const writeChildren = (
@@ -349,17 +639,17 @@ const writeChildren = (
   // that side occupies the document root; the head child then opens the
   // side's root element. The multi-key branch below never receives them:
   // a conflict side's head is always a single-key wrapper.
-  rootAttrs: ReadonlyArray<readonly [string, string]> = EMPTY_ATTRS
+  slot: RootSlot = NO_ROOT
 ): void => {
   for (let i = 0; i < children.length; i++) {
     const child = children[i] as JsonValue
-    const attrs = i === 0 ? rootAttrs : EMPTY_ATTRS
+    const childSlot = i === 0 ? slot : NO_ROOT
     if (isConflictBlock(child)) {
-      writeConflict(st, child, markers, attrs)
+      writeConflict(st, child, markers, childSlot)
       continue
     }
     if (!isObject(child)) {
-      writeText(st, String(child))
+      writeText(st, contentOf(st, markers, String(child)))
       continue
     }
     const keys = Object.keys(child)
@@ -370,7 +660,7 @@ const writeChildren = (
       // into writeChildren via splitAttrsAndChildren / the multi-key
       // branch below.
       const tagName = keys[0]!
-      writeElement(st, tagName, child[tagName] as JsonValue, attrs, markers)
+      writeElement(st, tagName, child[tagName] as JsonValue, childSlot, markers)
       continue
     }
     for (let j = 0; j < keys.length; j++) {
@@ -433,12 +723,19 @@ const getIndent = (depth: number): string => {
 
 // Design §6.3.3 line-state machine: strip horizontal whitespace before
 // a marker on the same line (pass 1), drop whitespace-only lines
-// (pass 2). Newline belongs to the line it terminates.
+// (pass 2), but never a line of a value. Newline belongs to the line it
+// terminates.
 class ConflictLineFilter {
   private buf = ''
+  // offset in the document of the line being read
+  private lineStart = 0
+  private nextValue = 0
   private readonly markers: readonly string[]
 
-  constructor(config: MergeConfig) {
+  constructor(
+    config: MergeConfig,
+    private readonly valueLines: ReadonlyArray<readonly [number, number]>
+  ) {
     this.markers = [
       LOCAL_CONFLICT_MARKER.repeat(config.conflictMarkerSize),
       ANCESTOR_CONFLICT_MARKER.repeat(config.conflictMarkerSize),
@@ -478,8 +775,25 @@ class ConflictLineFilter {
     return out.join('')
   }
 
+  // Lines are read in document order, and so are the value ranges: those
+  // that end before the line are behind for good
+  private skipValuesBefore(lineStart: number): void {
+    let range = this.valueLines[this.nextValue]
+    while (range !== undefined && range[1] <= lineStart) {
+      range = this.valueLines[++this.nextValue]
+    }
+  }
+
+  private isInValue(lineStart: number): boolean {
+    const range = this.valueLines[this.nextValue]
+    return range !== undefined && range[0] <= lineStart
+  }
+
   private flushLine(out: string[], withNewline: boolean): void {
     let line = this.buf
+    this.skipValuesBefore(this.lineStart)
+    const isValueLine = this.isInValue(this.lineStart)
+    this.lineStart += line.length + 1
     this.buf = ''
     // Pass 1: strip horizontal whitespace directly before a marker on
     // this line. Mirrors ConflictMarkerFormatter.indentRegex semantics.
@@ -491,7 +805,7 @@ class ConflictLineFilter {
       line = leadingWs[2]!
     }
     // Pass 2: drop whitespace-only lines (including their '\n').
-    if (/^[ \t]*$/.test(line)) return
+    if (!isValueLine && /^[ \t]*$/.test(line)) return
     out.push(withNewline ? `${line}\n` : line)
   }
 }
@@ -523,10 +837,10 @@ export class XmlStreamWriter implements XmlSerializer {
     out: Writable,
     ordered: JsonArray,
     rootAttributes: JsonObject,
-    eol: '\n' | '\r\n' = '\n',
-    hasConflict = true
+    options: WriteOptions = {}
   ): Promise<void> {
     if (ordered.length === 0) return
+    const { eol = '\n', hasConflict = true } = options
 
     // Pipelined: each formatted string flows emit → format → (filter) →
     // accumulator → eol → out.write. The accumulator batches filter
@@ -544,8 +858,12 @@ export class XmlStreamWriter implements XmlSerializer {
       depth: 0,
       endedWithGt: false,
       isFirstTopLevelAfterDecl: true,
+      hasConflict,
+      // Stryker disable next-line BooleanLiteral: writeRoot appends the declaration first, which clears the flag
+      endedOnMarker: false,
+      valueLines: [],
     }
-    writeRoot(st, ordered, rootAttributes, markers)
+    writeRoot(st, ordered, rootSlotOf(rootAttributes, options), markers)
     // Trailing newline: `sf project retrieve` (via source-deploy-retrieve)
     // writes metadata XML ending in a newline, so we converge to that byte
     // shape (see TRAILING_NEWLINE). Appended to the finished document AFTER
@@ -569,7 +887,7 @@ export class XmlStreamWriter implements XmlSerializer {
     // Conflict path: re-stream st.buf through the line filter in
     // FLUSH_BYTES windows so we don't buffer the entire document twice
     // (once in st.buf, once in the filter).
-    const filter = new ConflictLineFilter(this.config)
+    const filter = new ConflictLineFilter(this.config, st.valueLines)
     let batch = ''
     const flush = async (): Promise<void> => {
       const final = applyEol(batch, eol)

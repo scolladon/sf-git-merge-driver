@@ -20,7 +20,7 @@ describe('ConflictMarkerBuilder', () => {
       expect(sut.other).toEqual([other])
     })
 
-    it('should use empty object when local is empty', () => {
+    it('given an empty local when building then the local side is an empty list', () => {
       // Arrange
       const local = {}
       const ancestor = { field: 'ancestorValue' }
@@ -31,10 +31,10 @@ describe('ConflictMarkerBuilder', () => {
 
       // Assert
       expect(sut.__conflict).toBe(true)
-      expect(sut.local).toEqual([{}])
+      expect(sut.local).toEqual([])
     })
 
-    it('should use empty object when ancestor is empty', () => {
+    it('given an empty ancestor when building then the ancestor side is an empty list', () => {
       // Arrange
       const local = { field: 'localValue' }
       const ancestor = {}
@@ -45,10 +45,10 @@ describe('ConflictMarkerBuilder', () => {
 
       // Assert
       expect(sut.__conflict).toBe(true)
-      expect(sut.ancestor).toEqual([{}])
+      expect(sut.ancestor).toEqual([])
     })
 
-    it('should use empty object when other is empty', () => {
+    it('given an empty other when building then the other side is an empty list', () => {
       // Arrange
       const local = { field: 'localValue' }
       const ancestor = { field: 'ancestorValue' }
@@ -59,7 +59,7 @@ describe('ConflictMarkerBuilder', () => {
 
       // Assert
       expect(sut.__conflict).toBe(true)
-      expect(sut.other).toEqual([{}])
+      expect(sut.other).toEqual([])
     })
 
     it('should handle arrays as values', () => {
@@ -78,7 +78,7 @@ describe('ConflictMarkerBuilder', () => {
       expect(sut.other).toEqual(other)
     })
 
-    it('given empty array when building then replaces with empty object', () => {
+    it('given an empty array when building then that side is an empty list', () => {
       // Arrange
       const local: never[] = []
       const ancestor = { field: 'ancestorValue' }
@@ -88,7 +88,7 @@ describe('ConflictMarkerBuilder', () => {
       const sut: ConflictBlock = buildConflictMarkers(local, ancestor, other)
 
       // Assert
-      expect(sut.local).toEqual([{}])
+      expect(sut.local).toEqual([])
     })
 
     it('given non-empty array when building then keeps array as-is', () => {
@@ -115,6 +115,25 @@ describe('ConflictMarkerBuilder', () => {
 
       // Assert
       expect(sut.local).toEqual([{ a: 1 }])
+    })
+
+    it('given a null side when building then the side is an empty list', () => {
+      // Act
+      const sut: ConflictBlock = buildConflictMarkers(null, { a: '1' }, 'text')
+
+      // Assert
+      expect(sut.local).toEqual([])
+      expect(sut.other).toEqual(['text'])
+    })
+
+    it('given scalars without properties when building then each is kept as a side', () => {
+      // Act
+      const sut: ConflictBlock = buildConflictMarkers('', 0, false)
+
+      // Assert
+      expect(sut.local).toEqual([''])
+      expect(sut.ancestor).toEqual([0])
+      expect(sut.other).toEqual([false])
     })
   })
 })

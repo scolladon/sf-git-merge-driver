@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Obj</label>
+    <nameField>
+        <label>Name</label>
+        <type>AutoNumber</type>
+        <displayFormat>A-{0000}</displayFormat>
+    </nameField>
+</CustomObject>

@@ -8,10 +8,10 @@ Before the fix both keyless entries were given the same key, the string
 code.
 
 Both entries are now kept in input order. The array is routed to the
-unkeyed strategy, which takes ours' array as-is because theirs left it
-unchanged, and theirs' `<custom>` edit merges.
+ordered strategy, each keyless entry identified by its content, which keeps ours' edit because
+theirs left the array unchanged, and theirs' `<custom>` edit merges.
 
 Pins:
-- `hasKeylessCollision` routing a keyed array with several keyless entries
-  to the unkeyed strategy.
-- The unkeyed strategy's one-side-changed fast path.
+- `toSideKeys` routing a keyed array with keyless entries
+  to the ordered strategy.
+- The ordered strategy's one-side-changed path.

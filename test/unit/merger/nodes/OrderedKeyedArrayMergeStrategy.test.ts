@@ -45,6 +45,23 @@ interface ConflictDescription {
   other: string[]
 }
 
+// An entry whose content conflicts holds a field list: its conflict blocks
+// stand for the entry's conflict and its other fields are ignored.
+const extractFieldConflicts = (
+  fields: JsonArray
+): (string | ConflictDescription)[] =>
+  fields.flatMap((field): (string | ConflictDescription)[] => {
+    const block = field as JsonObject
+    if (!isConflictBlock(block)) return []
+    return [
+      {
+        local: extractLabels(block.local as JsonArray),
+        ancestor: extractLabels(block.ancestor as JsonArray),
+        other: extractLabels(block.other as JsonArray),
+      },
+    ]
+  })
+
 const extractConflictStructure = (
   items: JsonArray
 ): (string | ConflictDescription)[] =>
@@ -63,8 +80,9 @@ const extractConflictStructure = (
       ]
     }
 
-    const wrapped = obj['customValue'] as JsonObject | undefined
-    const content = wrapped ?? obj
+    const wrapped = obj['customValue'] as JsonObject | JsonArray | undefined
+    if (Array.isArray(wrapped)) return extractFieldConflicts(wrapped)
+    const content = (wrapped as JsonObject | undefined) ?? obj
     const label = getLabel(content)
     return label ? [label] : []
   })
@@ -99,6 +117,20 @@ describe('OrderedKeyedArrayMergeStrategy', () => {
   ]
 
   const gracefulMergeScenarios: GracefulMergeScenario[] = [
+    [
+      'Adjacent deletions merge',
+      ['A', 'B', 'C', 'D'],
+      ['A', 'D'],
+      ['A', 'B', 'D'],
+      ['A', 'D'],
+    ],
+    [
+      'Deletions of neighbouring entries on each side merge',
+      ['A', 'B', 'C', 'D'],
+      ['A', 'C', 'D'],
+      ['A', 'B', 'D'],
+      ['A', 'D'],
+    ],
     [
       'M1: Disjoint Changes',
       ['A', 'B', 'C'],
@@ -238,25 +270,18 @@ describe('OrderedKeyedArrayMergeStrategy', () => {
       [conflict(['B', 'A', 'C'], ['A', 'B', 'C'], ['A', 'C', 'B'])],
     ],
     [
-      'C5: Partially Overlapping Hunks',
-      ['A', 'B', 'C', 'D'],
-      ['A', 'D'],
-      ['A', 'B', 'D'],
-      ['A', conflict([], ['B', 'C'], ['B']), 'D'],
-    ],
-    [
       'C6: Concurrent Addition at Different Positions',
       ['A', 'C'],
       ['A', 'B', 'C'],
       ['A', 'C', 'B'],
-      [conflict(['A', 'B', 'C'], ['A', 'C'], ['A', 'C', 'B'])],
+      ['A', conflict(['B', 'C'], ['C'], ['C', 'B'])],
     ],
     [
       'C7: Concurrent Addition with Diverged Orderings',
       ['A', 'B'],
       ['B', 'A', 'X'],
       ['A', 'B', 'Y'],
-      [conflict(['B', 'A', 'X'], ['A', 'B'], ['A', 'B', 'Y'])],
+      ['B', 'A', conflict(['X'], [], ['Y'])],
     ],
     [
       'C8: Delete vs Modify (Other Deletes)',
@@ -273,30 +298,114 @@ describe('OrderedKeyedArrayMergeStrategy', () => {
       ['A', conflict(['B_LOCAL'], [], ['B_OTHER'])],
     ],
     [
-      'C10: Divergent deletions in same gap (local deletes B, other deletes C)',
-      ['A', 'B', 'C', 'D'],
-      ['A', 'C', 'D'],
-      ['A', 'B', 'D'],
-      ['A', conflict(['C'], ['B', 'C'], ['B']), 'D'],
-    ],
-    // Gap-scoped addition conflict — exercises `detectGapConflict`
-    // (the branch whose redundant `!setsEqual(...)` clause was removed).
-    // Both sides share the ancestor spine [A, B] without any moves, and
-    // each adds a different disjoint key in the trailing gap. The spine
-    // stays intact and only the gap is marked as a conflict. Contrast
-    // with C7 above, where ordering divergence triggers a full-array
-    // conflict; this case is deliberately narrower.
-    [
-      'Gap conflict: disjoint additions in the trailing gap, no moves',
+      'Disjoint additions after the last shared entry conflict',
       ['A', 'B'],
       ['A', 'B', 'X'],
       ['A', 'B', 'Y'],
       ['A', 'B', conflict(['X'], [], ['Y'])],
     ],
+    [
+      'Both sides make the same move next to different additions',
+      ['K', 'B'],
+      ['B', 'X', 'K'],
+      ['B', 'Y', 'K'],
+      ['B', conflict(['X'], [], ['Y']), 'K'],
+    ],
+    [
+      'Both sides make the same move and delete the same entry next to different additions',
+      ['K', 'B', 'D'],
+      ['B', 'X', 'K'],
+      ['B', 'Y', 'K'],
+      ['B', conflict(['X'], ['D'], ['Y']), 'K'],
+    ],
+    [
+      'Local reorders and adds two entries other adds in the reverse order',
+      ['A', 'B'],
+      ['B', 'A', 'X', 'Y'],
+      ['A', 'B', 'Y', 'X'],
+      ['B', 'A', conflict(['X', 'Y'], [], ['Y', 'X'])],
+    ],
+    [
+      'Other reorders and adds two entries local adds in the reverse order',
+      ['A', 'B'],
+      ['A', 'B', 'Y', 'X'],
+      ['B', 'A', 'X', 'Y'],
+      ['B', 'A', conflict(['Y', 'X'], [], ['X', 'Y'])],
+    ],
+    [
+      'Local deletes an entry other moves to another gap and edits',
+      ['K', 'B', 'C'],
+      ['B', 'C'],
+      ['B', 'C', 'K:K_MOD'],
+      ['B', 'C', conflict([], ['K'], ['K_MOD'])],
+    ],
+    [
+      'Other deletes an entry local moves to another gap and edits',
+      ['K', 'B', 'C'],
+      ['B', 'C', 'K:K_MOD'],
+      ['B', 'C'],
+      ['B', 'C', conflict(['K_MOD'], ['K'], [])],
+    ],
+    [
+      'Local reorders while other edits an entry and deletes another',
+      ['C', 'D'],
+      ['D', 'C'],
+      ['C:C_MOD'],
+      [conflict(['D'], ['D'], []), 'C_MOD'],
+    ],
+    [
+      'Local deletes an entry other only moves, and adds another',
+      ['K', 'B', 'C'],
+      ['B', 'C', 'Z'],
+      ['B', 'C', 'K'],
+      ['B', 'C', conflict(['Z'], ['K'], ['K'])],
+    ],
+    [
+      'Other deletes an entry local only moves, and adds another',
+      ['K', 'B', 'C'],
+      ['B', 'C', 'K'],
+      ['B', 'C', 'Z'],
+      ['B', 'C', conflict(['K'], ['K'], ['Z'])],
+    ],
+    [
+      'Other reorders while local edits an entry and deletes another',
+      ['C', 'D'],
+      ['C:C_MOD'],
+      ['D', 'C'],
+      [conflict([], ['D'], ['D']), 'C_MOD'],
+    ],
   ]
 
   // Additional scenarios to exercise gap analysis and spine processing branches
   const additionalGracefulScenarios: GracefulMergeScenario[] = [
+    [
+      'Local reorders and adds; other adds the same entry and one more',
+      ['A', 'B'],
+      ['B', 'A', 'X'],
+      ['A', 'B', 'X', 'Y'],
+      ['B', 'A', 'X', 'Y'],
+    ],
+    [
+      'Other reorders and adds; local adds the same entry and one more',
+      ['A', 'B'],
+      ['A', 'B', 'X', 'Y'],
+      ['B', 'A', 'X'],
+      ['B', 'A', 'X', 'Y'],
+    ],
+    [
+      'Only the other side reorders and adds',
+      ['A', 'B'],
+      ['A', 'B'],
+      ['X', 'B', 'A'],
+      ['X', 'B', 'A'],
+    ],
+    [
+      'Only the local side reorders and adds',
+      ['A', 'B'],
+      ['X', 'B', 'A'],
+      ['A', 'B'],
+      ['X', 'B', 'A'],
+    ],
     [
       'M13: Other-only move (local unchanged)',
       ['A', 'B', 'C'],
@@ -423,6 +532,41 @@ describe('OrderedKeyedArrayMergeStrategy', () => {
       ['A', 'B'],
       ['A', 'B'],
     ],
+    [
+      'Both sides apply the same reorder of an entry kept on all sides',
+      ['C', 'B'],
+      ['B', 'C'],
+      ['B', 'C'],
+      ['B', 'C'],
+    ],
+    [
+      'Local reorders and adds one entry before the one both sides add',
+      ['A', 'B'],
+      ['B', 'A', 'X', 'Y'],
+      ['A', 'B', 'Y'],
+      ['B', 'A', 'X', 'Y'],
+    ],
+    [
+      'Other reorders and adds one entry before the one both sides add',
+      ['A', 'B'],
+      ['A', 'B', 'Y'],
+      ['B', 'A', 'X', 'Y'],
+      ['B', 'A', 'X', 'Y'],
+    ],
+    [
+      'Other inserts before the entry both sides add after a shared anchor',
+      ['P'],
+      ['P', 'D'],
+      ['P', 'B', 'D'],
+      ['P', 'B', 'D'],
+    ],
+    [
+      'Local inserts before the entry both sides add after a shared anchor',
+      ['P'],
+      ['P', 'B', 'D'],
+      ['P', 'D'],
+      ['P', 'B', 'D'],
+    ],
   ]
 
   describe('Additional Graceful Merges', () => {
@@ -467,14 +611,13 @@ describe('OrderedKeyedArrayMergeStrategy', () => {
     )
   })
 
-  describe('processKeyOrder with deleted elements', () => {
-    it('given diverged ordering with one side deleting an element then filters out empty results', () => {
-      // Arrange - local moves A,B and local deletes C (not in other),
-      // processKeyOrder iterates keys and some produce null/empty results
+  describe('given a side that deletes an entry during a reorder', () => {
+    it('given diverged ordering with one side deleting an element then the deleted entry is dropped', () => {
+      // Arrange - local swaps A and B and deletes D; other edits C
       const strategy = createStrategy(
-        toElements(['A', 'B', 'C']),
-        toElements(['B', 'A']),
-        toElements(['A', 'B', 'C'])
+        toElements(['A', 'B', 'C', 'D']),
+        toElements(['B', 'A', 'C']),
+        toElements(['A', 'B', 'C:C_MOD', 'D'])
       )
 
       // Act
@@ -482,14 +625,123 @@ describe('OrderedKeyedArrayMergeStrategy', () => {
 
       // Assert
       expect(result.hasConflict).toBe(false)
-      expect(extractLabels(result.output)).toEqual(['B', 'A'])
+      expect(extractLabels(result.output)).toEqual(['B', 'A', 'C_MOD'])
     })
   })
 
-  describe('computeGapSets filtering', () => {
-    it('given gap where ancestor has keys not in local or other then computes correct deleted sets', () => {
-      // Arrange - A,B,C in ancestor; local has only A; other has only A
-      // Both deleted B and C independently via gap processing
+  describe('given a side that repeats a key', () => {
+    it('when both live sides repeat a key then the second copy is an agreed insertion', () => {
+      // Arrange
+      const sut = createStrategy(
+        toElements(['A', 'B', 'C']),
+        toElements(['A', 'B', 'A:A_SECOND', 'C', 'X']),
+        toElements(['A', 'B', 'A:A_SECOND', 'C:C_MOD'])
+      )
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      expect(extractLabels(result.output)).toEqual([
+        'A',
+        'B',
+        'A_SECOND',
+        'C_MOD',
+        'X',
+      ])
+    })
+
+    it('when both sides make the same change then every repeated entry is kept', () => {
+      // Arrange
+      const sut = createStrategy(
+        toElements(['A', 'B']),
+        toElements(['A:A_FIRST', 'A:A_SECOND', 'B']),
+        toElements(['A:A_FIRST', 'A:A_SECOND', 'B'])
+      )
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      expect(extractLabels(result.output)).toEqual(['A_FIRST', 'A_SECOND', 'B'])
+    })
+
+    it('when a repeated key anchors the shared order then each occurrence is written once', () => {
+      // Arrange
+      const sut = createStrategy(
+        toElements(['A', 'B', 'A']),
+        toElements(['A', 'B', 'A', 'X']),
+        toElements(['A', 'B:B_MOD', 'A'])
+      )
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      expect(extractLabels(result.output)).toEqual(['A', 'B_MOD', 'A', 'X'])
+    })
+
+    it('when only other changed then every repeated entry is kept', () => {
+      // Arrange
+      const sut = createStrategy(
+        toElements(['A', 'B']),
+        toElements(['A', 'B']),
+        toElements(['A:A_FIRST', 'A:A_SECOND', 'B'])
+      )
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      expect(extractLabels(result.output)).toEqual(['A_FIRST', 'A_SECOND', 'B'])
+    })
+
+    it('when only local changed then every repeated entry is kept', () => {
+      // Arrange
+      const sut = createStrategy(
+        toElements(['A', 'B']),
+        toElements(['A:A_FIRST', 'A:A_SECOND', 'B']),
+        toElements(['A', 'B'])
+      )
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      expect(extractLabels(result.output)).toEqual(['A_FIRST', 'A_SECOND', 'B'])
+    })
+
+    it('when orderings diverge then the conflict shows every repeated entry', () => {
+      // Arrange
+      const sut = createStrategy(
+        toElements(['A', 'B', 'C']),
+        toElements(['B', 'A', 'C']),
+        toElements(['A:A_FIRST', 'A:A_SECOND', 'C', 'B'])
+      )
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(true)
+      expect(extractConflictStructure(result.output)).toEqual([
+        conflict(
+          ['B', 'A', 'C'],
+          ['A', 'B', 'C'],
+          ['A_FIRST', 'A_SECOND', 'C', 'B']
+        ),
+      ])
+    })
+  })
+
+  describe('given both sides delete the same entries', () => {
+    it('given gap where ancestor has keys not in local or other then both deletions are kept', () => {
+      // Arrange - both sides delete B and C independently
       const strategy = createStrategy(
         toElements(['X', 'A', 'B', 'C', 'Y']),
         toElements(['X', 'A', 'Y']),
