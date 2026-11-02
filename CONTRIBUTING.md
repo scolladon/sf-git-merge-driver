@@ -79,6 +79,29 @@ To execute a particular test file, use the following command:
 npx vitest run <path_to_test>
 ```
 
+#### Property-based tests
+
+Property tests use [fast-check](https://fast-check.dev/) with a pinned seed (`20261029`) and 100 runs, set once in `test/utils/fastCheckSetup.ts`. A failure prints the seed, the replay path and the shrunk counterexample, and reruns identically with `npx vitest run <path_to_test>`. To explore other seeds, use `FC_SEED=<seed> npx vitest run <path_to_test>` (an integer; anything else throws). Never add a per-assert `seed` or `numRuns`.
+
+The merge doctrines are checked as laws, not only as examples (see "Engine-Wide Doctrines" and principle 0 of "Deterministic Ordering Algorithm" in [DESIGN.md](./DESIGN.md)):
+
+```bash
+# the engine laws: idempotence, one-sided and same changes, symmetry, no loss, compatible merge, relabelling, minimal blocks, delete vs modify,
+# deployable output, root attributes, child-tag order, value kinds (generators in test/unit/merger/laws/arbitraries.ts)
+npx vitest run test/unit/merger/laws
+
+# the exhaustive check: every trio of a set of values at a tag and at the root body, through the whole pipeline (no sampling)
+npx vitest run test/unit/merger/laws/valueKinds.exhaustive.test.ts
+
+# the readings checker: the identity readings of repeated keys, against an independent enumerator
+npx vitest run test/unit/merger/nodes/ordered/readings.test.ts
+
+# the git-shape guard: no block wider than git's zdiff3 hunk (needs git on the PATH, skipped otherwise)
+npx vitest run test/integration/OrderedZdiff3Shape.test.ts
+```
+
+The git-shape guard runs `git merge-file --zdiff3` as a black box and only reads its output. A new law that fails prints a shrunk counterexample: turn it into a named row of `test/unit/merger/nodes/ordered/doctrine.test.ts` (ordered arrays) or a fixture under `test/fixtures/xml/` before fixing the engine.
+
 ### Mutation Testing
 
 Run Stryker to validate that tests actually catch mutations:
@@ -312,7 +335,7 @@ When the key is a composite of multiple fields, return `undefined` when no part 
 
 If the XML element name already exists in the table for a different parent schema with a different key field, **do not overwrite** — build a named extractor with `firstPresentKey(...)` that prefers one key and falls back to the other. See `getPicklistValuesKey` for the canonical example, and the "Shared element names across schemas" subsection of [DESIGN.md](./DESIGN.md) for the list of currently-known cases.
 
-> **Why this matters:** if both schemas hit the single-key path with different field names, every block in the wrong-schema document will have no key and `buildKeyedMap` will silently retain only the last entry — a silent data-loss bug class. The keyless fail-safe turns such a collision into a whole-list merge or a conflict. It is a safety net, not a substitute for the right extractor.
+> **Why this matters:** if both schemas hit the single-key path with different field names, every entry in the wrong-schema document will have no key, so they cannot be matched across the three versions — a merge-quality bug class. The keyless fail-safe keeps every entry and merges them as an ordered list under one key. It is a safety net, not a substitute for the right extractor.
 
 ### Required test layering
 
