@@ -128,7 +128,7 @@ describe('TextMergeStrategy', () => {
         {
           __conflict: true,
           local: [objLocal],
-          ancestor: [{}],
+          ancestor: [],
           other: [objOther],
         },
       ])
@@ -175,7 +175,7 @@ describe('TextMergeStrategy', () => {
       expect(result.output).toEqual([
         {
           __conflict: true,
-          local: [{}],
+          local: [],
           ancestor: [objAncestor],
           other: [objOther],
         },
@@ -224,7 +224,7 @@ describe('TextMergeStrategy', () => {
           __conflict: true,
           local: [objLocal],
           ancestor: [objAncestor],
-          other: [{}],
+          other: [],
         },
       ])
     })
