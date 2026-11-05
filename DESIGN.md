@@ -589,7 +589,7 @@ The modules of `src/merger/nodes/ordered/`, in pipeline order, with the two help
 | Module | Purpose |
 |--------|---------|
 | `orderedEntry.ts` (`OrderedEntry`, `LiveSide`, `positionOn`, `valueOn`) | One identity with its ancestor, local and other values and positions |
-| `identity.ts` (`identify`) | Groups each side by key, builds the identity readings, keeps the no-loss readings first, then the fewest moves |
+| `identity.ts` (`identify`) | Groups each side by key, builds every key's identity readings, keeps each key's no-loss readings (all of every key's readings when one key cannot avoid a loss), then the fewest moves |
 | `content.ts` (`entryStatuses`) | Per-entry status: clean, gone, presence conflict (delete vs modify, delete vs move), content conflict; fields merge through the orchestrator |
 | `orderAxis.ts` (`notInEveryLis`, `possiblyMoved`, `isKeptByAll`) | Order axis: an entry is moved unless every longest common subsequence keeps it |
 | `replacement.ts` (`orderingView`, `replacementRuns`, `phantomSwaps`) | Replacement runs and the ordering view where they stand at the place of what they replaced; contested runs; swaps of interchangeable copies |

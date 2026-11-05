@@ -90,20 +90,30 @@ const uniqueDraft = (key: string, slots: Slots): Draft => ({
   other: slots.other[0],
 })
 
-// The alternatives of a stretch of keys, regenerated on demand: the cross
-// product walks them again for each combination of the stretches before it.
+// The alternatives of a stretch of keys, read again by the cross product for
+// each combination of the stretches before it.
 type Segment = () => Iterable<readonly Draft[]>
 
-// Keys with a single alternative fuse into one segment: recursing over every
+type Alternatives = readonly (readonly Draft[])[]
+
+// A fused run of keys held at most once per side has one alternative and no
+// slots to choose from.
+interface Stretch {
+  readonly alternatives: Alternatives
+  readonly slots: Slots | undefined
+}
+
+// Keys with a single alternative fuse into one stretch: recursing over every
 // key would nest as deep as the array is long.
-const segmentsOf = (groups: ReadonlyMap<string, Slots>): readonly Segment[] => {
-  const segments: Segment[] = []
+const stretchesOf = (
+  groups: ReadonlyMap<string, Slots>
+): readonly Stretch[] => {
+  const stretches: Stretch[] = []
   let run: Draft[] = []
   const closeRun = (): void => {
     // Stryker disable next-line ConditionalExpression: an empty fused run adds a segment yielding the empty draft list, the identity of the cross product
     if (run.length === 0) return
-    const fused = run
-    segments.push(() => [fused])
+    stretches.push({ alternatives: [run], slots: undefined })
     run = []
   }
   for (const [key, slots] of groups) {
@@ -112,10 +122,10 @@ const segmentsOf = (groups: ReadonlyMap<string, Slots>): readonly Segment[] => {
       continue
     }
     closeRun()
-    segments.push(() => pairingDrafts(key, slots))
+    stretches.push({ alternatives: [...pairingDrafts(key, slots)], slots })
   }
   closeRun()
-  return segments
+  return stretches
 }
 
 function* crossProduct(
@@ -231,12 +241,39 @@ const keepLeast = (
   return lone === undefined ? leaders.kept() : [lone]
 }
 
-// Memoised on first use: a single reading is never measured, so its
-// signatures are never needed.
-const lazily = <T extends object>(compute: () => T): (() => T) => {
-  let value: T | undefined
-  return () => (value ??= compute())
+const valuesOf = (slots: readonly Slot[]): JsonArray =>
+  slots.map(slot => slot.value)
+
+// Exact per key: the values a key's entries carry belong to it alone.
+const noLossOf = (stretch: Stretch): Alternatives => {
+  const { alternatives, slots } = stretch
+  if (slots === undefined) return alternatives
+  const held = valuesBothSidesHold(valuesOf(slots.local), valuesOf(slots.other))
+  return alternatives.filter(
+    alternative => !losesAValue(toReading(alternative), held)
+  )
 }
+
+const withoutLosses = (
+  stretches: readonly Stretch[]
+): readonly Alternatives[] => {
+  const kept = stretches.map(noLossOf)
+  // A key losing a value in every alternative makes every reading lose: all
+  // of them stay, as when no reading avoids a loss.
+  return kept.every(alternatives => alternatives.length > 0)
+    ? kept
+    : stretches.map(stretch => stretch.alternatives)
+}
+
+const leastMovingReadings = (
+  lists: readonly Alternatives[]
+): readonly Reading[] => {
+  const segments: readonly Segment[] = lists.map(list => () => list)
+  return keepLeast(mapped(crossProduct(segments, 0, []), toReading), movesOf)
+}
+
+const hasOneAlternative = (stretch: Stretch): boolean =>
+  stretch.alternatives.length === 1
 
 export const identify = (
   ancestor: JsonArray,
@@ -244,14 +281,12 @@ export const identify = (
   other: JsonArray,
   keys: KeyedSides
 ): readonly Reading[] => {
-  const groups = groupSlots({ ancestor, local, other }, keys)
-  const segments = segmentsOf(groups)
-  const held = lazily(() => valuesBothSidesHold(local, other))
-  // Minimising the losses keeps the no-loss readings when any exists and all
-  // of them otherwise.
-  const noLoss = keepLeast(
-    mapped(crossProduct(segments, 0, []), toReading),
-    reading => Number(losesAValue(reading, held()))
-  )
-  return keepLeast(noLoss, movesOf)
+  // A value determines its key (a field of the entry, or its whole content),
+  // so the values both sides hold split across keys and each key is judged
+  // alone.
+  const stretches = stretchesOf(groupSlots({ ancestor, local, other }, keys))
+  if (stretches.every(hasOneAlternative)) {
+    return [toReading(stretches.flatMap(stretch => stretch.alternatives[0]))]
+  }
+  return leastMovingReadings(withoutLosses(stretches))
 }

@@ -1,8 +1,20 @@
-import { describe, expect, it, vi } from 'vitest'
-import { readings } from '../../../../../src/merger/nodes/keyedReadings.js'
+import fc from 'fast-check'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+  type KeyCopies,
+  type Pairing,
+  readings,
+} from '../../../../../src/merger/nodes/keyedReadings.js'
 import { identify } from '../../../../../src/merger/nodes/ordered/identity.js'
 import type { Reading } from '../../../../../src/merger/nodes/ordered/orderedEntry.js'
-import { readingsOf } from '../../../../utils/orderedTokens.js'
+import * as reference from '../../../../utils/oracles/enumeratedIdentity.js'
+import {
+  caseArb,
+  IDENTITY,
+  IDENTITY_ANCESTORS,
+  IDENTITY_TOKENS,
+} from '../../../../utils/orderedCases.js'
+import { orderedSides, readingsOf } from '../../../../utils/orderedTokens.js'
 
 vi.mock(
   '../../../../../src/merger/nodes/keyedReadings.js',
@@ -28,6 +40,61 @@ const shapeOf = (reading: Reading): string =>
         `${e.key}@${placed(e.ancestorPos)},${placed(e.localPos)},${placed(e.otherPos)}`
     )
     .join(' ')
+
+const referenceReadings = (
+  sides: ReturnType<typeof orderedSides>
+): readonly Reading[] =>
+  reference.identify(sides.ancestor, sides.local, sides.other, sides.keys)
+
+const ENTRY_SIDES = ['ancestor', 'local', 'other'] as const
+
+const sameValueReferences = (
+  actual: readonly Reading[],
+  expected: readonly Reading[]
+): boolean =>
+  actual.every((reading, at) =>
+    reading.every((entry, id) =>
+      ENTRY_SIDES.every(side => entry[side] === expected[at][id][side])
+    )
+  )
+
+const CRAFTED_KEY = 'A'
+
+type Crafted = (copies: KeyCopies) => Generator<readonly Pairing[]>
+
+// Every other key keeps the real pairings
+const craftPairingsOfKeyA = async (crafted: Crafted): Promise<void> => {
+  const original = await vi.importActual<
+    typeof import('../../../../../src/merger/nodes/keyedReadings.js')
+  >('../../../../../src/merger/nodes/keyedReadings.js')
+  vi.mocked(readings).mockImplementation(copies =>
+    copies.ancestor[0]?.['fullName'] === CRAFTED_KEY
+      ? crafted(copies)
+      : original.readings(copies)
+  )
+}
+
+// Each pairing leaves the values both sides hold on entries of one side
+// only, so whichever one is picked, a value both sides hold is lost.
+function* losingPairings(copies: KeyCopies): Generator<readonly Pairing[]> {
+  const [first, second] = copies.ancestor
+  const [local] = copies.local
+  const [other] = copies.other
+  yield [{ ancestor: first, local }, { ancestor: second }, { other }]
+  yield [{ ancestor: first }, { ancestor: second, other }, { local }]
+}
+
+// The first pairing shares the value both sides hold, the second loses it.
+function* oneKeepingPairing(copies: KeyCopies): Generator<readonly Pairing[]> {
+  const [first, second] = copies.ancestor
+  const [local] = copies.local
+  const [other] = copies.other
+  yield [{ ancestor: first }, { ancestor: second, local, other }]
+  yield [
+    { ancestor: first, local },
+    { ancestor: second, other },
+  ]
+}
 
 describe('identify', () => {
   describe('given sides whose keys are unique', () => {
@@ -315,6 +382,107 @@ describe('identify', () => {
         'L@0,-,- M@1,2,0 M@2,-,- K@-,0,- K@-,1,-',
         'L@0,-,- M@1,-,- M@2,2,0 K@-,0,- K@-,1,-',
       ])
+    })
+  })
+
+  describe('given keyed and keyless repeated keys', () => {
+    describe('when identified', () => {
+      it('then the readings equal the enumerating reference, in order, values by reference', () => {
+        fc.assert(
+          fc.property(
+            caseArb(IDENTITY_ANCESTORS, IDENTITY, IDENTITY_TOKENS),
+            ([ancestor, local, other]) => {
+              // Arrange
+              const sides = orderedSides(
+                ancestor.join(' '),
+                local.join(' '),
+                other.join(' ')
+              )
+              const expected = referenceReadings(sides)
+
+              // Act
+              const sut = identify(
+                sides.ancestor,
+                sides.local,
+                sides.other,
+                sides.keys
+              )
+
+              // Assert
+              expect(sut).toStrictEqual(expected)
+              expect(sameValueReferences(sut, expected)).toBe(true)
+            }
+          )
+        )
+      })
+    })
+  })
+
+  describe('given an edited keyless copy beside its unedited twins', () => {
+    describe('when identified', () => {
+      it('then the readings equal the enumerating reference', () => {
+        // Arrange
+        const sides = orderedSides('~a ~a B', '~a* ~a B', '~a ~a B')
+        const expected = referenceReadings(sides)
+
+        // Act
+        const sut = identify(
+          sides.ancestor,
+          sides.local,
+          sides.other,
+          sides.keys
+        )
+
+        // Assert
+        expect(sut).toStrictEqual(expected)
+      })
+    })
+  })
+
+  describe('given crafted pairings for a key', () => {
+    afterEach(() => {
+      vi.mocked(readings).mockReset()
+    })
+
+    describe('when every pairing loses a value both sides hold', () => {
+      it('then the readings equal the reference, which keeps every pairing', async () => {
+        // Arrange
+        await craftPairingsOfKeyA(losingPairings)
+        const sides = orderedSides('A A B B', 'A* B B', 'A* B B')
+        const expected = referenceReadings(sides)
+
+        // Act
+        const sut = identify(
+          sides.ancestor,
+          sides.local,
+          sides.other,
+          sides.keys
+        )
+
+        // Assert
+        expect(sut).toStrictEqual(expected)
+      })
+    })
+
+    describe('when one pairing alone keeps every value both sides hold', () => {
+      it('then it is the one reading, equal to the reference', async () => {
+        // Arrange
+        await craftPairingsOfKeyA(oneKeepingPairing)
+        const sides = orderedSides('A A', 'A*', 'A*')
+        const expected = referenceReadings(sides)
+
+        // Act
+        const sut = identify(
+          sides.ancestor,
+          sides.local,
+          sides.other,
+          sides.keys
+        )
+
+        // Assert
+        expect(sut).toStrictEqual(expected)
+        expect(sut).toHaveLength(1)
+      })
     })
   })
 })
