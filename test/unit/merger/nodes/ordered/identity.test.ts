@@ -28,7 +28,14 @@ import {
   IDENTITY_ANCESTORS,
   IDENTITY_TOKENS,
   type Limits,
+  SMALL,
+  SMALL_ANCESTORS,
 } from '../../../../utils/orderedCases.js'
+import {
+  cutCaseArb,
+  LAYOUT_SHAPES,
+  layoutSides,
+} from '../../../../utils/orderedCuts.js'
 import { orderedSides, readingsOf } from '../../../../utils/orderedTokens.js'
 
 vi.mock(
@@ -60,6 +67,12 @@ const referenceReadings = (
   sides: ReturnType<typeof orderedSides>
 ): readonly Reading[] =>
   reference.identify(sides.ancestor, sides.local, sides.other, sides.keys)
+
+const identifiedFrom = (
+  sides: ReturnType<typeof orderedSides>
+): readonly Reading[] => [
+  ...identify(sides.ancestor, sides.local, sides.other, sides.keys),
+]
 
 const ENTRY_SIDES = ['ancestor', 'local', 'other'] as const
 
@@ -332,6 +345,17 @@ function* oneKeepingPairing(copies: KeyCopies): Generator<readonly Pairing[]> {
     { ancestor: second, other },
   ]
 }
+
+const LAYOUT_COPIES = [2, 3]
+const LAYOUT_GADGETS = [1, 2, 3, 4]
+
+const JOINED_CASES: readonly (readonly [string, fc.Arbitrary<Case>])[] = [
+  [
+    'repeated keyed and keyless keys',
+    cutCaseArb(IDENTITY_ANCESTORS, IDENTITY, IDENTITY_TOKENS),
+  ],
+  ['few repeated keys', cutCaseArb(SMALL_ANCESTORS, SMALL)],
+]
 
 describe('identify', () => {
   describe('given sides whose keys are unique', () => {
@@ -691,6 +715,57 @@ describe('identify', () => {
     })
   })
 
+  describe.each(
+    LAYOUT_SHAPES.flatMap(shape =>
+      LAYOUT_COPIES.flatMap(copies =>
+        LAYOUT_GADGETS.map(gadgets => [shape, copies, gadgets] as const)
+      )
+    )
+  )('given the %s layout at r = %i, m = %i', (shape, copies, gadgets) => {
+    describe('when identified', () => {
+      it('then the readings equal the enumerating reference, in order', () => {
+        // Arrange
+        const sides = layoutSides(shape, copies, gadgets)
+        const expected = referenceReadings(sides)
+
+        // Act
+        const sut = identifiedFrom(sides)
+
+        // Assert
+        expect(sut).toStrictEqual(expected)
+        expect(sameValueReferences(sut, expected)).toBe(true)
+      })
+    })
+  })
+
+  describe('given parts joined by unique keys', () => {
+    describe('when identified', () => {
+      it.each(JOINED_CASES)(
+        'then the readings of %s equal the enumerating reference, in order',
+        (_name, joinedCase) => {
+          fc.assert(
+            fc.property(joinedCase, ([ancestor, local, other]) => {
+              // Arrange
+              const sides = orderedSides(
+                ancestor.join(' '),
+                local.join(' '),
+                other.join(' ')
+              )
+              const expected = referenceReadings(sides)
+
+              // Act
+              const sut = identifiedFrom(sides)
+
+              // Assert
+              expect(sut).toStrictEqual(expected)
+              expect(sameValueReferences(sut, expected)).toBe(true)
+            })
+          )
+        }
+      )
+    })
+  })
+
   describe('given an edited keyless copy beside its unedited twins', () => {
     describe('when identified', () => {
       it('then the readings equal the enumerating reference', () => {
@@ -893,14 +968,11 @@ describe('identify', () => {
   })
 })
 
-const tiesOf = (
-  ancestor: string,
-  local: string,
-  other: string
-): IdentityTies => {
-  const sides = orderedSides(ancestor, local, other)
-  return identityTies(sides.ancestor, sides.local, sides.other, sides.keys)
-}
+const tiesOver = (sides: ReturnType<typeof orderedSides>): IdentityTies =>
+  identityTies(sides.ancestor, sides.local, sides.other, sides.keys)
+
+const tiesOf = (ancestor: string, local: string, other: string): IdentityTies =>
+  tiesOver(orderedSides(ancestor, local, other))
 
 describe('identityTies', () => {
   describe('given two repeated keys apart around a unique key', () => {
@@ -955,6 +1027,86 @@ describe('identityTies', () => {
         expect(result).toEqual(expected)
         expect([...sut.readings()]).toEqual(expected)
       })
+    })
+  })
+
+  describe('given the nocut-identical layout at r = 3, m = 3', () => {
+    describe('when exposing the tie set', () => {
+      it('then each repeated key is a component with three least tuples', () => {
+        // Arrange
+        const sides = layoutSides('nocut-identical', 3, 3)
+
+        // Act
+        const sut = tiesOver(sides)
+
+        // Assert
+        expect(sut.components.map(({ members }) => members)).toEqual([
+          [0],
+          [1],
+          [2],
+        ])
+        expect(sut.components.map(({ minimal }) => minimal.length)).toEqual([
+          3, 3, 3,
+        ])
+      })
+    })
+  })
+
+  describe('given the nocut-identical layout at r = 2, m = 2, keys with no entry between them', () => {
+    describe('when exposing the tie set', () => {
+      it('then the keys are two components', () => {
+        // Arrange
+        const sides = layoutSides('nocut-identical', 2, 2)
+
+        // Act
+        const sut = tiesOver(sides)
+
+        // Assert
+        expect(sut.components.map(({ members }) => members)).toEqual([[0], [1]])
+      })
+
+      it('then the readings equal the enumerating reference', () => {
+        // Arrange
+        const sides = layoutSides('nocut-identical', 2, 2)
+        const sut = tiesOver(sides)
+
+        // Act
+        const result = [...sut.readings()]
+
+        // Assert
+        expect(result).toStrictEqual(referenceReadings(sides))
+      })
+    })
+  })
+
+  describe('given the nocut-identical layout at r = 3, m = 7', () => {
+    // Every pairing of the one fused component took seconds; split where no
+    // point lies between the keys, each key is decided alone. The budget sits
+    // between the two so that CPU load and coverage instrumentation cannot
+    // push it over.
+    const COPIES = 3
+    const GADGETS = 7
+    const BUDGET_MS = 400
+    const GRID_TIMEOUT_MS = 120_000
+
+    describe('when exposing the tie set', () => {
+      it(
+        'then one component per key comes back within the budget',
+        () => {
+          // Arrange
+          const sides = layoutSides('nocut-identical', COPIES, GADGETS)
+          const start = performance.now()
+
+          // Act
+          const sut = tiesOver(sides)
+          const elapsed = performance.now() - start
+
+          // Assert
+          expect(sut.components).toHaveLength(GADGETS)
+          expect(elapsed).toBeLessThan(BUDGET_MS)
+        },
+        GRID_TIMEOUT_MS
+      )
     })
   })
 

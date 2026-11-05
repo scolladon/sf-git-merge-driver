@@ -496,6 +496,115 @@ describe('fewestMoves', () => {
   })
 })
 
+const SPLIT_PLANE = [
+  [alternative([[0, 0]]), alternative([[1, 0]])],
+  [alternative([[2, 1]]), alternative([[3, 1]])],
+]
+
+const CROSSING_PLANE = [
+  [alternative([[0, 1]]), alternative([[1, 1]])],
+  [alternative([[2, 0]]), alternative([[3, 0]])],
+]
+
+const SPLIT_ON_LOCAL_CROSSING_ON_OTHER = [
+  [alternative([[0, 0]], [[0, 1]]), alternative([[1, 0]], [[1, 1]])],
+  [alternative([[2, 1]], [[2, 0]]), alternative([[3, 1]], [[3, 0]])],
+]
+
+const ONE_COMPONENT = [
+  {
+    members: [0, 1],
+    minimal: [
+      [0, 0],
+      [0, 1],
+      [1, 0],
+      [1, 1],
+    ],
+  },
+]
+
+const membersAndMinima = (
+  stretches: readonly (readonly PointSet[])[]
+): readonly { members: readonly number[]; minimal: readonly Tuple[] }[] =>
+  tieComponents(stretches).map(({ members, minimal }) => ({
+    members,
+    minimal,
+  }))
+
+describe('tieComponents', () => {
+  describe('given two tied stretches whose points all lie below one another on both positions', () => {
+    describe('when taking their components', () => {
+      it('then each stretch is a component with both of its tuples', () => {
+        // Arrange
+        const sut = SPLIT_PLANE
+
+        // Act
+        const result = membersAndMinima(sut)
+
+        // Assert
+        expect(result).toEqual([
+          {
+            members: [0],
+            minimal: [[0], [1]],
+          },
+          {
+            members: [1],
+            minimal: [[0], [1]],
+          },
+        ])
+      })
+    })
+
+    describe('when walking every choice', () => {
+      it('then the tuples are the product in lexicographic order', () => {
+        // Arrange
+        const sut = SPLIT_PLANE
+
+        // Act
+        const result = [...fewestMoves(sut)]
+
+        // Assert
+        expect(result).toEqual([
+          [0, 0],
+          [0, 1],
+          [1, 0],
+          [1, 1],
+        ])
+      })
+    })
+  })
+
+  describe('given two tied stretches whose points cross on both positions', () => {
+    describe('when taking their components', () => {
+      it('then the stretches stay one component', () => {
+        // Arrange
+        const sut = CROSSING_PLANE
+
+        // Act
+        const result = membersAndMinima(sut)
+
+        // Assert
+        expect(result).toEqual(ONE_COMPONENT)
+      })
+    })
+  })
+
+  describe('given two tied stretches below one another on local and crossing on other', () => {
+    describe('when taking their components', () => {
+      it('then the other side keeps them one component', () => {
+        // Arrange
+        const sut = SPLIT_ON_LOCAL_CROSSING_ON_OTHER
+
+        // Act
+        const result = membersAndMinima(sut)
+
+        // Assert
+        expect(result).toEqual(ONE_COMPONENT)
+      })
+    })
+  })
+})
+
 describe('walkAround', () => {
   describe('given two tied stretches split by a fixed one', () => {
     const TWO_TIED_STRETCHES = [

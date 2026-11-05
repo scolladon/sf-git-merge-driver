@@ -28,6 +28,8 @@ const EDITED_COPIES = 2
 const EDITED_MARK = '*'
 const EDITED_LABEL = ' edited'
 const INDEXED_PREFIX = 'A#'
+const SEPARATOR_LABEL = 'u'
+const EDITED_SEPARATOR_LABEL = `${SEPARATOR_LABEL}${EDITED_LABEL}`
 
 const repeat = (token: string, count: number): Tokens =>
   Array.from({ length: count }, () => token)
@@ -107,19 +109,92 @@ const entryOf = (token: string, gadget: string): JsonObject => {
   return entry(`R${gadget}`, `R${gadget} c${copy}${mark}`)
 }
 
-const fenced = (tokens: Tokens, gadget: string): JsonArray => [
-  entry(`U${gadget}a`, 'u'),
-  ...tokens.map(token => entryOf(token, gadget)),
-  entry(`U${gadget}b`, 'u'),
+const opening = (gadget: string): JsonArray => [
+  entry(`U${gadget}a`, SEPARATOR_LABEL),
 ]
 
-const sideOf = (shaped: Shaped, side: Side, gadgets: number): JsonArray => {
+const closing = (gadget: string, label: string): JsonArray => [
+  entry(`U${gadget}b`, label),
+]
+
+const fenced = (tokens: Tokens, gadget: string): JsonArray => [
+  ...opening(gadget),
+  ...tokens.map(token => entryOf(token, gadget)),
+  ...closing(gadget, SEPARATOR_LABEL),
+]
+
+// The unique keys a layout writes around one gadget
+interface Joints {
+  readonly opening: JsonArray
+  readonly closing: JsonArray
+}
+
+type JointsOf = (side: Side, gadget: number, gadgets: number) => Joints
+
+type Layout =
+  | 'fenced'
+  | 'adjacent'
+  | 'editedClose'
+  | 'editedBetween'
+  | 'movedBetween'
+
+// Local edits the separator; the ancestor and other keep it
+const labelOn = (side: Side): string =>
+  side === 'local' ? EDITED_SEPARATOR_LABEL : SEPARATOR_LABEL
+
+// One separator after every gadget but the last
+const between = (gadget: number, gadgets: number, label: string): JsonArray =>
+  gadget === gadgets - 1 ? [] : closing(String(gadget), label)
+
+// Other writes each separator after the gadget that follows it
+const movedBack = (gadget: number): JsonArray =>
+  gadget === 0 ? [] : closing(String(gadget - 1), SEPARATOR_LABEL)
+
+const JOINTS: Readonly<Record<Layout, JointsOf>> = {
+  fenced: (_side, gadget) => ({
+    opening: opening(String(gadget)),
+    closing: closing(String(gadget), SEPARATOR_LABEL),
+  }),
+  adjacent: () => ({ opening: [], closing: [] }),
+  editedClose: (side, gadget) => ({
+    opening: opening(String(gadget)),
+    closing: closing(String(gadget), labelOn(side)),
+  }),
+  editedBetween: (side, gadget, gadgets) => ({
+    opening: [],
+    closing: between(gadget, gadgets, labelOn(side)),
+  }),
+  movedBetween: (side, gadget, gadgets) => ({
+    opening: [],
+    closing:
+      side === 'other'
+        ? movedBack(gadget)
+        : between(gadget, gadgets, SEPARATOR_LABEL),
+  }),
+}
+
+const gadgetBody = (
+  tokens: Tokens,
+  gadget: number,
+  joints: Joints
+): JsonArray => [
+  ...joints.opening,
+  ...tokens.map(token => entryOf(token, String(gadget))),
+  ...joints.closing,
+]
+
+const sideOf = (
+  shaped: Shaped,
+  side: Side,
+  gadgets: number,
+  layout: Layout
+): JsonArray => {
   const prefix =
     shaped.prefix === undefined
       ? []
       : fenced(shaped.prefix[side], PREFIX_GADGET)
   const body = Array.from({ length: gadgets }, (_, gadget) =>
-    fenced(shaped[side], String(gadget))
+    gadgetBody(shaped[side], gadget, JOINTS[layout](side, gadget, gadgets))
   ).flat()
   const tail = (shaped.tail?.[side] ?? []).map(token =>
     entryOf(token, TAIL_GADGET)
@@ -130,14 +205,13 @@ const sideOf = (shaped: Shaped, side: Side, gadgets: number): JsonArray => {
 const keysOf = (side: JsonArray): readonly string[] =>
   side.map(item => (item as JsonObject)['fullName'] as string)
 
-export const shapeSides = (
-  shape: Shape,
-  copies: number,
-  gadgets: number
+const sidesOf = (
+  shaped: Shaped,
+  gadgets: number,
+  layout: Layout
 ): OrderedSides => {
-  const shaped = SHAPED[shape](copies)
   const [ancestor, local, other] = SIDES.map(side =>
-    sideOf(shaped, side, gadgets)
+    sideOf(shaped, side, gadgets, layout)
   )
   return {
     ancestor,
@@ -149,6 +223,48 @@ export const shapeSides = (
       other: keysOf(other),
     },
   }
+}
+
+export const shapeSides = (
+  shape: Shape,
+  copies: number,
+  gadgets: number
+): OrderedSides => sidesOf(SHAPED[shape](copies), gadgets, 'fenced')
+
+type LayoutShape =
+  | 'nocut-identical'
+  | 'nocut-dropone'
+  | 'nocut-dropinsert'
+  | 'editedcut'
+  | 'editedcut-literal'
+  | 'movedcut'
+
+// A gadget of the grid and where its unique keys stand
+const LAYOUTS: Readonly<Record<LayoutShape, readonly [Shape, Layout]>> = {
+  'nocut-identical': ['identical', 'adjacent'],
+  'nocut-dropone': ['dropone', 'adjacent'],
+  'nocut-dropinsert': ['dropinsert', 'adjacent'],
+  editedcut: ['dropone', 'editedBetween'],
+  'editedcut-literal': ['dropone', 'editedClose'],
+  movedcut: ['dropone', 'movedBetween'],
+}
+
+export const LAYOUT_SHAPES: readonly LayoutShape[] = [
+  'nocut-identical',
+  'nocut-dropone',
+  'nocut-dropinsert',
+  'editedcut',
+  'editedcut-literal',
+  'movedcut',
+]
+
+export const layoutSides = (
+  name: LayoutShape,
+  copies: number,
+  gadgets: number
+): OrderedSides => {
+  const [shape, layout] = LAYOUTS[name]
+  return sidesOf(SHAPED[shape](copies), gadgets, layout)
 }
 
 const EDIT_SUFFIX = /[*+]+$/
@@ -174,39 +290,70 @@ const renamedCase = (names: Names, [ancestor, local, other]: Case): Case => {
   return [ancestor.map(rename), local.map(rename), other.map(rename)]
 }
 
-type NearMiss = 'none' | 'edited' | 'copied'
+// The key written between two parts: kept by every side, edited by one side,
+// edited alike or apart by both, copied past by one side, or absent
+type Join = 'kept' | 'edited' | 'alike' | 'apart' | 'copied' | 'absent'
 
-// Half the cases keep every cut
-const NEAR_MISSES: readonly NearMiss[] = ['none', 'none', 'edited', 'copied']
+// Two cases in seven join their parts with a key every side keeps unedited
+const JOINS: readonly Join[] = [
+  'kept',
+  'kept',
+  'edited',
+  'alike',
+  'apart',
+  'copied',
+  'absent',
+]
 
 const ANCESTOR = 0
 const LOCAL = 1
 const OTHER = 2
 
-// An edited cut no longer holds the same value on every side; a copy of an
-// earlier entry after the cut puts a key on both of its sides
-const cutTokens = (cut: number, before: Tokens, miss: NearMiss): Tokens => {
-  if (miss === 'edited') return [edited(`C${cut}`)]
-  if (miss === 'copied') return [`C${cut}`, ...before.slice(0, 1)]
-  return [`C${cut}`]
+// Local and other edit the key apart: each live side its own mark
+const APART_MARKS: readonly string[] = ['', '*', '+']
+
+type JoinTokens = (
+  cut: string,
+  before: Tokens,
+  side: number,
+  editedSide: number
+) => Tokens
+
+const JOIN_TOKENS: Readonly<Record<Join, JoinTokens>> = {
+  kept: cut => [cut],
+  edited: (cut, _before, side, editedSide) => [
+    side === editedSide ? edited(cut) : cut,
+  ],
+  alike: (cut, _before, side) => [side === ANCESTOR ? cut : edited(cut)],
+  apart: (cut, _before, side) => [`${cut}${APART_MARKS[side]}`],
+  copied: (cut, before, side, editedSide) =>
+    side === editedSide ? [cut, ...before.slice(0, 1)] : [cut],
+  absent: () => [],
 }
 
-const joinedSide = (sides: readonly Tokens[], miss: NearMiss): Tokens =>
+const joinedSide = (
+  sides: readonly Tokens[],
+  join: Join,
+  side: number,
+  editedSide: number
+): Tokens =>
   sides.flatMap((tokens, at) =>
     at === sides.length - 1
       ? tokens
-      : [...tokens, ...cutTokens(at, tokens, miss)]
+      : [...tokens, ...JOIN_TOKENS[join](`C${at}`, tokens, side, editedSide)]
   )
 
 const joinedCase = (
   parts: readonly Case[],
-  miss: NearMiss,
-  missedSide: number
+  join: Join,
+  editedSide: number
 ): Case => {
   const joined = (side: number): Tokens =>
     joinedSide(
       parts.map(part => part[side]),
-      side === missedSide ? miss : 'none'
+      join,
+      side,
+      editedSide
     )
   return [joined(ANCESTOR), joined(LOCAL), joined(OTHER)]
 }
@@ -222,13 +369,13 @@ export const cutCaseArb = (
         minLength: MIN_PARTS,
         maxLength: MAX_PARTS,
       }),
-      fc.constantFrom(...NEAR_MISSES),
+      fc.constantFrom(...JOINS),
       fc.constantFrom(LOCAL, OTHER)
     )
-    .map(([parts, miss, side]) =>
+    .map(([parts, join, side]) =>
       joinedCase(
         parts.map((part, at) => renamedCase(PART_NAMES[at], part)),
-        miss,
+        join,
         side
       )
     )

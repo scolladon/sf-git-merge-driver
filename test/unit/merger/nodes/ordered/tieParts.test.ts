@@ -226,7 +226,7 @@ describe('given a repeated key copied past the unique key on local', () => {
 
 describe('given no unique key between two repeated keys', () => {
   describe('when finding the tie parts', () => {
-    it('then the repeated keys share one part and no key is a cut', () => {
+    it('then the repeated keys are two components of one part and no key is a cut', () => {
       // Arrange
       const sides = ['A A B B', 'A B', 'A A B B Z'] as const
 
@@ -234,7 +234,7 @@ describe('given no unique key between two repeated keys', () => {
       const sut = partsOfTokens(...sides)
 
       // Assert
-      expect(sut.tied).toEqual([[0]])
+      expect(sut.tied).toEqual([[0, 1]])
       expect(sut.cutItems.size).toBe(0)
     })
   })

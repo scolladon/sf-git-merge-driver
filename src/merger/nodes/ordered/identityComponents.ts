@@ -20,7 +20,8 @@ interface Candidate extends Point {
   readonly fixed: boolean
 }
 
-// A candidate between two separators belongs to the gap they bound.
+// A candidate between two gap boundaries (separators or empty splits) belongs
+// to the gap they bound.
 interface Placed extends Candidate {
   readonly label: number
 }
@@ -98,6 +99,34 @@ const separatorTest = (
     candidate.fixed && aboveEarlier.has(candidate) && belowLater.has(candidate)
 }
 
+// The lowest position from each index on, +infinity past the end.
+const suffixMinima = (positions: readonly number[]): readonly number[] => {
+  const lowest = [...positions, Number.POSITIVE_INFINITY]
+  for (let at = positions.length - 1; at >= 0; at--) {
+    lowest[at] = Math.min(lowest[at], lowest[at + 1])
+  }
+  return lowest
+}
+
+// Where every candidate before lies below every candidate after on both
+// coordinates, the longest increasing runs add up across the boundary: the
+// plane splits there with no fixed point between.
+const emptySplits = (sorted: readonly Candidate[]): ReadonlySet<Candidate> => {
+  const lowestFrom = suffixMinima(sorted.map(({ position }) => position))
+  const splits = new Set<Candidate>()
+  let highest = Number.NEGATIVE_INFINITY
+  for (const [at, candidate] of sorted.entries()) {
+    const previous = sorted[at - 1]
+    const opens =
+      at > 0 &&
+      previous.ancestor < candidate.ancestor &&
+      highest < lowestFrom[at]
+    if (opens) splits.add(candidate)
+    highest = Math.max(highest, candidate.position)
+  }
+  return splits
+}
+
 const SIDE_COUNT = LIVE_SIDES.length
 
 // One label per gap of each side: a gap is shared by the keys whose moves it
@@ -111,9 +140,11 @@ const placedOn = (
 ): readonly Placed[] => {
   const sorted = candidatesOn(stretches, side)
   const isSeparator = separatorTest(sorted)
+  const splits = emptySplits(sorted)
   const placed: Placed[] = []
   let gap = 0
   for (const candidate of sorted) {
+    if (splits.has(candidate)) gap++
     if (isSeparator(candidate)) gap++
     else placed.push({ ...candidate, label: labelOf(side, gap) })
   }
@@ -377,8 +408,9 @@ class Walk {
 /**
  * Each group of stretches sharing a gap with its fewest-move choices, every tie
  * kept. The moves of a choice are the entries off the longest increasing run
- * of each live side. Fixed points that every other point lies on one side of
- * cut the plane into gaps: only the stretches sharing a gap trade moves.
+ * of each live side. Fixed points that every other point lies on one side of,
+ * and empty splits where every point before lies below every point after, cut
+ * the plane into gaps: only the stretches sharing a gap trade moves.
  */
 export const tieComponents = (
   stretches: readonly Alternatives[]
