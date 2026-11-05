@@ -595,7 +595,7 @@ The modules of `src/merger/nodes/ordered/`, in pipeline order, with the two help
 | `replacement.ts` (`orderingView`, `replacementRuns`, `phantomSwaps`) | Replacement runs and the ordering view where they stand at the place of what they replaced; contested runs; swaps of interchangeable copies |
 | `agreedReplacement.ts` (`withAgreedReplacements`) | An insertion both sides made in place of different entries: one entry whose place is ambiguous; it conflicts only when a kept entry lies between the two places |
 | `orderedContext.ts` (`buildOrderedContext`, `isExplicitNeighbour`) | Per-reading context: statuses, live sequences on the ordering view and as written, moved sets, shared neighbours |
-| `precedence.ts` (`orderOverlaps`, `tournament`, `cycleMarks`) | Pair rule over the shared entries, overlap seeds, cycles as strongly connected groups |
+| `precedence.ts` (`orderOverlaps`, `tournament`, `cycleMarks`) | Pair rule over the shared entries, overlap seeds, cycles as strongly connected groups; the tournament starts from local's order and corrects the pairs other flipped, pair by pair below `SCORE_SWEEP_FROM` entries other moved, by two three-coordinate dominance counts (`belowOnAll`, `../../tagOrder/dominance.ts`, O(K log² K)) from there |
 | `placement.ts` (`placeAgreedInsertions`) | Spine of shared entries with the entries both sides inserted in their slots |
 | `oneSidedPlacement.ts` (`placeOneSided`) | Slots for entries only one side holds, ordered by their inherited place where both sides have one; contradicted or shared slots become seeds |
 | `conflictSeeds.ts` (`ConflictSeeds`, `UnionFind`, `NO_MARKS`) | The seeds and joins the earlier steps raise |

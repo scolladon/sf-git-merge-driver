@@ -1,3 +1,4 @@
+import { belowOnAll } from '../../tagOrder/dominance.js'
 import type { ConflictMarks, Join } from './conflictSeeds.js'
 import type { OrderedContext } from './orderedContext.js'
 import type { LiveSide, OrderedEntry, Reading } from './orderedEntry.js'
@@ -62,7 +63,9 @@ const correction = (entry: OrderedEntry, rival: OrderedEntry): number => {
 }
 
 /** Starts from local's order and corrects the pairs other may have won. */
-const scoresOf = (ctx: OrderedContext): ReadonlyMap<number, number> => {
+export const pairScores = (
+  ctx: OrderedContext
+): ReadonlyMap<number, number> => {
   const kept = ctx.keptByAll
   const ranks = localRanks(kept)
   const movedByOther = kept.filter(entry => ctx.moved.other.has(entry.id))
@@ -77,6 +80,64 @@ const scoresOf = (ctx: OrderedContext): ReadonlyMap<number, number> => {
   }
   return new Map(kept.map(scoreOf))
 }
+
+const SAME_SIGN = 1
+const FLIPPED_SIGN = -1
+
+interface Coordinates {
+  readonly ancestor: Float64Array
+  readonly local: Float64Array
+  readonly other: Float64Array
+}
+
+// Float64Array: an entry a replacement inserted stands between two positions
+const coordinatesOf = (kept: Reading, sign: number): Coordinates => {
+  const coordinates = {
+    ancestor: new Float64Array(kept.length),
+    local: new Float64Array(kept.length),
+    other: new Float64Array(kept.length),
+  }
+  kept.forEach((entry, at) => {
+    coordinates.ancestor[at] = sign * entry.ancestorPos
+    coordinates.local[at] = sign * entry.localPos
+    coordinates.other[at] = sign * entry.otherPos
+  })
+  return coordinates
+}
+
+/**
+ * The same scores as `pairScores`, counted instead of corrected pair by pair.
+ * A rival lifts the entry when it stands before it on ancestor and local and
+ * after it on other, and lowers it when it stands after it on ancestor and
+ * local and before it on other. Two entries other did not move never differ
+ * on other, so counting over every kept entry changes nothing.
+ */
+export const sweepScores = (
+  ctx: OrderedContext
+): ReadonlyMap<number, number> => {
+  const kept = ctx.keptByAll
+  const same = coordinatesOf(kept, SAME_SIGN)
+  const flipped = coordinatesOf(kept, FLIPPED_SIGN)
+  const lifted = belowOnAll(same.ancestor, same.local, flipped.other)
+  const lowered = belowOnAll(flipped.ancestor, flipped.local, same.other)
+  const ranks = localRanks(kept)
+  const scoreAt = (entry: OrderedEntry, at: number): [number, number] => {
+    const start = kept.length - 1 - (ranks.get(entry.id) as number)
+    return [entry.id, start + lifted[at] - lowered[at]]
+  }
+  return new Map(kept.map(scoreAt))
+}
+
+// Below this many kept entries other moved, correcting pair by pair costs
+// less than the two dominance sweeps. Measured on unique-key arrays of 50 to
+// 4 000 entries: from 128 the sweeps are never more than 5 % slower.
+const SCORE_SWEEP_FROM = 128
+
+const movedByOtherCount = (ctx: OrderedContext): number =>
+  ctx.keptByAll.filter(entry => ctx.moved.other.has(entry.id)).length
+
+const scoresOf = (ctx: OrderedContext): ReadonlyMap<number, number> =>
+  movedByOtherCount(ctx) < SCORE_SWEEP_FROM ? pairScores(ctx) : sweepScores(ctx)
 
 /** A prefix beating everything after it closes a strongly connected group. */
 const closesGroup = (sum: number, size: number, total: number): boolean =>
