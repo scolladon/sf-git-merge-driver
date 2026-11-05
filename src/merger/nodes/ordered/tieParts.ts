@@ -74,26 +74,39 @@ const heldOnce = (
   )
 }
 
-const isUnchanged = (sides: OrderedSides, at: Places): boolean => {
+// The value keptByAllStatus renders without a nested merge: the changed side
+// when the other is unchanged, or the one value both sides changed it to.
+const takenValue = (
+  sides: OrderedSides,
+  at: Places
+): JsonObject | undefined => {
   const ancestor = sides.ancestor[at.ancestor]
-  return (
-    jsonIdentical(sides.local[at.local], ancestor) &&
-    jsonIdentical(sides.other[at.other], ancestor)
-  )
+  const local = sides.local[at.local] as JsonObject
+  if (jsonIdentical(local, ancestor)) return sides.other[at.other] as JsonObject
+  const other = sides.other[at.other]
+  return jsonIdentical(other, ancestor) || jsonIdentical(local, other)
+    ? local
+    : undefined
+}
+
+interface Cut {
+  readonly at: Places
+  readonly value: JsonObject
 }
 
 // A key held before the candidate on one side with a copy at or after it on
 // another reaches the copy: no such key may exist, whichever pair of sides.
-const cutsOf = (sides: OrderedSides): readonly Places[] => {
+const cutsOf = (sides: OrderedSides): readonly Cut[] => {
   const lasts = perSide(side => lastPlaces(sides.keys[side]))
   const reach = perSide(from =>
     perSide(to => reachBefore(sides.keys[from], lasts[to]))
   )
   const isReachedByNone = (at: Places): boolean =>
     SIDES.every(from => SIDES.every(to => reach[from][to][at[from]] < at[to]))
-  return heldOnce(sides.keys, lasts).filter(
-    at => isUnchanged(sides, at) && isReachedByNone(at)
-  )
+  return heldOnce(sides.keys, lasts).flatMap(at => {
+    const value = takenValue(sides, at)
+    return value !== undefined && isReachedByNone(at) ? [{ at, value }] : []
+  })
 }
 
 // Every key gets the number of cuts before its first copy on this side.
@@ -147,12 +160,11 @@ export const tiePartsOf = (
   attribute: string
 ): TieParts => {
   const cuts = cutsOf(sides)
+  const places = cuts.map(({ at }) => at)
   return {
-    tied: tiedOf(ties, partOfKeys(sides.keys, cuts)),
+    tied: tiedOf(ties, partOfKeys(sides.keys, places)),
     cutItems: new Set(
-      cuts.map(at =>
-        signatureOf({ [attribute]: sides.ancestor[at.ancestor] as JsonObject })
-      )
+      cuts.map(({ value }) => signatureOf({ [attribute]: value }))
     ),
   }
 }

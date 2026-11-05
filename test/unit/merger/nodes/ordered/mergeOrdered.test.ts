@@ -25,7 +25,11 @@ import {
   IDENTITY_ANCESTORS,
   IDENTITY_TOKENS,
 } from '../../../../utils/orderedCases.js'
-import { cutCaseArb, shapeSides } from '../../../../utils/orderedCuts.js'
+import {
+  cutCaseArb,
+  layoutSides,
+  shapeSides,
+} from '../../../../utils/orderedCuts.js'
 import {
   formatResult,
   ORDERED_ATTRIBUTE,
@@ -410,6 +414,15 @@ const aroundSeparator = (first: Case, second: Case): Case => [
   [...first[2], SEPARATOR_TOKEN, ...second[2]],
 ]
 
+const EDITED_SEPARATOR_TOKEN = `${SEPARATOR_TOKEN}*`
+
+// Local writes the separator edited; the ancestor and other keep it
+const aroundEditedSeparator = (first: Case, second: Case): Case => {
+  const [ancestor, , other] = aroundSeparator(first, second)
+  const local = [...first[1], EDITED_SEPARATOR_TOKEN, ...second[1]]
+  return [ancestor, local, other]
+}
+
 // The precondition of the concatenation law: the readings that survive the
 // swap count render one output, so that the case has no whole-array fallback
 const rendersOneOutput = (tokens: Case): boolean => {
@@ -480,6 +493,39 @@ describe('mergeOrderedArrays laws', () => {
         )
       })
     })
+
+    describe('when local edits the separator and each part renders one output', () => {
+      it("then the result is the two merges around local's separator", () => {
+        fc.assert(
+          fc.property(
+            caseArb(IDENTITY_ANCESTORS, IDENTITY, IDENTITY_TOKENS),
+            caseArb(IDENTITY_ANCESTORS, IDENTITY, IDENTITY_TOKENS),
+            (first, unrenamed) => {
+              // Arrange
+              const second = renamedCase(SECOND_KEYS, unrenamed)
+              fc.pre(rendersOneOutput(first) && rendersOneOutput(second))
+              const sut = mergeOrderedArrays
+              const merge = (tokens: Case) =>
+                sut(sidesOfCase(tokens), ORDERED_ATTRIBUTE, defaultConfig)
+              const [before, after] = [merge(first), merge(second)]
+
+              // Act
+              const result = merge(aroundEditedSeparator(first, second))
+
+              // Assert
+              expect(result.hasConflict).toBe(
+                before.hasConflict || after.hasConflict
+              )
+              expect(result.output).toEqual([
+                ...before.output,
+                { [ORDERED_ATTRIBUTE]: toEntry(EDITED_SEPARATOR_TOKEN) },
+                ...after.output,
+              ])
+            }
+          )
+        )
+      })
+    })
   })
 
   describe.each([2, 3, 4, 5])('given the grids at r = %i', copies => {
@@ -488,6 +534,38 @@ describe('mergeOrderedArrays laws', () => {
         it('then the result is the whole-array conflict', () => {
           // Arrange
           const sides = gridSides('identical', copies, keys)
+          const sut = mergeOrderedArrays
+
+          // Act
+          const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
+
+          // Assert
+          expect(result).toStrictEqual(wholeArrayConflict(sides))
+        })
+      })
+
+      describe('when merging the editedcut layout', () => {
+        it('then the result is the local side with the last entry of the other', () => {
+          // Arrange
+          const sides = layoutSides('editedcut', copies, keys)
+          const sut = mergeOrderedArrays
+
+          // Act
+          const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
+
+          // Assert
+          expect(result).toStrictEqual(
+            noConflict(
+              wrap([...sides.local, sides.other[sides.other.length - 1]])
+            )
+          )
+        })
+      })
+
+      describe('when merging the nocut-identical layout', () => {
+        it('then the result is the whole-array conflict', () => {
+          // Arrange
+          const sides = layoutSides('nocut-identical', copies, keys)
           const sut = mergeOrderedArrays
 
           // Act

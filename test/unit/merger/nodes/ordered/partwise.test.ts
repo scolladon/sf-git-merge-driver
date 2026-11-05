@@ -16,7 +16,7 @@ import {
   withConflict,
 } from '../../../../../src/types/mergeResult.js'
 import { mergeOrderedArrays as tieScanMerge } from '../../../../utils/oracles/tieScanMerge.js'
-import { shapeSides } from '../../../../utils/orderedCuts.js'
+import { layoutSides, shapeSides } from '../../../../utils/orderedCuts.js'
 import {
   formatResult,
   ORDERED_ATTRIBUTE,
@@ -75,6 +75,12 @@ const EXITS: readonly Exit[] = [
   {
     name: 'the dropone grid at r = 3, m = 3: every survivor renders alike',
     sides: () => shapeSides('dropone', 3, 3),
+    expected: sides => noConflict(wrap([...sides.local, lastOf(sides.other)])),
+    merges: 7,
+  },
+  {
+    name: 'the editedcut layout at r = 3, m = 3: every survivor renders alike',
+    sides: () => layoutSides('editedcut', 3, 3),
     expected: sides => noConflict(wrap([...sides.local, lastOf(sides.other)])),
     merges: 7,
   },
@@ -239,6 +245,48 @@ describe('given a part entry that carries the value of a cut under its own key',
   })
 })
 
+describe('given a part entry that carries the edited value of a cut under its own key', () => {
+  const editedCutValueUnderAnotherKey = (): OrderedSides => {
+    const grid = shapeSides('dropinsert', 2, 2)
+    const edited = { fullName: 'U0a', label: 'u edited' }
+    const local = grid.local.map((entry, at) =>
+      at === grid.keys.local.indexOf('U0a') ? edited : entry
+    )
+    const other = grid.other.map((entry, at) =>
+      at === grid.keys.other.indexOf('U0x') ? edited : entry
+    )
+    return { ...grid, local, other }
+  }
+
+  describe('when merging the tied parts', () => {
+    it('then the trimmed block is left to the stream', () => {
+      // Arrange
+      const { input } = inputOf(editedCutValueUnderAnotherKey())
+      const sut = mergePartwise
+
+      // Act
+      const result = sut(input)
+
+      // Assert
+      expect(result).toBeNull()
+    })
+  })
+
+  describe('when merging', () => {
+    it('then the result is the one the tie-scan merge builds', () => {
+      // Arrange
+      const sides = editedCutValueUnderAnotherKey()
+      const sut = mergeOrderedArrays
+
+      // Act
+      const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
+
+      // Assert
+      expect(result).toStrictEqual(oracleOf(sides))
+    })
+  })
+})
+
 describe('given one tied part', () => {
   describe('when merging', () => {
     it('then the result is the one the tie-scan merge builds', () => {
@@ -313,6 +361,39 @@ describe('given the dropinsert grid at r = 3, m = 9', () => {
 
         // Assert
         expect(result.hasConflict).toBe(true)
+        expect(elapsed).toBeLessThan(BUDGET_MS)
+      },
+      GRID_TIMEOUT_MS
+    )
+  })
+})
+
+describe('given the editedcut layout at r = 3, m = 9', () => {
+  // 3^9 tied readings take seconds; the partwise merge needs 19. The budget
+  // sits between the two so that CPU load and coverage instrumentation cannot
+  // push the merge over it.
+  const COPIES = 3
+  const GADGETS = 9
+  const BUDGET_MS = 400
+  const GRID_TIMEOUT_MS = 120_000
+
+  describe('when merging', () => {
+    it(
+      'then the one output comes back within the budget',
+      () => {
+        // Arrange
+        const sides = layoutSides('editedcut', COPIES, GADGETS)
+        const sut = mergeOrderedArrays
+        const start = performance.now()
+
+        // Act
+        const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
+        const elapsed = performance.now() - start
+
+        // Assert
+        expect(result).toStrictEqual(
+          noConflict(wrap([...sides.local, lastOf(sides.other)]))
+        )
         expect(elapsed).toBeLessThan(BUDGET_MS)
       },
       GRID_TIMEOUT_MS

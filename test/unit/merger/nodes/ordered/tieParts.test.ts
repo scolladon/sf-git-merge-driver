@@ -26,13 +26,29 @@ const TWO_LEAST_TUPLES = 2
 const placesOf = (keys: SideKeys, key: string): readonly number[] =>
   keys.flatMap((candidate, at) => (candidate === key ? [at] : []))
 
-const isHeldOnceAndAlike = (sides: OrderedSides, key: string): boolean => {
+const valuesOf = (
+  sides: OrderedSides,
+  key: string
+): readonly JsonObject[] | undefined => {
   const places = SIDE_NAMES.map(side => placesOf(sides.keys[side], key))
-  if (!places.every(held => held.length === 1)) return false
-  const [ancestor, local, other] = SIDE_NAMES.map(
-    (side, at) => sides[side][places[at][0]]
-  )
-  return jsonIdentical(ancestor, local) && jsonIdentical(ancestor, other)
+  if (!places.every(held => held.length === 1)) return undefined
+  return SIDE_NAMES.map((side, at) => sides[side][places[at][0]] as JsonObject)
+}
+
+// The value the merge keeps for a key held once: the changed side when the
+// other is unchanged, the shared value when both changed alike, none when they
+// changed it apart.
+const keptValueOf = (
+  sides: OrderedSides,
+  key: string
+): JsonObject | undefined => {
+  const values = valuesOf(sides, key)
+  if (values === undefined) return undefined
+  const [ancestor, local, other] = values
+  if (jsonIdentical(local, ancestor)) return other
+  return jsonIdentical(other, ancestor) || jsonIdentical(local, other)
+    ? local
+    : undefined
 }
 
 const allKeys = (sides: OrderedSides): readonly string[] => [
@@ -53,7 +69,7 @@ const sidesOfCopies = (
   )
 
 const isCutByDefinition = (sides: OrderedSides, key: string): boolean =>
-  isHeldOnceAndAlike(sides, key) &&
+  keptValueOf(sides, key) !== undefined &&
   allKeys(sides)
     .filter(other => other !== key)
     .every(other => sidesOfCopies(sides, key, other).size <= 1)
@@ -106,7 +122,7 @@ describe('given generated sides with and without cuts', () => {
           const sides = sidesOfCase(tokens)
           const expected = new Set(
             cutKeysByDefinition(sides).map(key =>
-              cutItemOf(sides.ancestor[sides.keys.ancestor.indexOf(key)])
+              cutItemOf(keptValueOf(sides, key))
             )
           )
 
@@ -192,11 +208,63 @@ describe('given two repeated keys around a unique key', () => {
   })
 })
 
+const CUT_C_EDITED = signatureOf({
+  [ORDERED_ATTRIBUTE]: { fullName: 'C', label: 'C*' },
+})
+
 describe('given the unique key edited by local', () => {
+  describe('when finding the tie parts', () => {
+    it("then each repeated key is a tied part and the edited key is the cut, with local's value", () => {
+      // Arrange
+      const sides = ['A A C B B', 'A C* B', 'A A C B B Z'] as const
+
+      // Act
+      const sut = partsOfTokens(...sides)
+
+      // Assert
+      expect(sut.tied).toEqual([[0], [1]])
+      expect(sut.cutItems).toEqual(new Set([CUT_C_EDITED]))
+    })
+  })
+})
+
+describe('given the unique key edited alike by both sides', () => {
+  describe('when finding the tie parts', () => {
+    it('then each repeated key is a tied part and the edited key is the cut', () => {
+      // Arrange
+      const sides = ['A A C B B', 'A C* B', 'A A C* B B Z'] as const
+
+      // Act
+      const sut = partsOfTokens(...sides)
+
+      // Assert
+      expect(sut.tied).toEqual([[0], [1]])
+      expect(sut.cutItems).toEqual(new Set([CUT_C_EDITED]))
+    })
+  })
+})
+
+describe('given the unique key edited apart by both sides', () => {
   describe('when finding the tie parts', () => {
     it('then both repeated keys share one part and no key is a cut', () => {
       // Arrange
-      const sides = ['A A C B B', 'A C* B', 'A A C B B Z'] as const
+      const sides = ['A A C B B', 'A C* B', 'A A C+ B B Z'] as const
+
+      // Act
+      const sut = partsOfTokens(...sides)
+
+      // Assert
+      expect(sut.tied).toEqual([[0, 1]])
+      expect(sut.cutItems.size).toBe(0)
+    })
+  })
+})
+
+describe('given a key one side inserts on both sides of an unchanged unique key', () => {
+  describe('when finding the tie parts', () => {
+    it('then no key is a cut', () => {
+      // Arrange
+      const sides = ['P b b Q', 'a P a b Q', 'P b b Q a'] as const
 
       // Act
       const sut = partsOfTokens(...sides)
@@ -282,7 +350,7 @@ describe('given the unique key held twice on local', () => {
 
 describe('given the unique key listing its fields in another order on other', () => {
   describe('when finding the tie parts', () => {
-    it('then the key is not a cut', () => {
+    it("then the key is a cut whose item is other's value", () => {
       // Arrange
       const sides = orderedSides('A A C B B', 'A C B', 'A A C B B Z')
       const reordered: OrderedSides = {
@@ -302,7 +370,8 @@ describe('given the unique key listing its fields in another order on other', ()
       const sut = tiePartsOf(reordered, ties, ORDERED_ATTRIBUTE)
 
       // Assert
-      expect(sut.cutItems.size).toBe(0)
+      expect(sut.tied).toEqual([[0], [1]])
+      expect(sut.cutItems).toEqual(new Set([CUT_C]))
     })
   })
 })

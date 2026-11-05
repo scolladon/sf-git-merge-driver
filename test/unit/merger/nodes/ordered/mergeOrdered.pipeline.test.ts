@@ -19,6 +19,8 @@ import {
 } from '../../../../utils/orderedCases.js'
 import {
   cutCaseArb,
+  LAYOUT_SHAPES,
+  layoutSides,
   SHAPES,
   shapeSides,
 } from '../../../../utils/orderedCuts.js'
@@ -108,7 +110,7 @@ describe('given generated token sides', () => {
   })
 })
 
-describe('given generated token sides cut by unchanged unique keys', () => {
+describe('given generated token sides joined by unique keys', () => {
   describe('when merged', () => {
     it.each([
       [
@@ -117,11 +119,11 @@ describe('given generated token sides cut by unchanged unique keys', () => {
       ],
       ['few repeated keys', caseArb(SMALL_ANCESTORS, SMALL)],
       [
-        'parts cut by unchanged unique keys',
+        'parts joined by unique keys',
         cutCaseArb(IDENTITY_ANCESTORS, IDENTITY, IDENTITY_TOKENS),
       ],
       [
-        'parts of few repeated keys cut by unchanged unique keys',
+        'parts of few repeated keys joined by unique keys',
         cutCaseArb(SMALL_ANCESTORS, SMALL),
       ],
     ])('then the result equals the tie-scan merge of %s', (_name, cases) => {
@@ -159,6 +161,30 @@ describe.each(
     it('then the result equals the tie-scan merge', () => {
       // Arrange
       const sides = shapeSides(shape, copies, gadgets)
+      const expected = tieScanMerge(sides, ORDERED_ATTRIBUTE, defaultConfig)
+
+      const sut = mergeOrderedArrays
+
+      // Act
+      const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
+
+      // Assert
+      expect(result).toStrictEqual(expected)
+    })
+  })
+})
+
+describe.each(
+  LAYOUT_SHAPES.flatMap(layout =>
+    GRID_COPIES.flatMap(copies =>
+      GRID_GADGETS.map(gadgets => [layout, copies, gadgets] as const)
+    )
+  )
+)('given the %s layout at r = %i, m = %i', (layout, copies, gadgets) => {
+  describe('when merged', () => {
+    it('then the result equals the tie-scan merge', () => {
+      // Arrange
+      const sides = layoutSides(layout, copies, gadgets)
       const expected = tieScanMerge(sides, ORDERED_ATTRIBUTE, defaultConfig)
 
       const sut = mergeOrderedArrays
@@ -289,7 +315,7 @@ describe('given the tie-scan merge wired in', () => {
     vi.doUnmock('../../../../../src/merger/nodes/ordered/mergeOrdered.js')
   })
 
-  describe('when token sides cut by unchanged unique keys are merged', () => {
+  describe('when token sides joined by unique keys are merged', () => {
     it('then output, conflict and rendering are identical', async () => {
       await fc.assert(
         fc.asyncProperty(
