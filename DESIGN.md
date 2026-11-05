@@ -524,7 +524,7 @@ Exhaustive tests enumerate the whole input space of a small alphabet instead of 
 
 ### Algorithm Overview
 
-`mergeOrderedArrays` (`src/merger/nodes/ordered/mergeOrdered.ts`) runs this pipeline once per identity reading and compares the outputs:
+`mergeOrderedArrays` (`src/merger/nodes/ordered/mergeOrdered.ts`) runs this pipeline once per identity reading, in the order `identify` yields them, and compares the outputs. No reading has fewer than zero phantom swaps, so once two zero-swap readings render different outputs and a zero-swap reading conflicts, the result is the whole-array conflict: it is returned at once and the remaining readings are never built. A tie set whose fewest-swap readings all render one output, never conflict, or all swap copies is still merged reading by reading, at a cost exponential in the number of repeated keys: that bound is known, uncapped, and not collapsed yet:
 
 ```mermaid
 flowchart TD
@@ -589,8 +589,8 @@ The modules of `src/merger/nodes/ordered/`, in pipeline order, with the two help
 | Module | Purpose |
 |--------|---------|
 | `orderedEntry.ts` (`OrderedEntry`, `LiveSide`, `positionOn`, `valueOn`) | One identity with its ancestor, local and other values and positions |
-| `identity.ts` (`identify`) | Groups each side by key, builds every key's identity readings, keeps each key's no-loss readings (all of every key's readings when one key cannot avoid a loss), then the fewest moves per component of the keys the separators leave interleaved (`identityComponents.ts`), returning the same readings in the same order as their cross product |
-| `identityComponents.ts` (`fewestMoves`) | Separators (fixed entries every other candidate pairing lies below or above on both positions), the gaps between them, the components of keys sharing a gap, and each component's fewest-move pairings with every tie kept |
+| `identity.ts` (`identify`) | Groups each side by key, builds every key's identity readings, keeps each key's no-loss readings (all of every key's readings when one key cannot avoid a loss), then the fewest moves per component of the keys the separators leave interleaved (`identityComponents.ts`), yielding the same readings in the same order as their cross product, each built only when the merge asks for the next one |
+| `identityComponents.ts` (`fewestMoves`) | Separators (fixed entries every other candidate pairing lies below or above on both positions), the gaps between them, the components of keys sharing a gap, and each component's fewest-move pairings with every tie kept, walked with an explicit stack (one level per stretch left more than one value) and yielded in lexicographic order |
 | `content.ts` (`entryStatuses`) | Per-entry status: clean, gone, presence conflict (delete vs modify, delete vs move), content conflict; fields merge through the orchestrator |
 | `orderAxis.ts` (`notInEveryLis`, `possiblyMoved`, `isKeptByAll`) | Order axis: an entry is moved unless every longest common subsequence keeps it |
 | `replacement.ts` (`orderingView`, `replacementRuns`, `phantomSwaps`) | Replacement runs and the ordering view where they stand at the place of what they replaced; contested runs; swaps of interchangeable copies |
@@ -604,7 +604,7 @@ The modules of `src/merger/nodes/ordered/`, in pipeline order, with the two help
 | `blockClosure.ts` (`BlockClosure`) | Grows seeds into blocks over the output, local and other spans |
 | `blockBase.ts` (`attachDeletions`) | Attaches deleted entries to the block whose region they bracket |
 | `blocks.ts` (`buildBlocks`) | Trims common ends, builds each block's slices and ancestor base |
-| `mergeOrdered.ts` (`mergeOrderedArrays`, `mergeReading`) | Entry point: whole-side shortcut, one pass per reading, the readings with the fewest phantom swaps, reading comparison, whole-array conflict |
+| `mergeOrdered.ts` (`mergeOrderedArrays`, `mergeReading`) | Entry point: whole-side shortcut, one pass per reading in stream order, the whole-array conflict as soon as two zero-swap readings differ and one conflicts, otherwise the readings with the fewest phantom swaps, reading comparison, whole-array conflict |
 | `../keyedReadings.ts` (`groupByKey`, `matchings`, `readings`) | Identity readings of a repeated key, shared with the unordered strategy |
 | `../elementPresence.ts` (`mergeElementPresence`) | Presence axis of one element: one-sided presence is verbatim, delete vs modify is one block, shared by keyed entries and pure objects |
 

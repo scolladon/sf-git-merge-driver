@@ -150,6 +150,11 @@ export interface MergedReading extends MergeResult {
   readonly phantomSwaps: () => number
 }
 
+const once = (count: () => number): (() => number) => {
+  let counted: number | undefined
+  return () => (counted ??= count())
+}
+
 const settledStatuses = (
   reading: Reading,
   attribute: string,
@@ -202,7 +207,7 @@ export const mergeReading = (
   const ordering = orderingView(reading, statuses)
   const ctx = buildOrderedContext(reading, statuses, ordering)
   const { output, seeds } = placeEntries(ctx, ordering, ambiguity)
-  const swaps = () => phantomSwaps(ordering.view, statuses)
+  const swaps = once(() => phantomSwaps(ordering.view, statuses))
   if (!seeds.hasSeeds()) {
     return { ...renderClean(ctx, output), phantomSwaps: swaps }
   }
@@ -288,6 +293,44 @@ const fewestPhantomSwaps = (
   return merged.filter((_, index) => swaps[index] === least).map(asResult)
 }
 
+// No reading has fewer than zero swaps: once one has none, the readings with
+// none are exactly those fewestPhantomSwaps keeps, whatever comes later.
+class TieScan {
+  private readonly merged: MergedReading[] = []
+  private first: JsonArray | undefined
+  private differs = false
+  private conflicts = false
+
+  add(reading: MergedReading): void {
+    this.merged.push(reading)
+    // A lone reading is never measured, as fewestPhantomSwaps leaves it.
+    if (this.merged.length === 2) this.see(this.merged[0])
+    if (this.merged.length >= 2) this.see(reading)
+  }
+
+  // combineReadings would build the block of the whole array, which reads the
+  // sides only.
+  isWholeConflict(): boolean {
+    return this.differs && this.conflicts
+  }
+
+  readings(): readonly MergedReading[] {
+    return this.merged
+  }
+
+  private see(reading: MergedReading): void {
+    if (reading.phantomSwaps() !== 0) return
+    this.conflicts ||= reading.hasConflict
+    if (this.first === undefined) this.first = reading.output
+    else this.differs ||= !jsonIdentical(reading.output, this.first)
+  }
+}
+
+const wholeConflict = (wrapped: Wrapped): MergeResult =>
+  withConflict([
+    buildConflictMarkers(wrapped.local, wrapped.ancestor, wrapped.other),
+  ])
+
 const combineReadings = (
   wrapped: Wrapped,
   results: readonly MergeResult[]
@@ -295,11 +338,7 @@ const combineReadings = (
   const [first] = results as [MergeResult]
   if (results.every(result => jsonIdentical(result.output, first.output)))
     return first
-  if (results.some(result => result.hasConflict)) {
-    return withConflict([
-      buildConflictMarkers(wrapped.local, wrapped.ancestor, wrapped.other),
-    ])
-  }
+  if (results.some(result => result.hasConflict)) return wholeConflict(wrapped)
   return trimmedBlock(
     wrapped,
     results.map(result => result.output)
@@ -314,12 +353,12 @@ export const mergeOrderedArrays = (
   const whole = takeWholeSide(sides, attribute)
   // Stryker disable next-line ConditionalExpression: shortcut of the general path: a merge takes the changed side whole (doctrine.test.ts)
   if (whole !== null) return whole
-  const merged = Array.from(
-    identify(sides.ancestor, sides.local, sides.other, sides.keys),
-    reading => mergeReading(reading, attribute, config)
-  )
-  return combineReadings(
-    wrapSides(sides, attribute),
-    fewestPhantomSwaps(merged)
-  )
+  const wrapped = wrapSides(sides, attribute)
+  const scan = new TieScan()
+  const { ancestor, local, other, keys } = sides
+  for (const reading of identify(ancestor, local, other, keys)) {
+    scan.add(mergeReading(reading, attribute, config))
+    if (scan.isWholeConflict()) return wholeConflict(wrapped)
+  }
+  return combineReadings(wrapped, fewestPhantomSwaps(scan.readings()))
 }
