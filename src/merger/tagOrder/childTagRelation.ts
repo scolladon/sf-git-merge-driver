@@ -62,8 +62,11 @@ export const pairStanding = (positions: SharedPositions): Standing => {
   return { before, after }
 }
 
-const negated = (values: ArrayLike<number>): Int32Array =>
-  Int32Array.from(values, value => -value)
+const negated = (values: ArrayLike<number>): Int32Array => {
+  const result = new Int32Array(values.length)
+  for (let at = 0; at < values.length; at++) result[at] = -values[at]
+  return result
+}
 
 // The pairs the sides agree on: a tag is below another on both sides.
 const agreedStanding = (

@@ -1,14 +1,23 @@
 import fc from 'fast-check'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 import {
   orderedComponents,
   pairStanding,
   type SharedPositions,
   sweepStanding,
 } from '../../../../src/merger/tagOrder/childTagRelation.js'
+import { mergePropertyOrder } from '../../../../src/merger/tagOrder/mergePropertyOrder.js'
 import { ABSENT } from '../../../../src/merger/tagOrder/tagPositions.js'
+import {
+  orderedComponents as referenceOrderedComponents,
+  sweepStanding as referenceSweepStanding,
+} from '../../../utils/oracles/comparatorDominance.js'
 
 const MAX_TAGS = 150
+// The merge takes the sweeps from 64 shared tags
+const SWEEP_TAGS_MIN = 64
+const SWEEP_TAGS_MAX = 300
+const SPARE_TAGS = 16
 
 const range = (size: number): number[] =>
   Array.from({ length: size }, (_, at) => at)
@@ -36,6 +45,29 @@ const positionsArb: fc.Arbitrary<SharedPositions> = fc
     })
   )
 
+// Letters first: integer-like keys reorder in JS objects
+const tagName = (at: number): string => `T${String(at).padStart(5, '0')}`
+
+const bodyOf = (tags: readonly string[]) =>
+  Object.fromEntries(tags.map(tag => [tag, 'v']))
+
+const bodiesArb = fc
+  .integer({ min: SWEEP_TAGS_MIN, max: SWEEP_TAGS_MAX })
+  .chain(size => {
+    const pool = Array.from({ length: size + SPARE_TAGS }, (_, at) =>
+      tagName(at)
+    )
+    const sideArb = fc.shuffledSubarray(pool, { minLength: SWEEP_TAGS_MIN })
+    return fc.record({
+      ancestor: fc.shuffledSubarray(pool.slice(0, size), {
+        minLength: size,
+        maxLength: size,
+      }),
+      local: sideArb,
+      other: sideArb,
+    })
+  })
+
 describe('childTagRelation', () => {
   describe('given the positions of the tags both live sides carry', () => {
     it('when standing is counted by sweeps then it matches the count pair by pair', () => {
@@ -49,6 +81,78 @@ describe('childTagRelation', () => {
 
           // Assert
           expect(sut).toEqual(expected)
+        })
+      )
+    })
+
+    it('when standing is counted by sweeps then it equals the comparator-sort reference', () => {
+      fc.assert(
+        fc.property(positionsArb, positions => {
+          // Arrange
+          const expected = referenceSweepStanding(positions)
+
+          // Act
+          const sut = sweepStanding(positions)
+
+          // Assert
+          expect(sut).toEqual(expected)
+        })
+      )
+    })
+
+    it('when ordering the components then they equal the reference', () => {
+      fc.assert(
+        fc.property(positionsArb, positions => {
+          // Arrange
+          const expected = referenceOrderedComponents(positions)
+
+          // Act
+          const sut = orderedComponents(positions)
+
+          // Assert
+          expect(sut).toEqual(expected)
+        })
+      )
+    })
+  })
+
+  describe('given bodies of 64 to 300 child tags', () => {
+    let reference: typeof import('../../../../src/merger/tagOrder/mergePropertyOrder.js')
+    beforeAll(async () => {
+      vi.resetModules()
+      vi.doMock(
+        '../../../../src/merger/tagOrder/childTagRelation.js',
+        () => import('../../../utils/oracles/comparatorDominance.js')
+      )
+      reference = await import(
+        '../../../../src/merger/tagOrder/mergePropertyOrder.js'
+      )
+      vi.doUnmock('../../../../src/merger/tagOrder/childTagRelation.js')
+    })
+
+    it('when merging their order with the reference wired in then the order and the blocks are identical', () => {
+      fc.assert(
+        fc.property(bodiesArb, ({ ancestor, local, other }) => {
+          // Arrange
+          const [ancestorBody, localBody, otherBody] = [
+            ancestor,
+            local,
+            other,
+          ].map(bodyOf)
+          const expected = reference.mergePropertyOrder(
+            ancestorBody,
+            localBody,
+            otherBody
+          )
+
+          // Act
+          const sut = mergePropertyOrder(ancestorBody, localBody, otherBody)
+
+          // Assert
+          expect(sut.order).toEqual(expected.order)
+          expect([...sut.blocks.entries()]).toEqual([
+            ...expected.blocks.entries(),
+          ])
         })
       )
     })
