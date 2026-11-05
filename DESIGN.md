@@ -604,7 +604,8 @@ The modules of `src/merger/nodes/ordered/`, in pipeline order, with the two help
 | `blockClosure.ts` (`BlockClosure`) | Grows seeds into blocks over the output, local and other spans |
 | `blockBase.ts` (`attachDeletions`) | Attaches deleted entries to the block whose region they bracket |
 | `blocks.ts` (`buildBlocks`) | Trims common ends, builds each block's slices and ancestor base |
-| `mergeOrdered.ts` (`mergeOrderedArrays`, `mergeReading`) | Entry point: whole-side shortcut, one pass per reading in stream order, the whole-array conflict as soon as two zero-swap readings differ and one conflicts, otherwise the readings with the fewest phantom swaps, reading comparison, whole-array conflict |
+| `mergeOrdered.ts` (`mergeOrderedArrays`, `mergeReading`) | Entry point: whole-side shortcut, one pass per reading in stream order, then the merged readings compared (`tieCombination.ts`) |
+| `tieCombination.ts` (`TieScan`, `combineReadings`) | Merged readings compared: the whole-array conflict as soon as two zero-swap readings differ and one conflicts, otherwise the readings with the fewest phantom swaps, then one output, the whole-array conflict, or one block trimmed to the ends every output and both sides share |
 | `../keyedReadings.ts` (`groupByKey`, `matchings`, `readings`) | Identity readings of a repeated key, shared with the unordered strategy |
 | `../elementPresence.ts` (`mergeElementPresence`) | Presence axis of one element: one-sided presence is verbatim, delete vs modify is one block, shared by keyed entries and pure objects |
 

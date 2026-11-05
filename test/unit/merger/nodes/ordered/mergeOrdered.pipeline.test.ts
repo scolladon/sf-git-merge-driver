@@ -8,6 +8,7 @@ import type {
   JsonObject,
 } from '../../../../../src/types/jsonTypes.js'
 import { mergeOrderedArrays as referenceMerge } from '../../../../utils/oracles/perReadingMerge.js'
+import { mergeOrderedArrays as tieScanMerge } from '../../../../utils/oracles/tieScanMerge.js'
 import {
   caseArb,
   IDENTITY,
@@ -16,6 +17,11 @@ import {
   SMALL,
   SMALL_ANCESTORS,
 } from '../../../../utils/orderedCases.js'
+import {
+  cutCaseArb,
+  SHAPES,
+  shapeSides,
+} from '../../../../utils/orderedCuts.js'
 import {
   ORDERED_ATTRIBUTE,
   orderedSides,
@@ -61,6 +67,10 @@ const sidesOf = (
   fc.tuple(sideOf(pool), sideOf(pool), sideOf(pool))
 
 const referenceSpy = vi.fn(referenceMerge)
+const tieScanSpy = vi.fn(tieScanMerge)
+
+const GRID_COPIES = [2, 3]
+const GRID_GADGETS = [1, 2, 3, 4]
 
 describe('given generated token sides', () => {
   describe('when merged', () => {
@@ -94,6 +104,70 @@ describe('given generated token sides', () => {
           expect(result).toStrictEqual(expected)
         })
       )
+    })
+  })
+})
+
+describe('given generated token sides cut by unchanged unique keys', () => {
+  describe('when merged', () => {
+    it.each([
+      [
+        'repeated keyed and keyless keys',
+        caseArb(IDENTITY_ANCESTORS, IDENTITY, IDENTITY_TOKENS),
+      ],
+      ['few repeated keys', caseArb(SMALL_ANCESTORS, SMALL)],
+      [
+        'parts cut by unchanged unique keys',
+        cutCaseArb(IDENTITY_ANCESTORS, IDENTITY, IDENTITY_TOKENS),
+      ],
+      [
+        'parts of few repeated keys cut by unchanged unique keys',
+        cutCaseArb(SMALL_ANCESTORS, SMALL),
+      ],
+    ])('then the result equals the tie-scan merge of %s', (_name, cases) => {
+      fc.assert(
+        fc.property(cases, ([ancestor, local, other]) => {
+          // Arrange
+          const sides = orderedSides(
+            ancestor.join(' '),
+            local.join(' '),
+            other.join(' ')
+          )
+          const expected = tieScanMerge(sides, ORDERED_ATTRIBUTE, defaultConfig)
+
+          const sut = mergeOrderedArrays
+
+          // Act
+          const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
+
+          // Assert
+          expect(result).toStrictEqual(expected)
+        })
+      )
+    })
+  })
+})
+
+describe.each(
+  SHAPES.flatMap(shape =>
+    GRID_COPIES.flatMap(copies =>
+      GRID_GADGETS.map(gadgets => [shape, copies, gadgets] as const)
+    )
+  )
+)('given the %s grid at r = %i, m = %i', (shape, copies, gadgets) => {
+  describe('when merged', () => {
+    it('then the result equals the tie-scan merge', () => {
+      // Arrange
+      const sides = shapeSides(shape, copies, gadgets)
+      const expected = tieScanMerge(sides, ORDERED_ATTRIBUTE, defaultConfig)
+
+      const sut = mergeOrderedArrays
+
+      // Act
+      const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
+
+      // Assert
+      expect(result).toStrictEqual(expected)
     })
   })
 })
@@ -197,6 +271,49 @@ describe('given the per-reading merge wired in', () => {
         })
       )
       expect(referenceSpy).toHaveBeenCalled()
+    })
+  })
+})
+
+describe('given the tie-scan merge wired in', () => {
+  let reference: typeof import('../../laws/arbitraries.js')
+  beforeAll(async () => {
+    vi.resetModules()
+    // A factory importing the reference never resolves: the reference waits on
+    // the cycle through MergeNodeFactory that this very factory stands in for
+    vi.doMock(
+      '../../../../../src/merger/nodes/ordered/mergeOrdered.js',
+      () => ({ mergeOrderedArrays: tieScanSpy })
+    )
+    reference = await import('../../laws/arbitraries.js')
+    vi.doUnmock('../../../../../src/merger/nodes/ordered/mergeOrdered.js')
+  })
+
+  describe('when token sides cut by unchanged unique keys are merged', () => {
+    it('then output, conflict and rendering are identical', async () => {
+      await fc.assert(
+        fc.asyncProperty(
+          cutCaseArb(IDENTITY_ANCESTORS, IDENTITY, IDENTITY_TOKENS),
+          async tokens => {
+            // Arrange
+            const [ancestor, local, other] = tokens.map(side =>
+              side.map(toEntry)
+            )
+            const expected = reference.merge(ordered, ancestor, local, other)
+
+            // Act
+            const sut = merge(ordered, ancestor, local, other)
+
+            // Assert
+            expect(sut.hasConflict).toBe(expected.hasConflict)
+            expect(sut.output).toEqual(expected.output)
+            expect(await render(sut.output)).toBe(
+              await reference.render(expected.output)
+            )
+          }
+        )
+      )
+      expect(tieScanSpy).toHaveBeenCalled()
     })
   })
 })
