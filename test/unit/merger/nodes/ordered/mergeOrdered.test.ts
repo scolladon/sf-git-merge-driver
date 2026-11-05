@@ -18,6 +18,7 @@ import {
 } from '../../../../../src/types/mergeResult.js'
 import { jsonIdentical } from '../../../../../src/utils/jsonEqual.js'
 import { mergeOrderedArrays as referenceMerge } from '../../../../utils/oracles/perReadingMerge.js'
+import { mergeOrderedArrays as tieScanMerge } from '../../../../utils/oracles/tieScanMerge.js'
 import {
   type Case,
   caseArb,
@@ -310,6 +311,75 @@ describe('mergeOrderedArrays', () => {
       })
     })
   })
+
+  // Tied readings that differ only in which identical copy a side keeps, and
+  // whose outputs still differ: merging one of them for all, or stopping once
+  // the first ones agree, would not return these results.
+  describe.each([
+    [
+      'an insertion placed before or after the kept copy',
+      'A A',
+      'A',
+      'A X A',
+      '<A|A,A|A,X,A>',
+    ],
+    [
+      'a dropped copy joining the block before or after it',
+      'P K K Q',
+      'K',
+      'P* K K Q*',
+      '<K|P,K,K,Q|P*,K,K,Q*>',
+    ],
+    [
+      'the nested merge on either inserted copy',
+      'U',
+      'U K* K*',
+      'U* K',
+      '<U,K*,K*|U|U*,K>',
+    ],
+    [
+      "a replacement taking the dropped copy's place in some readings only",
+      'K K K U',
+      'J K U J*',
+      'U K K K',
+      '<J,K,U,J*|K,K,K,U|U,K,K,K>',
+    ],
+    [
+      'one repeated key after a dropped copy that changes blocks halfway through the readings',
+      'P K K Q T R R',
+      'K T R',
+      'P* K K Q* R R T',
+      '<K,T,R|P,K,K,Q,T,R,R|P*,K,K,Q*,R,R,T>',
+    ],
+    [
+      'two repeated keys after a dropped copy that changes blocks halfway through the readings',
+      'P K K Q T R R S S',
+      'K T R S',
+      'P* K K Q* R R S S T',
+      '<K,T,R,S|P,K,K,Q,T,R,R,S,S|P*,K,K,Q*,R,R,S,S,T>',
+    ],
+  ])(
+    'given tied readings with %s',
+    (_name, ancestor, local, other, expected) => {
+      describe('when merging', () => {
+        it('then the result is the whole-array conflict, as the tie-scan merge builds', () => {
+          // Arrange
+          const sides = orderedSides(ancestor, local, other)
+          const sut = mergeOrderedArrays
+
+          // Act
+          const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
+
+          // Assert
+          expect(formatResult(result)).toBe(expected)
+          expect(result).toStrictEqual(wholeArrayConflict(sides))
+          expect(result).toStrictEqual(
+            tieScanMerge(sides, ORDERED_ATTRIBUTE, defaultConfig)
+          )
+        })
+      })
+    }
+  )
 })
 
 const EDIT_SUFFIX = /[*+]+$/
