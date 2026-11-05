@@ -67,7 +67,10 @@ const trimmedBlock = (
   return withConflict([...headItems, block, ...tailItems])
 }
 
-const asResult = ({ output, hasConflict }: MergeResult): MergeResult => ({
+export const asResult = ({
+  output,
+  hasConflict,
+}: MergeResult): MergeResult => ({
   output,
   hasConflict,
 })

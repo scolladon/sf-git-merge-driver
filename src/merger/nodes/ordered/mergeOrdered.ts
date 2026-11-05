@@ -21,6 +21,7 @@ import { placeOneSided } from './oneSidedPlacement.js'
 import { everyEntry, possiblyMoved } from './orderAxis.js'
 import { buildOrderedContext, type OrderedContext } from './orderedContext.js'
 import { type LiveSide, type Reading, valueOn } from './orderedEntry.js'
+import { mergePartwise } from './partwise.js'
 import { placeAgreedInsertions } from './placement.js'
 import { cycleMarks, orderOverlaps, tournament } from './precedence.js'
 import { type OrderingView, orderingView, phantomSwaps } from './replacement.js'
@@ -31,6 +32,7 @@ import {
   type Wrapped,
   wholeConflict,
 } from './tieCombination.js'
+import { tiePartsOf } from './tieParts.js'
 
 export interface OrderedSides {
   readonly ancestor: JsonArray
@@ -220,6 +222,22 @@ export const mergeReading = (
   return { ...renderItems(ctx, attribute, items), phantomSwaps: swaps }
 }
 
+// One tied part is the whole tie set: the parts split nothing.
+const FEWEST_TIED_PARTS = 2
+
+const mergeStream = (
+  wrapped: Wrapped,
+  readings: Iterable<Reading>,
+  merge: (reading: Reading) => MergedReading
+): MergeResult => {
+  const scan = new TieScan()
+  for (const reading of readings) {
+    scan.add(merge(reading))
+    if (scan.isWholeConflict()) return wholeConflict(wrapped)
+  }
+  return combineReadings(wrapped, fewestPhantomSwaps(scan.readings()))
+}
+
 export const mergeOrderedArrays = (
   sides: OrderedSides,
   attribute: string,
@@ -229,11 +247,18 @@ export const mergeOrderedArrays = (
   // Stryker disable next-line ConditionalExpression: shortcut of the general path: a merge takes the changed side whole (doctrine.test.ts)
   if (whole !== null) return whole
   const wrapped = wrapSides(sides, attribute)
-  const scan = new TieScan()
-  const { ancestor, local, other, keys } = sides
-  for (const reading of identityTies(ancestor, local, other, keys).readings()) {
-    scan.add(mergeReading(reading, attribute, config))
-    if (scan.isWholeConflict()) return wholeConflict(wrapped)
-  }
-  return combineReadings(wrapped, fewestPhantomSwaps(scan.readings()))
+  const ties = identityTies(
+    sides.ancestor,
+    sides.local,
+    sides.other,
+    sides.keys
+  )
+  const parts = tiePartsOf(sides, ties, attribute)
+  const merge = (reading: Reading): MergedReading =>
+    mergeReading(reading, attribute, config)
+  const partwise =
+    parts.tied.length >= FEWEST_TIED_PARTS
+      ? mergePartwise({ wrapped, ties, parts, merge })
+      : null
+  return partwise ?? mergeStream(wrapped, ties.readings(), merge)
 }
