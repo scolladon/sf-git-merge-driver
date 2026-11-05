@@ -207,7 +207,7 @@ describe('fewestMoves', () => {
         ]
 
         // Act
-        const result = fewestMoves(stretches)
+        const result = [...fewestMoves(stretches)]
 
         // Assert
         expect(result).toEqual([
@@ -242,10 +242,12 @@ describe('fewestMoves', () => {
         ])
 
         // Act
-        const result = fewestMoves([
-          [straightA, crossedA],
-          [straightB, crossedB],
-        ])
+        const result = [
+          ...fewestMoves([
+            [straightA, crossedA],
+            [straightB, crossedB],
+          ]),
+        ]
 
         // Assert
         expect(result).toEqual([[0, 0]])
@@ -269,7 +271,7 @@ describe('fewestMoves', () => {
         ]
 
         // Act
-        const result = fewestMoves(stretches)
+        const result = [...fewestMoves(stretches)]
 
         // Assert
         expect(result).toEqual([[0, 0]])
@@ -287,7 +289,7 @@ describe('fewestMoves', () => {
         ]
 
         // Act
-        const result = fewestMoves(stretches)
+        const result = [...fewestMoves(stretches)]
 
         // Assert
         expect(result).toEqual([[1, 0]])
@@ -309,10 +311,12 @@ describe('fewestMoves', () => {
         ] as const
 
         // Act
-        const result = fewestMoves([
-          [alternative(keyA), alternative(keyA)],
-          [alternative(keyB), alternative(keyB)],
-        ])
+        const result = [
+          ...fewestMoves([
+            [alternative(keyA), alternative(keyA)],
+            [alternative(keyB), alternative(keyB)],
+          ]),
+        ]
 
         // Assert
         expect(result).toEqual([
@@ -335,7 +339,7 @@ describe('fewestMoves', () => {
         ]
 
         // Act
-        const result = fewestMoves(stretches)
+        const result = [...fewestMoves(stretches)]
 
         // Assert
         expect(result).toEqual([
@@ -381,10 +385,12 @@ describe('fewestMoves', () => {
         )
 
         // Act
-        const result = fewestMoves([
-          [crossedA, straightA],
-          [crossedB, straightB],
-        ])
+        const result = [
+          ...fewestMoves([
+            [crossedA, straightA],
+            [crossedB, straightB],
+          ]),
+        ]
 
         // Assert
         expect(result).toEqual([[1, 1]])
@@ -413,7 +419,7 @@ describe('fewestMoves', () => {
         ]
 
         // Act
-        const result = fewestMoves(stretches)
+        const result = [...fewestMoves(stretches)]
 
         // Assert
         expect(result).toEqual([[1], [2]])
@@ -436,7 +442,7 @@ describe('fewestMoves', () => {
         ]
 
         // Act
-        const result = fewestMoves(stretches)
+        const result = [...fewestMoves(stretches)]
 
         // Assert
         expect(result).toEqual([[0, 0]])
@@ -451,7 +457,7 @@ describe('fewestMoves', () => {
         const stretches: readonly (readonly PointSet[])[] = []
 
         // Act
-        const result = fewestMoves(stretches)
+        const result = [...fewestMoves(stretches)]
 
         // Assert
         expect(result).toEqual([[]])
@@ -468,7 +474,7 @@ describe('fewestMoves', () => {
             const expected = bruteForce(stretches)
 
             // Act
-            const result = fewestMoves(stretches)
+            const result = [...fewestMoves(stretches)]
 
             // Assert
             expect(result).toEqual(expected)

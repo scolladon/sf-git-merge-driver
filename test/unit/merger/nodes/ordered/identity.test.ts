@@ -121,11 +121,11 @@ const gridSide = (
     return [gridEntry(`U${key}a`, 'u'), ...body, gridEntry(`U${key}b`, 'u')]
   }).flat()
 
-const identifyGrid = (
+const gridReadings = (
   variant: GridVariant,
   r: number,
   m: number
-): readonly Reading[] => {
+): Iterable<Reading> => {
   const [ancestor, local, other] = (
     ['ancestor', 'local', 'other'] as const
   ).map(side => gridSide(variant, r, m, side))
@@ -137,6 +137,12 @@ const identifyGrid = (
     other: keysOf(other),
   })
 }
+
+const identifyGrid = (
+  variant: GridVariant,
+  r: number,
+  m: number
+): readonly Reading[] => [...gridReadings(variant, r, m)]
 
 const COPY_COUNTS = [2, 3, 4, 5]
 
@@ -177,7 +183,7 @@ const identifyCase = ([ancestor, local, other]: Case): readonly Reading[] => {
     local.join(' '),
     other.join(' ')
   )
-  return identify(sides.ancestor, sides.local, sides.other, sides.keys)
+  return [...identify(sides.ancestor, sides.local, sides.other, sides.keys)]
 }
 
 type Place = (entry: OrderedEntry) => string
@@ -581,7 +587,7 @@ describe('identify', () => {
         const keys = { ancestor: [], local: ['K', 'K'], other: ['K'] }
 
         // Act
-        const result = identify([], [{ a: 'x' }, held], [twin], keys)
+        const result = [...identify([], [{ a: 'x' }, held], [twin], keys)]
 
         // Assert
         expect(result).toHaveLength(count)
@@ -600,12 +606,14 @@ describe('identify', () => {
       }
 
       // Act
-      const result = identify(
-        [v('2'), v('2')],
-        [v('1'), v('2'), v('1')],
-        [v('3'), v('2')],
-        keys
-      )
+      const result = [
+        ...identify(
+          [v('2'), v('2')],
+          [v('1'), v('2'), v('1')],
+          [v('3'), v('2')],
+          keys
+        ),
+      ]
 
       // Assert
       expect(result.map(shapeOf)).toEqual([
@@ -627,12 +635,14 @@ describe('identify', () => {
       }
 
       // Act
-      const result = identify(
-        [local('3'), local('1'), local('1')],
-        [local('2'), local('1'), local('1')],
-        [other('1')],
-        keys
-      )
+      const result = [
+        ...identify(
+          [local('3'), local('1'), local('1')],
+          [local('2'), local('1'), local('1')],
+          [other('1')],
+          keys
+        ),
+      ]
 
       // Assert
       expect(result.map(shapeOf)).toEqual([
@@ -658,12 +668,14 @@ describe('identify', () => {
               const expected = referenceReadings(sides)
 
               // Act
-              const sut = identify(
-                sides.ancestor,
-                sides.local,
-                sides.other,
-                sides.keys
-              )
+              const sut = [
+                ...identify(
+                  sides.ancestor,
+                  sides.local,
+                  sides.other,
+                  sides.keys
+                ),
+              ]
 
               // Assert
               expect(sut).toStrictEqual(expected)
@@ -683,12 +695,9 @@ describe('identify', () => {
         const expected = referenceReadings(sides)
 
         // Act
-        const sut = identify(
-          sides.ancestor,
-          sides.local,
-          sides.other,
-          sides.keys
-        )
+        const sut = [
+          ...identify(sides.ancestor, sides.local, sides.other, sides.keys),
+        ]
 
         // Assert
         expect(sut).toStrictEqual(expected)
@@ -709,12 +718,9 @@ describe('identify', () => {
         const expected = referenceReadings(sides)
 
         // Act
-        const sut = identify(
-          sides.ancestor,
-          sides.local,
-          sides.other,
-          sides.keys
-        )
+        const sut = [
+          ...identify(sides.ancestor, sides.local, sides.other, sides.keys),
+        ]
 
         // Assert
         expect(sut).toStrictEqual(expected)
@@ -729,12 +735,9 @@ describe('identify', () => {
         const expected = referenceReadings(sides)
 
         // Act
-        const sut = identify(
-          sides.ancestor,
-          sides.local,
-          sides.other,
-          sides.keys
-        )
+        const sut = [
+          ...identify(sides.ancestor, sides.local, sides.other, sides.keys),
+        ]
 
         // Assert
         expect(sut).toStrictEqual(expected)
@@ -780,6 +783,33 @@ describe('identify', () => {
         // Assert
         expect(result).toHaveLength(1)
       })
+    })
+  })
+
+  describe('given the identical grid at r = 2 and thousands of keys', () => {
+    // Every key leaves two tied choices: the first reading must come without
+    // nesting a frame per key and without building the 2^4000 others.
+    const COPIES = 2
+    const KEYS = 4000
+    // U{k}a, the two copies, U{k}b
+    const ENTRIES_PER_KEY = 4
+    const GRID_TIMEOUT_MS = 120_000
+
+    describe('when taking the first reading', () => {
+      it(
+        'then it arrives with every entry',
+        () => {
+          // Arrange
+          const sut = gridReadings('identical', COPIES, KEYS)
+
+          // Act
+          const [first] = sut
+
+          // Assert
+          expect(first).toHaveLength(ENTRIES_PER_KEY * KEYS)
+        },
+        GRID_TIMEOUT_MS
+      )
     })
   })
 

@@ -275,6 +275,11 @@ function* runsAt(
   }
 }
 
+interface Level {
+  readonly runs: Iterator<readonly [value: number, run: Range]>
+  readonly range: Range
+}
+
 interface Step {
   readonly stretch: number
   readonly component: number
@@ -284,8 +289,8 @@ interface Step {
 const isSettled = (minimal: readonly Tuple[], offset: number): boolean =>
   minimal.every(tuple => tuple[offset] === minimal[0][offset])
 
-// A stretch left one value by its component has nothing to walk: nesting a
-// call per such stretch would overflow the stack on long arrays.
+// A stretch left one value by its component has nothing to walk: settledChoices
+// fixes it once instead of giving it a level of the walk.
 const stepsOf = (components: readonly Minimised[]): readonly Step[] =>
   components
     .flatMap(({ members, minimal }, component) =>
@@ -315,7 +320,6 @@ class Walk {
   private readonly choice: number[]
   private readonly ranges: Range[]
   private readonly steps: readonly Step[]
-  private readonly results: Tuple[] = []
 
   constructor(
     size: number,
@@ -329,25 +333,43 @@ class Walk {
     this.steps = stepsOf(components)
   }
 
-  all(): readonly Tuple[] {
-    this.descend(0)
-    return this.results
-  }
-
-  private descend(at: number): void {
-    if (at === this.steps.length) {
-      this.results.push([...this.choice])
+  // One level per unsettled stretch on an explicit stack: a call frame per
+  // stretch overflowed the stack at a few thousand stretches.
+  *tuples(): Generator<Tuple> {
+    if (this.steps.length === 0) {
+      yield [...this.choice]
       return
     }
-    const { stretch, component, offset } = this.steps[at]
+    const levels: Level[] = [this.open(0)]
+    while (levels.length > 0) {
+      const at = levels.length - 1
+      const next = levels[at].runs.next()
+      if (next.done) {
+        this.close(levels)
+        continue
+      }
+      this.take(at, next.value)
+      if (at + 1 === this.steps.length) yield [...this.choice]
+      else levels.push(this.open(at + 1))
+    }
+  }
+
+  private open(at: number): Level {
+    const { component, offset } = this.steps[at]
     const range = this.ranges[component]
     const { minimal } = this.components[component]
-    for (const [value, run] of runsAt(minimal, offset, range)) {
-      this.choice[stretch] = value
-      this.ranges[component] = run
-      this.descend(at + 1)
-    }
-    this.ranges[component] = range
+    return { runs: runsAt(minimal, offset, range), range }
+  }
+
+  private take(at: number, [value, run]: readonly [number, Range]): void {
+    const { stretch, component } = this.steps[at]
+    this.choice[stretch] = value
+    this.ranges[component] = run
+  }
+
+  private close(levels: Level[]): void {
+    const { component } = this.steps[levels.length - 1]
+    this.ranges[component] = (levels.pop() as Level).range
   }
 }
 
@@ -360,10 +382,10 @@ class Walk {
  */
 export const fewestMoves = (
   stretches: readonly Alternatives[]
-): readonly Tuple[] => {
+): Iterable<Tuple> => {
   const layout = layoutOf(stretches)
   const components = componentsOf(stretches, layout).map(component =>
     minimise(component, layout)
   )
-  return new Walk(stretches.length, components).all()
+  return new Walk(stretches.length, components).tuples()
 }

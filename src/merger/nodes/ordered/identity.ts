@@ -204,31 +204,29 @@ const pointsOf = (drafts: readonly Draft[]): PointSet => ({
   other: pointsOn(drafts, 'other'),
 })
 
-// Each stretch keeps its no-loss alternatives; the fewest-move choices are
-// decided per group of stretches that share a gap, and walked back in the
-// order of the cross product of the alternatives.
-const leastMovingReadings = (
-  kept: readonly Alternatives[]
-): readonly Reading[] =>
-  fewestMoves(kept.map(alternatives => alternatives.map(pointsOf))).map(
-    choices => toReading(choices.flatMap((choice, at) => kept[at][choice]))
-  )
-
 const hasOneAlternative = (stretch: Stretch): boolean =>
   stretch.alternatives.length === 1
 
-export const identify = (
+// Each stretch keeps its no-loss alternatives; the fewest-move choices are
+// decided per group of stretches that share a gap, and walked back in the
+// order of the cross product of the alternatives.
+export function* identify(
   ancestor: JsonArray,
   local: JsonArray,
   other: JsonArray,
   keys: KeyedSides
-): readonly Reading[] => {
+): Generator<Reading> {
   // A value determines its key (a field of the entry, or its whole content),
   // so the values both sides hold split across keys and each key is judged
   // alone.
   const stretches = stretchesOf(groupSlots({ ancestor, local, other }, keys))
   if (stretches.every(hasOneAlternative)) {
-    return [toReading(stretches.flatMap(stretch => stretch.alternatives[0]))]
+    yield toReading(stretches.flatMap(stretch => stretch.alternatives[0]))
+    return
   }
-  return leastMovingReadings(withoutLosses(stretches))
+  const kept = withoutLosses(stretches)
+  const points = kept.map(alternatives => alternatives.map(pointsOf))
+  for (const choices of fewestMoves(points)) {
+    yield toReading(choices.flatMap((choice, at) => kept[at][choice]))
+  }
 }

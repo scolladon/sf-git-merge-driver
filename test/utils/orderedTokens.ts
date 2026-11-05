@@ -77,7 +77,7 @@ export const readingsOf = (
   other: string
 ): readonly Reading[] => {
   const sides = orderedSides(ancestor, local, other)
-  return identify(sides.ancestor, sides.local, sides.other, sides.keys)
+  return [...identify(sides.ancestor, sides.local, sides.other, sides.keys)]
 }
 
 type BlockSide = 'local' | 'ancestor' | 'other'

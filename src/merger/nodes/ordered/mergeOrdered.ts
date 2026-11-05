@@ -314,12 +314,10 @@ export const mergeOrderedArrays = (
   const whole = takeWholeSide(sides, attribute)
   // Stryker disable next-line ConditionalExpression: shortcut of the general path: a merge takes the changed side whole (doctrine.test.ts)
   if (whole !== null) return whole
-  const merged = identify(
-    sides.ancestor,
-    sides.local,
-    sides.other,
-    sides.keys
-  ).map(reading => mergeReading(reading, attribute, config))
+  const merged = Array.from(
+    identify(sides.ancestor, sides.local, sides.other, sides.keys),
+    reading => mergeReading(reading, attribute, config)
+  )
   return combineReadings(
     wrapSides(sides, attribute),
     fewestPhantomSwaps(merged)
