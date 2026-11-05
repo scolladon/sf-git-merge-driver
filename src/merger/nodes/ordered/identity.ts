@@ -7,14 +7,11 @@ import {
   readings,
   type SideGroups,
 } from '../keyedReadings.js'
-import { lisLength } from './orderAxis.js'
+import { fewestMoves, type Point, type PointSet } from './identityComponents.js'
 import {
   ABSENT_POSITION,
-  isOn,
-  LIVE_SIDES,
   type LiveSide,
   type OrderedEntry,
-  positionOn,
   type Reading,
 } from './orderedEntry.js'
 
@@ -90,10 +87,6 @@ const uniqueDraft = (key: string, slots: Slots): Draft => ({
   other: slots.other[0],
 })
 
-// The alternatives of a stretch of keys, read again by the cross product for
-// each combination of the stretches before it.
-type Segment = () => Iterable<readonly Draft[]>
-
 type Alternatives = readonly (readonly Draft[])[]
 
 // A fused run of keys held at most once per side has one alternative and no
@@ -126,20 +119,6 @@ const stretchesOf = (
   }
   closeRun()
   return stretches
-}
-
-function* crossProduct(
-  segments: readonly Segment[],
-  from: number,
-  prefix: readonly Draft[]
-): Generator<readonly Draft[]> {
-  if (from === segments.length) {
-    yield prefix
-    return
-  }
-  for (const drafts of segments[from]()) {
-    yield* crossProduct(segments, from + 1, [...prefix, ...drafts])
-  }
 }
 
 const toReading = (drafts: readonly Draft[]): Reading =>
@@ -184,63 +163,6 @@ const losesAValue = (reading: Reading, held: ReadonlySet<string>): boolean => {
   return [...held].some(signature => !shared.has(signature))
 }
 
-const movesOn = (reading: Reading, side: LiveSide): number => {
-  const kept = reading
-    .filter(entry => entry.ancestor !== undefined && isOn(entry, side))
-    .sort((left, right) => left.ancestorPos - right.ancestorPos)
-  return kept.length - lisLength(kept.map(entry => positionOn(entry, side)))
-}
-
-const movesOf = (reading: Reading): number =>
-  LIVE_SIDES.reduce((total, side) => total + movesOn(reading, side), 0)
-
-function* mapped<T, U>(items: Iterable<T>, fn: (item: T) => U): Generator<U> {
-  for (const item of items) yield fn(item)
-}
-
-interface Leaders {
-  readonly offer: (reading: Reading) => void
-  readonly kept: () => readonly Reading[]
-}
-
-const leadersBy = (measure: (reading: Reading) => number): Leaders => {
-  // Stryker disable next-line ArrayDeclaration: the first offer resets kept: a measure is finite (a boolean or a count), so it is below the initial infinity
-  let kept: Reading[] = []
-  let least = Number.POSITIVE_INFINITY
-  return {
-    offer: reading => {
-      const value = measure(reading)
-      if (value < least) {
-        least = value
-        kept = []
-      }
-      if (value === least) kept.push(reading)
-    },
-    kept: () => kept,
-  }
-}
-
-// Streams the candidates, holding only the best ones. A lone candidate is
-// the best whatever the measure says: it is returned unmeasured.
-const keepLeast = (
-  readings: Iterable<Reading>,
-  measure: (reading: Reading) => number
-): readonly Reading[] => {
-  const leaders = leadersBy(measure)
-  let lone: Reading | undefined
-  for (const reading of readings) {
-    // Stryker disable next-line ConditionalExpression,EqualityOperator,BlockStatement: the lone slot only defers offering the first reading; offering it at once keeps the same leaders
-    if (lone === undefined && leaders.kept().length === 0) {
-      lone = reading
-      continue
-    }
-    if (lone !== undefined) leaders.offer(lone)
-    lone = undefined
-    leaders.offer(reading)
-  }
-  return lone === undefined ? leaders.kept() : [lone]
-}
-
 const valuesOf = (slots: readonly Slot[]): JsonArray =>
   slots.map(slot => slot.value)
 
@@ -265,12 +187,32 @@ const withoutLosses = (
     : stretches.map(stretch => stretch.alternatives)
 }
 
-const leastMovingReadings = (
-  lists: readonly Alternatives[]
-): readonly Reading[] => {
-  const segments: readonly Segment[] = lists.map(list => () => list)
-  return keepLeast(mapped(crossProduct(segments, 0, []), toReading), movesOf)
+const pointsOn = (drafts: readonly Draft[], side: LiveSide): Point[] => {
+  const points: Point[] = []
+  for (const draft of drafts) {
+    const { ancestor } = draft
+    const slot = draft[side]
+    if (ancestor && slot) {
+      points.push({ ancestor: ancestor.pos, position: slot.pos })
+    }
+  }
+  return points
 }
+
+const pointsOf = (drafts: readonly Draft[]): PointSet => ({
+  local: pointsOn(drafts, 'local'),
+  other: pointsOn(drafts, 'other'),
+})
+
+// Each stretch keeps its no-loss alternatives; the fewest-move choices are
+// decided per group of stretches that share a gap, and walked back in the
+// order of the cross product of the alternatives.
+const leastMovingReadings = (
+  kept: readonly Alternatives[]
+): readonly Reading[] =>
+  fewestMoves(kept.map(alternatives => alternatives.map(pointsOf))).map(
+    choices => toReading(choices.flatMap((choice, at) => kept[at][choice]))
+  )
 
 const hasOneAlternative = (stretch: Stretch): boolean =>
   stretch.alternatives.length === 1

@@ -6,13 +6,24 @@ import {
   readings,
 } from '../../../../../src/merger/nodes/keyedReadings.js'
 import { identify } from '../../../../../src/merger/nodes/ordered/identity.js'
-import type { Reading } from '../../../../../src/merger/nodes/ordered/orderedEntry.js'
+import {
+  ABSENT_POSITION,
+  type OrderedEntry,
+  type Reading,
+} from '../../../../../src/merger/nodes/ordered/orderedEntry.js'
+import type {
+  JsonArray,
+  JsonObject,
+} from '../../../../../src/types/jsonTypes.js'
+import { signatureOf } from '../../../../../src/utils/jsonSignature.js'
 import * as reference from '../../../../utils/oracles/enumeratedIdentity.js'
 import {
+  type Case,
   caseArb,
   IDENTITY,
   IDENTITY_ANCESTORS,
   IDENTITY_TOKENS,
+  type Limits,
 } from '../../../../utils/orderedCases.js'
 import { orderedSides, readingsOf } from '../../../../utils/orderedTokens.js'
 
@@ -57,6 +68,222 @@ const sameValueReferences = (
       ENTRY_SIDES.every(side => entry[side] === expected[at][id][side])
     )
   )
+
+type GridVariant = 'identical' | 'distinct'
+
+type GridSide = 'ancestor' | 'local' | 'other'
+
+const gridEntry = (key: string, label: string): JsonObject => ({
+  fullName: key,
+  label,
+})
+
+const edited = (entry: JsonObject): JsonObject => ({
+  ...entry,
+  label: `${entry['label']} edited`,
+})
+
+const copiesOf = (variant: GridVariant, key: number, r: number): JsonObject[] =>
+  Array.from({ length: r }, (_, copy) =>
+    gridEntry(
+      `R${key}`,
+      variant === 'identical' ? `R${key}` : `R${key} c${copy}`
+    )
+  )
+
+// identical: local edits copy 0, other deletes copy 1. distinct: local edits
+// copies 0 and 1, other moves the last copy first and edits it.
+const perturbedCopies = (
+  variant: GridVariant,
+  copies: readonly JsonObject[],
+  side: Exclude<GridSide, 'ancestor'>
+): JsonObject[] => {
+  if (variant === 'identical') {
+    return side === 'local'
+      ? [edited(copies[0]), ...copies.slice(1)]
+      : copies.filter((_, copy) => copy !== 1)
+  }
+  return side === 'local'
+    ? copies.map((entry, copy) => (copy < 2 ? edited(entry) : entry))
+    : [edited(copies[copies.length - 1]), ...copies.slice(0, -1)]
+}
+
+const gridSide = (
+  variant: GridVariant,
+  r: number,
+  m: number,
+  side: GridSide
+): JsonObject[] =>
+  Array.from({ length: m }, (_, key) => {
+    const copies = copiesOf(variant, key, r)
+    const body =
+      side === 'ancestor' ? copies : perturbedCopies(variant, copies, side)
+    return [gridEntry(`U${key}a`, 'u'), ...body, gridEntry(`U${key}b`, 'u')]
+  }).flat()
+
+const identifyGrid = (
+  variant: GridVariant,
+  r: number,
+  m: number
+): readonly Reading[] => {
+  const [ancestor, local, other] = (
+    ['ancestor', 'local', 'other'] as const
+  ).map(side => gridSide(variant, r, m, side))
+  const keysOf = (side: JsonObject[]): string[] =>
+    side.map(entry => entry['fullName'] as string)
+  return identify(ancestor, local, other, {
+    ancestor: keysOf(ancestor),
+    local: keysOf(local),
+    other: keysOf(other),
+  })
+}
+
+const COPY_COUNTS = [2, 3, 4, 5]
+
+const EDIT_SUFFIX = /[*+]+$/
+
+type Names = Readonly<Record<string, string>>
+
+const SECOND_KEYS: Names = {
+  A: 'C',
+  B: 'D',
+  X: 'E',
+  '~a': '~c',
+  '~b': '~d',
+}
+
+const RENAMED_KEYS: Names = {
+  A: 'Q',
+  B: 'R',
+  X: 'Y',
+  '~a': '~q',
+  '~b': '~r',
+}
+
+// A token or a key, edit marks kept: 'A*' becomes 'Q*'
+const renamed = (names: Names, name: string): string => {
+  const stem = name.replace(EDIT_SUFFIX, '')
+  return `${names[stem]}${name.slice(stem.length)}`
+}
+
+const renamedCase = (names: Names, [ancestor, local, other]: Case): Case => {
+  const rename = (token: string): string => renamed(names, token)
+  return [ancestor.map(rename), local.map(rename), other.map(rename)]
+}
+
+const identifyCase = ([ancestor, local, other]: Case): readonly Reading[] => {
+  const sides = orderedSides(
+    ancestor.join(' '),
+    local.join(' '),
+    other.join(' ')
+  )
+  return identify(sides.ancestor, sides.local, sides.other, sides.keys)
+}
+
+type Place = (entry: OrderedEntry) => string
+
+const unchanged: Place = entry =>
+  `${entry.ancestorPos},${entry.localPos},${entry.otherPos}`
+
+const signatureOfPlaces = (places: readonly string[]): string =>
+  [...places].sort().join(' ')
+
+// The readings as a multiset: ids and order ignored
+const placementsOf = (
+  found: readonly Reading[],
+  place: Place
+): readonly string[] =>
+  found.map(reading => signatureOfPlaces(reading.map(place))).sort()
+
+const shiftedBy = (shift: number, position: number): number =>
+  position === ABSENT_POSITION ? position : position + shift
+
+const shiftedPlace =
+  ([ancestor, local, other]: readonly number[]): Place =>
+  entry =>
+    [
+      shiftedBy(ancestor, entry.ancestorPos),
+      shiftedBy(local, entry.localPos),
+      shiftedBy(other, entry.otherPos),
+    ].join(',')
+
+const SEPARATOR_TOKEN = 'Z'
+
+const aroundSeparator = (first: Case, second: Case): Case => [
+  [...first[0], SEPARATOR_TOKEN, ...second[0]],
+  [...first[1], SEPARATOR_TOKEN, ...second[1]],
+  [...first[2], SEPARATOR_TOKEN, ...second[2]],
+]
+
+// Each reading of a part followed by each reading of the next, around the
+// separator held at the end of the first part's sides.
+const placementsAround = (
+  first: readonly Reading[],
+  second: readonly Reading[],
+  firstLengths: readonly number[]
+): readonly string[] => {
+  const separator = firstLengths.join(',')
+  const shift = shiftedPlace(firstLengths.map(length => length + 1))
+  return first
+    .flatMap(head =>
+      second.map(tail =>
+        signatureOfPlaces([
+          ...head.map(unchanged),
+          separator,
+          ...tail.map(shift),
+        ])
+      )
+    )
+    .sort()
+}
+
+const signaturesOn = (side: JsonArray): ReadonlySet<string> =>
+  new Set((side as JsonObject[]).map(signatureOf))
+
+// Whether the first reading, the best by stage 1, shares every value both
+// live sides hold.
+const keepsEveryHeldValue = (tokens: Case): boolean => {
+  const sides = orderedSides(
+    tokens[0].join(' '),
+    tokens[1].join(' '),
+    tokens[2].join(' ')
+  )
+  const onOther = signaturesOn(sides.other)
+  const held = [...signaturesOn(sides.local)].filter(s => onOther.has(s))
+  const [first] = identifyCase(tokens)
+  const shared = new Set(
+    first
+      .filter(entry => entry.local && entry.other)
+      .flatMap(entry => [
+        signatureOf(entry.local as JsonObject),
+        signatureOf(entry.other as JsonObject),
+      ])
+  )
+  return held.every(signature => shared.has(signature))
+}
+
+const WIDE: Limits = {
+  length: 10,
+  perKey: { A: 4, B: 3, X: 1, '~a': 3, '~a*': 2, '~b': 2 },
+}
+
+const MAX_TIED_READINGS = 1024
+
+const identicalCells = (): (readonly [copies: number, keys: number])[] =>
+  COPY_COUNTS.flatMap(copies => {
+    const cells: (readonly [number, number])[] = []
+    for (let keys = 1; copies ** keys <= MAX_TIED_READINGS; keys++) {
+      cells.push([copies, keys])
+    }
+    return cells
+  })
+
+const startsWithAncestorLabel = (entry: OrderedEntry): boolean => {
+  const label = (entry.ancestor as JsonObject)['label'] as string
+  return [entry.local, entry.other].every(value =>
+    ((value as JsonObject)['label'] as string).startsWith(label)
+  )
+}
 
 const CRAFTED_KEY = 'A'
 
@@ -302,6 +529,36 @@ describe('identify', () => {
     )
   })
 
+  describe('given the identical grid at r = 2, m = 9', () => {
+    // 4^9 pairings enumerate in seconds; the 2^9 tied readings come back in
+    // milliseconds. The budget sits between the two so that CPU load and
+    // coverage instrumentation cannot push the selection over it.
+    const COPIES = 2
+    const KEYS = 9
+    const TIED_READINGS = 512
+    const BUDGET_MS = 400
+    const GRID_TIMEOUT_MS = 120_000
+
+    describe('when identifying', () => {
+      it(
+        'then its tied readings come back within the budget',
+        () => {
+          // Arrange
+          const start = performance.now()
+
+          // Act
+          const sut = identifyGrid('identical', COPIES, KEYS)
+          const elapsed = performance.now() - start
+
+          // Assert
+          expect(sut).toHaveLength(TIED_READINGS)
+          expect(elapsed).toBeLessThan(BUDGET_MS)
+        },
+        GRID_TIMEOUT_MS
+      )
+    })
+  })
+
   describe.each([
     ['key order', { a: '1', b: '2' }, { b: '2', a: '1' }, 1],
     [
@@ -482,6 +739,121 @@ describe('identify', () => {
         // Assert
         expect(sut).toStrictEqual(expected)
         expect(sut).toHaveLength(1)
+      })
+    })
+  })
+  describe('given the distinct grid', () => {
+    describe.each(COPY_COUNTS)('at r = %i', copies => {
+      describe.each([1, 12, 40])('and m = %i', keys => {
+        it('then one reading pairs every copy with its own', () => {
+          // Arrange
+          const sut = identifyGrid
+
+          // Act
+          const result = sut('distinct', copies, keys)
+
+          // Assert
+          expect(result).toHaveLength(1)
+          expect(
+            result[0]
+              .filter(entry => entry.ancestor)
+              .every(startsWithAncestorLabel)
+          ).toBe(true)
+        })
+      })
+    })
+  })
+
+  describe('given the distinct grid at thousands of keys', () => {
+    // Each key has one fewest-move choice: no walk may nest per key.
+    const COPIES = 2
+    const KEYS = 5000
+
+    describe('when identifying', () => {
+      it('then its one reading comes back', () => {
+        // Arrange
+        const sut = identifyGrid
+
+        // Act
+        const result = sut('distinct', COPIES, KEYS)
+
+        // Assert
+        expect(result).toHaveLength(1)
+      })
+    })
+  })
+
+  describe('given the identical grid', () => {
+    describe.each(identicalCells())('at r = %i and m = %i', (copies, keys) => {
+      it('then every choice of the edited and deleted copy is a reading', () => {
+        // Arrange
+        const sut = identifyGrid
+
+        // Act
+        const result = sut('identical', copies, keys)
+
+        // Assert
+        expect(result).toHaveLength(copies ** keys)
+      })
+    })
+  })
+
+  describe('given sides whose keys are renamed one for one', () => {
+    describe('when identified', () => {
+      it('then the readings keep their places and carry the renamed keys', () => {
+        fc.assert(
+          fc.property(
+            caseArb(IDENTITY_ANCESTORS, WIDE, IDENTITY_TOKENS),
+            tokens => {
+              // Arrange
+              const expected = identifyCase(tokens)
+
+              // Act
+              const sut = identifyCase(renamedCase(RENAMED_KEYS, tokens))
+
+              // Assert
+              expect(sut.map(reading => reading.map(unchanged))).toEqual(
+                expected.map(reading => reading.map(unchanged))
+              )
+              expect(sut.map(reading => reading.map(e => e.key))).toEqual(
+                expected.map(reading =>
+                  reading.map(e => renamed(RENAMED_KEYS, e.key))
+                )
+              )
+            }
+          )
+        )
+      })
+    })
+  })
+
+  describe('given two parts around an entry unmoved on every side', () => {
+    describe('when identified', () => {
+      it('then the readings are the product of the parts readings', () => {
+        fc.assert(
+          fc.property(
+            fc.tuple(
+              caseArb(IDENTITY_ANCESTORS, IDENTITY, IDENTITY_TOKENS),
+              caseArb(IDENTITY_ANCESTORS, IDENTITY, IDENTITY_TOKENS)
+            ),
+            ([first, unrenamed]) => {
+              // Arrange
+              const second = renamedCase(SECOND_KEYS, unrenamed)
+              fc.pre(keepsEveryHeldValue(first) === keepsEveryHeldValue(second))
+              const expected = placementsAround(
+                identifyCase(first),
+                identifyCase(second),
+                first.map(side => side.length)
+              )
+
+              // Act
+              const sut = identifyCase(aroundSeparator(first, second))
+
+              // Assert
+              expect(placementsOf(sut, unchanged)).toEqual(expected)
+            }
+          )
+        )
       })
     })
   })

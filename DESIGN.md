@@ -160,7 +160,7 @@ Every merge node applies the same rules; the kinds differ in what an element is 
 | `PropertyMergeNode` | the element, then each property | no; the order of the child tags is merged apart from the properties ("Canonical (First-Seen) XML Tag Order") | the whole element, or one property |
 | `TextMergeNode` | one value | no | the whole value |
 
-A text array decides a value's copies by counts, since copies are interchangeable: each side keeps `min(side, ancestor)` copies, the survivors range over `[max(0, keptLocal + keptOther - ancestor), min(keptLocal, keptOther)]`, and the merge is clean only when that range is one number (`mergedCount`, `src/merger/nodes/TextArrayMergeNode.ts`); the output holds the survivors plus the larger number of copies one side added. Repeated keys of a keyed array enumerate their identity readings (`readings`, `src/merger/nodes/keyedReadings.ts`), uncapped.
+A text array decides a value's copies by counts, since copies are interchangeable: each side keeps `min(side, ancestor)` copies, the survivors range over `[max(0, keptLocal + keptOther - ancestor), min(keptLocal, keptOther)]`, and the merge is clean only when that range is one number (`mergedCount`, `src/merger/nodes/TextArrayMergeNode.ts`); the output holds the survivors plus the larger number of copies one side added. Repeated keys of a keyed array enumerate their identity readings (`readings`, `src/merger/nodes/keyedReadings.ts`), uncapped; the ordered kind selects among them per key and per separator component instead of walking their cross product (`identify`, `src/merger/nodes/ordered/identity.ts`).
 
 ### Conflict Handling
 
@@ -532,7 +532,7 @@ flowchart TD
     Whole -->|Yes| Take["Take that side verbatim, every entry as written"]
     Whole -->|No| Identify
 
-    Identify["1. Identify<br/>per key: identical entries first, then by occurrence rank;<br/>every reading with the fewest losses, then the fewest moves"]
+    Identify["1. Identify<br/>per key: identical entries first, then by occurrence rank;<br/>the fewest losses per key, then the fewest moves per separator component"]
     Identify --> Content["2. Content and presence axis, per entry<br/>fields merge independently; delete vs modify and delete vs move conflict"]
     Content --> Order["3. Order axis<br/>a replacement stands at the place of what it replaced; entries not in every longest common subsequence; overlap = same entry, different flipped partners"]
     Order --> Precedence["4. Precedence<br/>pair rule over the shared entries; cycles become one block"]
@@ -589,7 +589,8 @@ The modules of `src/merger/nodes/ordered/`, in pipeline order, with the two help
 | Module | Purpose |
 |--------|---------|
 | `orderedEntry.ts` (`OrderedEntry`, `LiveSide`, `positionOn`, `valueOn`) | One identity with its ancestor, local and other values and positions |
-| `identity.ts` (`identify`) | Groups each side by key, builds every key's identity readings, keeps each key's no-loss readings (all of every key's readings when one key cannot avoid a loss), then the fewest moves |
+| `identity.ts` (`identify`) | Groups each side by key, builds every key's identity readings, keeps each key's no-loss readings (all of every key's readings when one key cannot avoid a loss), then the fewest moves per component of the keys the separators leave interleaved (`identityComponents.ts`), returning the same readings in the same order as their cross product |
+| `identityComponents.ts` (`fewestMoves`) | Separators (fixed entries every other candidate pairing lies below or above on both positions), the gaps between them, the components of keys sharing a gap, and each component's fewest-move pairings with every tie kept |
 | `content.ts` (`entryStatuses`) | Per-entry status: clean, gone, presence conflict (delete vs modify, delete vs move), content conflict; fields merge through the orchestrator |
 | `orderAxis.ts` (`notInEveryLis`, `possiblyMoved`, `isKeptByAll`) | Order axis: an entry is moved unless every longest common subsequence keeps it |
 | `replacement.ts` (`orderingView`, `replacementRuns`, `phantomSwaps`) | Replacement runs and the ordering view where they stand at the place of what they replaced; contested runs; swaps of interchangeable copies |
