@@ -5,7 +5,11 @@ import {
   type Pairing,
   readings,
 } from '../../../../../src/merger/nodes/keyedReadings.js'
-import { identify } from '../../../../../src/merger/nodes/ordered/identity.js'
+import {
+  type IdentityTies,
+  identify,
+  identityTies,
+} from '../../../../../src/merger/nodes/ordered/identity.js'
 import {
   ABSENT_POSITION,
   type OrderedEntry,
@@ -884,6 +888,90 @@ describe('identify', () => {
             }
           )
         )
+      })
+    })
+  })
+})
+
+const tiesOf = (
+  ancestor: string,
+  local: string,
+  other: string
+): IdentityTies => {
+  const sides = orderedSides(ancestor, local, other)
+  return identityTies(sides.ancestor, sides.local, sides.other, sides.keys)
+}
+
+describe('identityTies', () => {
+  describe('given two repeated keys apart around a unique key', () => {
+    const ancestor = 'A A C B B'
+    const local = 'A C B'
+    const other = 'A A C B B Z'
+
+    describe('when exposing the tie set', () => {
+      it('then it holds one component per key, each keyed by its stretch, from the first choice', () => {
+        // Arrange
+        const sut = tiesOf(ancestor, local, other)
+
+        // Act
+        const result = sut.components.map(({ members }) =>
+          members.map(sut.keyOf)
+        )
+
+        // Assert
+        expect(sut.first).toEqual([0, 0, 0, 0])
+        expect(result).toEqual([['A'], ['B']])
+      })
+    })
+
+    describe('when walking one component around a base choosing the second tuple of the other', () => {
+      it('then the choice of the base stays', () => {
+        // Arrange
+        const sut = tiesOf(ancestor, local, other)
+        const [, base] = sut.around([1], sut.first)
+
+        // Act
+        const result = [...sut.around([0], base)]
+
+        // Assert
+        expect(result).toEqual([
+          [0, 0, 1, 0],
+          [1, 0, 1, 0],
+        ])
+        expect([...sut.around([0], sut.first)][0]).toEqual(sut.first)
+      })
+    })
+
+    describe('when reading every choice of both components from the first', () => {
+      it('then the readings are the stream readings, in order', () => {
+        // Arrange
+        const sut = tiesOf(ancestor, local, other)
+        const expected = readingsOf(ancestor, local, other)
+
+        // Act
+        const result = [...sut.around([0, 1], sut.first)].map(sut.readingOf)
+
+        // Assert
+        expect(result).toEqual(expected)
+        expect([...sut.readings()]).toEqual(expected)
+      })
+    })
+  })
+
+  describe('given unique keys only', () => {
+    describe('when exposing the tie set', () => {
+      it('then it has no component and one reading', () => {
+        // Arrange
+        const sut = tiesOf('A B', 'A B C', 'A B')
+
+        // Act
+        const result = [...sut.readings()]
+
+        // Assert
+        expect(sut.components).toEqual([])
+        expect(sut.first).toEqual([0])
+        expect(result).toEqual(readingsOf('A B', 'A B C', 'A B'))
+        expect(result).toHaveLength(1)
       })
     })
   })

@@ -12,7 +12,7 @@ export type PointSet = Readonly<Record<LiveSide, readonly Point[]>>
 
 type Alternatives = readonly PointSet[]
 
-type Tuple = readonly number[]
+export type Tuple = readonly number[]
 
 interface Candidate extends Point {
   readonly stretch: number
@@ -233,12 +233,13 @@ function* tuplesOf(sizes: Tuple): Generator<Tuple> {
   }
 }
 
-interface Minimised extends Component {
+/** A component with its fewest-move tuples, in lexicographic order. */
+export interface TieComponent extends Component {
   readonly minimal: readonly Tuple[]
 }
 
 // Every minimal tuple stays, in lexicographic order.
-const minimise = (component: Component, layout: Layout): Minimised => {
+const minimise = (component: Component, layout: Layout): TieComponent => {
   const costOfTuple = costOf(component, layout)
   let least = Number.POSITIVE_INFINITY
   let minimal: Tuple[] = []
@@ -291,7 +292,7 @@ const isSettled = (minimal: readonly Tuple[], offset: number): boolean =>
 
 // A stretch left one value by its component has nothing to walk: settledChoices
 // fixes it once instead of giving it a level of the walk.
-const stepsOf = (components: readonly Minimised[]): readonly Step[] =>
+const stepsOf = (components: readonly TieComponent[]): readonly Step[] =>
   components
     .flatMap(({ members, minimal }, component) =>
       members
@@ -301,10 +302,10 @@ const stepsOf = (components: readonly Minimised[]): readonly Step[] =>
     .sort((left, right) => left.stretch - right.stretch)
 
 const settledChoices = (
-  size: number,
-  components: readonly Minimised[]
+  base: Tuple,
+  components: readonly TieComponent[]
 ): number[] => {
-  const choice = Array.from({ length: size }, () => 0)
+  const choice = [...base]
   for (const { members, minimal } of components) {
     members.forEach((stretch, offset) => {
       choice[stretch] = minimal[0][offset]
@@ -322,10 +323,10 @@ class Walk {
   private readonly steps: readonly Step[]
 
   constructor(
-    size: number,
-    private readonly components: readonly Minimised[]
+    base: Tuple,
+    private readonly components: readonly TieComponent[]
   ) {
-    this.choice = settledChoices(size, components)
+    this.choice = settledChoices(base, components)
     this.ranges = components.map(({ minimal }) => ({
       from: 0,
       to: minimal.length,
@@ -374,18 +375,33 @@ class Walk {
 }
 
 /**
- * Every choice of one alternative per stretch with the fewest moves, in
- * lexicographic order. The moves of a choice are the entries off the longest
- * increasing run of each live side. Fixed points that every other point lies
- * on one side of cut the plane into gaps: only the stretches sharing a gap
- * trade moves, so each group of them is chosen apart from the others.
+ * Each group of stretches sharing a gap with its fewest-move choices, every tie
+ * kept. The moves of a choice are the entries off the longest increasing run
+ * of each live side. Fixed points that every other point lies on one side of
+ * cut the plane into gaps: only the stretches sharing a gap trade moves.
  */
-export const fewestMoves = (
+export const tieComponents = (
   stretches: readonly Alternatives[]
-): Iterable<Tuple> => {
+): readonly TieComponent[] => {
   const layout = layoutOf(stretches)
-  const components = componentsOf(stretches, layout).map(component =>
+  return componentsOf(stretches, layout).map(component =>
     minimise(component, layout)
   )
-  return new Walk(stretches.length, components).tuples()
 }
+
+// Every component at its least tuple: the first choice of the walk.
+export const firstChoice = (
+  size: number,
+  components: readonly TieComponent[]
+): Tuple =>
+  settledChoices(
+    Array.from({ length: size }, () => 0),
+    components
+  )
+
+// The choices of the given components in lexicographic order, every other
+// stretch kept as in base.
+export const walkAround = (
+  components: readonly TieComponent[],
+  base: Tuple
+): Iterable<Tuple> => new Walk(base, components).tuples()

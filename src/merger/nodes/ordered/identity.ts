@@ -7,7 +7,15 @@ import {
   readings,
   type SideGroups,
 } from '../keyedReadings.js'
-import { fewestMoves, type Point, type PointSet } from './identityComponents.js'
+import {
+  firstChoice,
+  type Point,
+  type PointSet,
+  type TieComponent,
+  type Tuple,
+  tieComponents,
+  walkAround,
+} from './identityComponents.js'
 import {
   ABSENT_POSITION,
   type LiveSide,
@@ -207,26 +215,77 @@ const pointsOf = (drafts: readonly Draft[]): PointSet => ({
 const hasOneAlternative = (stretch: Stretch): boolean =>
   stretch.alternatives.length === 1
 
+/** The tie set of the readings, exposed for a merge that walks it by parts. */
+export interface IdentityTies {
+  readonly first: Tuple
+  readonly components: readonly TieComponent[]
+  readonly readingOf: (tuple: Tuple) => Reading
+  // A component's stretch holds one key: fused stretches are never tied.
+  readonly keyOf: (stretch: number) => string
+  readonly readings: () => Iterable<Reading>
+  readonly around: (
+    components: readonly number[],
+    base: Tuple
+  ) => Iterable<Tuple>
+}
+
+function* readingsAlong(
+  tuples: Iterable<Tuple>,
+  readingOf: (tuple: Tuple) => Reading
+): Generator<Reading> {
+  for (const tuple of tuples) yield readingOf(tuple)
+}
+
+const tiesOver = (
+  kept: readonly Alternatives[],
+  components: readonly TieComponent[]
+): IdentityTies => {
+  const first = firstChoice(kept.length, components)
+  const readingOf = (tuple: Tuple): Reading =>
+    toReading(tuple.flatMap((choice, at) => kept[at][choice]))
+  return {
+    first,
+    components,
+    readingOf,
+    keyOf: stretch => kept[stretch][0][0].key,
+    readings: () => readingsAlong(walkAround(components, first), readingOf),
+    around: (selected, base) =>
+      walkAround(
+        selected.map(at => components[at]),
+        base
+      ),
+  }
+}
+
 // Each stretch keeps its no-loss alternatives; the fewest-move choices are
 // decided per group of stretches that share a gap, and walked back in the
 // order of the cross product of the alternatives.
+export const identityTies = (
+  ancestor: JsonArray,
+  local: JsonArray,
+  other: JsonArray,
+  keys: KeyedSides
+): IdentityTies => {
+  // A value determines its key (a field of the entry, or its whole content),
+  // so the values both sides hold split across keys and each key is judged
+  // alone.
+  const stretches = stretchesOf(groupSlots({ ancestor, local, other }, keys))
+  if (stretches.every(hasOneAlternative)) {
+    return tiesOver(
+      stretches.map(stretch => stretch.alternatives),
+      []
+    )
+  }
+  const kept = withoutLosses(stretches)
+  const points = kept.map(alternatives => alternatives.map(pointsOf))
+  return tiesOver(kept, tieComponents(points))
+}
+
 export function* identify(
   ancestor: JsonArray,
   local: JsonArray,
   other: JsonArray,
   keys: KeyedSides
 ): Generator<Reading> {
-  // A value determines its key (a field of the entry, or its whole content),
-  // so the values both sides hold split across keys and each key is judged
-  // alone.
-  const stretches = stretchesOf(groupSlots({ ancestor, local, other }, keys))
-  if (stretches.every(hasOneAlternative)) {
-    yield toReading(stretches.flatMap(stretch => stretch.alternatives[0]))
-    return
-  }
-  const kept = withoutLosses(stretches)
-  const points = kept.map(alternatives => alternatives.map(pointsOf))
-  for (const choices of fewestMoves(points)) {
-    yield toReading(choices.flatMap((choice, at) => kept[at][choice]))
-  }
+  yield* identityTies(ancestor, local, other, keys).readings()
 }

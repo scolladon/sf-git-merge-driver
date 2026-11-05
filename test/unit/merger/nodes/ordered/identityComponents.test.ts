@@ -1,15 +1,26 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import {
-  fewestMoves,
+  firstChoice,
   type Point,
   type PointSet,
+  type Tuple,
+  tieComponents,
+  walkAround,
 } from '../../../../../src/merger/nodes/ordered/identityComponents.js'
 import { lisLength } from '../../../../../src/merger/nodes/ordered/orderAxis.js'
 import {
   LIVE_SIDES,
   type LiveSide,
 } from '../../../../../src/merger/nodes/ordered/orderedEntry.js'
+
+// The whole walk: every component from its least tuple.
+const fewestMoves = (
+  stretches: readonly (readonly PointSet[])[]
+): Iterable<Tuple> => {
+  const components = tieComponents(stretches)
+  return walkAround(components, firstChoice(stretches.length, components))
+}
 
 type Pair = readonly [ancestor: number, position: number]
 
@@ -480,6 +491,99 @@ describe('fewestMoves', () => {
             expect(result).toEqual(expected)
           })
         )
+      })
+    })
+  })
+})
+
+describe('walkAround', () => {
+  describe('given two tied stretches split by a fixed one', () => {
+    const TWO_TIED_STRETCHES = [
+      [
+        alternative(
+          [[0, 0]],
+          [
+            [0, 0],
+            [1, 1],
+          ]
+        ),
+        alternative(
+          [[1, 0]],
+          [
+            [0, 0],
+            [1, 1],
+          ]
+        ),
+      ],
+      [alternative([[2, 1]], [[2, 2]])],
+      [
+        alternative(
+          [[3, 2]],
+          [
+            [3, 3],
+            [4, 4],
+          ]
+        ),
+        alternative(
+          [[4, 2]],
+          [
+            [3, 3],
+            [4, 4],
+          ]
+        ),
+      ],
+    ]
+
+    describe('when taking their components', () => {
+      it('then each holds one stretch with both of its tuples, and the first choice takes the least', () => {
+        // Arrange
+        const sut = tieComponents(TWO_TIED_STRETCHES)
+
+        // Act
+        const result = sut.map(({ members, minimal }) => ({ members, minimal }))
+
+        // Assert
+        expect(result).toEqual([
+          { members: [0], minimal: [[0], [1]] },
+          { members: [2], minimal: [[0], [1]] },
+        ])
+        expect(firstChoice(TWO_TIED_STRETCHES.length, sut)).toEqual([0, 0, 0])
+      })
+    })
+
+    describe('when walking the first component around a base holding the other tuple of the second', () => {
+      it('then every tuple keeps the choice of the base for the second', () => {
+        // Arrange
+        const components = tieComponents(TWO_TIED_STRETCHES)
+        const base: Tuple = [0, 0, 1]
+
+        // Act
+        const result = [...walkAround([components[0]], base)]
+
+        // Assert
+        expect(result).toEqual([
+          [0, 0, 1],
+          [1, 0, 1],
+        ])
+      })
+    })
+
+    describe('when walking both from the first choice', () => {
+      it('then the whole product comes in lexicographic order', () => {
+        // Arrange
+        const components = tieComponents(TWO_TIED_STRETCHES)
+        const first = firstChoice(TWO_TIED_STRETCHES.length, components)
+
+        // Act
+        const result = [...walkAround(components, first)]
+
+        // Assert
+        expect(result).toEqual([
+          [0, 0, 0],
+          [0, 0, 1],
+          [1, 0, 0],
+          [1, 0, 1],
+        ])
       })
     })
   })

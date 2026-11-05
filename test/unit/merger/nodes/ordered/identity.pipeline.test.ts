@@ -59,7 +59,17 @@ describe('given the enumerating identity wired in', () => {
     vi.resetModules()
     vi.doMock(
       '../../../../../src/merger/nodes/ordered/identity.js',
-      () => import('../../../../utils/oracles/enumeratedIdentity.js')
+      async () => {
+        const oracle = await import(
+          '../../../../utils/oracles/enumeratedIdentity.js'
+        )
+        // The merge only reads the stream of readings from the tie set.
+        return {
+          identityTies: (...sides: Parameters<typeof oracle.identify>) => ({
+            readings: () => oracle.identify(...sides),
+          }),
+        }
+      }
     )
     reference = await import('../../laws/arbitraries.js')
     ReferenceNode = (

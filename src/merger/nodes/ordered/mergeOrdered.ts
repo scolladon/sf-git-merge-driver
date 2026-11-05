@@ -16,7 +16,7 @@ import { type Ambiguity, withAgreedReplacements } from './agreedReplacement.js'
 import { buildBlocks, type OrderedBlock, type OrderedItem } from './blocks.js'
 import { type ConflictMarks, ConflictSeeds, NO_MARKS } from './conflictSeeds.js'
 import { type EntryMerger, type EntryStatus, entryStatuses } from './content.js'
-import { identify } from './identity.js'
+import { identityTies } from './identity.js'
 import { placeOneSided } from './oneSidedPlacement.js'
 import { everyEntry, possiblyMoved } from './orderAxis.js'
 import { buildOrderedContext, type OrderedContext } from './orderedContext.js'
@@ -356,7 +356,7 @@ export const mergeOrderedArrays = (
   const wrapped = wrapSides(sides, attribute)
   const scan = new TieScan()
   const { ancestor, local, other, keys } = sides
-  for (const reading of identify(ancestor, local, other, keys)) {
+  for (const reading of identityTies(ancestor, local, other, keys).readings()) {
     scan.add(mergeReading(reading, attribute, config))
     if (scan.isWholeConflict()) return wholeConflict(wrapped)
   }
