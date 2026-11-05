@@ -172,9 +172,48 @@ describe('given a first part whose best reading is not the first one', () => {
 
 describe('given the dropinsert grid at r = 3, m = 3', () => {
   describe('when merging the tied parts', () => {
-    it('then survivors that differ without conflict are left to the stream', () => {
+    it('then the survivors that differ without conflict come back as the trimmed block', () => {
+      // Arrange
+      const sides = shapeSides('dropinsert', 3, 3)
+      const { input } = inputOf(sides)
+      const sut = mergePartwise
+
+      // Act
+      const result = sut(input)
+
+      // Assert
+      expect(result).toStrictEqual(oracleOf(sides))
+      expect(result?.hasConflict).toBe(true)
+    })
+
+    it('then it merges the readings of the survivors and the shortest one', () => {
       // Arrange
       const { input, merge } = inputOf(shapeSides('dropinsert', 3, 3))
+      const sut = mergePartwise
+
+      // Act
+      sut(input)
+
+      // Assert
+      expect(merge).toHaveBeenCalledTimes(8)
+    })
+  })
+})
+
+describe('given a part entry that carries the value of a cut under its own key', () => {
+  const cutValueUnderAnotherKey = (): OrderedSides => {
+    const grid = shapeSides('dropinsert', 2, 2)
+    const cut = grid.ancestor[grid.keys.ancestor.indexOf('U0a')]
+    const other = grid.other.map((entry, at) =>
+      at === grid.keys.other.indexOf('U0x') ? cut : entry
+    )
+    return { ...grid, other }
+  }
+
+  describe('when merging the tied parts', () => {
+    it('then the trimmed block is left to the stream', () => {
+      // Arrange
+      const { input } = inputOf(cutValueUnderAnotherKey())
       const sut = mergePartwise
 
       // Act
@@ -182,7 +221,20 @@ describe('given the dropinsert grid at r = 3, m = 3', () => {
 
       // Assert
       expect(result).toBeNull()
-      expect(merge).toHaveBeenCalledTimes(7)
+    })
+  })
+
+  describe('when merging', () => {
+    it('then the result is the one the tie-scan merge builds', () => {
+      // Arrange
+      const sides = cutValueUnderAnotherKey()
+      const sut = mergeOrderedArrays
+
+      // Act
+      const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
+
+      // Assert
+      expect(result).toStrictEqual(oracleOf(sides))
     })
   })
 })
@@ -230,6 +282,37 @@ describe('given the dropone grid at r = 3, m = 9', () => {
         expect(result).toStrictEqual(
           noConflict(wrap([...sides.local, lastOf(sides.other)]))
         )
+        expect(elapsed).toBeLessThan(BUDGET_MS)
+      },
+      GRID_TIMEOUT_MS
+    )
+  })
+})
+
+describe('given the dropinsert grid at r = 3, m = 9', () => {
+  // 3^9 tied readings take seconds; the partwise merge needs 20. The budget
+  // sits between the two so that CPU load and coverage instrumentation cannot
+  // push the merge over it.
+  const COPIES = 3
+  const GADGETS = 9
+  const BUDGET_MS = 400
+  const GRID_TIMEOUT_MS = 120_000
+
+  describe('when merging', () => {
+    it(
+      'then the trimmed block comes back within the budget',
+      () => {
+        // Arrange
+        const sides = shapeSides('dropinsert', COPIES, GADGETS)
+        const sut = mergeOrderedArrays
+        const start = performance.now()
+
+        // Act
+        const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
+        const elapsed = performance.now() - start
+
+        // Assert
+        expect(result.hasConflict).toBe(true)
         expect(elapsed).toBeLessThan(BUDGET_MS)
       },
       GRID_TIMEOUT_MS

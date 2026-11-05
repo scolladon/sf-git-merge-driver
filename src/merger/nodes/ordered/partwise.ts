@@ -1,5 +1,7 @@
+import type { JsonArray } from '../../../types/jsonTypes.js'
 import type { MergeResult } from '../../../types/mergeResult.js'
 import { jsonIdentical } from '../../../utils/jsonEqual.js'
+import { signatureOf } from '../../../utils/jsonSignature.js'
 import type { IdentityTies } from './identity.js'
 import type { Tuple } from './identityComponents.js'
 import type { MergedReading } from './mergeOrdered.js'
@@ -7,6 +9,7 @@ import type { Reading } from './orderedEntry.js'
 import {
   asResult,
   TieScan,
+  trimmedBlock,
   type Wrapped,
   wholeConflict,
 } from './tieCombination.js'
@@ -48,12 +51,43 @@ const choiceAt = (
 const withChoices = (
   ties: IdentityTies,
   rounds: readonly PartRound[],
-  positionOf: (round: PartRound) => number
+  positionOf: (round: PartRound, at: number) => number
 ): Tuple =>
   rounds.reduce(
-    (base, round) => choiceAt(ties, round.part, base, positionOf(round)),
+    (base, round, at) =>
+      choiceAt(ties, round.part, base, positionOf(round, at)),
     ties.first
   )
+
+const shortestAt = (readings: readonly MergedReading[]): number => {
+  const lengths = readings.map(reading => reading.output.length)
+  return lengths.indexOf(Math.min(...lengths))
+}
+
+// Lengths add up over the parts: each at its shortest survivor gives the
+// shortest survivor.
+const shortestTuple = (
+  ties: IdentityTies,
+  rounds: readonly PartRound[],
+  variations: Variations
+): Tuple =>
+  withChoices(
+    ties,
+    rounds,
+    (round, at) => round.survivors[shortestAt(variations[at])]
+  )
+
+// A region item equal to a cut's would let two outputs agree across the cut,
+// and the one-part variations would no longer bound every survivor's ends.
+const holdsEachCutOnce = (
+  output: JsonArray,
+  cutItems: ReadonlySet<string>
+): boolean => {
+  const held = output
+    .map(item => signatureOf(item))
+    .filter(signature => cutItems.has(signature))
+  return held.length === cutItems.size && new Set(held).size === held.length
+}
 
 const rendersAlike = (variations: Variations): boolean => {
   const [[star]] = variations
@@ -101,13 +135,34 @@ class PartwiseRun {
     return rounds.map(round => this.aroundStar(round, star, starMerged))
   }
 
-  decided(variations: Variations): MergeResult | null {
+  decided(
+    rounds: readonly PartRound[],
+    variations: Variations
+  ): MergeResult | null {
     if (rendersAlike(variations)) return asResult(variations[0][0])
     if (variations.flat().some(reading => reading.hasConflict)) {
       return wholeConflict(this.input.wrapped)
     }
-    // Survivors that differ without conflict: the stream builds their block.
-    return null
+    return this.stitched(rounds, variations)
+  }
+
+  private stitched(
+    rounds: readonly PartRound[],
+    variations: Variations
+  ): MergeResult | null {
+    const shortest = this.merged(
+      shortestTuple(this.input.ties, rounds, variations)
+    )
+    const outputs = [
+      variations[0][0].output,
+      ...variations.flat().map(reading => reading.output),
+      shortest.output,
+    ]
+    const { cutItems } = this.input.parts
+    if (!outputs.every(output => holdsEachCutOnce(output, cutItems))) {
+      return null
+    }
+    return trimmedBlock(this.input.wrapped, outputs)
   }
 
   private aroundStar(
@@ -131,5 +186,5 @@ export const mergePartwise = (input: Partwise): MergeResult | null => {
   }
   const variations = run.variations(rounds)
   if (run.isWholeConflict()) return wholeConflict(input.wrapped)
-  return run.decided(variations)
+  return run.decided(rounds, variations)
 }

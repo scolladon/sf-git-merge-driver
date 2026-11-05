@@ -46,7 +46,7 @@ const startsAndEndsWith = (
     jsonIdentical(ancestor[ancestor.length - tail.length + index], item)
   )
 
-const trimmedBlock = (
+export const trimmedBlock = (
   wrapped: Wrapped,
   outputs: readonly JsonArray[]
 ): MergeResult => {

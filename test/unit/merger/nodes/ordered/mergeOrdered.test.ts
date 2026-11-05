@@ -12,7 +12,10 @@ import type {
   JsonObject,
   JsonValue,
 } from '../../../../../src/types/jsonTypes.js'
-import { withConflict } from '../../../../../src/types/mergeResult.js'
+import {
+  noConflict,
+  withConflict,
+} from '../../../../../src/types/mergeResult.js'
 import { jsonIdentical } from '../../../../../src/utils/jsonEqual.js'
 import { mergeOrderedArrays as referenceMerge } from '../../../../utils/oracles/perReadingMerge.js'
 import {
@@ -22,6 +25,7 @@ import {
   IDENTITY_ANCESTORS,
   IDENTITY_TOKENS,
 } from '../../../../utils/orderedCases.js'
+import { cutCaseArb, shapeSides } from '../../../../utils/orderedCuts.js'
 import {
   formatResult,
   ORDERED_ATTRIBUTE,
@@ -319,6 +323,34 @@ const RENAMED_KEYS: Names = {
   '~b': '~r',
 }
 
+// Every name prefixed: first appearance and alphabetical order are kept. The
+// label stems 'a' to 'h' are those of the keyless tokens.
+const CUT_RENAMED_KEYS: Names = {
+  A: 'RA',
+  B: 'RB',
+  X: 'RX',
+  C0: 'RC0',
+  C1: 'RC1',
+  D: 'RD',
+  E: 'RE',
+  F: 'RF',
+  G: 'RG',
+  H: 'RH',
+  I: 'RI',
+  '~a': '~ra',
+  '~b': '~rb',
+  '~d': '~rd',
+  '~e': '~re',
+  '~g': '~rg',
+  '~h': '~rh',
+  a: 'ra',
+  b: 'rb',
+  d: 'rd',
+  e: 're',
+  g: 'rg',
+  h: 'rh',
+}
+
 const SECOND_KEYS: Names = {
   A: 'C',
   B: 'D',
@@ -340,17 +372,34 @@ const renamedCase = (names: Names, [ancestor, local, other]: Case): Case => {
 
 const NAMED_FIELDS: ReadonlySet<string> = new Set(['fullName', 'label'])
 
-const relabeled = (value: JsonValue): JsonValue => {
-  if (Array.isArray(value)) return value.map(item => relabeled(item))
+const relabeled = (names: Names, value: JsonValue): JsonValue => {
+  if (Array.isArray(value)) return value.map(item => relabeled(names, item))
   if (value === null || typeof value !== 'object') return value
   return Object.fromEntries(
     Object.entries(value).map(([field, content]) => [
       field,
       NAMED_FIELDS.has(field) && typeof content === 'string'
-        ? renamed(RENAMED_KEYS, content)
-        : relabeled(content),
+        ? renamed(names, content)
+        : relabeled(names, content),
     ])
   )
+}
+
+const expectRelabeled = (tokens: Case, names: Names): void => {
+  // Arrange
+  const sut = mergeOrderedArrays
+  const original = sut(sidesOfCase(tokens), ORDERED_ATTRIBUTE, defaultConfig)
+
+  // Act
+  const result = sut(
+    sidesOfCase(renamedCase(names, tokens)),
+    ORDERED_ATTRIBUTE,
+    defaultConfig
+  )
+
+  // Assert
+  expect(result.hasConflict).toBe(original.hasConflict)
+  expect(result.output).toEqual(relabeled(names, original.output))
 }
 
 const SEPARATOR_TOKEN = 'Z'
@@ -382,26 +431,16 @@ describe('mergeOrderedArrays laws', () => {
         fc.assert(
           fc.property(
             caseArb(IDENTITY_ANCESTORS, IDENTITY, IDENTITY_TOKENS),
-            tokens => {
-              // Arrange
-              const sut = mergeOrderedArrays
-              const original = sut(
-                sidesOfCase(tokens),
-                ORDERED_ATTRIBUTE,
-                defaultConfig
-              )
+            tokens => expectRelabeled(tokens, RENAMED_KEYS)
+          )
+        )
+      })
 
-              // Act
-              const result = sut(
-                sidesOfCase(renamedCase(RENAMED_KEYS, tokens)),
-                ORDERED_ATTRIBUTE,
-                defaultConfig
-              )
-
-              // Assert
-              expect(result.hasConflict).toBe(original.hasConflict)
-              expect(result.output).toEqual(relabeled(original.output))
-            }
+      it('then the result holds across the cuts of a case with several parts', () => {
+        fc.assert(
+          fc.property(
+            cutCaseArb(IDENTITY_ANCESTORS, IDENTITY, IDENTITY_TOKENS),
+            tokens => expectRelabeled(tokens, CUT_RENAMED_KEYS)
           )
         )
       })
@@ -458,6 +497,41 @@ describe('mergeOrderedArrays laws', () => {
           expect(result).toStrictEqual(wholeArrayConflict(sides))
         })
       })
+
+      describe('when merging the dropone grid', () => {
+        it('then the result is the local side with the last entry of the other', () => {
+          // Arrange
+          const sides = shapeSides('dropone', copies, keys)
+          const sut = mergeOrderedArrays
+
+          // Act
+          const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
+
+          // Assert
+          expect(result).toStrictEqual(
+            noConflict(
+              wrap([...sides.local, sides.other[sides.other.length - 1]])
+            )
+          )
+        })
+      })
+
+      describe.each(['floorIdentical', 'swapgrow'] as const)(
+        'when merging the %s grid',
+        shape => {
+          it('then the result is the whole-array conflict', () => {
+            // Arrange
+            const sides = shapeSides(shape, copies, keys)
+            const sut = mergeOrderedArrays
+
+            // Act
+            const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
+
+            // Assert
+            expect(result).toStrictEqual(wholeArrayConflict(sides))
+          })
+        }
+      )
 
       describe('when merging the distinct grid', () => {
         it('then the result is its one reading merged', () => {
