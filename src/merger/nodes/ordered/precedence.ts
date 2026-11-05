@@ -3,6 +3,7 @@ import type { ConflictMarks, Join } from './conflictSeeds.js'
 import type { OrderedContext } from './orderedContext.js'
 import type { LiveSide, OrderedEntry, Reading } from './orderedEntry.js'
 import { positionOn } from './orderedEntry.js'
+import { componentOverlaps } from './overlapComponents.js'
 
 export interface Precedence {
   readonly order: Reading
@@ -29,7 +30,7 @@ const flippedPartners = (
       flippedOn(entry, partner, 'local') !== flippedOn(entry, partner, 'other')
   )
 
-export const orderOverlaps = (ctx: OrderedContext): ConflictMarks => {
+export const pairOverlaps = (ctx: OrderedContext): ConflictMarks => {
   const joins: Join[] = []
   for (const id of ctx.moved.local) {
     if (!ctx.moved.other.has(id)) continue
@@ -40,6 +41,19 @@ export const orderOverlaps = (ctx: OrderedContext): ConflictMarks => {
   }
   return { joins, seeds: [] }
 }
+
+// Below this many entries both sides moved, joining pair by pair costs less
+// than the component sweep. Measured on unique-key arrays of 50 to 4 000
+// entries: from 64 the sweep is never more than 5 % slower.
+const OVERLAP_SWEEP_FROM = 64
+
+const movedByBothCount = (ctx: OrderedContext): number =>
+  [...ctx.moved.local].filter(id => ctx.moved.other.has(id)).length
+
+export const orderOverlaps = (ctx: OrderedContext): ConflictMarks =>
+  movedByBothCount(ctx) < OVERLAP_SWEEP_FROM
+    ? pairOverlaps(ctx)
+    : componentOverlaps(ctx)
 
 /** Where the sides disagree, the side that flipped the pair wins it. */
 const comesBefore = (entry: OrderedEntry, partner: OrderedEntry): boolean => {

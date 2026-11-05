@@ -4,12 +4,17 @@ import type { OrderedContext } from '../../../../../src/merger/nodes/ordered/ord
 import {
   cycleMarks,
   orderOverlaps,
+  pairOverlaps,
   pairScores,
   sweepScores,
   tournament,
 } from '../../../../../src/merger/nodes/ordered/precedence.js'
 import * as pairwise from '../../../../utils/oracles/pairwisePrecedence.js'
-import { contextOf, keysOf } from '../../../../utils/orderedContext.js'
+import {
+  contextOf,
+  keysOf,
+  seededClasses,
+} from '../../../../utils/orderedContext.js'
 import {
   keyTokens,
   type MovedCase,
@@ -23,6 +28,7 @@ const MAX_GENERATED_SIZE = 300
 const MANY_KEYS = 2_000
 const MOVE_STRIDE = 4
 const MOVE_SHIFT = 1
+const OTHER_SHIFT = 2
 
 const contextOfCase = (generated: MovedCase): OrderedContext =>
   contextOf(generated.ancestor, generated.local, generated.other)
@@ -328,21 +334,74 @@ describe('given generated orderings', () => {
     })
   })
 
-  describe('when overlaps are computed', () => {
-    it('then the joins equal the pairwise reference', () => {
+  describe('when reading the entries both sides moved', () => {
+    it('then each is an entry both sides kept', () => {
       fc.assert(
         fc.property(movedCaseArb(MAX_GENERATED_SIZE), generated => {
           // Arrange
           const ctx = contextOfCase(generated)
-          const expected = pairwise.orderOverlaps(ctx)
+          const kept = new Set(ctx.keptByAll.map(entry => entry.id))
 
           // Act
-          const sut = orderOverlaps(ctx)
+          const sut = [...ctx.moved.local].filter(id => ctx.moved.other.has(id))
+
+          // Assert
+          expect(sut.filter(id => !kept.has(id))).toEqual([])
+        })
+      )
+    })
+  })
+
+  describe('when overlaps are joined', () => {
+    it('then the classes and the marked entries equal the pairwise reference', () => {
+      fc.assert(
+        fc.property(movedCaseArb(MAX_GENERATED_SIZE), generated => {
+          // Arrange
+          const ctx = contextOfCase(generated)
+          const size = ctx.entries.length
+          const expected = seededClasses(pairwise.orderOverlaps(ctx), size)
+
+          // Act
+          const sut = seededClasses(orderOverlaps(ctx), size)
 
           // Assert
           expect(sut).toEqual(expected)
         })
       )
+    })
+
+    it('then pair by pair the classes and the marked entries equal the pairwise reference', () => {
+      fc.assert(
+        fc.property(movedCaseArb(MAX_GENERATED_SIZE), generated => {
+          // Arrange
+          const ctx = contextOfCase(generated)
+          const size = ctx.entries.length
+          const expected = seededClasses(pairwise.orderOverlaps(ctx), size)
+
+          // Act
+          const sut = seededClasses(pairOverlaps(ctx), size)
+
+          // Assert
+          expect(sut).toEqual(expected)
+        })
+      )
+    })
+
+    it('then both sides moving every fourth of thousands of entries differently gives the pairwise classes and marks', () => {
+      // Arrange
+      const keys = keyTokens(MANY_KEYS)
+      const ancestor = keys.join(' ')
+      const local = movedEvery(keys, MOVE_STRIDE, MOVE_SHIFT).join(' ')
+      const other = movedEvery(keys, MOVE_STRIDE, OTHER_SHIFT).join(' ')
+      const ctx = contextOf(ancestor, local, other)
+      const size = ctx.entries.length
+      const expected = seededClasses(pairwise.orderOverlaps(ctx), size)
+
+      // Act
+      const sut = seededClasses(orderOverlaps(ctx), size)
+
+      // Assert
+      expect(sut).toEqual(expected)
     })
   })
 })
@@ -367,6 +426,37 @@ describe('given thousands of kept entries, every other one moved by other', () =
         // Act
         const start = performance.now()
         tournament(ctx)
+        const elapsed = performance.now() - start
+
+        // Assert
+        expect(elapsed).toBeLessThan(BUDGET_MS)
+      },
+      QUADRATIC_GUARD_TIMEOUT_MS
+    )
+  })
+})
+
+describe('given thousands of kept entries both sides move differently', () => {
+  // Joining by component takes tens of milliseconds at SIZE; joining pair by
+  // pair takes seconds. The budget sits between the two so that CPU load and
+  // coverage instrumentation cannot push the component code over it.
+  const SIZE = 16_000
+  const BUDGET_MS = 300
+  const QUADRATIC_GUARD_TIMEOUT_MS = 120_000
+
+  describe('when the overlaps are joined', () => {
+    it(
+      'then it stays within the budget',
+      () => {
+        // Arrange
+        const keys = keyTokens(SIZE)
+        const local = movedEvery(keys, MOVE_STRIDE, MOVE_SHIFT)
+        const other = movedEvery(keys, MOVE_STRIDE, OTHER_SHIFT)
+        const ctx = contextOf(keys.join(' '), local.join(' '), other.join(' '))
+
+        // Act
+        const start = performance.now()
+        orderOverlaps(ctx)
         const elapsed = performance.now() - start
 
         // Assert
