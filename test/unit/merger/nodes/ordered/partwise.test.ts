@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import { buildConflictMarkers } from '../../../../../src/merger/ConflictMarkerBuilder.js'
-import { identityTies } from '../../../../../src/merger/nodes/ordered/identity.js'
 import {
+  type IdentityTies,
+  identityTies,
+} from '../../../../../src/merger/nodes/ordered/identity.js'
+import type { Tuple } from '../../../../../src/merger/nodes/ordered/identityComponents.js'
+import {
+  type MergedReading,
   mergeOrderedArrays,
   mergeReading,
   type OrderedSides,
@@ -9,7 +14,10 @@ import {
 import type { Reading } from '../../../../../src/merger/nodes/ordered/orderedEntry.js'
 import { mergePartwise } from '../../../../../src/merger/nodes/ordered/partwise.js'
 import { tiePartsOf } from '../../../../../src/merger/nodes/ordered/tieParts.js'
-import type { JsonArray } from '../../../../../src/types/jsonTypes.js'
+import type {
+  JsonArray,
+  JsonObject,
+} from '../../../../../src/types/jsonTypes.js'
 import {
   type MergeResult,
   noConflict,
@@ -21,6 +29,7 @@ import {
   formatResult,
   ORDERED_ATTRIBUTE,
   orderedSides,
+  toEntry,
 } from '../../../../utils/orderedTokens.js'
 import { defaultConfig } from '../../../../utils/testConfig.js'
 
@@ -397,6 +406,86 @@ describe('given the editedcut layout at r = 3, m = 9', () => {
         expect(elapsed).toBeLessThan(BUDGET_MS)
       },
       GRID_TIMEOUT_MS
+    )
+  })
+})
+
+describe('given one tied part with more choices than a spread can pass', () => {
+  // A spread passes one argument per choice and overflows the stack from about
+  // 100 000 of them: twice that leaves room for any depth the runner adds.
+  const CHOICES = 200_000
+  // Coverage and mutation runs slow the merge code several-fold.
+  const LARGE_TIMEOUT_MS = 120_000
+  const ITEM: JsonObject = { [ORDERED_ATTRIBUTE]: toEntry('R') }
+  const SHORT: MergedReading = {
+    output: [ITEM],
+    hasConflict: false,
+    phantomSwaps: () => 0,
+  }
+  const LONG: MergedReading = { ...SHORT, output: [ITEM, ITEM] }
+
+  function* choices(): Generator<Tuple> {
+    for (let at = 0; at < CHOICES; at++) yield [at]
+  }
+
+  const ties: IdentityTies = {
+    first: [0],
+    components: [],
+    readingOf: () => [],
+    keyOf: () => 'R',
+    readings: () => [],
+    around: choices,
+  }
+
+  // The first choice renders longer than every other, so the outputs differ
+  // without conflict and the merge goes on to the shortest survivor.
+  const inputWithChoices = () => {
+    const merge = vi
+      .fn<(reading: Reading) => MergedReading>()
+      .mockReturnValueOnce(LONG)
+      .mockReturnValue(SHORT)
+    const input = {
+      wrapped: { ancestor: [ITEM], local: [ITEM, ITEM], other: [ITEM] },
+      ties,
+      parts: { tied: [[0]], cutItems: new Set<string>() },
+      merge,
+    }
+    return { input, merge }
+  }
+
+  describe('when merging the tied parts', () => {
+    it(
+      'then the trimmed block holds what the outputs and both sides do not share',
+      () => {
+        // Arrange
+        const { input } = inputWithChoices()
+        const sut = mergePartwise
+
+        // Act
+        const result = sut(input)
+
+        // Assert
+        expect(result).toStrictEqual(
+          withConflict([ITEM, buildConflictMarkers([ITEM], [], [])])
+        )
+      },
+      LARGE_TIMEOUT_MS
+    )
+
+    it(
+      'then it merges every choice and the shortest survivor',
+      () => {
+        // Arrange
+        const { input, merge } = inputWithChoices()
+        const sut = mergePartwise
+
+        // Act
+        sut(input)
+
+        // Assert
+        expect(merge).toHaveBeenCalledTimes(CHOICES + 1)
+      },
+      LARGE_TIMEOUT_MS
     )
   })
 })

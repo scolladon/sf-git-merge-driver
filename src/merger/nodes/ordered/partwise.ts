@@ -1,5 +1,6 @@
 import type { JsonArray } from '../../../types/jsonTypes.js'
 import type { MergeResult } from '../../../types/mergeResult.js'
+import { leastOf } from '../../../utils/arrayUtils.js'
 import { jsonIdentical } from '../../../utils/jsonEqual.js'
 import { signatureOf } from '../../../utils/jsonSignature.js'
 import type { IdentityTies } from './identity.js'
@@ -34,7 +35,7 @@ type Variations = readonly (readonly MergedReading[])[]
 
 const fewestAt = (merged: readonly MergedReading[]): readonly number[] => {
   const swaps = merged.map(reading => reading.phantomSwaps())
-  const least = Math.min(...swaps)
+  const least = leastOf(swaps)
   return swaps.flatMap((count, at) => (count === least ? [at] : []))
 }
 
@@ -61,7 +62,7 @@ const withChoices = (
 
 const shortestAt = (readings: readonly MergedReading[]): number => {
   const lengths = readings.map(reading => reading.output.length)
-  return lengths.indexOf(Math.min(...lengths))
+  return lengths.indexOf(leastOf(lengths))
 }
 
 // Lengths add up over the parts: each at its shortest survivor gives the

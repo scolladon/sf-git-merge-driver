@@ -1,5 +1,6 @@
 import type { JsonArray } from '../../../types/jsonTypes.js'
 import { type MergeResult, withConflict } from '../../../types/mergeResult.js'
+import { leastOf } from '../../../utils/arrayUtils.js'
 import { jsonIdentical } from '../../../utils/jsonEqual.js'
 import { buildConflictMarkers } from '../../ConflictMarkerBuilder.js'
 import type { MergedReading, OrderedSides } from './mergeOrdered.js'
@@ -26,7 +27,7 @@ const sharedHead = (sides: readonly JsonArray[]): number => {
 }
 
 const sharedTail = (sides: readonly JsonArray[], head: number): number => {
-  const room = Math.min(...sides.map(side => side.length)) - head
+  const room = leastOf(sides.map(side => side.length)) - head
   let length = 0
   const fromEnd = (side: JsonArray) => side.length - length - 1
   while (length < room && itemsAgree(sides, fromEnd)) length++
@@ -83,7 +84,7 @@ export const fewestPhantomSwaps = (
   // Stryker disable next-line ConditionalExpression: a lone reading is its own minimum, so the filter keeps it
   if (merged.length === 1) return merged.map(asResult)
   const swaps = merged.map(reading => reading.phantomSwaps())
-  const least = Math.min(...swaps)
+  const least = leastOf(swaps)
   return merged.filter((_, index) => swaps[index] === least).map(asResult)
 }
 
