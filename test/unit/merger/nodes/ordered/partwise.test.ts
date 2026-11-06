@@ -5,13 +5,13 @@ import {
   identityTies,
 } from '../../../../../src/merger/nodes/ordered/identity.js'
 import type { Tuple } from '../../../../../src/merger/nodes/ordered/identityComponents.js'
+import { mergeOrderedArrays } from '../../../../../src/merger/nodes/ordered/mergeOrdered.js'
 import {
   type MergedReading,
-  mergeOrderedArrays,
   mergeReading,
-  type OrderedSides,
-} from '../../../../../src/merger/nodes/ordered/mergeOrdered.js'
+} from '../../../../../src/merger/nodes/ordered/mergeReading.js'
 import type { Reading } from '../../../../../src/merger/nodes/ordered/orderedEntry.js'
+import type { OrderedSides } from '../../../../../src/merger/nodes/ordered/orderedSides.js'
 import { mergePartwise } from '../../../../../src/merger/nodes/ordered/partwise.js'
 import { tiePartsOf } from '../../../../../src/merger/nodes/ordered/tieParts.js'
 import type {

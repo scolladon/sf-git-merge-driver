@@ -1,9 +1,7 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
-import {
-  mergeOrderedArrays,
-  mergeReading,
-} from '../../../../../src/merger/nodes/ordered/mergeOrdered.js'
+import { mergeOrderedArrays } from '../../../../../src/merger/nodes/ordered/mergeOrdered.js'
+import { mergeReading } from '../../../../../src/merger/nodes/ordered/mergeReading.js'
 import { jsonEqual } from '../../../../../src/utils/jsonEqual.js'
 import {
   type Case,

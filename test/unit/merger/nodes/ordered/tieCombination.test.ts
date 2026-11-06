@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildConflictMarkers } from '../../../../../src/merger/ConflictMarkerBuilder.js'
-import type { MergedReading } from '../../../../../src/merger/nodes/ordered/mergeOrdered.js'
+import type { MergedReading } from '../../../../../src/merger/nodes/ordered/mergeReading.js'
 import {
   fewestPhantomSwaps,
   trimmedBlock,

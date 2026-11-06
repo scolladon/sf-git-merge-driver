@@ -4,7 +4,7 @@ import { signatureOf } from '../../../utils/jsonSignature.js'
 import type { KeyedSides, SideKeys } from '../KeyedArrayIndex.js'
 import type { IdentityTies } from './identity.js'
 import { isTied } from './identityComponents.js'
-import type { OrderedSides } from './mergeOrdered.js'
+import type { OrderedSides } from './orderedSides.js'
 
 const SIDES = ['ancestor', 'local', 'other'] as const
 

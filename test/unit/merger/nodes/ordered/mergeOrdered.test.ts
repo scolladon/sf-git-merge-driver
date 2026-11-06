@@ -2,11 +2,9 @@ import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import { buildConflictMarkers } from '../../../../../src/merger/ConflictMarkerBuilder.js'
 import { identify } from '../../../../../src/merger/nodes/ordered/identity.js'
-import {
-  mergeOrderedArrays,
-  mergeReading,
-  type OrderedSides,
-} from '../../../../../src/merger/nodes/ordered/mergeOrdered.js'
+import { mergeOrderedArrays } from '../../../../../src/merger/nodes/ordered/mergeOrdered.js'
+import { mergeReading } from '../../../../../src/merger/nodes/ordered/mergeReading.js'
+import type { OrderedSides } from '../../../../../src/merger/nodes/ordered/orderedSides.js'
 import type {
   JsonArray,
   JsonObject,

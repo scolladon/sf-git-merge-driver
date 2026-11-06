@@ -3,9 +3,8 @@ import { type MergeResult, withConflict } from '../../../types/mergeResult.js'
 import { leastOf } from '../../../utils/arrayUtils.js'
 import { jsonIdentical } from '../../../utils/jsonEqual.js'
 import { buildConflictMarkers } from '../../ConflictMarkerBuilder.js'
-import type { MergedReading, OrderedSides } from './mergeOrdered.js'
-
-export type Wrapped = Pick<OrderedSides, 'ancestor' | 'local' | 'other'>
+import type { MergedReading } from './mergeReading.js'
+import type { Wrapped } from './orderedSides.js'
 
 const itemsAgree = (
   sides: readonly JsonArray[],

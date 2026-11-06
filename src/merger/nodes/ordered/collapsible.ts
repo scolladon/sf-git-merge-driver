@@ -1,8 +1,8 @@
 import type { JsonValue } from '../../../types/jsonTypes.js'
 import { jsonIdentical } from '../../../utils/jsonEqual.js'
 import type { SideKeys } from '../KeyedArrayIndex.js'
-import type { OrderedSides } from './mergeOrdered.js'
 import { LIVE_SIDES, type LiveSide } from './orderedEntry.js'
+import type { OrderedSides } from './orderedSides.js'
 
 type Side = LiveSide | 'ancestor'
 

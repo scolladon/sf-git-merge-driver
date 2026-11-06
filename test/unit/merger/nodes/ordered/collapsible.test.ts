@@ -1,7 +1,7 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import { collapsibleKeys } from '../../../../../src/merger/nodes/ordered/collapsible.js'
-import type { OrderedSides } from '../../../../../src/merger/nodes/ordered/mergeOrdered.js'
+import type { OrderedSides } from '../../../../../src/merger/nodes/ordered/orderedSides.js'
 import { jsonIdentical } from '../../../../../src/utils/jsonEqual.js'
 import {
   type Case,

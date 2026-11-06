@@ -5,13 +5,13 @@ import { jsonIdentical } from '../../../utils/jsonEqual.js'
 import { signatureOf } from '../../../utils/jsonSignature.js'
 import type { IdentityTies } from './identity.js'
 import type { Tuple } from './identityComponents.js'
-import type { MergedReading } from './mergeOrdered.js'
+import type { MergedReading } from './mergeReading.js'
 import type { Reading } from './orderedEntry.js'
+import type { Wrapped } from './orderedSides.js'
 import {
   asResult,
   TieScan,
   trimmedBlock,
-  type Wrapped,
   wholeConflict,
 } from './tieCombination.js'
 import type { TieParts } from './tieParts.js'

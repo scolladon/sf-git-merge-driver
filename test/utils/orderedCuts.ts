@@ -1,5 +1,5 @@
 import fc from 'fast-check'
-import type { OrderedSides } from '../../src/merger/nodes/ordered/mergeOrdered.js'
+import type { OrderedSides } from '../../src/merger/nodes/ordered/orderedSides.js'
 import type { JsonArray, JsonObject } from '../../src/types/jsonTypes.js'
 import { type Case, caseArb, type Limits, type Tokens } from './orderedCases.js'
 import { REORDERED_MARK } from './orderedTokens.js'

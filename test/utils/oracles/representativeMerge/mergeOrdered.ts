@@ -26,10 +26,7 @@ import {
   type EntryStatus,
   entryStatuses,
 } from '../../../../src/merger/nodes/ordered/content.js'
-import type {
-  MergedReading,
-  OrderedSides,
-} from '../../../../src/merger/nodes/ordered/mergeOrdered.js'
+import type { MergedReading } from '../../../../src/merger/nodes/ordered/mergeReading.js'
 import { placeOneSided } from '../../../../src/merger/nodes/ordered/oneSidedPlacement.js'
 import {
   everyEntry,
@@ -44,6 +41,10 @@ import {
   type Reading,
   valueOn,
 } from '../../../../src/merger/nodes/ordered/orderedEntry.js'
+import type {
+  OrderedSides,
+  Wrapped,
+} from '../../../../src/merger/nodes/ordered/orderedSides.js'
 import { mergePartwise } from '../../../../src/merger/nodes/ordered/partwise.js'
 import { placeAgreedInsertions } from '../../../../src/merger/nodes/ordered/placement.js'
 import {
@@ -60,7 +61,6 @@ import {
   combineReadings,
   fewestPhantomSwaps,
   TieScan,
-  type Wrapped,
   wholeConflict,
 } from '../../../../src/merger/nodes/ordered/tieCombination.js'
 import { tiePartsOf } from '../../../../src/merger/nodes/ordered/tieParts.js'
