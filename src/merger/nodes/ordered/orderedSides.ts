@@ -14,6 +14,16 @@ export type Side = LiveSide | 'ancestor'
 
 export const SIDES: readonly Side[] = ['ancestor', ...LIVE_SIDES]
 
+export type PerSide<Value> = Readonly<Record<Side, Value>>
+
+export const perSide = <Value>(
+  atSide: (side: Side) => Value
+): PerSide<Value> => ({
+  ancestor: atSide('ancestor'),
+  local: atSide('local'),
+  other: atSide('other'),
+})
+
 /** Where a key's copies stand on one side: first and last place, and count. */
 export interface KeySpan {
   readonly first: number
@@ -35,22 +45,16 @@ const keySpans = (keys: SideKeys): ReadonlyMap<string, KeySpan> => {
   return spans
 }
 
-export type SideSpans = Readonly<Record<Side, ReadonlyMap<string, KeySpan>>>
+export type SideSpans = PerSide<ReadonlyMap<string, KeySpan>>
 
-export const sideSpans = (keys: KeyedSides): SideSpans => ({
-  ancestor: keySpans(keys.ancestor),
-  local: keySpans(keys.local),
-  other: keySpans(keys.other),
-})
+export const sideSpans = (keys: KeyedSides): SideSpans =>
+  perSide(side => keySpans(keys[side]))
 
 /** The sides' entries wrapped under the attribute, as the output lists them. */
-export type Wrapped = Pick<OrderedSides, 'ancestor' | 'local' | 'other'>
+export type Wrapped = PerSide<JsonArray>
 
 export const wrapAll = (attribute: string, side: JsonArray): JsonArray =>
   side.map(entry => ({ [attribute]: entry }))
 
-export const wrapSides = (sides: OrderedSides, attribute: string): Wrapped => ({
-  ancestor: wrapAll(attribute, sides.ancestor),
-  local: wrapAll(attribute, sides.local),
-  other: wrapAll(attribute, sides.other),
-})
+export const wrapSides = (sides: OrderedSides, attribute: string): Wrapped =>
+  perSide(side => wrapAll(attribute, sides[side]))

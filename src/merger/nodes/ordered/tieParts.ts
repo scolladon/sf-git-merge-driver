@@ -7,13 +7,12 @@ import { isTied } from './identityComponents.js'
 import {
   type KeySpan,
   type OrderedSides,
+  type PerSide,
+  perSide,
   SIDES,
-  type Side,
   type SideSpans,
   sideSpans,
 } from './orderedSides.js'
-
-type PerSide<Value> = Readonly<Record<Side, Value>>
 
 type Places = PerSide<number>
 
@@ -25,12 +24,6 @@ export interface TieParts {
 
 // Before the first entry no key reaches anywhere.
 const NOWHERE = -1
-
-const perSide = <Value>(atSide: (side: Side) => Value): PerSide<Value> => ({
-  ancestor: atSide('ancestor'),
-  local: atSide('local'),
-  other: atSide('other'),
-})
 
 // reach[i] is the furthest place on the target side (the last copy wins) of a
 // key held before place i on this side.

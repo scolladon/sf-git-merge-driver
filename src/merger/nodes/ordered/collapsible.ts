@@ -1,6 +1,6 @@
 import type { JsonValue } from '../../../types/jsonTypes.js'
 import { jsonIdentical } from '../../../utils/jsonEqual.js'
-import type { SideKeys } from '../KeyedArrayIndex.js'
+import type { KeyedSides } from '../KeyedArrayIndex.js'
 import { LIVE_SIDES } from './orderedEntry.js'
 import {
   type OrderedSides,
@@ -17,7 +17,7 @@ const REPEATED_COUNT = 2
 const MOST_DROPPING_SIDES = 1
 
 interface Facts {
-  readonly keys: Readonly<Record<Side, SideKeys>>
+  readonly keys: KeyedSides
   readonly spans: SideSpans
   readonly varied: ReadonlySet<string>
 }
