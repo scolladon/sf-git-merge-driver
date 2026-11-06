@@ -92,7 +92,7 @@ export const fewestSwapIndices = (
 export const fewestPhantomSwaps = (
   merged: readonly MergedReading[]
 ): readonly MergeResult[] => {
-  // Stryker disable next-line ConditionalExpression: a lone reading is its own minimum, so the filter keeps it
+  // A lone reading is its own minimum: its swaps are never measured
   if (merged.length === 1) return merged.map(asResult)
   return fewestSwapIndices(merged).map(at => asResult(merged[at]))
 }
