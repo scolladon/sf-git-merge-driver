@@ -51,7 +51,49 @@ const reference = (ancestor: string, local: string, other: string): string =>
     )
   )
 
+// The readings the tie-scan merge builds for the same sides
+const referenceMerges = (
+  ancestor: string,
+  local: string,
+  other: string
+): number => {
+  const sides = orderedSides(ancestor, local, other)
+  constructions.count = 0
+  tieScanMerge(sides, ORDERED_ATTRIBUTE, defaultConfig)
+  return constructions.count
+}
+
 describe('mergeOrderedArrays', () => {
+  describe.each([
+    [
+      'an interchangeable key beside a tied key that is not interchangeable',
+      'C C X K K U',
+      'C C X K U',
+      'C C X K^ K U',
+    ],
+    [
+      'the same keys with the neighbours edited apart',
+      'C C X K K U',
+      'C C X K U*',
+      'C C X K^ K U+',
+    ],
+  ])('given %s', (_name, ancestor, local, other) => {
+    describe('when merging', () => {
+      it('then no reading is merged twice', () => {
+        // Arrange
+        const expected = reference(ancestor, local, other)
+        const merges = referenceMerges(ancestor, local, other)
+
+        // Act
+        const sut = mergedReadings(ancestor, local, other)
+
+        // Assert
+        expect(sut.merges).toBe(merges)
+        expect(sut.result).toBe(expected)
+      })
+    })
+  })
+
   describe('given one reading holding an interchangeable key whose merge conflicts elsewhere', () => {
     const sides = ['K K U', 'K K U*', 'K K U+'] as const
 

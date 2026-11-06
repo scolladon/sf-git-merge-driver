@@ -84,14 +84,25 @@ interface Tied {
   readonly merge: (reading: Reading) => MergedReading
 }
 
-// Without an interchangeable key every reading is its own group: the stream
-// merges them with its early exit
+// A group has several readings only when a tied component holds an
+// interchangeable key: otherwise every reading is its own group
+const holdsCollapsible = (
+  ties: GroupedTies,
+  collapsible: ReadonlySet<string>
+): boolean =>
+  ties.components.some(
+    component =>
+      isTied(component) &&
+      component.members.some(stretch => collapsible.has(ties.keyOf(stretch)))
+  )
+
+// Without a group of several readings the stream merges them all, with its
+// early exit
 const mergeTied = ({ sides, wrapped, ties, merge }: Tied): MergeResult => {
   const collapsible = collapsibleKeys(sides)
-  const grouped =
-    collapsible.size === 0
-      ? null
-      : mergeRepresentatives(wrapped, ties.representatives(collapsible), merge)
+  const grouped = holdsCollapsible(ties, collapsible)
+    ? mergeRepresentatives(wrapped, ties.representatives(collapsible), merge)
+    : null
   return grouped ?? mergeStream(wrapped, ties.readings(), merge)
 }
 
