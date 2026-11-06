@@ -18,6 +18,7 @@ import { collapsibleKeys } from './collapsible.js'
 import { type ConflictMarks, ConflictSeeds, NO_MARKS } from './conflictSeeds.js'
 import { type EntryMerger, type EntryStatus, entryStatuses } from './content.js'
 import { type GroupedTies, identityTies } from './identity.js'
+import { isTied } from './identityComponents.js'
 import { placeOneSided } from './oneSidedPlacement.js'
 import { everyEntry, possiblyMoved } from './orderAxis.js'
 import { buildOrderedContext, type OrderedContext } from './orderedContext.js'
@@ -278,6 +279,20 @@ const mergeTied = ({ sides, wrapped, ties, merge }: Tied): MergeResult => {
   return grouped ?? mergeStream(wrapped, ties.readings(), merge)
 }
 
+// Two tied parts need two tied components: with fewer, the cuts are not even
+// looked for.
+const mergePartwiseOf = (
+  { sides, wrapped, ties, merge }: Tied,
+  tiedComponents: number,
+  attribute: string
+): MergeResult | null => {
+  if (tiedComponents < FEWEST_TIED_PARTS) return null
+  const parts = tiePartsOf(sides, ties, attribute)
+  return parts.tied.length >= FEWEST_TIED_PARTS
+    ? mergePartwise({ wrapped, ties, parts, merge })
+    : null
+}
+
 export const mergeOrderedArrays = (
   sides: OrderedSides,
   attribute: string,
@@ -293,12 +308,11 @@ export const mergeOrderedArrays = (
     sides.other,
     sides.keys
   )
-  const parts = tiePartsOf(sides, ties, attribute)
   const merge = (reading: Reading): MergedReading =>
     mergeReading(reading, attribute, config)
-  const partwise =
-    parts.tied.length >= FEWEST_TIED_PARTS
-      ? mergePartwise({ wrapped, ties, parts, merge })
-      : null
-  return partwise ?? mergeTied({ sides, wrapped, ties, merge })
+  const tiedComponents = ties.components.filter(isTied).length
+  // One reading: nothing to group or to split, the stream merges it once
+  if (tiedComponents === 0) return mergeStream(wrapped, ties.readings(), merge)
+  const tied = { sides, wrapped, ties, merge }
+  return mergePartwiseOf(tied, tiedComponents, attribute) ?? mergeTied(tied)
 }

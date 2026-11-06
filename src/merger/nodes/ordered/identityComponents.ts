@@ -269,6 +269,12 @@ export interface TieComponent extends Component {
   readonly minimal: readonly Tuple[]
 }
 
+// A component left two least tuples or more varies across the readings.
+const FEWEST_TIED_TUPLES = 2
+
+export const isTied = (component: TieComponent): boolean =>
+  component.minimal.length >= FEWEST_TIED_TUPLES
+
 // Every minimal tuple stays, in lexicographic order.
 const minimise = (component: Component, layout: Layout): TieComponent => {
   const costOfTuple = costOf(component, layout)

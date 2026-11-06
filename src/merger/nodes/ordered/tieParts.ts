@@ -3,6 +3,7 @@ import { jsonIdentical } from '../../../utils/jsonEqual.js'
 import { signatureOf } from '../../../utils/jsonSignature.js'
 import type { KeyedSides, SideKeys } from '../KeyedArrayIndex.js'
 import type { IdentityTies } from './identity.js'
+import { isTied } from './identityComponents.js'
 import type { OrderedSides } from './mergeOrdered.js'
 
 const SIDES = ['ancestor', 'local', 'other'] as const
@@ -21,9 +22,6 @@ export interface TieParts {
 
 // Before the first entry no key reaches anywhere.
 const NOWHERE = -1
-
-// A component left two least tuples or more varies across the readings.
-const TIED = 2
 
 const perSide = <Value>(atSide: (side: Side) => Value): PerSide<Value> => ({
   ancestor: atSide('ancestor'),
@@ -147,9 +145,11 @@ const tiedOf = (
 ): readonly (readonly number[])[] => {
   const byPart = new Map<number, number[]>()
   for (const [at, component] of ties.components.entries()) {
-    if (component.minimal.length < TIED) continue
+    if (!isTied(component)) continue
     const part = partOf.get(ties.keyOf(component.members[0])) as number
-    byPart.set(part, [...(byPart.get(part) ?? []), at])
+    const group = byPart.get(part)
+    if (group === undefined) byPart.set(part, [at])
+    else group.push(at)
   }
   return [...byPart.values()]
 }

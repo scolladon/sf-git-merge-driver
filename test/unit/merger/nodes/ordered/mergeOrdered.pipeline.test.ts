@@ -83,6 +83,9 @@ const streamSpy = vi.fn(streamMerge)
 
 const GRID_COPIES = [2, 3]
 const GRID_GADGETS = [1, 2, 3, 4]
+// A cell merging 81 readings through the head and the reference under
+// coverage takes seconds when the suite's workers compete for the machine
+const GRID_CELL_TIMEOUT_MS = 30_000
 
 describe('given generated token sides', () => {
   describe('when merged', () => {
@@ -168,19 +171,23 @@ describe.each(
   )
 )('given the %s grid at r = %i, m = %i', (shape, copies, gadgets) => {
   describe('when merged', () => {
-    it('then the result equals the tie-scan merge', () => {
-      // Arrange
-      const sides = shapeSides(shape, copies, gadgets)
-      const expected = tieScanMerge(sides, ORDERED_ATTRIBUTE, defaultConfig)
+    it(
+      'then the result equals the tie-scan merge',
+      () => {
+        // Arrange
+        const sides = shapeSides(shape, copies, gadgets)
+        const expected = tieScanMerge(sides, ORDERED_ATTRIBUTE, defaultConfig)
 
-      const sut = mergeOrderedArrays
+        const sut = mergeOrderedArrays
 
-      // Act
-      const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
+        // Act
+        const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
 
-      // Assert
-      expect(result).toStrictEqual(expected)
-    })
+        // Assert
+        expect(result).toStrictEqual(expected)
+      },
+      GRID_CELL_TIMEOUT_MS
+    )
   })
 })
 
@@ -192,19 +199,23 @@ describe.each(
   )
 )('given the %s layout at r = %i, m = %i', (layout, copies, gadgets) => {
   describe('when merged', () => {
-    it('then the result equals the tie-scan merge', () => {
-      // Arrange
-      const sides = layoutSides(layout, copies, gadgets)
-      const expected = tieScanMerge(sides, ORDERED_ATTRIBUTE, defaultConfig)
+    it(
+      'then the result equals the tie-scan merge',
+      () => {
+        // Arrange
+        const sides = layoutSides(layout, copies, gadgets)
+        const expected = tieScanMerge(sides, ORDERED_ATTRIBUTE, defaultConfig)
 
-      const sut = mergeOrderedArrays
+        const sut = mergeOrderedArrays
 
-      // Act
-      const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
+        // Act
+        const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
 
-      // Assert
-      expect(result).toStrictEqual(expected)
-    })
+        // Assert
+        expect(result).toStrictEqual(expected)
+      },
+      GRID_CELL_TIMEOUT_MS
+    )
   })
 })
 
