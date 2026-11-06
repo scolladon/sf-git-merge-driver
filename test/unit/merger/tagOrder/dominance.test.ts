@@ -111,6 +111,32 @@ describe('dominance', () => {
     })
   })
 
+  describe('given numbers none of which is an integer', () => {
+    it('when ordering fractions that differ below the unit then they are ordered by value', () => {
+      // Arrange
+      const values = [0.75, 0.25, 0.5]
+
+      // Act
+      const sut = orderedBy(values)
+
+      // Assert
+      expect([...sut]).toEqual([1, 2, 0])
+    })
+  })
+
+  describe('given two integers further apart than any array can span', () => {
+    it('when ordering them then they are ordered without a slot for each integer between', () => {
+      // Arrange
+      const values = [0, 2 ** 52]
+
+      // Act
+      const sut = orderedBy(values)
+
+      // Assert
+      expect([...sut]).toEqual([0, 1])
+    })
+  })
+
   describe('given the comparator-sort reference', () => {
     it('when ordering points then the order equals the reference element for element', () => {
       fc.assert(
