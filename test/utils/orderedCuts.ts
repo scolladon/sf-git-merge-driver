@@ -2,6 +2,7 @@ import fc from 'fast-check'
 import type { OrderedSides } from '../../src/merger/nodes/ordered/mergeOrdered.js'
 import type { JsonArray, JsonObject } from '../../src/types/jsonTypes.js'
 import { type Case, caseArb, type Limits, type Tokens } from './orderedCases.js'
+import { REORDERED_MARK } from './orderedTokens.js'
 
 type Side = 'ancestor' | 'local' | 'other'
 type Gadget = Readonly<Record<Side, Tokens>>
@@ -379,3 +380,155 @@ export const cutCaseArb = (
         side
       )
     )
+
+const SPAN_KEYS: Tokens = ['K', 'J']
+const NEIGHBOUR_KEYS: Tokens = ['U', 'V', 'W']
+const MIN_SPAN_COPIES = 2
+const MAX_SPAN_COPIES = 3
+const MIN_DROPPED = 1
+const MAX_DROPPED = 2
+const MAX_NEIGHBOURS = 3
+const NO_SIDE = -1
+// fc.option builds null once in MOVE_FREQUENCY: two cases in three move one
+// unit on one side
+const MOVE_FREQUENCY = 3
+
+// Half the spans write one copy with its fields reordered, on one side
+const REORDERED_SIDES: readonly number[] = [
+  NO_SIDE,
+  NO_SIDE,
+  NO_SIDE,
+  ANCESTOR,
+  LOCAL,
+  OTHER,
+]
+
+type Treatment =
+  | 'kept'
+  | 'edited'
+  | 'apart'
+  | 'dropped'
+  | 'inserted'
+  | 'reordered'
+
+// Two neighbours in seven are kept as they are
+const TREATMENTS: readonly Treatment[] = [
+  'kept',
+  'kept',
+  'edited',
+  'apart',
+  'dropped',
+  'inserted',
+  'reordered',
+]
+
+interface CopySpan {
+  readonly copies: number
+  readonly dropper: number
+  readonly dropped: number
+  readonly reordered: number
+}
+
+interface Neighbour {
+  readonly treatment: Treatment
+  readonly side: number
+}
+
+interface Move {
+  readonly side: number
+  readonly from: number
+  readonly to: number
+}
+
+// What a side writes for one key of the case
+type Unit = (side: number) => Tokens
+
+const spanArb: fc.Arbitrary<CopySpan> = fc.record({
+  copies: fc.integer({ min: MIN_SPAN_COPIES, max: MAX_SPAN_COPIES }),
+  dropper: fc.constantFrom(LOCAL, OTHER),
+  dropped: fc.integer({ min: MIN_DROPPED, max: MAX_DROPPED }),
+  reordered: fc.constantFrom(...REORDERED_SIDES),
+})
+
+const neighbourArb: fc.Arbitrary<Neighbour> = fc.record({
+  treatment: fc.constantFrom(...TREATMENTS),
+  side: fc.constantFrom(LOCAL, OTHER),
+})
+
+const moveArb: fc.Arbitrary<Move> = fc.record({
+  side: fc.constantFrom(LOCAL, OTHER),
+  from: fc.nat(),
+  to: fc.nat(),
+})
+
+// The dropping side loses copies yet keeps one, so the key is always tied
+const keptCopies = (span: CopySpan): number =>
+  span.copies - Math.min(span.dropped, span.copies - 1)
+
+const spanTokens =
+  (key: string, span: CopySpan): Unit =>
+  side => {
+    const count = side === span.dropper ? keptCopies(span) : span.copies
+    return Array.from({ length: count }, (_, copy) =>
+      copy === 0 && side === span.reordered ? `${key}${REORDERED_MARK}` : key
+    )
+  }
+
+type NeighbourTokens = (key: string, side: number, mine: boolean) => Tokens
+
+// mine: the side is the one the neighbour is treated on; the ancestor never is
+const NEIGHBOUR_TOKENS: Readonly<Record<Treatment, NeighbourTokens>> = {
+  kept: key => [key],
+  edited: (key, _side, mine) => [mine ? edited(key) : key],
+  apart: (key, side) => [`${key}${APART_MARKS[side]}`],
+  dropped: (key, _side, mine) => (mine ? [] : [key]),
+  inserted: (key, _side, mine) => (mine ? [key] : []),
+  reordered: (key, _side, mine) => [mine ? `${key}${REORDERED_MARK}` : key],
+}
+
+const neighbourTokens =
+  (key: string, neighbour: Neighbour): Unit =>
+  side =>
+    NEIGHBOUR_TOKENS[neighbour.treatment](key, side, side === neighbour.side)
+
+const unitsArb: fc.Arbitrary<readonly Unit[]> = fc
+  .tuple(
+    fc.array(spanArb, { minLength: 1, maxLength: SPAN_KEYS.length }),
+    fc.array(neighbourArb, { maxLength: MAX_NEIGHBOURS })
+  )
+  .map(([spans, neighbours]) => [
+    ...spans.map((span, at) => spanTokens(SPAN_KEYS[at], span)),
+    ...neighbours.map((neighbour, at) =>
+      neighbourTokens(NEIGHBOUR_KEYS[at], neighbour)
+    ),
+  ])
+
+const movedOn = (
+  units: readonly Unit[],
+  move: Move | null,
+  side: number
+): readonly Unit[] => {
+  if (move === null || move.side !== side) return units
+  const from = move.from % units.length
+  const to = move.to % units.length
+  const rest = units.filter((_, at) => at !== from)
+  return [...rest.slice(0, to), units[from], ...rest.slice(to)]
+}
+
+// Spans of identical copies one side drops some of, beside unique keys under
+// every treatment that can tell the copies apart
+export const groupCaseArb: fc.Arbitrary<Case> = unitsArb
+  .chain(units =>
+    fc.tuple(
+      fc.shuffledSubarray([...units], {
+        minLength: units.length,
+        maxLength: units.length,
+      }),
+      fc.option(moveArb, { freq: MOVE_FREQUENCY })
+    )
+  )
+  .map(([units, move]) => {
+    const sideOf = (side: number): Tokens =>
+      movedOn(units, move, side).flatMap(unit => unit(side))
+    return [sideOf(ANCESTOR), sideOf(LOCAL), sideOf(OTHER)]
+  })

@@ -15,13 +15,22 @@ const KEY_LABEL_SEPARATOR = ':'
 const LABEL_DEFAULT_SEPARATOR = '/'
 const EDIT_MARKS = /[*+]+$/
 const ONLY_EDIT_MARKS = /^[*+]*$/
+// 'A^': A's fields listed in reverse, the same content in another key order
+export const REORDERED_MARK = '^'
 const EMPTY_SIDE = '∅'
 const CLEAN_SUFFIX = ' (clean)'
 
 const isKeyless = (token: string): boolean => token.startsWith(KEYLESS_PREFIX)
 
+const reordered = (entry: JsonObject): JsonObject =>
+  Object.fromEntries(Object.entries(entry).reverse())
+
 // 'A' | 'A*' (label edited) | 'A:x' | 'A:x/y' (label and default) | '~a' (keyless)
+// | 'A^' (fields reordered)
 export const toEntry = (token: string): JsonObject => {
+  if (token.endsWith(REORDERED_MARK)) {
+    return reordered(toEntry(token.slice(0, -REORDERED_MARK.length)))
+  }
   if (isKeyless(token)) return { label: token.slice(KEYLESS_PREFIX.length) }
   const separator = token.indexOf(KEY_LABEL_SEPARATOR)
   if (separator < 0) {
@@ -83,8 +92,7 @@ export const readingsOf = (
 type BlockSide = 'local' | 'ancestor' | 'other'
 const BLOCK_SIDES: readonly BlockSide[] = ['local', 'ancestor', 'other']
 
-// Inverse of toEntry
-const fromEntry = (entry: JsonObject): string => {
+const fromListedEntry = (entry: JsonObject): string => {
   const {
     fullName,
     label,
@@ -105,6 +113,15 @@ const fromEntry = (entry: JsonObject): string => {
       : `${LABEL_DEFAULT_SEPARATOR}${defaultValue}`
   return `${fullName}${KEY_LABEL_SEPARATOR}${label}${suffix}`
 }
+
+const listsFullNameAfterOtherFields = (entry: JsonObject): boolean =>
+  'fullName' in entry && Object.keys(entry)[0] !== 'fullName'
+
+// Inverse of toEntry
+const fromEntry = (entry: JsonObject): string =>
+  listsFullNameAfterOtherFields(entry)
+    ? `${fromListedEntry(reordered(entry))}${REORDERED_MARK}`
+    : fromListedEntry(entry)
 
 const sideTokens = (entries: JsonArray): string =>
   entries.length === 0
