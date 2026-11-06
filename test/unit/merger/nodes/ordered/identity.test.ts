@@ -5,8 +5,9 @@ import {
   type Pairing,
   readings,
 } from '../../../../../src/merger/nodes/keyedReadings.js'
+import { collapsibleKeys } from '../../../../../src/merger/nodes/ordered/collapsible.js'
 import {
-  type IdentityTies,
+  type GroupedTies,
   identify,
   identityTies,
 } from '../../../../../src/merger/nodes/ordered/identity.js'
@@ -22,6 +23,10 @@ import type {
 import { signatureOf } from '../../../../../src/utils/jsonSignature.js'
 import * as reference from '../../../../utils/oracles/enumeratedIdentity.js'
 import {
+  identify as streamIdentify,
+  identityTies as streamTies,
+} from '../../../../utils/oracles/representativeMerge/identity.js'
+import {
   type Case,
   caseArb,
   IDENTITY,
@@ -33,6 +38,7 @@ import {
 } from '../../../../utils/orderedCases.js'
 import {
   cutCaseArb,
+  groupCaseArb,
   LAYOUT_SHAPES,
   layoutSides,
 } from '../../../../utils/orderedCuts.js'
@@ -348,6 +354,28 @@ function* oneKeepingPairing(copies: KeyCopies): Generator<readonly Pairing[]> {
 
 const LAYOUT_COPIES = [2, 3]
 const LAYOUT_GADGETS = [1, 2, 3, 4]
+
+const LAYOUT_CELLS = LAYOUT_SHAPES.flatMap(shape =>
+  LAYOUT_COPIES.flatMap(copies =>
+    LAYOUT_GADGETS.map(gadgets => [shape, copies, gadgets] as const)
+  )
+)
+
+const GENERATED_CASES: readonly (readonly [string, fc.Arbitrary<Case>])[] = [
+  [
+    'repeated keyed and keyless keys',
+    caseArb(IDENTITY_ANCESTORS, IDENTITY, IDENTITY_TOKENS),
+  ],
+  ['few repeated keys', caseArb(SMALL_ANCESTORS, SMALL)],
+  [
+    'repeated keyed and keyless keys joined by unique keys',
+    cutCaseArb(IDENTITY_ANCESTORS, IDENTITY, IDENTITY_TOKENS),
+  ],
+  ['spans of identical copies one side drops', groupCaseArb],
+]
+
+const sidesFrom = ([ancestor, local, other]: Case) =>
+  orderedSides(ancestor.join(' '), local.join(' '), other.join(' '))
 
 const JOINED_CASES: readonly (readonly [string, fc.Arbitrary<Case>])[] = [
   [
@@ -715,28 +743,81 @@ describe('identify', () => {
     })
   })
 
-  describe.each(
-    LAYOUT_SHAPES.flatMap(shape =>
-      LAYOUT_COPIES.flatMap(copies =>
-        LAYOUT_GADGETS.map(gadgets => [shape, copies, gadgets] as const)
-      )
-    )
-  )('given the %s layout at r = %i, m = %i', (shape, copies, gadgets) => {
-    describe('when identified', () => {
-      it('then the readings equal the enumerating reference, in order', () => {
-        // Arrange
-        const sides = layoutSides(shape, copies, gadgets)
-        const expected = referenceReadings(sides)
+  describe.each(LAYOUT_CELLS)(
+    'given the %s layout at r = %i, m = %i',
+    (shape, copies, gadgets) => {
+      describe('when identified', () => {
+        it('then the readings equal the enumerating reference, in order', () => {
+          // Arrange
+          const sides = layoutSides(shape, copies, gadgets)
+          const expected = referenceReadings(sides)
 
-        // Act
-        const sut = identifiedFrom(sides)
+          // Act
+          const sut = identifiedFrom(sides)
 
-        // Assert
-        expect(sut).toStrictEqual(expected)
-        expect(sameValueReferences(sut, expected)).toBe(true)
+          // Assert
+          expect(sut).toStrictEqual(expected)
+          expect(sameValueReferences(sut, expected)).toBe(true)
+        })
       })
+    }
+  )
+
+  describe('given generated sides', () => {
+    describe('when identified', () => {
+      it.each(GENERATED_CASES)(
+        'then the readings of %s are those of the tie set before grouping',
+        (_name, cases) => {
+          fc.assert(
+            fc.property(cases, tokens => {
+              // Arrange
+              const sides = sidesFrom(tokens)
+              const expected = [
+                ...streamIdentify(
+                  sides.ancestor,
+                  sides.local,
+                  sides.other,
+                  sides.keys
+                ),
+              ]
+
+              // Act
+              const sut = identifiedFrom(sides)
+
+              // Assert
+              expect(sut).toStrictEqual(expected)
+            })
+          )
+        }
+      )
     })
   })
+
+  describe.each(LAYOUT_CELLS)(
+    'given the %s layout at r = %i, m = %i',
+    (shape, copies, gadgets) => {
+      describe('when identified', () => {
+        it('then the readings are those of the tie set before grouping', () => {
+          // Arrange
+          const sides = layoutSides(shape, copies, gadgets)
+          const expected = [
+            ...streamIdentify(
+              sides.ancestor,
+              sides.local,
+              sides.other,
+              sides.keys
+            ),
+          ]
+
+          // Act
+          const sut = identifiedFrom(sides)
+
+          // Assert
+          expect(sut).toStrictEqual(expected)
+        })
+      })
+    }
+  )
 
   describe('given parts joined by unique keys', () => {
     describe('when identified', () => {
@@ -968,11 +1049,99 @@ describe('identify', () => {
   })
 })
 
-const tiesOver = (sides: ReturnType<typeof orderedSides>): IdentityTies =>
+const tiesOver = (sides: ReturnType<typeof orderedSides>): GroupedTies =>
   identityTies(sides.ancestor, sides.local, sides.other, sides.keys)
 
-const tiesOf = (ancestor: string, local: string, other: string): IdentityTies =>
+const tiesOf = (ancestor: string, local: string, other: string): GroupedTies =>
   tiesOver(orderedSides(ancestor, local, other))
+
+const streamReadings = (
+  sides: ReturnType<typeof orderedSides>
+): readonly Reading[] => [
+  ...streamTies(
+    sides.ancestor,
+    sides.local,
+    sides.other,
+    sides.keys
+  ).readings(),
+]
+
+// The readings choosing alike on every entry whose key is not in the set
+const groupOf = (reading: Reading, keys: ReadonlySet<string>): string =>
+  JSON.stringify(
+    reading
+      .filter(entry => !keys.has(entry.key))
+      .map(entry => [
+        entry.key,
+        entry.ancestorPos,
+        entry.localPos,
+        entry.otherPos,
+      ])
+  )
+
+const firstOfEachGroup = (
+  stream: readonly Reading[],
+  keys: ReadonlySet<string>
+): readonly Reading[] => {
+  const firsts = new Map<string, Reading>()
+  for (const reading of stream) {
+    const group = groupOf(reading, keys)
+    if (!firsts.has(group)) firsts.set(group, reading)
+  }
+  return [...firsts.values()]
+}
+
+const keysOfSides = (
+  sides: ReturnType<typeof orderedSides>
+): readonly string[] => [
+  ...new Set([
+    ...sides.keys.ancestor,
+    ...sides.keys.local,
+    ...sides.keys.other,
+  ]),
+]
+
+const withAnyKeys = (cases: fc.Arbitrary<Case>) =>
+  cases.chain(tokens => {
+    const sides = sidesFrom(tokens)
+    return fc
+      .subarray([...keysOfSides(sides)])
+      .map(keys => ({ sides, keys: new Set(keys) }))
+  })
+
+type GroupRow = readonly [
+  name: string,
+  sides: ReturnType<typeof orderedSides>,
+  positions: readonly number[],
+]
+
+const GROUP_ROWS: readonly GroupRow[] = [
+  [
+    'two repeated keys after a dropped copy, one interchangeable, sharing a component with the other',
+    orderedSides('P K K Q T R R S S', 'K T R S', 'P* K K Q* R R S S T'),
+    [0, 2, 4, 6],
+  ],
+  [
+    'a fixed tied key after the interchangeable one',
+    orderedSides('K K T T U', 'K K X T U', 'K T T U'),
+    [0, 1],
+  ],
+  [
+    'an interchangeable key between two fixed ones',
+    orderedSides('P b b Q K K V', 'a P a b Q K V', 'P b b Q a K K V'),
+    [0, 1, 4, 5],
+  ],
+  [
+    'a dropped copy whose twin lists its fields in another order',
+    orderedSides('K K U', 'K U', 'K^ K U'),
+    [0, 1],
+  ],
+  [
+    'the nocut-dropinsert layout at r = 2, m = 2',
+    layoutSides('nocut-dropinsert', 2, 2),
+    [0, 1, 2, 3],
+  ],
+]
 
 describe('identityTies', () => {
   describe('given two repeated keys apart around a unique key', () => {
@@ -1110,7 +1279,121 @@ describe('identityTies', () => {
     })
   })
 
+  describe('given the nocut-dropone layout at r = 3, m = 4', () => {
+    describe('when grouping by its interchangeable keys', () => {
+      it('then one reading stands for all, the first', () => {
+        // Arrange
+        const sides = layoutSides('nocut-dropone', 3, 4)
+        const sut = tiesOver(sides)
+
+        // Act
+        const result = [...sut.representatives(collapsibleKeys(sides))]
+
+        // Assert
+        expect(result).toStrictEqual([sut.readingOf(sut.first)])
+        expect([...sut.readings()]).toHaveLength(81)
+      })
+    })
+  })
+
+  describe.each(GROUP_ROWS)('given %s', (_name, sides, positions) => {
+    describe('when grouping by its interchangeable keys', () => {
+      it('then the representatives stand at their stream positions', () => {
+        // Arrange
+        const sut = tiesOver(sides)
+        const stream = [...sut.readings()]
+        const expected = positions.map(at => stream[at])
+
+        // Act
+        const result = [...sut.representatives(collapsibleKeys(sides))]
+
+        // Assert
+        expect(result).toStrictEqual(expected)
+      })
+    })
+  })
+
+  describe('given generated sides and any set of their keys', () => {
+    describe('when grouping by that set', () => {
+      it.each(GENERATED_CASES)(
+        'then the representatives of %s are the first reading of each group of the stream before grouping, in stream order',
+        (_name, cases) => {
+          fc.assert(
+            fc.property(withAnyKeys(cases), ({ sides, keys }) => {
+              // Arrange
+              const sut = tiesOver(sides)
+              const expected = firstOfEachGroup(streamReadings(sides), keys)
+
+              // Act
+              const result = [...sut.representatives(keys)]
+
+              // Assert
+              expect(result).toStrictEqual(expected)
+            })
+          )
+        }
+      )
+    })
+  })
+
+  describe('given generated sides of spans of identical copies one side drops', () => {
+    describe('when grouping by their interchangeable keys', () => {
+      it('then the representatives are the first reading of each group of the stream before grouping, in stream order', () => {
+        fc.assert(
+          fc.property(groupCaseArb, tokens => {
+            // Arrange
+            const sides = sidesFrom(tokens)
+            const keys = collapsibleKeys(sides)
+            const sut = tiesOver(sides)
+            const expected = firstOfEachGroup(streamReadings(sides), keys)
+
+            // Act
+            const result = [...sut.representatives(keys)]
+
+            // Assert
+            expect(result).toStrictEqual(expected)
+          })
+        )
+      })
+    })
+  })
+
+  describe.each(LAYOUT_CELLS)(
+    'given the %s layout at r = %i, m = %i',
+    (shape, copies, gadgets) => {
+      describe('when grouping by its interchangeable keys', () => {
+        it('then the representatives are the first reading of each group of the stream before grouping', () => {
+          // Arrange
+          const sides = layoutSides(shape, copies, gadgets)
+          const keys = collapsibleKeys(sides)
+          const sut = tiesOver(sides)
+          const expected = firstOfEachGroup(streamReadings(sides), keys)
+
+          // Act
+          const result = [...sut.representatives(keys)]
+
+          // Assert
+          expect(result).toStrictEqual(expected)
+        })
+      })
+    }
+  )
+
   describe('given unique keys only', () => {
+    describe('when grouping by one of them', () => {
+      it('then the one reading stands for its group', () => {
+        // Arrange
+        const sut = tiesOf('A B', 'A B C', 'A B')
+
+        // Act
+        const result = [...sut.representatives(new Set(['A']))]
+
+        // Assert
+        expect(result).toStrictEqual([...sut.readings()])
+        expect(result).toHaveLength(1)
+      })
+    })
+
     describe('when exposing the tie set', () => {
       it('then it has no component and one reading', () => {
         // Arrange

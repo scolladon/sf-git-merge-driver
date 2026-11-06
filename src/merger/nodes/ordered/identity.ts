@@ -11,6 +11,7 @@ import {
   firstChoice,
   type Point,
   type PointSet,
+  projected,
   type TieComponent,
   type Tuple,
   tieComponents,
@@ -236,24 +237,50 @@ function* readingsAlong(
   for (const tuple of tuples) yield readingOf(tuple)
 }
 
+/** The tie set with the first reading of each group of interchangeable ones. */
+export interface GroupedTies extends IdentityTies {
+  // The groups are the readings choosing alike on every stretch whose key is
+  // not in the set; each comes once, at its first reading, in stream order.
+  readonly representatives: (
+    collapsible: ReadonlySet<string>
+  ) => Iterable<Reading>
+}
+
+type Walked = Pick<IdentityTies, 'components' | 'first' | 'keyOf' | 'readingOf'>
+
+const aroundOf =
+  (components: readonly TieComponent[]): IdentityTies['around'] =>
+  (selected, base) =>
+    walkAround(
+      selected.map(at => components[at]),
+      base
+    )
+
+const representativesOf =
+  ({ components, first, keyOf, readingOf }: Walked) =>
+  (collapsible: ReadonlySet<string>): Iterable<Reading> => {
+    const isFixed = (stretch: number): boolean =>
+      !collapsible.has(keyOf(stretch))
+    const reduced = components.map(component => projected(component, isFixed))
+    return readingsAlong(walkAround(reduced, first), readingOf)
+  }
+
 const tiesOver = (
   kept: readonly Alternatives[],
   components: readonly TieComponent[]
-): IdentityTies => {
+): GroupedTies => {
   const first = firstChoice(kept.length, components)
+  const keyOf = (stretch: number): string => kept[stretch][0][0].key
   const readingOf = (tuple: Tuple): Reading =>
     toReading(tuple.flatMap((choice, at) => kept[at][choice]))
   return {
     first,
     components,
     readingOf,
-    keyOf: stretch => kept[stretch][0][0].key,
+    keyOf,
     readings: () => readingsAlong(walkAround(components, first), readingOf),
-    around: (selected, base) =>
-      walkAround(
-        selected.map(at => components[at]),
-        base
-      ),
+    around: aroundOf(components),
+    representatives: representativesOf({ components, first, keyOf, readingOf }),
   }
 }
 
@@ -265,7 +292,7 @@ export const identityTies = (
   local: JsonArray,
   other: JsonArray,
   keys: KeyedSides
-): IdentityTies => {
+): GroupedTies => {
   // A value determines its key (a field of the entry, or its whole content),
   // so the values both sides hold split across keys and each key is judged
   // alone.

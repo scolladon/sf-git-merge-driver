@@ -437,3 +437,24 @@ export const walkAround = (
   components: readonly TieComponent[],
   base: Tuple
 ): Iterable<Tuple> => new Walk(base, components).tuples()
+
+// Joins one tuple's choices into a map key
+const CHOICE_SEPARATOR = ','
+
+// The tuples agreeing on the kept stretches, the first of each: the list keeps
+// its lexicographic order and its least tuple, so the walk meets each choice
+// of those stretches once, at its first tuple.
+export const projected = (
+  component: TieComponent,
+  keeps: (stretch: number) => boolean
+): TieComponent => {
+  const offsets = component.members.flatMap((stretch, offset) =>
+    keeps(stretch) ? [offset] : []
+  )
+  const firstOf = new Map<string, Tuple>()
+  for (const tuple of component.minimal) {
+    const choice = offsets.map(offset => tuple[offset]).join(CHOICE_SEPARATOR)
+    if (!firstOf.has(choice)) firstOf.set(choice, tuple)
+  }
+  return { ...component, minimal: [...firstOf.values()] }
+}
