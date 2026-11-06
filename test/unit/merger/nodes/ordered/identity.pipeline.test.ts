@@ -63,13 +63,16 @@ describe('given the enumerating identity wired in', () => {
         const oracle = await import(
           '../../../../utils/oracles/enumeratedIdentity.js'
         )
-        // The merge reads the stream of readings from the tie set, and its
-        // components to split the tie set into parts: none, so every case
-        // takes the stream path.
+        // The merge reads the stream of readings from the tie set, its
+        // components to split the tie set into parts (none, so every case
+        // takes the stream path), and one reading per group of interchangeable
+        // copies: every reading is its own group, so the merge covers the
+        // whole stream as the enumerating reference does.
         return {
           identityTies: (...sides: Parameters<typeof oracle.identify>) => ({
             components: [],
             readings: () => oracle.identify(...sides),
+            representatives: () => oracle.identify(...sides),
           }),
         }
       }

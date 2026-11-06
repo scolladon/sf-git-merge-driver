@@ -14,9 +14,10 @@ import type { KeyedSides } from '../KeyedArrayIndex.js'
 import { defaultNodeFactory } from '../MergeNodeFactory.js'
 import { type Ambiguity, withAgreedReplacements } from './agreedReplacement.js'
 import { buildBlocks, type OrderedBlock, type OrderedItem } from './blocks.js'
+import { collapsibleKeys } from './collapsible.js'
 import { type ConflictMarks, ConflictSeeds, NO_MARKS } from './conflictSeeds.js'
 import { type EntryMerger, type EntryStatus, entryStatuses } from './content.js'
-import { identityTies } from './identity.js'
+import { type GroupedTies, identityTies } from './identity.js'
 import { placeOneSided } from './oneSidedPlacement.js'
 import { everyEntry, possiblyMoved } from './orderAxis.js'
 import { buildOrderedContext, type OrderedContext } from './orderedContext.js'
@@ -238,6 +239,45 @@ const mergeStream = (
   return combineReadings(wrapped, fewestPhantomSwaps(scan.readings()))
 }
 
+// One merge stands for its group because the merge treats the exchanged
+// copies alike. Three steps carry that and must be re-checked when they
+// change: possiblyMoved and notInEveryLis give a group's dropped copies one
+// flag, relations between insertions both sides agreed map copy for copy, and
+// the readings of a group count equal phantom swaps.
+const mergeRepresentatives = (
+  wrapped: Wrapped,
+  representatives: Iterable<Reading>,
+  merge: (reading: Reading) => MergedReading
+): MergeResult | null => {
+  const merged: MergedReading[] = []
+  for (const reading of representatives) {
+    const result = merge(reading)
+    // A conflict may come from a block that differs across the group: the
+    // whole stream decides, in its own order
+    if (result.hasConflict) return null
+    merged.push(result)
+  }
+  return combineReadings(wrapped, fewestPhantomSwaps(merged))
+}
+
+interface Tied {
+  readonly sides: OrderedSides
+  readonly wrapped: Wrapped
+  readonly ties: GroupedTies
+  readonly merge: (reading: Reading) => MergedReading
+}
+
+// Without an interchangeable key every reading is its own group: the stream
+// merges them with its early exit
+const mergeTied = ({ sides, wrapped, ties, merge }: Tied): MergeResult => {
+  const collapsible = collapsibleKeys(sides)
+  const grouped =
+    collapsible.size === 0
+      ? null
+      : mergeRepresentatives(wrapped, ties.representatives(collapsible), merge)
+  return grouped ?? mergeStream(wrapped, ties.readings(), merge)
+}
+
 export const mergeOrderedArrays = (
   sides: OrderedSides,
   attribute: string,
@@ -260,5 +300,5 @@ export const mergeOrderedArrays = (
     parts.tied.length >= FEWEST_TIED_PARTS
       ? mergePartwise({ wrapped, ties, parts, merge })
       : null
-  return partwise ?? mergeStream(wrapped, ties.readings(), merge)
+  return partwise ?? mergeTied({ sides, wrapped, ties, merge })
 }

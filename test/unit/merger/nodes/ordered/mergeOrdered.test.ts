@@ -18,6 +18,7 @@ import {
 } from '../../../../../src/types/mergeResult.js'
 import { jsonIdentical } from '../../../../../src/utils/jsonEqual.js'
 import { mergeOrderedArrays as referenceMerge } from '../../../../utils/oracles/perReadingMerge.js'
+import { mergeOrderedArrays as streamMerge } from '../../../../utils/oracles/representativeMerge/mergeOrdered.js'
 import { mergeOrderedArrays as tieScanMerge } from '../../../../utils/oracles/tieScanMerge.js'
 import {
   type Case,
@@ -212,6 +213,77 @@ describe('mergeOrderedArrays', () => {
     })
   })
 
+  describe('given the nocut-dropone layout at r = 3, m = 9', () => {
+    // 3^9 tied readings merge in seconds; their copies are interchangeable, so
+    // one merge decides. The budget sits between the two so that CPU load and
+    // coverage instrumentation cannot push it over.
+    const COPIES = 3
+    const GADGETS = 9
+    const BUDGET_MS = 400
+    const GRID_TIMEOUT_MS = 120_000
+
+    describe('when merging', () => {
+      it(
+        'then the merged layout comes back within the budget',
+        () => {
+          // Arrange
+          const sides = layoutSides('nocut-dropone', COPIES, GADGETS)
+          const sut = mergeOrderedArrays
+          const start = performance.now()
+
+          // Act
+          const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
+          const elapsed = performance.now() - start
+
+          // Assert
+          expect(result).toStrictEqual(
+            noConflict(
+              wrap([...sides.local, sides.other[sides.other.length - 1]])
+            )
+          )
+          expect(elapsed).toBeLessThan(BUDGET_MS)
+        },
+        GRID_TIMEOUT_MS
+      )
+    })
+  })
+
+  describe('given the movedcut layout at r = 3, m = 9', () => {
+    // 3^9 tied readings merge in seconds; their copies are interchangeable, so
+    // one merge decides. The budget sits between the two so that CPU load and
+    // coverage instrumentation cannot push it over.
+    const COPIES = 3
+    const GADGETS = 9
+    const BUDGET_MS = 400
+    const GRID_TIMEOUT_MS = 120_000
+
+    describe('when merging', () => {
+      it(
+        'then the merged layout comes back within the budget',
+        () => {
+          // Arrange
+          const sides = layoutSides('movedcut', COPIES, GADGETS)
+          const withoutDropped = layoutSides(
+            'movedcut',
+            COPIES - 1,
+            GADGETS
+          ).other
+          const sut = mergeOrderedArrays
+          const start = performance.now()
+
+          // Act
+          const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
+          const elapsed = performance.now() - start
+
+          // Assert
+          expect(result).toStrictEqual(noConflict(wrap(withoutDropped)))
+          expect(elapsed).toBeLessThan(BUDGET_MS)
+        },
+        GRID_TIMEOUT_MS
+      )
+    })
+  })
+
   describe('given the identical grid at r = 2, m = 3', () => {
     describe('when merging', () => {
       it('then the whole-array conflict equals the per-reading merge', () => {
@@ -380,6 +452,197 @@ describe('mergeOrderedArrays', () => {
       })
     }
   )
+
+  describe.each([
+    [
+      'an insertion on the keeping side after the copies',
+      'K K U',
+      'K U',
+      'K K Z U',
+      'K,Z,U (clean)',
+    ],
+    [
+      'an insertion on the keeping side before the copies',
+      'U K K',
+      'U K',
+      'U Z K K',
+      'U,Z,K (clean)',
+    ],
+    [
+      'an interchangeable neighbour the keeping side drops whole',
+      'K K J J U',
+      'K J J U',
+      'K K Z U',
+      'K,Z,U (clean)',
+    ],
+    [
+      'two adjacent interchangeable keys of three copies',
+      'K K K J J J V',
+      'K K J J J V',
+      'K K K J V',
+      'K,K,J,V (clean)',
+    ],
+    [
+      'neighbours edited by either side',
+      'K K U V',
+      'U* K V',
+      'K K U V*',
+      'U*,K,V* (clean)',
+    ],
+    [
+      'a neighbour the keeping side edits',
+      'K K U',
+      'K U',
+      'K K U*',
+      'K,U* (clean)',
+    ],
+    [
+      'a neighbour the keeping side writes with its fields reordered',
+      'K K U',
+      'K U',
+      'K K U^',
+      'K,U^ (clean)',
+    ],
+    [
+      'a fixed tied key beside the interchangeable one',
+      'K K T T U',
+      'K K X T U',
+      'K T T U',
+      'K,X,T,U (clean)',
+    ],
+    [
+      'an insertion both sides made beside the copies on one side only',
+      'K K U V',
+      'K U Z V',
+      'K K Z U V',
+      '<K,U,Z,V|K,K,U,V|K,K,Z,U,V>',
+    ],
+    [
+      'a neighbour both sides edit apart',
+      'K K U',
+      'K U*',
+      'K K U+',
+      'K,<U*|U|U+>',
+    ],
+    [
+      'the keeping side moving the copies past their neighbours',
+      'K K U V',
+      'K U V',
+      'U V K K',
+      '<K,U,V|K,K,U,V|U,V,K,K>',
+    ],
+    [
+      "the keeping side moving one key's copies ahead of another's",
+      'R0 R0 R0 R1 R1',
+      'R0 R0 R0 R1',
+      'R1 R1 R0 R0 R0',
+      '<R0,R0,R0,R1|R0,R0,R0,R1,R1|R1,R1,R0,R0,R0>',
+    ],
+    [
+      'a key inserted twice on one side beside a dropped copy, interchangeable copies after it',
+      'P b b Q K K V',
+      'a P a b Q K V',
+      'P b b Q a K K V',
+      '<a,P,a,b,Q,K,V|P,b,b,Q,K,K,V|P,b,b,Q,a,K,K,V>',
+    ],
+    [
+      'two repeated keys after a dropped copy, one interchangeable',
+      'P K K Q T R R S S',
+      'K T R S',
+      'P* K K Q* R R S S T',
+      '<K,T,R,S|P,K,K,Q,T,R,R,S,S|P*,K,K,Q*,R,R,S,S,T>',
+    ],
+    [
+      'a dropped copy whose twin on the keeping side lists its fields in another order',
+      'K K U',
+      'K U',
+      'K^ K U',
+      '<K,U|K,K,U|K^,K,U>',
+    ],
+    [
+      'a kept copy whose twin on the keeping side lists its fields in another order',
+      'K K U',
+      'K U',
+      'K K^ U',
+      '<K,U|K,K,U|K,K^,U>',
+    ],
+    [
+      'interchangeable copies in a part between cuts',
+      'K K U L L',
+      'K U T T L',
+      'K K U T T L L',
+      'K,U,T,T,L (clean)',
+    ],
+  ])(
+    'given tied readings that exchange interchangeable copies with %s',
+    (_name, ancestor, local, other, expected) => {
+      describe('when merging', () => {
+        it('then the result is the merge before grouping', () => {
+          // Arrange
+          const sides = orderedSides(ancestor, local, other)
+          const expectedResult = streamMerge(
+            sides,
+            ORDERED_ATTRIBUTE,
+            defaultConfig
+          )
+          const sut = mergeOrderedArrays
+
+          // Act
+          const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
+
+          // Assert
+          expect(formatResult(result)).toBe(expected)
+          expect(result).toStrictEqual(expectedResult)
+          expect(jsonIdentical(result.output, expectedResult.output)).toBe(true)
+        })
+      })
+    }
+  )
+
+  describe('given the nocut-dropone layout at r = 3, m = 3', () => {
+    describe('when merging', () => {
+      it('then the result is the local side with the last entry of the other, as the merge before grouping', () => {
+        // Arrange
+        const sides = layoutSides('nocut-dropone', 3, 3)
+        const expected = streamMerge(sides, ORDERED_ATTRIBUTE, defaultConfig)
+        const sut = mergeOrderedArrays
+
+        // Act
+        const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
+
+        // Assert
+        expect(result).toStrictEqual(
+          noConflict(
+            wrap([...sides.local, sides.other[sides.other.length - 1]])
+          )
+        )
+        expect(result).toStrictEqual(expected)
+        expect(jsonIdentical(result.output, expected.output)).toBe(true)
+      })
+    })
+  })
+
+  describe('given the movedcut layout at r = 2, m = 2', () => {
+    describe('when merging', () => {
+      it('then the result is the other side drawn with one copy fewer, as the merge before grouping', () => {
+        // Arrange
+        const sides = layoutSides('movedcut', 2, 2)
+        const expected = streamMerge(sides, ORDERED_ATTRIBUTE, defaultConfig)
+        // The other side's order with each key's dropped copy gone is that
+        // layout drawn with one copy fewer
+        const withoutDropped = layoutSides('movedcut', 1, 2).other
+        const sut = mergeOrderedArrays
+
+        // Act
+        const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
+
+        // Assert
+        expect(result).toStrictEqual(noConflict(wrap(withoutDropped)))
+        expect(result).toStrictEqual(expected)
+        expect(jsonIdentical(result.output, expected.output)).toBe(true)
+      })
+    })
+  })
 })
 
 const EDIT_SUFFIX = /[*+]+$/
@@ -661,6 +924,39 @@ describe('mergeOrderedArrays laws', () => {
               wrap([...sides.local, sides.other[sides.other.length - 1]])
             )
           )
+        })
+      })
+
+      describe('when merging the nocut-dropone layout', () => {
+        it('then the result is the local side with the last entry of the other', () => {
+          // Arrange
+          const sides = layoutSides('nocut-dropone', copies, keys)
+          const sut = mergeOrderedArrays
+
+          // Act
+          const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
+
+          // Assert
+          expect(result).toStrictEqual(
+            noConflict(
+              wrap([...sides.local, sides.other[sides.other.length - 1]])
+            )
+          )
+        })
+      })
+
+      describe('when merging the movedcut layout', () => {
+        it("then the result is the other side with each repeated key's dropped copy gone", () => {
+          // Arrange
+          const sides = layoutSides('movedcut', copies, keys)
+          const withoutDropped = layoutSides('movedcut', copies - 1, keys).other
+          const sut = mergeOrderedArrays
+
+          // Act
+          const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
+
+          // Assert
+          expect(result).toStrictEqual(noConflict(wrap(withoutDropped)))
         })
       })
 

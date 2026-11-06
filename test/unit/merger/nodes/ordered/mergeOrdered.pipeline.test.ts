@@ -7,7 +7,9 @@ import type {
   JsonArray,
   JsonObject,
 } from '../../../../../src/types/jsonTypes.js'
+import { jsonIdentical } from '../../../../../src/utils/jsonEqual.js'
 import { mergeOrderedArrays as referenceMerge } from '../../../../utils/oracles/perReadingMerge.js'
+import { mergeOrderedArrays as streamMerge } from '../../../../utils/oracles/representativeMerge/mergeOrdered.js'
 import { mergeOrderedArrays as tieScanMerge } from '../../../../utils/oracles/tieScanMerge.js'
 import {
   caseArb,
@@ -19,6 +21,7 @@ import {
 } from '../../../../utils/orderedCases.js'
 import {
   cutCaseArb,
+  groupCaseArb,
   LAYOUT_SHAPES,
   layoutSides,
   SHAPES,
@@ -30,7 +33,13 @@ import {
   toEntry,
 } from '../../../../utils/orderedTokens.js'
 import { defaultConfig } from '../../../../utils/testConfig.js'
-import { merge, ordered, render } from '../../laws/arbitraries.js'
+import {
+  contestedSidesArb,
+  dupSidesArb,
+  merge,
+  ordered,
+  render,
+} from '../../laws/arbitraries.js'
 
 const fieldPermissionsKey =
   MetadataService.getKeyFieldExtractor('fieldPermissions')
@@ -70,6 +79,7 @@ const sidesOf = (
 
 const referenceSpy = vi.fn(referenceMerge)
 const tieScanSpy = vi.fn(tieScanMerge)
+const streamSpy = vi.fn(streamMerge)
 
 const GRID_COPIES = [2, 3]
 const GRID_GADGETS = [1, 2, 3, 4]
@@ -197,6 +207,106 @@ describe.each(
     })
   })
 })
+
+const gridOf = <Name extends string>(names: readonly Name[]) =>
+  names.flatMap(name =>
+    GRID_COPIES.flatMap(copies =>
+      GRID_GADGETS.map(gadgets => [name, copies, gadgets] as const)
+    )
+  )
+
+describe('given generated token sides with interchangeable copies', () => {
+  describe('when merged', () => {
+    it.each([
+      [
+        'repeated keyed and keyless keys',
+        caseArb(IDENTITY_ANCESTORS, IDENTITY, IDENTITY_TOKENS),
+      ],
+      ['few repeated keys', caseArb(SMALL_ANCESTORS, SMALL)],
+      [
+        'parts joined by unique keys',
+        cutCaseArb(IDENTITY_ANCESTORS, IDENTITY, IDENTITY_TOKENS),
+      ],
+      [
+        'parts of few repeated keys joined by unique keys',
+        cutCaseArb(SMALL_ANCESTORS, SMALL),
+      ],
+      ['spans of identical copies one side drops', groupCaseArb],
+    ])(
+      'then the result equals the merge before grouping of %s',
+      (_name, cases) => {
+        fc.assert(
+          fc.property(cases, ([ancestor, local, other]) => {
+            // Arrange
+            const sides = orderedSides(
+              ancestor.join(' '),
+              local.join(' '),
+              other.join(' ')
+            )
+            const expected = streamMerge(
+              sides,
+              ORDERED_ATTRIBUTE,
+              defaultConfig
+            )
+
+            const sut = mergeOrderedArrays
+
+            // Act
+            const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
+
+            // Assert
+            expect(result).toStrictEqual(expected)
+            expect(jsonIdentical(result.output, expected.output)).toBe(true)
+          })
+        )
+      }
+    )
+  })
+})
+
+describe.each(gridOf(SHAPES))(
+  'given the %s grid at r = %i, m = %i read against the merge before grouping',
+  (shape, copies, gadgets) => {
+    describe('when merged', () => {
+      it('then the result equals the merge before grouping', () => {
+        // Arrange
+        const sides = shapeSides(shape, copies, gadgets)
+        const expected = streamMerge(sides, ORDERED_ATTRIBUTE, defaultConfig)
+
+        const sut = mergeOrderedArrays
+
+        // Act
+        const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
+
+        // Assert
+        expect(result).toStrictEqual(expected)
+        expect(jsonIdentical(result.output, expected.output)).toBe(true)
+      })
+    })
+  }
+)
+
+describe.each(gridOf(LAYOUT_SHAPES))(
+  'given the %s layout at r = %i, m = %i read against the merge before grouping',
+  (layout, copies, gadgets) => {
+    describe('when merged', () => {
+      it('then the result equals the merge before grouping', () => {
+        // Arrange
+        const sides = layoutSides(layout, copies, gadgets)
+        const expected = streamMerge(sides, ORDERED_ATTRIBUTE, defaultConfig)
+
+        const sut = mergeOrderedArrays
+
+        // Act
+        const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
+
+        // Assert
+        expect(result).toStrictEqual(expected)
+        expect(jsonIdentical(result.output, expected.output)).toBe(true)
+      })
+    })
+  }
+)
 
 describe('given the per-reading merge wired in', () => {
   let reference: typeof import('../../laws/arbitraries.js')
@@ -340,6 +450,75 @@ describe('given the tie-scan merge wired in', () => {
         )
       )
       expect(tieScanSpy).toHaveBeenCalled()
+    })
+  })
+})
+
+describe('given the merge before grouping wired in', () => {
+  let reference: typeof import('../../laws/arbitraries.js')
+  beforeAll(async () => {
+    vi.resetModules()
+    // A factory importing the reference never resolves: the reference waits on
+    // the cycle through MergeNodeFactory that this very factory stands in for
+    vi.doMock(
+      '../../../../../src/merger/nodes/ordered/mergeOrdered.js',
+      () => ({ mergeOrderedArrays: streamSpy })
+    )
+    reference = await import('../../laws/arbitraries.js')
+    vi.doUnmock('../../../../../src/merger/nodes/ordered/mergeOrdered.js')
+  })
+
+  describe.each([
+    [
+      'token sides with keyed and keyless repeated keys',
+      caseArb(IDENTITY_ANCESTORS, IDENTITY, IDENTITY_TOKENS),
+    ],
+    ['token sides with spans of identical copies', groupCaseArb],
+  ])('when %s are merged', (_name, cases) => {
+    it('then output, conflict and rendering are identical', async () => {
+      await fc.assert(
+        fc.asyncProperty(cases, async tokens => {
+          // Arrange
+          const [ancestor, local, other] = tokens.map(side => side.map(toEntry))
+          const expected = reference.merge(ordered, ancestor, local, other)
+
+          // Act
+          const sut = merge(ordered, ancestor, local, other)
+
+          // Assert
+          expect(sut.hasConflict).toBe(expected.hasConflict)
+          expect(sut.output).toEqual(expected.output)
+          expect(await render(sut.output)).toBe(
+            await reference.render(expected.output)
+          )
+        })
+      )
+      expect(streamSpy).toHaveBeenCalled()
+    })
+  })
+
+  describe.each([
+    ['entries with duplicated keys', dupSidesArb(ordered)],
+    ['entries with one contested entry', contestedSidesArb(ordered)],
+  ])('when %s are merged', (_name, cases) => {
+    it('then output, conflict and rendering are identical', async () => {
+      await fc.assert(
+        fc.asyncProperty(cases, async ([ancestor, local, other]) => {
+          // Arrange
+          const expected = reference.merge(ordered, ancestor, local, other)
+
+          // Act
+          const sut = merge(ordered, ancestor, local, other)
+
+          // Assert
+          expect(sut.hasConflict).toBe(expected.hasConflict)
+          expect(sut.output).toEqual(expected.output)
+          expect(await render(sut.output)).toBe(
+            await reference.render(expected.output)
+          )
+        })
+      )
+      expect(streamSpy).toHaveBeenCalled()
     })
   })
 })
