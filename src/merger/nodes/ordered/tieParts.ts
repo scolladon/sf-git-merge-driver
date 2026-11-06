@@ -6,10 +6,10 @@ import type { IdentityTies } from './identity.js'
 import { isTied } from './identityComponents.js'
 import {
   type KeySpan,
-  keySpans,
   type OrderedSides,
   SIDES,
   type Side,
+  sideSpans,
 } from './orderedSides.js'
 
 type PerSide<Value> = Readonly<Record<Side, Value>>
@@ -87,7 +87,7 @@ interface Cut {
 // A key held before the candidate on one side with a copy at or after it on
 // another reaches the copy: no such key may exist, whichever pair of sides.
 const cutsOf = (sides: OrderedSides): readonly Cut[] => {
-  const spans = perSide(side => keySpans(sides.keys[side]))
+  const spans = sideSpans(sides.keys)
   const reach = perSide(from =>
     perSide(to => reachBefore(sides.keys[from], spans[to]))
   )

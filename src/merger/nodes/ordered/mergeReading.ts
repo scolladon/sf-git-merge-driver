@@ -13,7 +13,8 @@ import { type EntryMerger, type EntryStatus, entryStatuses } from './content.js'
 import { placeOneSided } from './oneSidedPlacement.js'
 import { everyEntry, possiblyMoved } from './orderAxis.js'
 import { buildOrderedContext, type OrderedContext } from './orderedContext.js'
-import { type LiveSide, type Reading, valueOn } from './orderedEntry.js'
+import { type Reading, valueOn } from './orderedEntry.js'
+import type { Side } from './orderedSides.js'
 import { placeAgreedInsertions } from './placement.js'
 import { cycleMarks, orderOverlaps, tournament } from './precedence.js'
 import { type OrderingView, orderingView, phantomSwaps } from './replacement.js'
@@ -55,7 +56,7 @@ const sideValues = (
   ctx: OrderedContext,
   attribute: string,
   ids: readonly number[],
-  side: LiveSide | 'ancestor'
+  side: Side
 ): JsonArray =>
   ids.map(id => {
     const entry = ctx.entries[id] as Reading[number]

@@ -21,7 +21,7 @@ export interface KeySpan {
   readonly count: number
 }
 
-export const keySpans = (keys: SideKeys): ReadonlyMap<string, KeySpan> => {
+const keySpans = (keys: SideKeys): ReadonlyMap<string, KeySpan> => {
   const spans = new Map<string, KeySpan>()
   keys.forEach((key, at) => {
     const span = spans.get(key)
@@ -34,6 +34,14 @@ export const keySpans = (keys: SideKeys): ReadonlyMap<string, KeySpan> => {
   })
   return spans
 }
+
+export type SideSpans = Readonly<Record<Side, ReadonlyMap<string, KeySpan>>>
+
+export const sideSpans = (keys: KeyedSides): SideSpans => ({
+  ancestor: keySpans(keys.ancestor),
+  local: keySpans(keys.local),
+  other: keySpans(keys.other),
+})
 
 /** The sides' entries wrapped under the attribute, as the output lists them. */
 export type Wrapped = Pick<OrderedSides, 'ancestor' | 'local' | 'other'>

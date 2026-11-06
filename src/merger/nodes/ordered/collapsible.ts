@@ -4,10 +4,10 @@ import type { SideKeys } from '../KeyedArrayIndex.js'
 import { LIVE_SIDES } from './orderedEntry.js'
 import {
   type KeySpan,
-  keySpans,
   type OrderedSides,
   SIDES,
   type Side,
+  sideSpans,
 } from './orderedSides.js'
 
 // A key held twice on one side has copies a reading can exchange
@@ -41,11 +41,7 @@ const variedKeys = (sides: OrderedSides): ReadonlySet<string> => {
 
 const factsOf = (sides: OrderedSides): Facts => ({
   keys: sides.keys,
-  spans: {
-    ancestor: keySpans(sides.keys.ancestor),
-    local: keySpans(sides.keys.local),
-    other: keySpans(sides.keys.other),
-  },
+  spans: sideSpans(sides.keys),
   varied: variedKeys(sides),
 })
 

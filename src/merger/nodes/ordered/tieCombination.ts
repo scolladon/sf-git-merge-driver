@@ -75,7 +75,10 @@ export const asResult = ({
   hasConflict,
 })
 
-/** The positions of the readings with the fewest swaps of interchangeable copies. */
+/**
+ * The positions of the readings with the fewest swaps of interchangeable
+ * copies.
+ */
 export const fewestSwapIndices = (
   merged: readonly MergedReading[]
 ): readonly number[] => {
