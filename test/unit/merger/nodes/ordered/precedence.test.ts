@@ -406,7 +406,7 @@ describe('given generated orderings', () => {
   })
 })
 
-describe('given thousands of kept entries, every other one moved by other', () => {
+describe('given thousands of kept entries, every fourth one moved by other', () => {
   // Counting by dominance takes ~100 ms at SIZE under coverage; scoring pair
   // by pair took ~20 s. The budget sits between the two so that CPU load and
   // coverage instrumentation cannot push the counting code over it.

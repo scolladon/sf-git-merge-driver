@@ -7,7 +7,6 @@ import {
   readings,
   type SideGroups,
 } from '../../../../src/merger/nodes/keyedReadings.js'
-import type { IdentityTies } from '../../../../src/merger/nodes/ordered/identity.js'
 import {
   ABSENT_POSITION,
   type LiveSide,
@@ -25,6 +24,20 @@ import {
   tieComponents,
   walkAround,
 } from './identityComponents.js'
+
+/** The tie set of the readings, exposed for a merge that walks it by parts. */
+export interface IdentityTies {
+  readonly first: Tuple
+  readonly components: readonly TieComponent[]
+  readonly readingOf: (tuple: Tuple) => Reading
+  // A component's stretch holds one key: fused stretches are never tied.
+  readonly keyOf: (stretch: number) => string
+  readonly readings: () => Iterable<Reading>
+  readonly around: (
+    components: readonly number[],
+    base: Tuple
+  ) => Iterable<Tuple>
+}
 
 interface Slot {
   readonly pos: number

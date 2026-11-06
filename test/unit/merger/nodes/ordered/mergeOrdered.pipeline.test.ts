@@ -1,7 +1,19 @@
 import fc from 'fast-check'
-import { beforeAll, describe, expect, it, vi } from 'vitest'
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 import { KeyedArrayMergeNode } from '../../../../../src/merger/nodes/KeyedArrayMergeNode.js'
+import { collapsibleKeys } from '../../../../../src/merger/nodes/ordered/collapsible.js'
+import { identityTies } from '../../../../../src/merger/nodes/ordered/identity.js'
 import { mergeOrderedArrays } from '../../../../../src/merger/nodes/ordered/mergeOrdered.js'
+import { mergeReading } from '../../../../../src/merger/nodes/ordered/mergeReading.js'
+import type { Reading } from '../../../../../src/merger/nodes/ordered/orderedEntry.js'
 import { MetadataService } from '../../../../../src/service/MetadataService.js'
 import type {
   JsonArray,
@@ -12,6 +24,7 @@ import { mergeOrderedArrays as referenceMerge } from '../../../../utils/oracles/
 import { mergeOrderedArrays as streamMerge } from '../../../../utils/oracles/representativeMerge/mergeOrdered.js'
 import { mergeOrderedArrays as tieScanMerge } from '../../../../utils/oracles/tieScanMerge.js'
 import {
+  type Case,
   caseArb,
   IDENTITY,
   IDENTITY_ANCESTORS,
@@ -83,6 +96,12 @@ const streamSpy = vi.fn(streamMerge)
 
 const GRID_COPIES = [2, 3]
 const GRID_GADGETS = [1, 2, 3, 4]
+// The group path is reached by a tenth of the sampled cases: the property over
+// those cases runs more times so the path sees tens of them per seed
+const GROUP_RUNS = 400
+const REACH_RUNS = 100
+const MIN_CLEAN_GROUPS = 5
+const MIN_SEVERAL_GROUPS = 1
 // A cell merging 81 readings through the head and the reference under
 // coverage takes seconds when the suite's workers compete for the machine
 const GRID_CELL_TIMEOUT_MS = 30_000
@@ -319,9 +338,86 @@ describe.each(gridOf(LAYOUT_SHAPES))(
   }
 )
 
+const representativesOf = (tokens: Case): readonly Reading[] => {
+  const sides = orderedSides(
+    tokens[0].join(' '),
+    tokens[1].join(' '),
+    tokens[2].join(' ')
+  )
+  const collapsible = collapsibleKeys(sides)
+  if (collapsible.size === 0) return []
+  const { ancestor, local, other, keys } = sides
+  return [
+    ...identityTies(ancestor, local, other, keys).representatives(collapsible),
+  ]
+}
+
+const mergesClean = (reading: Reading): boolean =>
+  !mergeReading(reading, ORDERED_ATTRIBUTE, defaultConfig).hasConflict
+
+describe('given sampled token sides with spans of identical copies', () => {
+  const sampled = fc.sample(groupCaseArb, REACH_RUNS).map(representativesOf)
+
+  describe('when their representatives are merged', () => {
+    it('then enough cases merge every representative clean', () => {
+      // Arrange
+      const grouped = sampled.filter(reps => reps.length > 0)
+
+      // Act
+      const result = grouped.filter(reps => reps.every(mergesClean))
+
+      // Assert
+      expect(result.length).toBeGreaterThanOrEqual(MIN_CLEAN_GROUPS)
+    })
+
+    it('then enough cases hold more than one representative', () => {
+      // Act
+      const result = sampled.filter(reps => reps.length > 1)
+
+      // Assert
+      expect(result.length).toBeGreaterThanOrEqual(MIN_SEVERAL_GROUPS)
+    })
+  })
+})
+
+describe('given many generated token sides with spans of identical copies', () => {
+  describe('when merged', () => {
+    it('then the result equals the merge before grouping', () => {
+      fc.assert(
+        fc.property(groupCaseArb, ([ancestor, local, other]) => {
+          // Arrange
+          const sides = orderedSides(
+            ancestor.join(' '),
+            local.join(' '),
+            other.join(' ')
+          )
+          const expected = streamMerge(sides, ORDERED_ATTRIBUTE, defaultConfig)
+
+          const sut = mergeOrderedArrays
+
+          // Act
+          const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
+
+          // Assert
+          expect(result).toStrictEqual(expected)
+        }),
+        { numRuns: GROUP_RUNS }
+      )
+    })
+  })
+})
+
 describe('given the per-reading merge wired in', () => {
   let reference: typeof import('../../laws/arbitraries.js')
   let ReferenceNode: typeof KeyedArrayMergeNode
+  // The spy keeps its calls across tests: each test must add some of its own
+  let callsBefore = 0
+  beforeEach(() => {
+    callsBefore = referenceSpy.mock.calls.length
+  })
+  afterEach(() =>
+    expect(referenceSpy.mock.calls.length).toBeGreaterThan(callsBefore)
+  )
   beforeAll(async () => {
     vi.resetModules()
     // A factory importing the reference never resolves: the reference waits on
@@ -424,6 +520,13 @@ describe('given the per-reading merge wired in', () => {
 
 describe('given the tie-scan merge wired in', () => {
   let reference: typeof import('../../laws/arbitraries.js')
+  let callsBefore = 0
+  beforeEach(() => {
+    callsBefore = tieScanSpy.mock.calls.length
+  })
+  afterEach(() =>
+    expect(tieScanSpy.mock.calls.length).toBeGreaterThan(callsBefore)
+  )
   beforeAll(async () => {
     vi.resetModules()
     // A factory importing the reference never resolves: the reference waits on
@@ -467,6 +570,13 @@ describe('given the tie-scan merge wired in', () => {
 
 describe('given the merge before grouping wired in', () => {
   let reference: typeof import('../../laws/arbitraries.js')
+  let callsBefore = 0
+  beforeEach(() => {
+    callsBefore = streamSpy.mock.calls.length
+  })
+  afterEach(() =>
+    expect(streamSpy.mock.calls.length).toBeGreaterThan(callsBefore)
+  )
   beforeAll(async () => {
     vi.resetModules()
     // A factory importing the reference never resolves: the reference waits on

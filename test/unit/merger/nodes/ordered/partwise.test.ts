@@ -1,3 +1,4 @@
+import fc from 'fast-check'
 import { describe, expect, it, vi } from 'vitest'
 import { buildConflictMarkers } from '../../../../../src/merger/ConflictMarkerBuilder.js'
 import {
@@ -24,7 +25,17 @@ import {
   withConflict,
 } from '../../../../../src/types/mergeResult.js'
 import { mergeOrderedArrays as tieScanMerge } from '../../../../utils/oracles/tieScanMerge.js'
-import { layoutSides, shapeSides } from '../../../../utils/orderedCuts.js'
+import {
+  type Case,
+  IDENTITY,
+  IDENTITY_ANCESTORS,
+  IDENTITY_TOKENS,
+} from '../../../../utils/orderedCases.js'
+import {
+  cutCaseArb,
+  layoutSides,
+  shapeSides,
+} from '../../../../utils/orderedCuts.js'
 import {
   formatResult,
   ORDERED_ATTRIBUTE,
@@ -487,5 +498,46 @@ describe('given one tied part with more choices than a spread can pass', () => {
       },
       LARGE_TIMEOUT_MS
     )
+  })
+})
+
+// A cut's value written by other under one of its part keys: the guard reads
+// the cut items by value, so it must send the trimmed block to the stream
+const withCutValueCopied = (tokens: Case): OrderedSides | null => {
+  const sides = orderedSides(
+    tokens[0].join(' '),
+    tokens[1].join(' '),
+    tokens[2].join(' ')
+  )
+  const cutAt = sides.keys.ancestor.findIndex(key => key.startsWith('C'))
+  const target = sides.keys.other.findIndex(key => !key.startsWith('C'))
+  if (cutAt < 0 || target < 0) return null
+  const other = sides.other.map((entry, at) =>
+    at === target ? sides.ancestor[cutAt] : entry
+  )
+  return { ...sides, other }
+}
+
+describe('given generated parts where other writes a cut value under its own key', () => {
+  describe('when merging', () => {
+    it('then the result is the one the tie-scan merge builds', () => {
+      fc.assert(
+        fc.property(
+          cutCaseArb(IDENTITY_ANCESTORS, IDENTITY, IDENTITY_TOKENS),
+          tokens => {
+            // Arrange
+            const sides = withCutValueCopied(tokens)
+            fc.pre(sides !== null)
+            const sut = mergeOrderedArrays
+
+            // Act
+            const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
+
+            // Assert
+            expect(result).toStrictEqual(oracleOf(sides))
+          }
+        )
+      )
+    })
   })
 })
