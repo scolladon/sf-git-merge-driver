@@ -2,8 +2,11 @@ import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import {
   firstChoice,
+  isTied,
   type Point,
   type PointSet,
+  projected,
+  type TieComponent,
   type Tuple,
   tieComponents,
   walkAround,
@@ -600,6 +603,190 @@ describe('tieComponents', () => {
 
         // Assert
         expect(result).toEqual(ONE_COMPONENT)
+      })
+    })
+  })
+})
+
+describe('tieComponents gaps', () => {
+  const gapsPerComponent = (
+    stretches: readonly (readonly PointSet[])[]
+  ): readonly number[] =>
+    tieComponents(stretches).map(({ labels }) => labels.length)
+
+  describe('given a fixed stretch standing in a gap on each of two sides', () => {
+    describe('when taking the components of the tied stretches around it', () => {
+      it('then they stay apart: the fixed stretch moves no cost between them', () => {
+        // Arrange
+        const sut = [
+          [alternative([], [[0, 2]]), alternative([], [[0, 3]])],
+          [
+            alternative([
+              [1, 0],
+              [3, 2],
+            ]),
+            alternative([[1, 2]]),
+          ],
+          [alternative([[5, 1]], [[5, 0]])],
+        ]
+
+        // Act
+        const result = membersAndMinima(sut)
+
+        // Assert
+        expect(result).toEqual([
+          { members: [0], minimal: [[0], [1]] },
+          { members: [1], minimal: [[0], [1]] },
+        ])
+      })
+    })
+  })
+
+  describe('given alternatives of one entry landing on different positions', () => {
+    describe('when counting the gaps of the stretch', () => {
+      it('then it spans one gap: the alternatives are never present together', () => {
+        // Arrange
+        const sut = [[alternative([[0, 0]]), alternative([[0, 1]])]]
+
+        // Act
+        const result = gapsPerComponent(sut)
+
+        // Assert
+        expect(result).toEqual([1])
+      })
+    })
+  })
+
+  describe('given alternatives of different entries landing on one position', () => {
+    describe('when counting the gaps of the stretch', () => {
+      it('then it spans one gap: the position is not strictly above the first', () => {
+        // Arrange
+        const sut = [[alternative([[0, 0]]), alternative([[1, 0]])]]
+
+        // Act
+        const result = gapsPerComponent(sut)
+
+        // Assert
+        expect(result).toEqual([1])
+      })
+    })
+  })
+
+  describe('given alternatives with points on both sides', () => {
+    describe('when counting the gaps of the stretch', () => {
+      it('then it spans one gap per side', () => {
+        // Arrange
+        const sut = [
+          [alternative([[0, 0]], [[0, 0]]), alternative([[0, 1]], [[0, 1]])],
+        ]
+
+        // Act
+        const result = gapsPerComponent(sut)
+
+        // Assert
+        expect(result).toEqual([2])
+      })
+    })
+  })
+})
+
+describe('isTied', () => {
+  const componentOf = (minimal: readonly Tuple[]): TieComponent => ({
+    members: [0],
+    labels: [],
+    sizes: [2],
+    minimal,
+  })
+
+  describe('given a component left two fewest-move tuples', () => {
+    describe('when asking whether it is tied', () => {
+      it('then it is', () => {
+        // Arrange
+        const sut = componentOf([[0], [1]])
+
+        // Act
+        const result = isTied(sut)
+
+        // Assert
+        expect(result).toBe(true)
+      })
+    })
+  })
+
+  describe('given a component left one fewest-move tuple', () => {
+    describe('when asking whether it is tied', () => {
+      it('then it is not', () => {
+        // Arrange
+        const sut = componentOf([[0]])
+
+        // Act
+        const result = isTied(sut)
+
+        // Assert
+        expect(result).toBe(false)
+      })
+    })
+  })
+})
+
+describe('projected', () => {
+  const componentOf = (
+    members: readonly number[],
+    minimal: readonly Tuple[]
+  ): TieComponent => ({
+    members,
+    labels: [],
+    sizes: members.map(() => 1 + Math.max(...minimal.flat())),
+    minimal,
+  })
+
+  describe('given tuples agreeing on the kept stretches', () => {
+    describe('when projecting on those stretches', () => {
+      it('then each choice of the kept ones stays at its first tuple, in order', () => {
+        // Arrange
+        const sut = componentOf(
+          [0, 1, 2],
+          [
+            [0, 0, 0],
+            [0, 0, 1],
+            [0, 1, 0],
+            [1, 0, 0],
+          ]
+        )
+
+        // Act
+        const result = projected(sut, stretch => stretch !== 1)
+
+        // Assert
+        expect(result.minimal).toEqual([
+          [0, 0, 0],
+          [0, 0, 1],
+          [1, 0, 0],
+        ])
+      })
+    })
+  })
+
+  describe('given kept choices whose digits run together', () => {
+    describe('when projecting on every stretch', () => {
+      it('then both tuples stay: 1 then 12 is not 11 then 2', () => {
+        // Arrange
+        const sut = componentOf(
+          [0, 1],
+          [
+            [1, 12],
+            [11, 2],
+          ]
+        )
+
+        // Act
+        const result = projected(sut, () => true)
+
+        // Assert
+        expect(result.minimal).toEqual([
+          [1, 12],
+          [11, 2],
+        ])
       })
     })
   })
