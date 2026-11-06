@@ -382,9 +382,9 @@ class Walk {
 /**
  * Each group of stretches sharing a gap with its fewest-move choices, every tie
  * kept. The moves of a choice are the entries off the longest increasing run
- * of each live side. Fixed points that every other point lies on one side of,
- * and empty splits where every point before lies below every point after, cut
- * the plane into gaps: only the stretches sharing a gap trade moves.
+ * of each live side. Empty splits, where every point before lies below every
+ * point after, cut the plane into gaps: only the stretches sharing a gap trade
+ * moves.
  */
 export const tieComponents = (
   stretches: readonly Alternatives[]
