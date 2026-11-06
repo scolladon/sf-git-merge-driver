@@ -1,12 +1,14 @@
 import type { JsonValue } from '../../../types/jsonTypes.js'
 import { jsonIdentical } from '../../../utils/jsonEqual.js'
 import type { SideKeys } from '../KeyedArrayIndex.js'
-import { LIVE_SIDES, type LiveSide } from './orderedEntry.js'
-import type { OrderedSides } from './orderedSides.js'
-
-type Side = LiveSide | 'ancestor'
-
-const SIDES: readonly Side[] = ['ancestor', ...LIVE_SIDES]
+import { LIVE_SIDES } from './orderedEntry.js'
+import {
+  type KeySpan,
+  keySpans,
+  type OrderedSides,
+  SIDES,
+  type Side,
+} from './orderedSides.js'
 
 // A key held twice on one side has copies a reading can exchange
 const REPEATED_COUNT = 2
@@ -14,30 +16,10 @@ const REPEATED_COUNT = 2
 // The other side keeps every copy where the ancestor had it
 const MOST_DROPPING_SIDES = 1
 
-interface Span {
-  readonly first: number
-  readonly last: number
-  readonly count: number
-}
-
 interface Facts {
   readonly keys: Readonly<Record<Side, SideKeys>>
-  readonly spans: Readonly<Record<Side, ReadonlyMap<string, Span>>>
+  readonly spans: Readonly<Record<Side, ReadonlyMap<string, KeySpan>>>
   readonly varied: ReadonlySet<string>
-}
-
-const spansOf = (keys: SideKeys): ReadonlyMap<string, Span> => {
-  const spans = new Map<string, Span>()
-  keys.forEach((key, at) => {
-    const span = spans.get(key)
-    spans.set(
-      key,
-      span === undefined
-        ? { first: at, last: at, count: 1 }
-        : { ...span, last: at, count: span.count + 1 }
-    )
-  })
-  return spans
 }
 
 const copiesOn = (sides: OrderedSides): (readonly [string, JsonValue])[] =>
@@ -60,9 +42,9 @@ const variedKeys = (sides: OrderedSides): ReadonlySet<string> => {
 const factsOf = (sides: OrderedSides): Facts => ({
   keys: sides.keys,
   spans: {
-    ancestor: spansOf(sides.keys.ancestor),
-    local: spansOf(sides.keys.local),
-    other: spansOf(sides.keys.other),
+    ancestor: keySpans(sides.keys.ancestor),
+    local: keySpans(sides.keys.local),
+    other: keySpans(sides.keys.other),
   },
   varied: variedKeys(sides),
 })
@@ -134,8 +116,6 @@ export const collapsibleKeys = (sides: OrderedSides): ReadonlySet<string> => {
   const facts = factsOf(sides)
   const keys = new Set(SIDES.flatMap(side => sides.keys[side]))
   return new Set(
-    [...keys].filter(
-      key => isRepeated(facts, key) && isCore(facts, key) && isQuiet(facts, key)
-    )
+    [...keys].filter(key => isExempt(facts, key) && isQuiet(facts, key))
   )
 }

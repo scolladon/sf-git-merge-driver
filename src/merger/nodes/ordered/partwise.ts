@@ -10,6 +10,7 @@ import type { Reading } from './orderedEntry.js'
 import type { Wrapped } from './orderedSides.js'
 import {
   asResult,
+  fewestSwapIndices,
   TieScan,
   trimmedBlock,
   wholeConflict,
@@ -29,15 +30,9 @@ interface PartRound {
   readonly survivors: readonly number[]
 }
 
-// Per tied part, the merged readings of V: s* first, then s* with that part at
-// each of its other surviving choices.
+// Per tied part, its surviving choices merged around the star tuple: the star
+// first, then the star with that part at each of its other surviving choices.
 type Variations = readonly (readonly MergedReading[])[]
-
-const fewestAt = (merged: readonly MergedReading[]): readonly number[] => {
-  const swaps = merged.map(reading => reading.phantomSwaps())
-  const least = leastOf(swaps)
-  return swaps.flatMap((count, at) => (count === least ? [at] : []))
-}
 
 // around() orders a part's choices from its components alone, so a position
 // names the same choice of the part around any base tuple.
@@ -48,7 +43,8 @@ const choiceAt = (
   position: number
 ): Tuple => [...ties.around(part, base)][position]
 
-// Each tied part at the chosen position, every other stretch as the first tuple.
+// Each tied part at the chosen position, every other stretch as the first
+// tuple.
 const withChoices = (
   ties: IdentityTies,
   rounds: readonly PartRound[],
@@ -102,7 +98,8 @@ class PartwiseRun {
 
   constructor(private readonly input: Partwise) {}
 
-  merged(tuple: Tuple): MergedReading {
+  // Records the reading in the scan before handing it back
+  mergeAndRecord(tuple: Tuple): MergedReading {
     const reading = this.input.merge(this.input.ties.readingOf(tuple))
     this.scan.add(reading)
     return reading
@@ -117,8 +114,8 @@ class PartwiseRun {
   // The part's first choice around the first tuple is the first tuple itself.
   roundOne(part: readonly number[], first: MergedReading): PartRound {
     const [, ...others] = this.input.ties.around(part, this.input.ties.first)
-    const merged = [first, ...others.map(tuple => this.merged(tuple))]
-    return { part, merged, survivors: fewestAt(merged) }
+    const merged = [first, ...others.map(tuple => this.mergeAndRecord(tuple))]
+    return { part, merged, survivors: fewestSwapIndices(merged) }
   }
 
   variations(rounds: readonly PartRound[]): Variations {
@@ -132,7 +129,7 @@ class PartwiseRun {
       rounds,
       ({ survivors }) => survivors[0]
     )
-    const starMerged = this.merged(star)
+    const starMerged = this.mergeAndRecord(star)
     return rounds.map(round => this.aroundStar(round, star, starMerged))
   }
 
@@ -151,11 +148,11 @@ class PartwiseRun {
     rounds: readonly PartRound[],
     variations: Variations
   ): MergeResult | null {
-    const shortest = this.merged(
+    const shortest = this.mergeAndRecord(
       shortestTuple(this.input.ties, rounds, variations)
     )
+    // The star's output leads: every round's list starts with it
     const outputs = [
-      variations[0][0].output,
       ...variations.flat().map(reading => reading.output),
       shortest.output,
     ]
@@ -173,13 +170,13 @@ class PartwiseRun {
   ): readonly MergedReading[] {
     const tuples = [...this.input.ties.around(round.part, star)]
     const [, ...others] = round.survivors
-    return [starMerged, ...others.map(at => this.merged(tuples[at]))]
+    return [starMerged, ...others.map(at => this.mergeAndRecord(tuples[at]))]
   }
 }
 
 export const mergePartwise = (input: Partwise): MergeResult | null => {
   const run = new PartwiseRun(input)
-  const first = run.merged(input.ties.first)
+  const first = run.mergeAndRecord(input.ties.first)
   const rounds: PartRound[] = []
   for (const part of input.parts.tied) {
     rounds.push(run.roundOne(part, first))

@@ -1,7 +1,7 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import { buildConflictMarkers } from '../../../../../src/merger/ConflictMarkerBuilder.js'
-import { identify } from '../../../../../src/merger/nodes/ordered/identity.js'
+import { identityTies } from '../../../../../src/merger/nodes/ordered/identity.js'
 import { mergeOrderedArrays } from '../../../../../src/merger/nodes/ordered/mergeOrdered.js'
 import { mergeReading } from '../../../../../src/merger/nodes/ordered/mergeReading.js'
 import type { OrderedSides } from '../../../../../src/merger/nodes/ordered/orderedSides.js'
@@ -759,7 +759,12 @@ const aroundEditedSeparator = (first: Case, second: Case): Case => {
 const rendersOneOutput = (tokens: Case): boolean => {
   const sides = sidesOfCase(tokens)
   const merged = [
-    ...identify(sides.ancestor, sides.local, sides.other, sides.keys),
+    ...identityTies(
+      sides.ancestor,
+      sides.local,
+      sides.other,
+      sides.keys
+    ).readings(),
   ].map(reading => mergeReading(reading, ORDERED_ATTRIBUTE, defaultConfig))
   const swaps = merged.map(reading => reading.phantomSwaps())
   const fewest = merged.filter((_, at) => swaps[at] === Math.min(...swaps))
@@ -979,12 +984,12 @@ describe('mergeOrderedArrays laws', () => {
         it('then the result is its one reading merged', () => {
           // Arrange
           const sides = gridSides('distinct', copies, keys)
-          const [reading] = identify(
+          const [reading] = identityTies(
             sides.ancestor,
             sides.local,
             sides.other,
             sides.keys
-          )
+          ).readings()
           const { output, hasConflict } = mergeReading(
             reading,
             ORDERED_ATTRIBUTE,

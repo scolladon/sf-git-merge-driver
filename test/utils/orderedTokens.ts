@@ -1,5 +1,5 @@
 import type { KeyedSides } from '../../src/merger/nodes/KeyedArrayIndex.js'
-import { identify } from '../../src/merger/nodes/ordered/identity.js'
+import { identityTies } from '../../src/merger/nodes/ordered/identity.js'
 import type { Reading } from '../../src/merger/nodes/ordered/orderedEntry.js'
 import {
   type ConflictBlock,
@@ -85,8 +85,13 @@ export const readingsOf = (
   local: string,
   other: string
 ): readonly Reading[] => {
-  const sides = orderedSides(ancestor, local, other)
-  return [...identify(sides.ancestor, sides.local, sides.other, sides.keys)]
+  const {
+    ancestor: a,
+    local: l,
+    other: o,
+    keys,
+  } = orderedSides(ancestor, local, other)
+  return [...identityTies(a, l, o, keys).readings()]
 }
 
 type BlockSide = 'local' | 'ancestor' | 'other'

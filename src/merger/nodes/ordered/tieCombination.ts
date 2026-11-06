@@ -75,6 +75,15 @@ export const asResult = ({
   hasConflict,
 })
 
+/** The positions of the readings with the fewest swaps of interchangeable copies. */
+export const fewestSwapIndices = (
+  merged: readonly MergedReading[]
+): readonly number[] => {
+  const swaps = merged.map(reading => reading.phantomSwaps())
+  const least = leastOf(swaps)
+  return swaps.flatMap((count, at) => (count === least ? [at] : []))
+}
+
 // Among the readings, only those with the fewest swaps of interchangeable
 // copies count: the others fabricate a disagreement.
 export const fewestPhantomSwaps = (
@@ -82,9 +91,7 @@ export const fewestPhantomSwaps = (
 ): readonly MergeResult[] => {
   // Stryker disable next-line ConditionalExpression: a lone reading is its own minimum, so the filter keeps it
   if (merged.length === 1) return merged.map(asResult)
-  const swaps = merged.map(reading => reading.phantomSwaps())
-  const least = leastOf(swaps)
-  return merged.filter((_, index) => swaps[index] === least).map(asResult)
+  return fewestSwapIndices(merged).map(at => asResult(merged[at]))
 }
 
 // No reading has fewer than zero swaps: once one has none, the readings with

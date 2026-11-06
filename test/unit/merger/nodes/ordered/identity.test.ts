@@ -1,5 +1,6 @@
 import fc from 'fast-check'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { KeyedSides } from '../../../../../src/merger/nodes/KeyedArrayIndex.js'
 import {
   type KeyCopies,
   type Pairing,
@@ -8,7 +9,6 @@ import {
 import { collapsibleKeys } from '../../../../../src/merger/nodes/ordered/collapsible.js'
 import {
   type GroupedTies,
-  identify,
   identityTies,
 } from '../../../../../src/merger/nodes/ordered/identity.js'
 import {
@@ -54,6 +54,14 @@ vi.mock(
     return { ...original, readings: vi.fn(original.readings) }
   }
 )
+
+// The stream of readings, as the merge walks it
+const identify = (
+  ancestor: JsonArray,
+  local: JsonArray,
+  other: JsonArray,
+  keys: KeyedSides
+): Iterable<Reading> => identityTies(ancestor, local, other, keys).readings()
 
 const NONE = '-'
 

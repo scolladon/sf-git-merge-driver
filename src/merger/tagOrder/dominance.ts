@@ -140,7 +140,7 @@ class ThreeCoordinates {
       const point = this.order[right]
       for (; left < middle; left++) {
         const lower = this.order[left]
-        // Stryker disable next-line EqualityOperator: each coordinate holds distinct integers
+        // Stryker disable next-line EqualityOperator: each coordinate holds distinct values
         if (this.second[lower] > this.second[point]) break
         this.tree.add(this.ranks[lower], 1)
       }
@@ -158,7 +158,7 @@ class ThreeCoordinates {
       const takeLeft =
         right >= to ||
         (left < middle &&
-          // Stryker disable next-line EqualityOperator: each coordinate holds distinct integers
+          // Stryker disable next-line EqualityOperator: each coordinate holds distinct values
           this.second[this.order[left]] < this.second[this.order[right]])
       this.merged[at] = this.order[takeLeft ? left++ : right++]
     }

@@ -1,5 +1,6 @@
 import type { JsonArray } from '../../../types/jsonTypes.js'
-import type { KeyedSides } from '../KeyedArrayIndex.js'
+import type { KeyedSides, SideKeys } from '../KeyedArrayIndex.js'
+import { LIVE_SIDES, type LiveSide } from './orderedEntry.js'
 
 /** The three sides of an ordered array, with the key of every entry. */
 export interface OrderedSides {
@@ -7,6 +8,31 @@ export interface OrderedSides {
   readonly local: JsonArray
   readonly other: JsonArray
   readonly keys: KeyedSides
+}
+
+export type Side = LiveSide | 'ancestor'
+
+export const SIDES: readonly Side[] = ['ancestor', ...LIVE_SIDES]
+
+/** Where a key's copies stand on one side: first and last place, and count. */
+export interface KeySpan {
+  readonly first: number
+  readonly last: number
+  readonly count: number
+}
+
+export const keySpans = (keys: SideKeys): ReadonlyMap<string, KeySpan> => {
+  const spans = new Map<string, KeySpan>()
+  keys.forEach((key, at) => {
+    const span = spans.get(key)
+    spans.set(
+      key,
+      span === undefined
+        ? { first: at, last: at, count: 1 }
+        : { ...span, last: at, count: span.count + 1 }
+    )
+  })
+  return spans
 }
 
 /** The sides' entries wrapped under the attribute, as the output lists them. */

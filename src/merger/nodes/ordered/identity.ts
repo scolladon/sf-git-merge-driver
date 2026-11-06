@@ -307,12 +307,3 @@ export const identityTies = (
   const points = kept.map(alternatives => alternatives.map(pointsOf))
   return tiesOver(kept, tieComponents(points))
 }
-
-export function* identify(
-  ancestor: JsonArray,
-  local: JsonArray,
-  other: JsonArray,
-  keys: KeyedSides
-): Generator<Reading> {
-  yield* identityTies(ancestor, local, other, keys).readings()
-}
