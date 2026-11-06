@@ -3,10 +3,10 @@ import { jsonIdentical } from '../../../utils/jsonEqual.js'
 import type { SideKeys } from '../KeyedArrayIndex.js'
 import { LIVE_SIDES } from './orderedEntry.js'
 import {
-  type KeySpan,
   type OrderedSides,
   SIDES,
   type Side,
+  type SideSpans,
   sideSpans,
 } from './orderedSides.js'
 
@@ -18,7 +18,7 @@ const MOST_DROPPING_SIDES = 1
 
 interface Facts {
   readonly keys: Readonly<Record<Side, SideKeys>>
-  readonly spans: Readonly<Record<Side, ReadonlyMap<string, KeySpan>>>
+  readonly spans: SideSpans
   readonly varied: ReadonlySet<string>
 }
 

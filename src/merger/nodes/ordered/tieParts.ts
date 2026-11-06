@@ -9,12 +9,11 @@ import {
   type OrderedSides,
   SIDES,
   type Side,
+  type SideSpans,
   sideSpans,
 } from './orderedSides.js'
 
 type PerSide<Value> = Readonly<Record<Side, Value>>
-
-type Spans = PerSide<ReadonlyMap<string, KeySpan>>
 
 type Places = PerSide<number>
 
@@ -47,11 +46,11 @@ const reachBefore = (
   })
 }
 
-const isHeldOnce = (spans: Spans, key: string): boolean =>
+const isHeldOnce = (spans: SideSpans, key: string): boolean =>
   SIDES.every(side => spans[side].get(key)?.count === 1)
 
 // The keys counted once on every side, at their places, in ancestor order.
-const heldOnce = (keys: KeyedSides, spans: Spans): readonly Places[] =>
+const heldOnce = (keys: KeyedSides, spans: SideSpans): readonly Places[] =>
   keys.ancestor.flatMap((key, ancestor) =>
     isHeldOnce(spans, key)
       ? [

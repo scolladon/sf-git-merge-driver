@@ -104,12 +104,12 @@ class PartwiseRun {
     return this.input.merge(this.input.ties.readingOf(tuple))
   }
 
-  // Every reading merged here belongs to the tie set, and the scan's decision
-  // holds on any of its subsets.
   record(readings: readonly MergedReading[]): void {
     for (const reading of readings) this.scan.add(reading)
   }
 
+  // Every reading recorded belongs to the tie set, and the scan's decision
+  // holds on any of its subsets.
   isWholeConflict(): boolean {
     return this.scan.isWholeConflict()
   }
@@ -134,10 +134,10 @@ class PartwiseRun {
       rounds,
       ({ survivors }) => survivors[0]
     )
-    const merged = this.mergeOf(firstSurvivors)
-    this.record([merged])
+    const firstSurvivorsMerged = this.mergeOf(firstSurvivors)
+    this.record([firstSurvivorsMerged])
     return rounds.map(round =>
-      this.aroundFirstSurvivors(round, firstSurvivors, merged)
+      this.aroundFirstSurvivors(round, firstSurvivors, firstSurvivorsMerged)
     )
   }
 
@@ -156,10 +156,11 @@ class PartwiseRun {
     rounds: readonly PartRound[],
     variations: Variations
   ): MergeResult | null {
+    // Nothing reads the scan past this point: the shortest reading is not
+    // recorded
     const shortest = this.mergeOf(
       shortestTuple(this.input.ties, rounds, variations)
     )
-    this.record([shortest])
     // The first survivors' output leads: every round's list starts with it
     const outputs = [
       ...variations.flat().map(reading => reading.output),
@@ -175,13 +176,13 @@ class PartwiseRun {
   private aroundFirstSurvivors(
     round: PartRound,
     firstSurvivors: Tuple,
-    merged: MergedReading
+    firstSurvivorsMerged: MergedReading
   ): readonly MergedReading[] {
     const tuples = [...this.input.ties.around(round.part, firstSurvivors)]
     const [, ...others] = round.survivors
-    const variations = others.map(at => this.mergeOf(tuples[at]))
-    this.record(variations)
-    return [merged, ...variations]
+    const otherChoices = others.map(at => this.mergeOf(tuples[at]))
+    this.record(otherChoices)
+    return [firstSurvivorsMerged, ...otherChoices]
   }
 }
 
