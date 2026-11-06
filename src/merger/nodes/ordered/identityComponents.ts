@@ -20,8 +20,7 @@ interface Candidate extends Point {
   readonly fixed: boolean
 }
 
-// A candidate between two gap boundaries (separators or empty splits) belongs
-// to the gap they bound.
+// A candidate between two empty splits belongs to the gap they bound.
 interface Placed extends Candidate {
   readonly label: number
 }
@@ -68,37 +67,6 @@ const candidatesOn = (
     )
     .sort(byAncestor)
 
-// The candidates whose value beats every one before them in the sequence.
-const recordHolders = (
-  sequence: readonly Candidate[],
-  coordinateOf: (candidate: Candidate) => number
-): ReadonlySet<Candidate> => {
-  const holders = new Set<Candidate>()
-  let best = Number.NEGATIVE_INFINITY
-  for (const candidate of sequence) {
-    const value = coordinateOf(candidate)
-    if (value <= best) continue
-    holders.add(candidate)
-    best = value
-  }
-  return holders
-}
-
-// A fixed point is a separator when every other candidate is below it on both
-// coordinates or above it on both: the candidates sorted by ancestor then
-// show it above all positions before it and below all positions after it.
-const separatorTest = (
-  sorted: readonly Candidate[]
-): ((candidate: Candidate) => boolean) => {
-  const aboveEarlier = recordHolders(sorted, ({ position }) => position)
-  const belowLater = recordHolders(
-    sorted.toReversed(),
-    ({ position }) => -position
-  )
-  return candidate =>
-    candidate.fixed && aboveEarlier.has(candidate) && belowLater.has(candidate)
-}
-
 // The lowest position from each index on, +infinity past the end.
 const suffixMinima = (positions: readonly number[]): readonly number[] => {
   const lowest = [...positions, Number.POSITIVE_INFINITY]
@@ -110,7 +78,9 @@ const suffixMinima = (positions: readonly number[]): readonly number[] => {
 
 // Where every candidate before lies below every candidate after on both
 // coordinates, the longest increasing runs add up across the boundary: the
-// plane splits there with no fixed point between.
+// plane splits there. A fixed point every other candidate lies below or above
+// on both coordinates opens a split before and after itself, so it needs no
+// test of its own.
 const emptySplits = (sorted: readonly Candidate[]): ReadonlySet<Candidate> => {
   const lowestFrom = suffixMinima(sorted.map(({ position }) => position))
   const splits = new Set<Candidate>()
@@ -139,14 +109,12 @@ const placedOn = (
   side: LiveSide
 ): readonly Placed[] => {
   const sorted = candidatesOn(stretches, side)
-  const isSeparator = separatorTest(sorted)
   const splits = emptySplits(sorted)
   const placed: Placed[] = []
   let gap = 0
   for (const candidate of sorted) {
     if (splits.has(candidate)) gap++
-    if (isSeparator(candidate)) gap++
-    else placed.push({ ...candidate, label: labelOf(side, gap) })
+    placed.push({ ...candidate, label: labelOf(side, gap) })
   }
   return placed
 }
