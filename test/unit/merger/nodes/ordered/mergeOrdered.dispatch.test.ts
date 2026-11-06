@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { mergeOrderedArrays } from '../../../../../src/merger/nodes/ordered/mergeOrdered.js'
+import type { OrderedSides } from '../../../../../src/merger/nodes/ordered/orderedSides.js'
 import { mergeOrderedArrays as tieScanMerge } from '../../../../utils/oracles/tieScanMerge.js'
+import { layoutSides } from '../../../../utils/orderedCuts.js'
 import {
   formatResult,
   ORDERED_ATTRIBUTE,
@@ -31,25 +33,22 @@ vi.mock(
   }
 )
 
-const mergedReadings = (
-  ancestor: string,
-  local: string,
-  other: string
+const mergedReadingsOf = (
+  sides: OrderedSides
 ): { readonly merges: number; readonly result: string } => {
-  const sides = orderedSides(ancestor, local, other)
   constructions.count = 0
   const result = mergeOrderedArrays(sides, ORDERED_ATTRIBUTE, defaultConfig)
   return { merges: constructions.count, result: formatResult(result) }
 }
 
+const mergedReadings = (ancestor: string, local: string, other: string) =>
+  mergedReadingsOf(orderedSides(ancestor, local, other))
+
+const referenceOf = (sides: OrderedSides): string =>
+  formatResult(tieScanMerge(sides, ORDERED_ATTRIBUTE, defaultConfig))
+
 const reference = (ancestor: string, local: string, other: string): string =>
-  formatResult(
-    tieScanMerge(
-      orderedSides(ancestor, local, other),
-      ORDERED_ATTRIBUTE,
-      defaultConfig
-    )
-  )
+  referenceOf(orderedSides(ancestor, local, other))
 
 // The readings the tie-scan merge builds for the same sides
 const referenceMerges = (
@@ -143,6 +142,41 @@ describe('mergeOrderedArrays', () => {
 
         // Assert
         expect(sut.merges).toBeGreaterThan(1)
+        expect(sut.result).toBe(expected)
+      })
+    })
+  })
+
+  describe('given tied readings that group into fewer merges than they number', () => {
+    const sides = ['K K J J', 'U K J', 'J J K K'] as const
+
+    describe('when merging', () => {
+      it('then one reading per group is merged', () => {
+        // Arrange
+        const expected = reference(...sides)
+
+        // Act
+        const sut = mergedReadings(...sides)
+
+        // Assert
+        expect(sut.merges).toBe(3)
+        expect(sut.result).toBe(expected)
+      })
+    })
+  })
+
+  describe('given tied readings of which the first two already differ and conflict', () => {
+    describe('when merging', () => {
+      it('then the stream stops at the second reading', () => {
+        // Arrange
+        const sides = layoutSides('nocut-identical', 2, 2)
+        const expected = referenceOf(sides)
+
+        // Act
+        const sut = mergedReadingsOf(sides)
+
+        // Assert
+        expect(sut.merges).toBe(2)
         expect(sut.result).toBe(expected)
       })
     })

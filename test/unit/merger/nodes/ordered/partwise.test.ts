@@ -24,6 +24,7 @@ import {
   noConflict,
   withConflict,
 } from '../../../../../src/types/mergeResult.js'
+import { signatureOf } from '../../../../../src/utils/jsonSignature.js'
 import { mergeOrderedArrays as tieScanMerge } from '../../../../utils/oracles/tieScanMerge.js'
 import {
   type Case,
@@ -115,6 +116,12 @@ const EXITS: readonly Exit[] = [
     sides: () => shapeSides('identical', 3, 3),
     expected: wholeArrayConflict,
     merges: 3,
+  },
+  {
+    name: 'the identical grid at r = 2, m = 2: the first reading and a variation of the first part already differ and conflict',
+    sides: () => shapeSides('identical', 2, 2),
+    expected: wholeArrayConflict,
+    merges: 2,
   },
   {
     name: 'a second part whose conflict shows only around the best readings',
@@ -541,6 +548,112 @@ describe('given generated parts where other writes a cut value under its own key
           }
         )
       )
+    })
+  })
+})
+
+const FOREIGN_ITEM: JsonObject = {
+  [ORDERED_ATTRIBUTE]: { fullName: 'Foreign', label: 'foreign' },
+}
+
+type Tamper = (output: JsonArray, cutItems: ReadonlySet<string>) => JsonArray
+
+const cutPlacesOf = (
+  output: JsonArray,
+  cutItems: ReadonlySet<string>
+): readonly number[] =>
+  output.flatMap((item, at) => (cutItems.has(signatureOf(item)) ? [at] : []))
+
+const withoutACut: Tamper = (output, cutItems) => {
+  const [first] = cutPlacesOf(output, cutItems)
+  return output.map((item, at) => (at === first ? FOREIGN_ITEM : item))
+}
+
+const withACutRepeated: Tamper = (output, cutItems) => {
+  const [first, second] = cutPlacesOf(output, cutItems)
+  return output.map((item, at) => (at === first ? output[second] : item))
+}
+
+const tamperedInput = (
+  sides: OrderedSides,
+  tamper: Tamper,
+  isTampered: (call: number) => boolean
+) => {
+  const { input } = inputOf(sides)
+  let calls = 0
+  const merge = (reading: Reading): MergedReading => {
+    const merged = mergeReading(reading, ORDERED_ATTRIBUTE, defaultConfig)
+    const output = isTampered(calls++)
+      ? tamper(merged.output, input.parts.cutItems)
+      : merged.output
+    return { ...merged, output }
+  }
+  return { ...input, merge }
+}
+
+// The dropinsert grid at r = 3, m = 3 merges the shortest reading last
+const DROPINSERT_MERGES = 8
+
+interface Fault {
+  readonly name: string
+  readonly tamper: Tamper
+  readonly isTampered: (call: number) => boolean
+}
+
+const FAULTS: readonly Fault[] = [
+  {
+    name: 'every output lacking a cut item',
+    tamper: withoutACut,
+    isTampered: () => true,
+  },
+  {
+    name: 'every output repeating a cut item where another stood',
+    tamper: withACutRepeated,
+    isTampered: () => true,
+  },
+  {
+    name: 'only the shortest output lacking a cut item',
+    tamper: withoutACut,
+    isTampered: call => call === DROPINSERT_MERGES - 1,
+  },
+]
+
+describe.each(FAULTS)('given $name', ({ tamper, isTampered }) => {
+  describe('when merging the tied parts', () => {
+    it('then the trimmed block is left to the stream', () => {
+      // Arrange
+      const sides = shapeSides('dropinsert', 3, 3)
+      const input = tamperedInput(sides, tamper, isTampered)
+      const sut = mergePartwise
+
+      // Act
+      const result = sut(input)
+
+      // Assert
+      expect(result).toBeNull()
+    })
+  })
+})
+
+describe('given readings with the same swaps of which one conflicts', () => {
+  describe('when merging the tied parts', () => {
+    it('then the result is the whole-array conflict', () => {
+      // Arrange
+      const sides = shapeSides('dropinsert', 3, 3)
+      const { input } = inputOf(sides)
+      let calls = 0
+      const merge = (reading: Reading): MergedReading => ({
+        ...mergeReading(reading, ORDERED_ATTRIBUTE, defaultConfig),
+        hasConflict: calls++ === 1,
+        phantomSwaps: () => 1,
+      })
+      const sut = mergePartwise
+
+      // Act
+      const result = sut({ ...input, merge })
+
+      // Assert
+      expect(result).toStrictEqual(wholeArrayConflict(sides))
     })
   })
 })
