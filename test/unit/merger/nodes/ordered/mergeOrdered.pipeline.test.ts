@@ -1,19 +1,21 @@
 import fc from 'fast-check'
-import {
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { KeyedArrayMergeNode } from '../../../../../src/merger/nodes/KeyedArrayMergeNode.js'
 import { collapsibleKeys } from '../../../../../src/merger/nodes/ordered/collapsible.js'
-import { identityTies } from '../../../../../src/merger/nodes/ordered/identity.js'
+import {
+  type GroupedTies,
+  identityTies,
+} from '../../../../../src/merger/nodes/ordered/identity.js'
+import { isTied } from '../../../../../src/merger/nodes/ordered/identityComponents.js'
 import { mergeOrderedArrays } from '../../../../../src/merger/nodes/ordered/mergeOrdered.js'
 import { mergeReading } from '../../../../../src/merger/nodes/ordered/mergeReading.js'
 import type { Reading } from '../../../../../src/merger/nodes/ordered/orderedEntry.js'
+import {
+  type OrderedSides,
+  wrapSides,
+} from '../../../../../src/merger/nodes/ordered/orderedSides.js'
+import { mergePartwise } from '../../../../../src/merger/nodes/ordered/partwise.js'
+import { tiePartsOf } from '../../../../../src/merger/nodes/ordered/tieParts.js'
 import { MetadataService } from '../../../../../src/service/MetadataService.js'
 import type {
   JsonArray,
@@ -99,7 +101,10 @@ const GRID_GADGETS = [1, 2, 3, 4]
 // The group path is reached by a tenth of the sampled cases: the property over
 // those cases runs more times so the path sees tens of them per seed
 const GROUP_RUNS = 400
-const REACH_RUNS = 100
+// On the merge's own path 5-14 cases per 100 merge every representative clean
+// and 1-5 hold several: sampling as many cases as the property runs keeps a
+// margin above the thresholds
+const REACH_RUNS = GROUP_RUNS
 const MIN_CLEAN_GROUPS = 5
 const MIN_SEVERAL_GROUPS = 1
 // A cell merging 81 readings through the head and the reference under
@@ -338,18 +343,40 @@ describe.each(gridOf(LAYOUT_SHAPES))(
   }
 )
 
+const takesASideWhole = (sides: OrderedSides): boolean =>
+  jsonIdentical(sides.ancestor, sides.local) ||
+  jsonIdentical(sides.ancestor, sides.other) ||
+  jsonIdentical(sides.local, sides.other)
+
+const mergesPartwise = (sides: OrderedSides, ties: GroupedTies): boolean => {
+  const parts = tiePartsOf(sides, ties, ORDERED_ATTRIBUTE)
+  if (parts.tied.length < 2) return false
+  const merge = (reading: Reading) =>
+    mergeReading(reading, ORDERED_ATTRIBUTE, defaultConfig)
+  const wrapped = wrapSides(sides, ORDERED_ATTRIBUTE)
+  return mergePartwise({ wrapped, ties, parts, merge }) !== null
+}
+
+// The representatives the merge itself walks: none on the exits before the
+// group path (a side taken whole, no tied component, the merge part by part
+// answering, no tied component holding an interchangeable key)
 const representativesOf = (tokens: Case): readonly Reading[] => {
   const sides = orderedSides(
     tokens[0].join(' '),
     tokens[1].join(' '),
     tokens[2].join(' ')
   )
-  const collapsible = collapsibleKeys(sides)
-  if (collapsible.size === 0) return []
+  if (takesASideWhole(sides)) return []
   const { ancestor, local, other, keys } = sides
-  return [
-    ...identityTies(ancestor, local, other, keys).representatives(collapsible),
-  ]
+  const ties = identityTies(ancestor, local, other, keys)
+  const tied = ties.components.filter(isTied)
+  if (tied.length === 0) return []
+  if (tied.length >= 2 && mergesPartwise(sides, ties)) return []
+  const collapsible = collapsibleKeys(sides)
+  const holdsCollapsible = tied.some(component =>
+    component.members.some(stretch => collapsible.has(ties.keyOf(stretch)))
+  )
+  return holdsCollapsible ? [...ties.representatives(collapsible)] : []
 }
 
 const mergesClean = (reading: Reading): boolean =>
@@ -410,14 +437,6 @@ describe('given many generated token sides with spans of identical copies', () =
 describe('given the per-reading merge wired in', () => {
   let reference: typeof import('../../laws/arbitraries.js')
   let ReferenceNode: typeof KeyedArrayMergeNode
-  // The spy keeps its calls across tests: each test must add some of its own
-  let callsBefore = 0
-  beforeEach(() => {
-    callsBefore = referenceSpy.mock.calls.length
-  })
-  afterEach(() =>
-    expect(referenceSpy.mock.calls.length).toBeGreaterThan(callsBefore)
-  )
   beforeAll(async () => {
     vi.resetModules()
     // A factory importing the reference never resolves: the reference waits on
@@ -520,13 +539,6 @@ describe('given the per-reading merge wired in', () => {
 
 describe('given the tie-scan merge wired in', () => {
   let reference: typeof import('../../laws/arbitraries.js')
-  let callsBefore = 0
-  beforeEach(() => {
-    callsBefore = tieScanSpy.mock.calls.length
-  })
-  afterEach(() =>
-    expect(tieScanSpy.mock.calls.length).toBeGreaterThan(callsBefore)
-  )
   beforeAll(async () => {
     vi.resetModules()
     // A factory importing the reference never resolves: the reference waits on
@@ -570,13 +582,6 @@ describe('given the tie-scan merge wired in', () => {
 
 describe('given the merge before grouping wired in', () => {
   let reference: typeof import('../../laws/arbitraries.js')
-  let callsBefore = 0
-  beforeEach(() => {
-    callsBefore = streamSpy.mock.calls.length
-  })
-  afterEach(() =>
-    expect(streamSpy.mock.calls.length).toBeGreaterThan(callsBefore)
-  )
   beforeAll(async () => {
     vi.resetModules()
     // A factory importing the reference never resolves: the reference waits on

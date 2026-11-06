@@ -501,8 +501,11 @@ describe('given one tied part with more choices than a spread can pass', () => {
   })
 })
 
-// A cut's value written by other under one of its part keys: the guard reads
-// the cut items by value, so it must send the trimmed block to the stream
+// A cut's value written by other under one of its part keys, with the keys
+// left as they were: a shape the node never builds (it reads keys from the
+// content), near the guard on the cut items. The property compares the merge
+// with the reference on it; the guard's own exit stays pinned by the examples
+// above, which no generated case reaches.
 const withCutValueCopied = (tokens: Case): OrderedSides | null => {
   const sides = orderedSides(
     tokens[0].join(' '),

@@ -85,13 +85,14 @@ export const readingsOf = (
   local: string,
   other: string
 ): readonly Reading[] => {
-  const {
-    ancestor: a,
-    local: l,
-    other: o,
-    keys,
-  } = orderedSides(ancestor, local, other)
-  return [...identityTies(a, l, o, keys).readings()]
+  const sides = orderedSides(ancestor, local, other)
+  const ties = identityTies(
+    sides.ancestor,
+    sides.local,
+    sides.other,
+    sides.keys
+  )
+  return [...ties.readings()]
 }
 
 type BlockSide = 'local' | 'ancestor' | 'other'
