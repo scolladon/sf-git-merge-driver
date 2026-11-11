@@ -8,7 +8,12 @@ export interface Point {
   readonly position: number
 }
 
-export type PointSet = Readonly<Record<LiveSide, readonly Point[]>>
+/**
+ * The points of one alternative on a live side, built when asked for and
+ * never held: a repeated key has more alternatives than a merge can keep the
+ * points of.
+ */
+export type PointSet = (side: LiveSide) => readonly Point[]
 
 type Alternatives = readonly PointSet[]
 
@@ -41,7 +46,7 @@ function* pointsOn(
   side: LiveSide
 ): Generator<Point> {
   for (const alternatives of stretches) {
-    for (const set of alternatives) yield* set[side]
+    for (const set of alternatives) yield* set(side)
   }
 }
 
@@ -129,7 +134,7 @@ const gather = (
   labels: Labels
 ): void => {
   for (const side of LIVE_SIDES) {
-    for (const point of set[side]) {
+    for (const point of set(side)) {
       addTo(into, labelIn(labels, side, point), point)
     }
   }

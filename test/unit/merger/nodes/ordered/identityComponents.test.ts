@@ -33,7 +33,10 @@ const pointsOf = (pairs: readonly Pair[]): readonly Point[] =>
 const alternative = (
   local: readonly Pair[],
   other: readonly Pair[] = []
-): PointSet => ({ local: pointsOf(local), other: pointsOf(other) })
+): PointSet => {
+  const points = { local: pointsOf(local), other: pointsOf(other) }
+  return side => points[side]
+}
 
 const NO_POINTS = alternative([])
 
@@ -52,9 +55,7 @@ const movesOfTuple = (
   LIVE_SIDES.reduce(
     (total, side) =>
       total +
-      movesOnSide(
-        tuple.flatMap((choice, at) => stretches[at][choice][side] as Point[])
-      ),
+      movesOnSide(tuple.flatMap((choice, at) => stretches[at][choice](side))),
     0
   )
 

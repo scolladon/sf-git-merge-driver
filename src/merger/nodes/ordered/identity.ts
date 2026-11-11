@@ -208,10 +208,10 @@ const pointsOn = (drafts: readonly Draft[], side: LiveSide): Point[] => {
   return points
 }
 
-const pointsOf = (drafts: readonly Draft[]): PointSet => ({
-  local: pointsOn(drafts, 'local'),
-  other: pointsOn(drafts, 'other'),
-})
+const pointsOf =
+  (drafts: readonly Draft[]): PointSet =>
+  side =>
+    pointsOn(drafts, side)
 
 const hasOneAlternative = (stretch: Stretch): boolean =>
   stretch.alternatives.length === 1
