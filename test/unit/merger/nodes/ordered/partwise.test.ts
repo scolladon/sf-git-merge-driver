@@ -1,4 +1,3 @@
-import fc from 'fast-check'
 import { describe, expect, it, vi } from 'vitest'
 import { buildConflictMarkers } from '../../../../../src/merger/ConflictMarkerBuilder.js'
 import {
@@ -24,19 +23,8 @@ import {
   noConflict,
   withConflict,
 } from '../../../../../src/types/mergeResult.js'
-import { signatureOf } from '../../../../../src/utils/jsonSignature.js'
 import { mergeOrderedArrays as tieScanMerge } from '../../../../utils/oracles/tieScanMerge.js'
-import {
-  type Case,
-  IDENTITY,
-  IDENTITY_ANCESTORS,
-  IDENTITY_TOKENS,
-} from '../../../../utils/orderedCases.js'
-import {
-  cutCaseArb,
-  layoutSides,
-  shapeSides,
-} from '../../../../utils/orderedCuts.js'
+import { layoutSides, shapeSides } from '../../../../utils/orderedCuts.js'
 import {
   formatResult,
   ORDERED_ATTRIBUTE,
@@ -76,7 +64,7 @@ const inputOf = (sides: OrderedSides) => {
       other: wrap(sides.other),
     },
     ties,
-    parts: tiePartsOf(sides, ties, ORDERED_ATTRIBUTE),
+    parts: tiePartsOf(sides, ties),
     merge,
   }
   return { input, merge }
@@ -182,7 +170,7 @@ describe('given a first part whose best reading is not the first one', () => {
       const sut = mergePartwise
 
       // Act
-      const result = sut(input) as MergeResult
+      const result = sut(input)
 
       // Assert
       expect(formatResult(result)).toBe('B,A,B,C,D,D,Z (clean)')
@@ -216,10 +204,10 @@ describe('given the dropinsert grid at r = 3, m = 3', () => {
 
       // Assert
       expect(result).toStrictEqual(oracleOf(sides))
-      expect(result?.hasConflict).toBe(true)
+      expect(result.hasConflict).toBe(true)
     })
 
-    it('then it merges the readings of the survivors and the shortest one', () => {
+    it('then it merges the readings of the survivors only', () => {
       // Arrange
       const { input, merge } = inputOf(shapeSides('dropinsert', 3, 3))
       const sut = mergePartwise
@@ -228,88 +216,7 @@ describe('given the dropinsert grid at r = 3, m = 3', () => {
       sut(input)
 
       // Assert
-      expect(merge).toHaveBeenCalledTimes(8)
-    })
-  })
-})
-
-describe('given a part entry that carries the value of a cut under its own key', () => {
-  const cutValueUnderAnotherKey = (): OrderedSides => {
-    const grid = shapeSides('dropinsert', 2, 2)
-    const cut = grid.ancestor[grid.keys.ancestor.indexOf('U0a')]
-    const other = grid.other.map((entry, at) =>
-      at === grid.keys.other.indexOf('U0x') ? cut : entry
-    )
-    return { ...grid, other }
-  }
-
-  describe('when merging the tied parts', () => {
-    it('then the trimmed block is left to the stream', () => {
-      // Arrange
-      const { input } = inputOf(cutValueUnderAnotherKey())
-      const sut = mergePartwise
-
-      // Act
-      const result = sut(input)
-
-      // Assert
-      expect(result).toBeNull()
-    })
-  })
-
-  describe('when merging', () => {
-    it('then the result is the one the tie-scan merge builds', () => {
-      // Arrange
-      const sides = cutValueUnderAnotherKey()
-      const sut = mergeOrderedArrays
-
-      // Act
-      const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
-
-      // Assert
-      expect(result).toStrictEqual(oracleOf(sides))
-    })
-  })
-})
-
-describe('given a part entry that carries the edited value of a cut under its own key', () => {
-  const editedCutValueUnderAnotherKey = (): OrderedSides => {
-    const grid = shapeSides('dropinsert', 2, 2)
-    const edited = { fullName: 'U0a', label: 'u edited' }
-    const local = grid.local.map((entry, at) =>
-      at === grid.keys.local.indexOf('U0a') ? edited : entry
-    )
-    const other = grid.other.map((entry, at) =>
-      at === grid.keys.other.indexOf('U0x') ? edited : entry
-    )
-    return { ...grid, local, other }
-  }
-
-  describe('when merging the tied parts', () => {
-    it('then the trimmed block is left to the stream', () => {
-      // Arrange
-      const { input } = inputOf(editedCutValueUnderAnotherKey())
-      const sut = mergePartwise
-
-      // Act
-      const result = sut(input)
-
-      // Assert
-      expect(result).toBeNull()
-    })
-  })
-
-  describe('when merging', () => {
-    it('then the result is the one the tie-scan merge builds', () => {
-      // Arrange
-      const sides = editedCutValueUnderAnotherKey()
-      const sut = mergeOrderedArrays
-
-      // Act
-      const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
-
-      // Assert
-      expect(result).toStrictEqual(oracleOf(sides))
+      expect(merge).toHaveBeenCalledTimes(7)
     })
   })
 })
@@ -365,7 +272,7 @@ describe('given the dropone grid at r = 3, m = 9', () => {
 })
 
 describe('given the dropinsert grid at r = 3, m = 9', () => {
-  // 3^9 tied readings take seconds; the partwise merge needs 20. The budget
+  // 3^9 tied readings take seconds; the partwise merge needs 19. The budget
   // sits between the two so that CPU load and coverage instrumentation cannot
   // push the merge over it.
   const COPIES = 3
@@ -456,7 +363,7 @@ describe('given one tied part with more choices than a spread can pass', () => {
   }
 
   // The first choice renders longer than every other, so the outputs differ
-  // without conflict and the merge goes on to the shortest survivor.
+  // without conflict and the merge trims them all.
   const inputWithChoices = () => {
     const merge = vi
       .fn<(reading: Reading) => MergedReading>()
@@ -465,7 +372,7 @@ describe('given one tied part with more choices than a spread can pass', () => {
     const input = {
       wrapped: { ancestor: [ITEM], local: [ITEM, ITEM], other: [ITEM] },
       ties,
-      parts: { tied: [[0]], cutItems: new Set<string>() },
+      parts: { tied: [[0]] },
       merge,
     }
     return { input, merge }
@@ -491,7 +398,7 @@ describe('given one tied part with more choices than a spread can pass', () => {
     )
 
     it(
-      'then it merges every choice and the shortest survivor',
+      'then it merges every choice once',
       () => {
         // Arrange
         const { input, merge } = inputWithChoices()
@@ -501,137 +408,10 @@ describe('given one tied part with more choices than a spread can pass', () => {
         sut(input)
 
         // Assert
-        expect(merge).toHaveBeenCalledTimes(CHOICES + 1)
+        expect(merge).toHaveBeenCalledTimes(CHOICES)
       },
       LARGE_TIMEOUT_MS
     )
-  })
-})
-
-// A cut's value written by other under one of its part keys, with the keys
-// left as they were: a shape the node never builds (it reads keys from the
-// content), near the guard on the cut items. The property compares the merge
-// with the reference on it; the guard's own exit stays pinned by the examples
-// above, which no generated case reaches.
-const withCutValueCopied = (tokens: Case): OrderedSides | null => {
-  const sides = orderedSides(
-    tokens[0].join(' '),
-    tokens[1].join(' '),
-    tokens[2].join(' ')
-  )
-  const cutAt = sides.keys.ancestor.findIndex(key => key.startsWith('C'))
-  const target = sides.keys.other.findIndex(key => !key.startsWith('C'))
-  if (cutAt < 0 || target < 0) return null
-  const other = sides.other.map((entry, at) =>
-    at === target ? sides.ancestor[cutAt] : entry
-  )
-  return { ...sides, other }
-}
-
-describe('given generated parts where other writes a cut value under its own key', () => {
-  describe('when merging', () => {
-    it('then the result is the one the tie-scan merge builds', () => {
-      fc.assert(
-        fc.property(
-          cutCaseArb(IDENTITY_ANCESTORS, IDENTITY, IDENTITY_TOKENS),
-          tokens => {
-            // Arrange
-            const sides = withCutValueCopied(tokens)
-            fc.pre(sides !== null)
-            const sut = mergeOrderedArrays
-
-            // Act
-            const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
-
-            // Assert
-            expect(result).toStrictEqual(oracleOf(sides))
-          }
-        )
-      )
-    })
-  })
-})
-
-const FOREIGN_ITEM: JsonObject = {
-  [ORDERED_ATTRIBUTE]: { fullName: 'Foreign', label: 'foreign' },
-}
-
-type Tamper = (output: JsonArray, cutItems: ReadonlySet<string>) => JsonArray
-
-const cutPlacesOf = (
-  output: JsonArray,
-  cutItems: ReadonlySet<string>
-): readonly number[] =>
-  output.flatMap((item, at) => (cutItems.has(signatureOf(item)) ? [at] : []))
-
-const withoutACut: Tamper = (output, cutItems) => {
-  const [first] = cutPlacesOf(output, cutItems)
-  return output.map((item, at) => (at === first ? FOREIGN_ITEM : item))
-}
-
-const withACutRepeated: Tamper = (output, cutItems) => {
-  const [first, second] = cutPlacesOf(output, cutItems)
-  return output.map((item, at) => (at === first ? output[second] : item))
-}
-
-const tamperedInput = (
-  sides: OrderedSides,
-  tamper: Tamper,
-  isTampered: (call: number) => boolean
-) => {
-  const { input } = inputOf(sides)
-  let calls = 0
-  const merge = (reading: Reading): MergedReading => {
-    const merged = mergeReading(reading, ORDERED_ATTRIBUTE, defaultConfig)
-    const output = isTampered(calls++)
-      ? tamper(merged.output, input.parts.cutItems)
-      : merged.output
-    return { ...merged, output }
-  }
-  return { ...input, merge }
-}
-
-// The dropinsert grid at r = 3, m = 3 merges the shortest reading last
-const DROPINSERT_MERGES = 8
-
-interface Fault {
-  readonly name: string
-  readonly tamper: Tamper
-  readonly isTampered: (call: number) => boolean
-}
-
-const FAULTS: readonly Fault[] = [
-  {
-    name: 'every output lacking a cut item',
-    tamper: withoutACut,
-    isTampered: () => true,
-  },
-  {
-    name: 'every output repeating a cut item where another stood',
-    tamper: withACutRepeated,
-    isTampered: () => true,
-  },
-  {
-    name: 'only the shortest output lacking a cut item',
-    tamper: withoutACut,
-    isTampered: call => call === DROPINSERT_MERGES - 1,
-  },
-]
-
-describe.each(FAULTS)('given $name', ({ tamper, isTampered }) => {
-  describe('when merging the tied parts', () => {
-    it('then the trimmed block is left to the stream', () => {
-      // Arrange
-      const sides = shapeSides('dropinsert', 3, 3)
-      const input = tamperedInput(sides, tamper, isTampered)
-      const sut = mergePartwise
-
-      // Act
-      const result = sut(input)
-
-      // Assert
-      expect(result).toBeNull()
-    })
   })
 })
 

@@ -279,7 +279,7 @@ export const mergeOrderedArrays = (
     sides.other,
     sides.keys
   )
-  const parts = tiePartsOf(sides, ties, attribute)
+  const parts = tiePartsOf(sides, ties)
   const merge = (reading: Reading): MergedReading =>
     mergeReading(reading, attribute, config)
   const partwise =

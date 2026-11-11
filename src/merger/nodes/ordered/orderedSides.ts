@@ -2,7 +2,10 @@ import type { JsonArray } from '../../../types/jsonTypes.js'
 import type { KeyedSides, SideKeys } from '../KeyedArrayIndex.js'
 import { LIVE_SIDES, type LiveSide } from './orderedEntry.js'
 
-/** The three sides of an ordered array, with the key of every entry. */
+/**
+ * The three sides of an ordered array, with the key of every entry. A key is
+ * read from its entry: two entries of equal content hold the same key.
+ */
 export interface OrderedSides {
   readonly ancestor: JsonArray
   readonly local: JsonArray

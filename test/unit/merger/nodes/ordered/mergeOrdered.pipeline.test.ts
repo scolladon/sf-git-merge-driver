@@ -10,11 +10,7 @@ import { isTied } from '../../../../../src/merger/nodes/ordered/identityComponen
 import { mergeOrderedArrays } from '../../../../../src/merger/nodes/ordered/mergeOrdered.js'
 import { mergeReading } from '../../../../../src/merger/nodes/ordered/mergeReading.js'
 import type { Reading } from '../../../../../src/merger/nodes/ordered/orderedEntry.js'
-import {
-  type OrderedSides,
-  wrapSides,
-} from '../../../../../src/merger/nodes/ordered/orderedSides.js'
-import { mergePartwise } from '../../../../../src/merger/nodes/ordered/partwise.js'
+import type { OrderedSides } from '../../../../../src/merger/nodes/ordered/orderedSides.js'
 import { fewestPhantomSwaps } from '../../../../../src/merger/nodes/ordered/tieCombination.js'
 import { tiePartsOf } from '../../../../../src/merger/nodes/ordered/tieParts.js'
 import { MetadataService } from '../../../../../src/service/MetadataService.js'
@@ -360,14 +356,8 @@ const takesASideWhole = (sides: OrderedSides): boolean =>
 // as tied components and as parts
 const FEWEST_TIED_PARTS = 2
 
-const mergesPartwise = (sides: OrderedSides, ties: GroupedTies): boolean => {
-  const parts = tiePartsOf(sides, ties, ORDERED_ATTRIBUTE)
-  if (parts.tied.length < FEWEST_TIED_PARTS) return false
-  const merge = (reading: Reading) =>
-    mergeReading(reading, ORDERED_ATTRIBUTE, defaultConfig)
-  const wrapped = wrapSides(sides, ORDERED_ATTRIBUTE)
-  return mergePartwise({ wrapped, ties, parts, merge }) !== null
-}
+const mergesPartwise = (sides: OrderedSides, ties: GroupedTies): boolean =>
+  tiePartsOf(sides, ties).tied.length >= FEWEST_TIED_PARTS
 
 // The representatives the merge itself walks: none on the exits before the
 // group path (a side taken whole, no tied component, the merge part by part
@@ -430,8 +420,7 @@ const rendersApartByParts = (tokens: Case): boolean => {
   const { ancestor, local, other, keys } = sides
   const ties = identityTies(ancestor, local, other, keys)
   if (ties.components.filter(isTied).length < FEWEST_TIED_PARTS) return false
-  const parts = tiePartsOf(sides, ties, ORDERED_ATTRIBUTE)
-  if (parts.tied.length < FEWEST_TIED_PARTS) return false
+  if (!mergesPartwise(sides, ties)) return false
   const [first, ...others] = fewestPhantomSwaps(
     [...ties.readings()].map(reading =>
       mergeReading(reading, ORDERED_ATTRIBUTE, defaultConfig)

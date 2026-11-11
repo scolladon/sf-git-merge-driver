@@ -1,6 +1,4 @@
-import type { JsonObject } from '../../../types/jsonTypes.js'
 import { jsonIdentical } from '../../../utils/jsonEqual.js'
-import { signatureOf } from '../../../utils/jsonSignature.js'
 import type { KeyedSides, SideKeys } from '../KeyedArrayIndex.js'
 import type { IdentityTies } from './identity.js'
 import { isTied } from './identityComponents.js'
@@ -16,10 +14,9 @@ import {
 
 type Places = PerSide<number>
 
-/** The tied components of each part between two cuts, and the cuts' items. */
+/** The tied components of each part between two cuts. */
 export interface TieParts {
   readonly tied: readonly (readonly number[])[]
-  readonly cutItems: ReadonlySet<string>
 }
 
 // Before the first entry no key reaches anywhere.
@@ -56,39 +53,31 @@ const heldOnce = (keys: KeyedSides, spans: SideSpans): readonly Places[] =>
       : []
   )
 
-// The value keptByAllStatus renders without a nested merge: the changed side
-// when the other is unchanged, or the one value both sides changed it to.
-const takenValue = (
-  sides: OrderedSides,
-  at: Places
-): JsonObject | undefined => {
+// keptByAllStatus renders the entry without a nested merge: a side left it
+// unchanged, or both changed it to one value.
+const isTakenWhole = (sides: OrderedSides, at: Places): boolean => {
   const ancestor = sides.ancestor[at.ancestor]
-  const local = sides.local[at.local] as JsonObject
-  if (jsonIdentical(local, ancestor)) return sides.other[at.other] as JsonObject
+  const local = sides.local[at.local]
   const other = sides.other[at.other]
-  return jsonIdentical(other, ancestor) || jsonIdentical(local, other)
-    ? local
-    : undefined
-}
-
-interface Cut {
-  readonly at: Places
-  readonly value: JsonObject
+  return (
+    jsonIdentical(local, ancestor) ||
+    jsonIdentical(other, ancestor) ||
+    jsonIdentical(local, other)
+  )
 }
 
 // A key held before the candidate on one side with a copy at or after it on
 // another reaches the copy: no such key may exist, whichever pair of sides.
-const cutsOf = (sides: OrderedSides): readonly Cut[] => {
+const cutsOf = (sides: OrderedSides): readonly Places[] => {
   const spans = sideSpans(sides.keys)
   const reach = perSide(from =>
     perSide(to => reachBefore(sides.keys[from], spans[to]))
   )
   const isReachedByNone = (at: Places): boolean =>
     SIDES.every(from => SIDES.every(to => reach[from][to][at[from]] < at[to]))
-  return heldOnce(sides.keys, spans).flatMap(at => {
-    const value = takenValue(sides, at)
-    return value !== undefined && isReachedByNone(at) ? [{ at, value }] : []
-  })
+  return heldOnce(sides.keys, spans).filter(
+    at => isTakenWhole(sides, at) && isReachedByNone(at)
+  )
 }
 
 // Every key gets the number of cuts before its first copy on this side.
@@ -148,15 +137,7 @@ const tiedOf = (
 
 export const tiePartsOf = (
   sides: OrderedSides,
-  ties: IdentityTies,
-  attribute: string
-): TieParts => {
-  const cuts = cutsOf(sides)
-  const places = cuts.map(({ at }) => at)
-  return {
-    tied: tiedOf(ties, partOfKeys(sides.keys, places)),
-    cutItems: new Set(
-      cuts.map(({ value }) => signatureOf({ [attribute]: value }))
-    ),
-  }
-}
+  ties: IdentityTies
+): TieParts => ({
+  tied: tiedOf(ties, partOfKeys(sides.keys, cutsOf(sides))),
+})

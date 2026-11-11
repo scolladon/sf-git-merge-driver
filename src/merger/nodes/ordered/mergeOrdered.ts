@@ -110,11 +110,10 @@ const mergeTied = ({ sides, wrapped, ties, merge }: Tied): MergeResult => {
 // looked for.
 const mergePartwiseOf = (
   { sides, wrapped, ties, merge }: Tied,
-  tiedComponents: number,
-  attribute: string
+  tiedComponents: number
 ): MergeResult | null => {
   if (tiedComponents < FEWEST_TIED_PARTS) return null
-  const parts = tiePartsOf(sides, ties, attribute)
+  const parts = tiePartsOf(sides, ties)
   return parts.tied.length >= FEWEST_TIED_PARTS
     ? mergePartwise({ wrapped, ties, parts, merge })
     : null
@@ -139,5 +138,5 @@ export const mergeOrderedArrays = (
   // One reading: nothing to group or to split, the stream merges it once
   if (tiedComponents === 0) return mergeStream(wrapped, ties.readings(), merge)
   const tied = { sides, wrapped, ties, merge }
-  return mergePartwiseOf(tied, tiedComponents, attribute) ?? mergeTied(tied)
+  return mergePartwiseOf(tied, tiedComponents) ?? mergeTied(tied)
 }

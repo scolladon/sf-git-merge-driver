@@ -1,8 +1,5 @@
-import type { JsonArray } from '../../../types/jsonTypes.js'
 import type { MergeResult } from '../../../types/mergeResult.js'
-import { leastOf } from '../../../utils/arrayUtils.js'
 import { jsonIdentical } from '../../../utils/jsonEqual.js'
-import { signatureOf } from '../../../utils/jsonSignature.js'
 import type { IdentityTies } from './identity.js'
 import type { Tuple } from './identityComponents.js'
 import type { MergedReading } from './mergeReading.js'
@@ -45,48 +42,16 @@ const choiceAt = (
   position: number
 ): Tuple => [...ties.around(part, base)][position]
 
-// Each tied part at the chosen position, every other stretch as the first
-// tuple.
-const withChoices = (
+// Each tied part at its first surviving choice, every other stretch as the
+// first tuple.
+const firstSurvivorsOf = (
   ties: IdentityTies,
-  rounds: readonly PartRound[],
-  positionOf: (round: PartRound, at: number) => number
+  rounds: readonly PartRound[]
 ): Tuple =>
   rounds.reduce(
-    (base, round, at) =>
-      choiceAt(ties, round.part, base, positionOf(round, at)),
+    (base, { part, survivors }) => choiceAt(ties, part, base, survivors[0]),
     ties.first
   )
-
-const shortestAt = (readings: readonly MergedReading[]): number => {
-  const lengths = readings.map(reading => reading.output.length)
-  return lengths.indexOf(leastOf(lengths))
-}
-
-// Lengths add up over the parts: each at its shortest survivor gives the
-// shortest survivor.
-const shortestTuple = (
-  ties: IdentityTies,
-  rounds: readonly PartRound[],
-  variations: Variations
-): Tuple =>
-  withChoices(
-    ties,
-    rounds,
-    (round, at) => round.survivors[shortestAt(variations[at])]
-  )
-
-// A region item equal to a cut's would let two outputs agree across the cut,
-// and the one-part variations would no longer bound every survivor's ends.
-const holdsEachCutOnce = (
-  output: JsonArray,
-  cutItems: ReadonlySet<string>
-): boolean => {
-  const held = output
-    .map(item => signatureOf(item))
-    .filter(signature => cutItems.has(signature))
-  return held.length === cutItems.size && new Set(held).size === held.length
-}
 
 const rendersAlike = (variations: Variations): boolean => {
   const [[firstSurvivors]] = variations
@@ -133,45 +98,28 @@ class PartwiseRun {
         survivors.map(at => merged[at])
       )
     }
-    const firstSurvivors = withChoices(
-      this.ties,
-      rounds,
-      ({ survivors }) => survivors[0]
-    )
+    const firstSurvivors = firstSurvivorsOf(this.ties, rounds)
     const firstSurvivorsMerged = this.mergeOf(firstSurvivors)
     return rounds.map(round =>
       this.aroundFirstSurvivors(round, firstSurvivors, firstSurvivorsMerged)
     )
   }
 
-  decided(
-    rounds: readonly PartRound[],
-    variations: Variations
-  ): MergeResult | null {
+  // The one-part variations bound every survivor's ends: a cut's item stands
+  // once in every output (OrderedSides: equal entries share a key, and a
+  // cut's key is held once), so two survivors that differ in a part first
+  // disagree inside it, where its variations already do.
+  decided(variations: Variations): MergeResult {
     if (rendersAlike(variations)) return asResult(variations[0][0])
-    if (variations.flat().some(reading => reading.hasConflict)) {
+    const readings = variations.flat()
+    if (readings.some(reading => reading.hasConflict)) {
       return wholeConflict(this.input.wrapped)
     }
-    return this.stitched(rounds, variations)
-  }
-
-  private stitched(
-    rounds: readonly PartRound[],
-    variations: Variations
-  ): MergeResult | null {
-    // Nothing reads the scan past this point: the shortest reading is not
-    // recorded
-    const shortest = this.mergeOf(shortestTuple(this.ties, rounds, variations))
     // The first survivors' output leads: every round's list starts with it
-    const outputs = [
-      ...variations.flat().map(reading => reading.output),
-      shortest.output,
-    ]
-    const { cutItems } = this.input.parts
-    if (!outputs.every(output => holdsEachCutOnce(output, cutItems))) {
-      return null
-    }
-    return trimmedBlock(this.input.wrapped, outputs)
+    return trimmedBlock(
+      this.input.wrapped,
+      readings.map(reading => reading.output)
+    )
   }
 
   private aroundFirstSurvivors(
@@ -186,7 +134,7 @@ class PartwiseRun {
   }
 }
 
-export const mergePartwise = (input: Partwise): MergeResult | null => {
+export const mergePartwise = (input: Partwise): MergeResult => {
   const run = new PartwiseRun(input)
   const first = run.mergeOf(input.ties.first)
   run.record([first])
@@ -195,6 +143,5 @@ export const mergePartwise = (input: Partwise): MergeResult | null => {
     rounds.push(run.roundOne(part, first))
     if (run.isWholeConflict()) return wholeConflict(input.wrapped)
   }
-  const variations = run.variations(rounds)
-  return run.decided(rounds, variations)
+  return run.decided(run.variations(rounds))
 }

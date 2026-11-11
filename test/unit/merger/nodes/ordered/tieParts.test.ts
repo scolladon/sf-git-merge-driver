@@ -6,7 +6,6 @@ import type { OrderedSides } from '../../../../../src/merger/nodes/ordered/order
 import { tiePartsOf } from '../../../../../src/merger/nodes/ordered/tieParts.js'
 import type { JsonObject } from '../../../../../src/types/jsonTypes.js'
 import { jsonIdentical } from '../../../../../src/utils/jsonEqual.js'
-import { signatureOf } from '../../../../../src/utils/jsonSignature.js'
 import {
   caseArb,
   IDENTITY,
@@ -14,10 +13,7 @@ import {
   IDENTITY_TOKENS,
 } from '../../../../utils/orderedCases.js'
 import { cutCaseArb } from '../../../../utils/orderedCuts.js'
-import {
-  ORDERED_ATTRIBUTE,
-  orderedSides,
-} from '../../../../utils/orderedTokens.js'
+import { orderedSides } from '../../../../utils/orderedTokens.js'
 
 const SIDE_NAMES = ['ancestor', 'local', 'other'] as const
 
@@ -88,9 +84,6 @@ const partByDefinition = (
   return cutKeys.filter(cut => keys.indexOf(cut) < first).length
 }
 
-const cutItemOf = (value: unknown): string =>
-  signatureOf({ [ORDERED_ATTRIBUTE]: value as JsonObject })
-
 const sidesOfCase = ([ancestor, local, other]: readonly [
   readonly string[],
   readonly string[],
@@ -105,7 +98,7 @@ const tiePartsFor = (sides: OrderedSides) => {
     sides.other,
     sides.keys
   )
-  return { ties, parts: tiePartsOf(sides, ties, ORDERED_ATTRIBUTE) }
+  return { ties, parts: tiePartsOf(sides, ties) }
 }
 
 const GENERATED_CASES = fc.oneof(
@@ -115,26 +108,6 @@ const GENERATED_CASES = fc.oneof(
 
 describe('given generated sides with and without cuts', () => {
   describe('when finding the tie parts', () => {
-    it('then the cut items are those of the keys meeting the definition', () => {
-      fc.assert(
-        fc.property(GENERATED_CASES, tokens => {
-          // Arrange
-          const sides = sidesOfCase(tokens)
-          const expected = new Set(
-            cutKeysByDefinition(sides).map(key =>
-              cutItemOf(keptValueOf(sides, key))
-            )
-          )
-
-          // Act
-          const sut = tiePartsFor(sides).parts
-
-          // Assert
-          expect(new Set(sut.cutItems)).toEqual(expected)
-        })
-      )
-    })
-
     it('then each tied part holds the components of one part, apart from the others', () => {
       fc.assert(
         fc.property(GENERATED_CASES, tokens => {
@@ -185,10 +158,6 @@ describe('given generated sides with and without cuts', () => {
   })
 })
 
-const CUT_C = signatureOf({
-  [ORDERED_ATTRIBUTE]: { fullName: 'C', label: 'C' },
-})
-
 const partsOfTokens = (ancestor: string, local: string, other: string) =>
   tiePartsFor(orderedSides(ancestor, local, other)).parts
 
@@ -203,18 +172,13 @@ describe('given two repeated keys around a unique key', () => {
 
       // Assert
       expect(sut.tied).toEqual([[0], [1]])
-      expect(sut.cutItems).toEqual(new Set([CUT_C]))
     })
   })
 })
 
-const CUT_C_EDITED = signatureOf({
-  [ORDERED_ATTRIBUTE]: { fullName: 'C', label: 'C*' },
-})
-
 describe('given the unique key edited by local', () => {
   describe('when finding the tie parts', () => {
-    it("then each repeated key is a tied part and the edited key is the cut, with local's value", () => {
+    it('then each repeated key is a tied part and the edited key is the cut', () => {
       // Arrange
       const sides = ['A A C B B', 'A C* B', 'A A C B B Z'] as const
 
@@ -223,7 +187,6 @@ describe('given the unique key edited by local', () => {
 
       // Assert
       expect(sut.tied).toEqual([[0], [1]])
-      expect(sut.cutItems).toEqual(new Set([CUT_C_EDITED]))
     })
   })
 })
@@ -239,7 +202,6 @@ describe('given the unique key edited alike by both sides', () => {
 
       // Assert
       expect(sut.tied).toEqual([[0], [1]])
-      expect(sut.cutItems).toEqual(new Set([CUT_C_EDITED]))
     })
   })
 })
@@ -255,7 +217,6 @@ describe('given the unique key edited apart by both sides', () => {
 
       // Assert
       expect(sut.tied).toEqual([[0, 1]])
-      expect(sut.cutItems.size).toBe(0)
     })
   })
 })
@@ -271,7 +232,6 @@ describe('given a key one side inserts on both sides of an unchanged unique key'
 
       // Assert
       expect(sut.tied).toEqual([[0, 1]])
-      expect(sut.cutItems.size).toBe(0)
     })
   })
 })
@@ -287,7 +247,6 @@ describe('given a repeated key copied past the unique key on local', () => {
 
       // Assert
       expect(sut.tied).toEqual([[0]])
-      expect(sut.cutItems.size).toBe(0)
     })
   })
 })
@@ -303,14 +262,13 @@ describe('given no unique key between two repeated keys', () => {
 
       // Assert
       expect(sut.tied).toEqual([[0, 1]])
-      expect(sut.cutItems.size).toBe(0)
     })
   })
 })
 
 describe('given unique keys only', () => {
   describe('when finding the tie parts', () => {
-    it('then no part is tied and every unchanged key is a cut', () => {
+    it('then no part is tied', () => {
       // Arrange
       const sides = ['A B', 'A B C', 'A B'] as const
 
@@ -319,15 +277,6 @@ describe('given unique keys only', () => {
 
       // Assert
       expect(sut.tied).toEqual([])
-      expect(sut.cutItems).toEqual(
-        new Set(
-          ['A', 'B'].map(key =>
-            signatureOf({
-              [ORDERED_ATTRIBUTE]: { fullName: key, label: key },
-            })
-          )
-        )
-      )
     })
   })
 })
@@ -343,14 +292,13 @@ describe('given the unique key held twice on local', () => {
 
       // Assert
       expect(sut.tied).toHaveLength(1)
-      expect(sut.cutItems.size).toBe(0)
     })
   })
 })
 
 describe('given the unique key listing its fields in another order on other', () => {
   describe('when finding the tie parts', () => {
-    it("then the key is a cut whose item is other's value", () => {
+    it('then the key is a cut', () => {
       // Arrange
       const sides = orderedSides('A A C B B', 'A C B', 'A A C B B Z')
       const reordered: OrderedSides = {
@@ -367,11 +315,10 @@ describe('given the unique key listing its fields in another order on other', ()
       )
 
       // Act
-      const sut = tiePartsOf(reordered, ties, ORDERED_ATTRIBUTE)
+      const sut = tiePartsOf(reordered, ties)
 
       // Assert
       expect(sut.tied).toEqual([[0], [1]])
-      expect(sut.cutItems).toEqual(new Set([CUT_C]))
     })
   })
 })
