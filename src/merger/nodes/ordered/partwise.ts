@@ -112,7 +112,8 @@ class PartwiseRun {
   }
 
   // Every reading recorded belongs to the tie set, and the scan's decision
-  // holds on any of its subsets.
+  // holds on any of its subsets. It is read between the rounds only: past
+  // them, decided() answers the same conflict from the variations.
   isWholeConflict(): boolean {
     return this.scan.isWholeConflict()
   }
@@ -138,7 +139,6 @@ class PartwiseRun {
       ({ survivors }) => survivors[0]
     )
     const firstSurvivorsMerged = this.mergeOf(firstSurvivors)
-    this.record([firstSurvivorsMerged])
     return rounds.map(round =>
       this.aroundFirstSurvivors(round, firstSurvivors, firstSurvivorsMerged)
     )
@@ -182,7 +182,6 @@ class PartwiseRun {
     const tuples = [...this.ties.around(round.part, firstSurvivors)]
     const [, ...others] = round.survivors
     const otherChoices = others.map(at => this.mergeOf(tuples[at]))
-    this.record(otherChoices)
     return [firstSurvivorsMerged, ...otherChoices]
   }
 }
@@ -197,6 +196,5 @@ export const mergePartwise = (input: Partwise): MergeResult | null => {
     if (run.isWholeConflict()) return wholeConflict(input.wrapped)
   }
   const variations = run.variations(rounds)
-  if (run.isWholeConflict()) return wholeConflict(input.wrapped)
   return run.decided(rounds, variations)
 }
