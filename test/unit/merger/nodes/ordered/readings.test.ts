@@ -91,6 +91,8 @@ const Q6_ROWS: readonly (readonly [string, string, string, string, number])[] =
     ['unique keys reorder', 'A B C', 'B A C', 'A C B', 1],
     ['surplus copies on the longer side', '', '~p', '~p ~p', 2],
     ['surplus copies on the longer side, mirrored', '', '~p ~p', '~p', 2],
+    ['as many surplus copies on each side', '', 'A A', 'A A*', 2],
+    ['as many surplus copies on each side, mirrored', '', 'A A*', 'A A', 2],
   ]
 
 const tokensOf = (side: string): Tokens => (side === '' ? [] : side.split(' '))

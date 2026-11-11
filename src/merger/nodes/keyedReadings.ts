@@ -248,19 +248,58 @@ const surplusPairings = (
   ...unmatched(restOther, matchedRest, ([, j]) => j).map(other => ({ other })),
 ]
 
+function* enumeratedFromOther(
+  restLocal: readonly JsonObject[],
+  restOther: readonly JsonObject[]
+): Generator<Matching> {
+  for (const matching of matchingsOf(restOther, restLocal)) {
+    yield matching.map(([other, local]): Pair => [local, other])
+  }
+}
+
+const byLocal = ([left]: Pair, [right]: Pair): number => left - right
+
+// The pairs of a matching whatever order they come in: a local copy is paired
+// once, so its place orders them
+const pairsKey = (matching: Matching): string =>
+  JSON.stringify([...matching].sort(byLocal))
+
+function* once(matchings: Iterable<Matching>): Generator<Matching> {
+  const seen = new Set<string>()
+  for (const matching of matchings) {
+    const key = pairsKey(matching)
+    if (seen.has(key)) continue
+    seen.add(key)
+    yield matching
+  }
+}
+
+function* enumeratedFromBoth(
+  restLocal: readonly JsonObject[],
+  restOther: readonly JsonObject[]
+): Generator<Matching> {
+  yield* matchingsOf(restLocal, restOther)
+  yield* enumeratedFromOther(restLocal, restOther)
+}
+
 // The longer list is enumerated whichever side it is: which of its copies
-// pair is the reading, and it must not depend on the role of the side.
+// pair is the reading, and it must not depend on the role of the side. Two
+// lists as long are each enumerated in turn, a matching both give coming
+// once: enumerating from one alone would leave out the readings only the
+// other tells apart.
 function* surplusMatchings(
   restLocal: readonly JsonObject[],
   restOther: readonly JsonObject[]
 ): Generator<Matching> {
-  if (restLocal.length >= restOther.length) {
+  if (restLocal.length > restOther.length) {
     yield* matchingsOf(restLocal, restOther)
     return
   }
-  for (const matching of matchingsOf(restOther, restLocal)) {
-    yield matching.map(([other, local]): Pair => [local, other])
+  if (restLocal.length < restOther.length) {
+    yield* enumeratedFromOther(restLocal, restOther)
+    return
   }
+  yield* once(enumeratedFromBoth(restLocal, restOther))
 }
 
 // Every way to read the key's copies as the same entries on the three sides.

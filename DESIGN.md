@@ -418,7 +418,7 @@ XML is converted to a compact JSON format for easier manipulation. The domain op
 
 Salesforce metadata arrays (like `fieldPermissions`) use semantic keys rather than position-based merging. The driver identifies key fields from metadata configuration to match elements across versions.
 
-An entry's identity is its key plus its occurrence among the entries of that key, on every array kind. Identical entries are matched first, then the rest by occurrence. A key the sides agree on, or that only one side changed, is taken as written, every copy kept. A key whose copies cannot be told apart is merged only if every identity reading merges to the same entries; otherwise the copies of that key are one block. Two entries of one key are never collapsed to the last one.
+An entry's identity is its key plus its occurrence among the entries of that key, on every array kind. Identical entries are matched first, then the rest by occurrence. A key the sides agree on, or that only one side changed, is taken as written, every copy kept. A key whose copies cannot be told apart is merged only if every identity reading merges to the same entries; otherwise the copies of that key are one block. The readings do not depend on which side is local: the copies neither side traces to the ancestor are paired from the longer list, and from each list in turn when they are as long, so a merge with the sides exchanged is the mirror of the merge. Two entries of one key are never collapsed to the last one.
 
 #### Shared element names across schemas
 

@@ -1,7 +1,10 @@
+import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import {
   groupByKey,
+  type KeyCopies,
   matchings,
+  type Pairing,
   readings,
   valueClasses,
 } from '../../../../src/merger/nodes/keyedReadings.js'
@@ -392,6 +395,109 @@ describe('readings', () => {
 
       // Assert
       expect(result).toEqual([[{ other: a }]])
+    })
+  })
+})
+
+const ABSENT = -1
+
+// Copies are told apart by identity: equal values are distinct objects here
+const placeOf = (
+  copies: readonly JsonObject[],
+  copy: JsonObject | undefined
+): number => (copy === undefined ? ABSENT : copies.indexOf(copy))
+
+type Places = readonly [ancestor: number, local: number, other: number]
+
+const placesOf =
+  (copies: KeyCopies) =>
+  (pairing: Pairing): Places => [
+    placeOf(copies.ancestor, pairing.ancestor),
+    placeOf(copies.local, pairing.local),
+    placeOf(copies.other, pairing.other),
+  ]
+
+const exchanged = ([ancestor, local, other]: Places): Places => [
+  ancestor,
+  other,
+  local,
+]
+
+// One reading as the set of its pairings, whatever order they come in
+const readingKey = (pairings: readonly Places[]): string =>
+  pairings
+    .map(places => places.join(':'))
+    .sort()
+    .join(' ')
+
+const readingKeys = (
+  copies: KeyCopies,
+  seenFrom: (places: Places) => Places
+): readonly string[] =>
+  [...readings(copies)]
+    .map(pairings => readingKey(pairings.map(placesOf(copies)).map(seenFrom)))
+    .sort()
+
+const asWritten = (places: Places): Places => places
+
+const exchangedSides = (copies: KeyCopies): KeyCopies => ({
+  ancestor: copies.ancestor,
+  local: copies.other,
+  other: copies.local,
+})
+
+describe('readings with the sides exchanged', () => {
+  describe.each([
+    ['local', ['', ''], ['', 'edited']],
+    ['other', ['', 'edited'], ['', '']],
+  ] as const)(
+    'given as many copies on each side and no ancestor, the copies of %s alike and one of the other side edited',
+    (_side, local, other) => {
+      it('then the identical copy pairs with either of the copies alike', () => {
+        // Arrange
+        const copies: KeyCopies = {
+          ancestor: [],
+          local: local.map(extra => entry('a', extra)),
+          other: other.map(extra => entry('a', extra)),
+        }
+
+        // Act
+        const sut = readingKeys(copies, asWritten)
+
+        // Assert
+        expect(sut).toHaveLength(2)
+        expect(sut).toEqual(readingKeys(exchangedSides(copies), exchanged))
+      })
+    }
+  )
+
+  describe('given generated copies of one key', () => {
+    const MAX_COPIES = 3
+    const sideArb = fc.array(fc.constantFrom('', 'edited', 'apart'), {
+      maxLength: MAX_COPIES,
+    })
+    const copiesArb: fc.Arbitrary<KeyCopies> = fc
+      .record({ ancestor: sideArb, local: sideArb, other: sideArb })
+      .map(({ ancestor, local, other }) => ({
+        ancestor: ancestor.map(extra => entry('a', extra)),
+        local: local.map(extra => entry('a', extra)),
+        other: other.map(extra => entry('a', extra)),
+      }))
+
+    it('then the readings are those of the exchanged sides, seen from the other side', () => {
+      fc.assert(
+        fc.property(copiesArb, copies => {
+          // Arrange
+          const expected = readingKeys(exchangedSides(copies), exchanged)
+
+          // Act
+          const sut = readingKeys(copies, asWritten)
+
+          // Assert
+          expect(sut).toEqual(expected)
+        }),
+        { numRuns: 2000 }
+      )
     })
   })
 })

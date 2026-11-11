@@ -17,7 +17,8 @@ import { toEntry } from './orderedTokens.js'
 //   remaining anchor copies; the surplus is new.
 // - The two live sides pair against the ancestor, then the copies neither
 //   paired pair local with other by the same rules, the longer list being
-//   the anchor.
+//   the anchor; two lists as long are each the anchor in turn, and a pairing
+//   both give counts once.
 // - Keys are independent: a reading is one choice per key.
 // - Readings where the sides kept different copies of a value both hold are
 //   dropped when a reading where they kept the same copy exists; then only
@@ -125,15 +126,33 @@ const pairings = (anchors: readonly Slot[], side: readonly Slot[]): Pair[][] =>
 const flipped = (pairs: readonly Pair[]): Pair[] =>
   pairs.map(({ anchor, side }) => ({ anchor: side, side: anchor }))
 
+const pairsOf = (pairs: readonly Pair[]): string =>
+  JSON.stringify(
+    pairs
+      .map(({ anchor, side }) => [anchor, side])
+      .sort(([left], [right]) => left - right)
+  )
+
+const withoutRepeats = (candidates: readonly Pair[][]): Pair[][] =>
+  candidates.filter(
+    (pairs, index) =>
+      candidates.findIndex(earlier => pairsOf(earlier) === pairsOf(pairs)) ===
+      index
+  )
+
 // The longer list plays the anchor whichever side it is: which of its copies
-// pair is the reading.
+// pair is the reading. Two lists as long each play it in turn.
 const pairingsOfLongest = (
   local: readonly Slot[],
   other: readonly Slot[]
-): Pair[][] =>
-  local.length >= other.length
-    ? pairings(local, other)
-    : pairings(other, local).map(flipped)
+): Pair[][] => {
+  if (local.length > other.length) return pairings(local, other)
+  if (local.length < other.length) return pairings(other, local).map(flipped)
+  return withoutRepeats([
+    ...pairings(local, other),
+    ...pairings(other, local).map(flipped),
+  ])
+}
 
 interface KeySlots {
   readonly key: string
