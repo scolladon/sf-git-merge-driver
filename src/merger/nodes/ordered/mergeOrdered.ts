@@ -120,6 +120,9 @@ const mergePartwiseOf = (
     : null
 }
 
+const tiesOf = (sides: OrderedSides): GroupedTies =>
+  identityTies(sides.ancestor, sides.local, sides.other, sides.keys)
+
 export const mergeOrderedArrays = (
   sides: OrderedSides,
   attribute: string,
@@ -129,12 +132,7 @@ export const mergeOrderedArrays = (
   // Stryker disable next-line ConditionalExpression: shortcut of the general path: a merge takes the changed side whole (doctrine.test.ts)
   if (whole !== null) return whole
   const wrapped = wrapSides(sides, attribute)
-  const ties = identityTies(
-    sides.ancestor,
-    sides.local,
-    sides.other,
-    sides.keys
-  )
+  const ties = tiesOf(sides)
   const merge = (reading: Reading): MergedReading =>
     mergeReading(reading, attribute, config)
   const tiedComponents = ties.components.filter(isTied).length

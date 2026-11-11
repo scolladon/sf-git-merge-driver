@@ -97,11 +97,14 @@ const rendersAlike = (variations: Variations): boolean => {
 
 class PartwiseRun {
   private readonly scan = new TieScan()
+  private readonly ties: IdentityTies
 
-  constructor(private readonly input: Partwise) {}
+  constructor(private readonly input: Partwise) {
+    this.ties = input.ties
+  }
 
   mergeOf(tuple: Tuple): MergedReading {
-    return this.input.merge(this.input.ties.readingOf(tuple))
+    return this.input.merge(this.ties.readingOf(tuple))
   }
 
   record(readings: readonly MergedReading[]): void {
@@ -116,7 +119,7 @@ class PartwiseRun {
 
   // The part's first choice around the first tuple is the first tuple itself.
   roundOne(part: readonly number[], first: MergedReading): PartRound {
-    const [, ...others] = this.input.ties.around(part, this.input.ties.first)
+    const [, ...others] = this.ties.around(part, this.ties.first)
     const merged = others.map(tuple => this.mergeOf(tuple))
     this.record(merged)
     const all = [first, ...merged]
@@ -130,7 +133,7 @@ class PartwiseRun {
       )
     }
     const firstSurvivors = withChoices(
-      this.input.ties,
+      this.ties,
       rounds,
       ({ survivors }) => survivors[0]
     )
@@ -158,9 +161,7 @@ class PartwiseRun {
   ): MergeResult | null {
     // Nothing reads the scan past this point: the shortest reading is not
     // recorded
-    const shortest = this.mergeOf(
-      shortestTuple(this.input.ties, rounds, variations)
-    )
+    const shortest = this.mergeOf(shortestTuple(this.ties, rounds, variations))
     // The first survivors' output leads: every round's list starts with it
     const outputs = [
       ...variations.flat().map(reading => reading.output),
@@ -178,7 +179,7 @@ class PartwiseRun {
     firstSurvivors: Tuple,
     firstSurvivorsMerged: MergedReading
   ): readonly MergedReading[] {
-    const tuples = [...this.input.ties.around(round.part, firstSurvivors)]
+    const tuples = [...this.ties.around(round.part, firstSurvivors)]
     const [, ...others] = round.survivors
     const otherChoices = others.map(at => this.mergeOf(tuples[at]))
     this.record(otherChoices)

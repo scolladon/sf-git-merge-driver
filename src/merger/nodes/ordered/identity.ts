@@ -31,10 +31,12 @@ interface Slot {
 
 type Slots = SideGroups<Slot>
 
+type SlotsByKey = ReadonlyMap<string, Slots>
+
 const groupSlots = (
   sides: Readonly<Record<keyof Slots, JsonArray>>,
   keys: KeyedSides
-): ReadonlyMap<string, Slots> =>
+): SlotsByKey =>
   groupSides(keys, (side, pos) => ({
     pos,
     value: sides[side][pos] as JsonObject,
@@ -107,9 +109,7 @@ interface Stretch {
 
 // Keys with a single alternative fuse into one stretch: recursing over every
 // key would nest as deep as the array is long.
-const stretchesOf = (
-  groups: ReadonlyMap<string, Slots>
-): readonly Stretch[] => {
+const stretchesOf = (groups: SlotsByKey): readonly Stretch[] => {
   const stretches: Stretch[] = []
   let run: Draft[] = []
   const closeRun = (): void => {

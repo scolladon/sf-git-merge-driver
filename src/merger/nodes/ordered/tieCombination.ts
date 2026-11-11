@@ -97,6 +97,10 @@ export const fewestPhantomSwaps = (
   return fewestSwapIndices(merged).map(at => asResult(merged[at]))
 }
 
+// Readings compete from two on: a lone reading is never measured, as
+// fewestPhantomSwaps leaves it.
+const FEWEST_COMPETING_READINGS = 2
+
 // No reading has fewer than zero swaps: once one has none, the readings with
 // none are exactly those fewestPhantomSwaps keeps, whatever comes later.
 export class TieScan {
@@ -107,9 +111,10 @@ export class TieScan {
 
   add(reading: MergedReading): void {
     this.merged.push(reading)
-    // A lone reading is never measured, as fewestPhantomSwaps leaves it.
-    if (this.merged.length === 2) this.see(this.merged[0])
-    if (this.merged.length >= 2) this.see(reading)
+    const count = this.merged.length
+    // The second reading brings the first along
+    if (count === FEWEST_COMPETING_READINGS) this.see(this.merged[0])
+    if (count >= FEWEST_COMPETING_READINGS) this.see(reading)
   }
 
   // combineReadings would build the block of the whole array, which reads the
