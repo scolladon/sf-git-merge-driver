@@ -221,6 +221,26 @@ describe('given the dropinsert grid at r = 3, m = 3', () => {
   })
 })
 
+describe('given a last part whose readings merge clean to outputs of different lengths', () => {
+  const tokens = ['A A C0 D D D', 'A X A C0 ~d F D D', 'A C0 D D'] as const
+
+  describe('when merging the tied parts', () => {
+    it('then the block stops where the readings of that part stop agreeing', () => {
+      // Arrange
+      const sides = orderedSides(...tokens)
+      const { input } = inputOf(sides)
+      const sut = mergePartwise
+
+      // Act
+      const result = sut(input)
+
+      // Assert
+      expect(formatResult(result)).toBe('<A,X,A,C0,~d,F,D|A,A,C0,D,D|A,C0,D>,D')
+      expect(result).toStrictEqual(oracleOf(sides))
+    })
+  })
+})
+
 describe('given one tied part', () => {
   describe('when merging', () => {
     it('then the result is the one the tie-scan merge builds', () => {

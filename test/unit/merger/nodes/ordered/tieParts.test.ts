@@ -236,6 +236,21 @@ describe('given a key one side inserts on both sides of an unchanged unique key'
   })
 })
 
+describe('given a unique key one side moves past the unique key between two repeated keys', () => {
+  describe('when finding the tie parts', () => {
+    it('then neither unique key is a cut and the repeated keys share one part', () => {
+      // Arrange
+      const sides = ['A A X C B B', 'A C X B', 'A A X C B B Z'] as const
+
+      // Act
+      const sut = partsOfTokens(...sides)
+
+      // Assert
+      expect(sut.tied).toEqual([[0, 1]])
+    })
+  })
+})
+
 describe('given a repeated key copied past the unique key on local', () => {
   describe('when finding the tie parts', () => {
     it('then no key is a cut', () => {

@@ -27,9 +27,10 @@ const LOCAL_MOVES = { stride: 8, shift: 3 } as const
 const OTHER_MOVES = { stride: 4, shift: 1 } as const
 // The random moves of movedCaseArb stay under both thresholds of the
 // precedence (a few tens of entries moved by other, fewer by both), where the
-// head runs the pairwise code the reference holds. A third of this many keys
-// passes both: the tournament counts by dominance from 128 entries moved by
-// other, the overlaps are joined by component from 64 moved by both
+// head runs the pairwise code the reference holds. Strided moves over this
+// many keys pass both, a third of them moved by other and a sixth by both: the
+// tournament counts by dominance from 128 entries moved by other, the overlaps
+// are joined by component from 64 moved by both
 const STRIDED_SIZES = { min: 400, max: 480 } as const
 const SCORE_SWEEP_FROM = 128
 const OVERLAP_SWEEP_FROM = 64

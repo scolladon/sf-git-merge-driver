@@ -136,9 +136,17 @@ const strideArb: fc.Arbitrary<Stride> = fc
     })
   )
 
+// Against other's strides of two and three, local's short strides end in one
+// whole-array conflict or one clean order whatever the scores are: with one
+// key in four or six moved one place, every output depends on them
+const LOCAL_STRIDES: readonly Stride[] = [
+  { stride: 4, shift: 1 },
+  { stride: 6, shift: 1 },
+]
+
 // Each side moves one key of every stride: a third of the keys or more are
-// moved by each side and by both, where the random moves of movedCaseArb
-// displace a few tens of them at most
+// moved by other and a sixth or more by both, where the random moves of
+// movedCaseArb displace a few tens of them at most
 export const stridedCaseArb = (
   minSize: number,
   maxSize: number
@@ -146,7 +154,7 @@ export const stridedCaseArb = (
   fc
     .record({
       size: fc.integer({ min: minSize, max: maxSize }),
-      local: strideArb,
+      local: fc.constantFrom(...LOCAL_STRIDES),
       other: strideArb,
     })
     .map(({ size, local, other }) => {

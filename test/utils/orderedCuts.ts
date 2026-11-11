@@ -411,10 +411,30 @@ const dropInsertArb: fc.Arbitrary<Case> = fc
   })
   .map(dropInsertPart)
 
+const DROP_BOTH_COPIES = 3
+
+// Both sides drop a copy and one writes a keyless entry and a key ahead of the
+// rest: the readings of the part merge clean to outputs of different lengths,
+// which differ past the place where the sides themselves agree again
+const dropBothPart = (inserter: number): Case => {
+  const kept = repeat('A', DROP_BOTH_COPIES)
+  const dropped = repeat('A', DROP_BOTH_COPIES - 1)
+  const inserted = ['~a', 'X', ...dropped]
+  return inserter === LOCAL
+    ? [kept, inserted, dropped]
+    : [kept, dropped, inserted]
+}
+
+const dropBothArb: fc.Arbitrary<Case> = fc
+  .constantFrom(LOCAL, OTHER)
+  .map(dropBothPart)
+
 // Parts whose readings render apart without a conflict: joined by a cut, the
 // merge part by part answers with the block it stitches, which the cases drawn
 // token by token never reach
-export const stitchedCaseArb: fc.Arbitrary<Case> = joinedPartsArb(dropInsertArb)
+export const stitchedCaseArb: fc.Arbitrary<Case> = joinedPartsArb(
+  fc.oneof(dropInsertArb, dropBothArb)
+)
 
 const SPAN_KEYS: Tokens = ['K', 'J']
 const NEIGHBOUR_KEYS: Tokens = ['U', 'V', 'W']
