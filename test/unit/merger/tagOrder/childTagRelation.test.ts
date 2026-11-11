@@ -14,9 +14,9 @@ import {
 } from '../../../utils/oracles/comparatorDominance.js'
 
 const MAX_TAGS = 150
-// The merge takes the sweeps from 64 shared tags
-const SWEEP_TAGS_MIN = 64
-const SWEEP_TAGS_MAX = 300
+// The merge takes the sweeps from 256 shared tags
+const SWEEP_TAGS_MIN = 256
+const SWEEP_TAGS_MAX = 400
 const SPARE_TAGS = 16
 
 const range = (size: number): number[] =>
@@ -35,9 +35,10 @@ const ancestorArb = (size: number) =>
     return positions
   })
 
-const positionsArb: fc.Arbitrary<SharedPositions> = fc
-  .integer({ min: 0, max: MAX_TAGS })
-  .chain(size =>
+const positionsOf = (
+  sizes: fc.Arbitrary<number>
+): fc.Arbitrary<SharedPositions> =>
+  sizes.chain(size =>
     fc.record({
       ancestor: ancestorArb(size),
       local: permutationArb(size),
@@ -45,19 +46,27 @@ const positionsArb: fc.Arbitrary<SharedPositions> = fc
     })
   )
 
+const positionsArb = positionsOf(fc.integer({ min: 0, max: MAX_TAGS }))
+
+const sweptPositionsArb = positionsOf(
+  fc.integer({ min: SWEEP_TAGS_MIN, max: SWEEP_TAGS_MAX })
+)
+
 // Letters first: integer-like keys reorder in JS objects
 const tagName = (at: number): string => `T${String(at).padStart(5, '0')}`
 
 const bodyOf = (tags: readonly string[]) =>
   Object.fromEntries(tags.map(tag => [tag, 'v']))
 
+// Each side leaves out as many tags as the pool spares at most, so the sides
+// share enough of them for the sweeps whatever they drop
 const bodiesArb = fc
-  .integer({ min: SWEEP_TAGS_MIN, max: SWEEP_TAGS_MAX })
+  .integer({ min: SWEEP_TAGS_MIN + SPARE_TAGS, max: SWEEP_TAGS_MAX })
   .chain(size => {
     const pool = Array.from({ length: size + SPARE_TAGS }, (_, at) =>
       tagName(at)
     )
-    const sideArb = fc.shuffledSubarray(pool, { minLength: SWEEP_TAGS_MIN })
+    const sideArb = fc.shuffledSubarray(pool, { minLength: size })
     return fc.record({
       ancestor: fc.shuffledSubarray(pool.slice(0, size), {
         minLength: size,
@@ -116,7 +125,24 @@ describe('childTagRelation', () => {
     })
   })
 
-  describe('given bodies of 64 to 300 child tags', () => {
+  describe('given the positions of enough shared tags for the sweeps', () => {
+    it('when ordering the components then they equal the reference', () => {
+      fc.assert(
+        fc.property(sweptPositionsArb, positions => {
+          // Arrange
+          const expected = referenceOrderedComponents(positions)
+
+          // Act
+          const sut = orderedComponents(positions)
+
+          // Assert
+          expect(sut).toEqual(expected)
+        })
+      )
+    })
+  })
+
+  describe('given bodies of 272 to 400 child tags', () => {
     let reference: typeof import('../../../../src/merger/tagOrder/mergePropertyOrder.js')
     beforeAll(async () => {
       vi.resetModules()

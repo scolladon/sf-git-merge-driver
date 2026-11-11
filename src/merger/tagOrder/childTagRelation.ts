@@ -17,8 +17,10 @@ export interface Standing {
 }
 
 // Below this many shared tags, counting pair by pair is cheaper than the
-// bookkeeping of the sweeps. Measured on the element-sized merges of a Profile.
-const SWEEP_FROM = 64
+// bookkeeping of the sweeps. Measured on 64 to 512 shared tags: the pair count
+// wins up to about 210 tags the sides shuffle and 270 they nearly keep in
+// order.
+const SWEEP_FROM = 256
 
 // The relation the sides leave over the tags both carry (ADR 073):
 // - tags the sides agree on keep that order;
