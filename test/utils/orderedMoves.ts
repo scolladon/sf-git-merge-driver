@@ -117,5 +117,48 @@ export const movedCaseArb = (maxSize: number): fc.Arbitrary<MovedCase> =>
       })
   )
 
+interface Stride {
+  readonly stride: number
+  readonly shift: number
+}
+
+const SHORTEST_STRIDE = 2
+const LONGEST_STRIDE = 3
+
+// A shift below the stride moves a token once: from the stride on, the next
+// step would pick the same token up again
+const strideArb: fc.Arbitrary<Stride> = fc
+  .integer({ min: SHORTEST_STRIDE, max: LONGEST_STRIDE })
+  .chain(stride =>
+    fc.record({
+      stride: fc.constant(stride),
+      shift: fc.integer({ min: 1, max: stride - 1 }),
+    })
+  )
+
+// Each side moves one key of every stride: a third of the keys or more are
+// moved by each side and by both, where the random moves of movedCaseArb
+// displace a few tens of them at most
+export const stridedCaseArb = (
+  minSize: number,
+  maxSize: number
+): fc.Arbitrary<MovedCase> =>
+  fc
+    .record({
+      size: fc.integer({ min: minSize, max: maxSize }),
+      local: strideArb,
+      other: strideArb,
+    })
+    .map(({ size, local, other }) => {
+      const keys = keyTokens(size)
+      const moved = ({ stride, shift }: Stride): string =>
+        movedEvery(keys, stride, shift).join(TOKEN_SEPARATOR)
+      return {
+        ancestor: keys.join(TOKEN_SEPARATOR),
+        local: moved(local),
+        other: moved(other),
+      }
+    })
+
 export const toOrderedSide = (tokens: string): JsonArray =>
   tokens === '' ? [] : tokens.split(TOKEN_SEPARATOR).map(toEntry)

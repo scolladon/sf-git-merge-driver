@@ -15,6 +15,7 @@ import {
   wrapSides,
 } from '../../../../../src/merger/nodes/ordered/orderedSides.js'
 import { mergePartwise } from '../../../../../src/merger/nodes/ordered/partwise.js'
+import { fewestPhantomSwaps } from '../../../../../src/merger/nodes/ordered/tieCombination.js'
 import { tiePartsOf } from '../../../../../src/merger/nodes/ordered/tieParts.js'
 import { MetadataService } from '../../../../../src/service/MetadataService.js'
 import type {
@@ -41,6 +42,7 @@ import {
   layoutSides,
   SHAPES,
   shapeSides,
+  stitchedCaseArb,
 } from '../../../../utils/orderedCuts.js'
 import {
   ORDERED_ATTRIBUTE,
@@ -107,6 +109,10 @@ const GROUP_RUNS = 400
 const REACH_RUNS = GROUP_RUNS
 const MIN_CLEAN_GROUPS = 5
 const MIN_SEVERAL_GROUPS = 1
+// Half the sampled parts are joined by a cut and reach the stitched block
+// (48 to 57 in 100 on seeds 1 to 3): a fifth of them keeps a margin
+const STITCH_SAMPLES = 100
+const MIN_STITCHED = 20
 // A cell merging 81 readings through the head and the reference under
 // coverage takes seconds when the suite's workers compete for the machine
 const GRID_CELL_TIMEOUT_MS = 30_000
@@ -163,6 +169,7 @@ describe('given generated token sides joined by unique keys', () => {
         'parts of few repeated keys joined by unique keys',
         cutCaseArb(SMALL_ANCESTORS, SMALL),
       ],
+      ['parts whose readings render apart', stitchedCaseArb],
     ])('then the result equals the tie-scan merge of %s', (_name, cases) => {
       fc.assert(
         fc.property(cases, ([ancestor, local, other]) => {
@@ -267,6 +274,7 @@ describe('given generated token sides with interchangeable copies', () => {
         cutCaseArb(SMALL_ANCESTORS, SMALL),
       ],
       ['spans of identical copies one side drops', groupCaseArb],
+      ['parts whose readings render apart', stitchedCaseArb],
     ])(
       'then the result equals the merge before grouping of %s',
       (_name, cases) => {
@@ -411,6 +419,45 @@ describe('given sampled token sides with spans of identical copies', () => {
   })
 })
 
+// The cases the stitched block answers: two tied parts or more whose
+// fewest-swap readings all merge clean and do not render alike
+const rendersApartByParts = (tokens: Case): boolean => {
+  const sides = orderedSides(
+    tokens[0].join(' '),
+    tokens[1].join(' '),
+    tokens[2].join(' ')
+  )
+  const { ancestor, local, other, keys } = sides
+  const ties = identityTies(ancestor, local, other, keys)
+  if (ties.components.filter(isTied).length < FEWEST_TIED_PARTS) return false
+  const parts = tiePartsOf(sides, ties, ORDERED_ATTRIBUTE)
+  if (parts.tied.length < FEWEST_TIED_PARTS) return false
+  const [first, ...others] = fewestPhantomSwaps(
+    [...ties.readings()].map(reading =>
+      mergeReading(reading, ORDERED_ATTRIBUTE, defaultConfig)
+    )
+  )
+  return (
+    [first, ...others].every(reading => !reading.hasConflict) &&
+    others.some(reading => !jsonIdentical(reading.output, first.output))
+  )
+}
+
+describe('given sampled token sides of parts whose readings render apart', () => {
+  describe('when their readings are merged', () => {
+    it('then enough cases are answered by the stitched block', () => {
+      // Arrange
+      const sampled = fc.sample(stitchedCaseArb, STITCH_SAMPLES)
+
+      // Act
+      const result = sampled.filter(rendersApartByParts)
+
+      // Assert
+      expect(result.length).toBeGreaterThanOrEqual(MIN_STITCHED)
+    })
+  })
+})
+
 describe('given many generated token sides with spans of identical copies', () => {
   describe('when merged', () => {
     it('then the result equals the merge before grouping', () => {
@@ -431,6 +478,7 @@ describe('given many generated token sides with spans of identical copies', () =
 
           // Assert
           expect(result).toStrictEqual(expected)
+          expect(jsonIdentical(result.output, expected.output)).toBe(true)
         }),
         { numRuns: GROUP_RUNS }
       )

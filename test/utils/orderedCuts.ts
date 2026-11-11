@@ -359,27 +359,62 @@ const joinedCase = (
   return [joined(ANCESTOR), joined(LOCAL), joined(OTHER)]
 }
 
-export const cutCaseArb = (
-  ancestors: readonly Tokens[],
-  limits: Limits,
-  tokens?: Tokens
-): fc.Arbitrary<Case> =>
+// Two or three parts drawn alike, each under its own names, joined by one key
+const joinedPartsArb = (part: fc.Arbitrary<Case>): fc.Arbitrary<Case> =>
   fc
     .tuple(
-      fc.array(caseArb(ancestors, limits, tokens), {
-        minLength: MIN_PARTS,
-        maxLength: MAX_PARTS,
-      }),
+      fc.array(part, { minLength: MIN_PARTS, maxLength: MAX_PARTS }),
       fc.constantFrom(...JOINS),
       fc.constantFrom(LOCAL, OTHER)
     )
     .map(([parts, join, side]) =>
       joinedCase(
-        parts.map((part, at) => renamedCase(PART_NAMES[at], part)),
+        parts.map((drawn, at) => renamedCase(PART_NAMES[at], drawn)),
         join,
         side
       )
     )
+
+export const cutCaseArb = (
+  ancestors: readonly Tokens[],
+  limits: Limits,
+  tokens?: Tokens
+): fc.Arbitrary<Case> => joinedPartsArb(caseArb(ancestors, limits, tokens))
+
+const MIN_STITCHED_COPIES = 2
+const MAX_STITCHED_COPIES = 3
+
+interface DropInsert {
+  readonly copies: number
+  readonly dropper: number
+  readonly gap: number
+}
+
+// One side drops a copy, the other writes a key in a gap between the copies:
+// no copy is interchangeable, and the readings of the part merge clean to
+// outputs that differ
+const dropInsertPart = ({ copies, dropper, gap }: DropInsert): Case => {
+  const kept = repeat('A', copies)
+  const at = 1 + (gap % (copies - 1))
+  const inserted = [...kept.slice(0, at), 'X', ...kept.slice(at)]
+  const dropped = repeat('A', copies - 1)
+  return dropper === LOCAL
+    ? [kept, dropped, inserted]
+    : [kept, inserted, dropped]
+}
+
+const dropInsertArb: fc.Arbitrary<Case> = fc
+  .record({
+    copies: fc.integer({ min: MIN_STITCHED_COPIES, max: MAX_STITCHED_COPIES }),
+    dropper: fc.constantFrom(LOCAL, OTHER),
+    gap: fc.nat(),
+  })
+  .map(dropInsertPart)
+
+// Parts whose readings render apart without a conflict: joined by a cut, the
+// merge part by part answers with the block it stitches, which the cases drawn
+// token by token never reach
+export const stitchedCaseArb: fc.Arbitrary<Case> = joinedPartsArb(dropInsertArb)
 
 const SPAN_KEYS: Tokens = ['K', 'J']
 const NEIGHBOUR_KEYS: Tokens = ['U', 'V', 'W']
