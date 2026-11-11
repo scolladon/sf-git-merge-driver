@@ -8,7 +8,7 @@ import { type MergedReading, mergeReading } from './mergeReading.js'
 import type { Reading } from './orderedEntry.js'
 import {
   type OrderedSides,
-  type Wrapped,
+  type WrapSides,
   wrapAll,
   wrapSides,
 } from './orderedSides.js'
@@ -44,16 +44,16 @@ const takeWholeSide = (
 const FEWEST_TIED_PARTS = 2
 
 const mergeStream = (
-  wrapped: Wrapped,
+  wrap: WrapSides,
   readings: Iterable<Reading>,
   merge: (reading: Reading) => MergedReading
 ): MergeResult => {
   const scan = new TieScan()
   for (const reading of readings) {
     scan.add(merge(reading))
-    if (scan.isWholeConflict()) return wholeConflict(wrapped)
+    if (scan.isWholeConflict()) return wholeConflict(wrap())
   }
-  return combineReadings(wrapped, fewestPhantomSwaps(scan.readings()))
+  return combineReadings(wrap, fewestPhantomSwaps(scan.readings()))
 }
 
 // One merge stands for its group because the merge treats the exchanged
@@ -62,7 +62,7 @@ const mergeStream = (
 // flag, relations between insertions both sides agreed map copy for copy, and
 // the readings of a group count equal phantom swaps.
 const mergeRepresentatives = (
-  wrapped: Wrapped,
+  wrap: WrapSides,
   representatives: Iterable<Reading>,
   merge: (reading: Reading) => MergedReading
 ): MergeResult | null => {
@@ -74,12 +74,12 @@ const mergeRepresentatives = (
     if (result.hasConflict) return null
     merged.push(result)
   }
-  return combineReadings(wrapped, fewestPhantomSwaps(merged))
+  return combineReadings(wrap, fewestPhantomSwaps(merged))
 }
 
 interface Tied {
   readonly sides: OrderedSides
-  readonly wrapped: Wrapped
+  readonly wrap: WrapSides
   readonly ties: GroupedTies
   readonly merge: (reading: Reading) => MergedReading
 }
@@ -98,24 +98,24 @@ const holdsCollapsible = (
 
 // Without a group of several readings the stream merges them all, with its
 // early exit
-const mergeTied = ({ sides, wrapped, ties, merge }: Tied): MergeResult => {
+const mergeTied = ({ sides, wrap, ties, merge }: Tied): MergeResult => {
   const collapsible = collapsibleKeys(sides)
   const grouped = holdsCollapsible(ties, collapsible)
-    ? mergeRepresentatives(wrapped, ties.representatives(collapsible), merge)
+    ? mergeRepresentatives(wrap, ties.representatives(collapsible), merge)
     : null
-  return grouped ?? mergeStream(wrapped, ties.readings(), merge)
+  return grouped ?? mergeStream(wrap, ties.readings(), merge)
 }
 
 // Two tied parts need two tied components: with fewer, the cuts are not even
 // looked for.
 const mergePartwiseOf = (
-  { sides, wrapped, ties, merge }: Tied,
+  { sides, wrap, ties, merge }: Tied,
   tiedComponents: number
 ): MergeResult | null => {
   if (tiedComponents < FEWEST_TIED_PARTS) return null
   const parts = tiePartsOf(sides, ties)
   return parts.tied.length >= FEWEST_TIED_PARTS
-    ? mergePartwise({ wrapped, ties, parts, merge })
+    ? mergePartwise({ wrapped: wrap(), ties, parts, merge })
     : null
 }
 
@@ -130,13 +130,13 @@ export const mergeOrderedArrays = (
   const whole = takeWholeSide(sides, attribute)
   // Stryker disable next-line ConditionalExpression: shortcut of the general path: a merge takes the changed side whole (doctrine.test.ts)
   if (whole !== null) return whole
-  const wrapped = wrapSides(sides, attribute)
+  const wrap: WrapSides = () => wrapSides(sides, attribute)
   const ties = tiesOf(sides)
   const merge = (reading: Reading): MergedReading =>
     mergeReading(reading, attribute, config)
   const tiedComponents = ties.components.filter(isTied).length
   // One reading: nothing to group or to split, the stream merges it once
-  if (tiedComponents === 0) return mergeStream(wrapped, ties.readings(), merge)
-  const tied = { sides, wrapped, ties, merge }
+  if (tiedComponents === 0) return mergeStream(wrap, ties.readings(), merge)
+  const tied = { sides, wrap, ties, merge }
   return mergePartwiseOf(tied, tiedComponents) ?? mergeTied(tied)
 }

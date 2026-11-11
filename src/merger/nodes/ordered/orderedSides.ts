@@ -61,3 +61,6 @@ export const wrapAll = (attribute: string, side: JsonArray): JsonArray =>
 
 export const wrapSides = (sides: OrderedSides, attribute: string): Wrapped =>
   perSide(side => wrapAll(attribute, sides[side]))
+
+/** The wrapped sides, built when a block needs them: most merges render none. */
+export type WrapSides = () => Wrapped

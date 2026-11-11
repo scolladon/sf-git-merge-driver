@@ -4,7 +4,7 @@ import { leastOf } from '../../../utils/arrayUtils.js'
 import { jsonIdentical } from '../../../utils/jsonEqual.js'
 import { buildConflictMarkers } from '../../ConflictMarkerBuilder.js'
 import type { MergedReading } from './mergeReading.js'
-import type { Wrapped } from './orderedSides.js'
+import type { Wrapped, WrapSides } from './orderedSides.js'
 
 const itemsAgree = (
   sides: readonly JsonArray[],
@@ -141,12 +141,13 @@ export const wholeConflict = (wrapped: Wrapped): MergeResult =>
   ])
 
 export const combineReadings = (
-  wrapped: Wrapped,
+  wrap: WrapSides,
   results: readonly MergeResult[]
 ): MergeResult => {
   const [first] = results as [MergeResult]
   if (results.every(result => jsonIdentical(result.output, first.output)))
     return first
+  const wrapped = wrap()
   if (results.some(result => result.hasConflict)) return wholeConflict(wrapped)
   return trimmedBlock(
     wrapped,

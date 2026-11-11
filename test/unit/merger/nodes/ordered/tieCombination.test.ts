@@ -220,7 +220,7 @@ describe('combineReadings', () => {
         const sut = combineReadings
 
         // Act
-        const result = sut(wrapped, results)
+        const result = sut(() => wrapped, results)
 
         // Assert
         expect(result).toStrictEqual(
@@ -232,6 +232,58 @@ describe('combineReadings', () => {
             ),
           ])
         )
+      })
+    })
+  })
+
+  describe('given results that render alike', () => {
+    describe('when combining them', () => {
+      it('then the first result comes back and the sides are never wrapped', () => {
+        // Arrange
+        const wrap = vi.fn()
+        const results: MergeResult[] = [
+          noConflict([itemOf('H'), itemOf('A')]),
+          noConflict([itemOf('H'), itemOf('A')]),
+        ]
+        const sut = combineReadings
+
+        // Act
+        const result = sut(wrap, results)
+
+        // Assert
+        expect(result).toBe(results[0])
+        expect(wrap).not.toHaveBeenCalled()
+      })
+    })
+  })
+
+  describe('given clean results that differ past a shared head', () => {
+    describe('when combining them', () => {
+      it('then the sides are wrapped once for the trimmed block', () => {
+        // Arrange
+        const wrapped = {
+          ancestor: [itemOf('H')],
+          local: [itemOf('H'), itemOf('A')],
+          other: [itemOf('H'), itemOf('B')],
+        }
+        const wrap = vi.fn(() => wrapped)
+        const results: MergeResult[] = [
+          noConflict([itemOf('H'), itemOf('A'), itemOf('B')]),
+          noConflict([itemOf('H'), itemOf('B'), itemOf('A')]),
+        ]
+        const sut = combineReadings
+
+        // Act
+        const result = sut(wrap, results)
+
+        // Assert
+        expect(result).toStrictEqual(
+          withConflict([
+            itemOf('H'),
+            buildConflictMarkers([itemOf('A')], [], [itemOf('B')]),
+          ])
+        )
+        expect(wrap).toHaveBeenCalledTimes(1)
       })
     })
   })

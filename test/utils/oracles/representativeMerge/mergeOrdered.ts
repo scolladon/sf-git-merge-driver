@@ -262,7 +262,7 @@ const mergeStream = (
     scan.add(merge(reading))
     if (scan.isWholeConflict()) return wholeConflict(wrapped)
   }
-  return combineReadings(wrapped, fewestPhantomSwaps(scan.readings()))
+  return combineReadings(() => wrapped, fewestPhantomSwaps(scan.readings()))
 }
 
 export const mergeOrderedArrays = (
