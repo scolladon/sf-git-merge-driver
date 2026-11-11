@@ -134,16 +134,24 @@ class ThreeCoordinates {
     this.mergeBySecond(from, middle, to)
   }
 
+  // Adds the left points not above the point on the second coordinate, from
+  // the one the previous point stopped at, and returns where it stops.
+  private addBelow(point: number, start: number, middle: number): number {
+    let left = start
+    for (; left < middle; left++) {
+      const lower = this.order[left]
+      // Stryker disable next-line EqualityOperator: each coordinate holds distinct values
+      if (this.second[lower] > this.second[point]) break
+      this.tree.add(this.ranks[lower], 1)
+    }
+    return left
+  }
+
   private countAcross(from: number, middle: number, to: number): void {
     let left = from
     for (let right = middle; right < to; right++) {
       const point = this.order[right]
-      for (; left < middle; left++) {
-        const lower = this.order[left]
-        // Stryker disable next-line EqualityOperator: each coordinate holds distinct values
-        if (this.second[lower] > this.second[point]) break
-        this.tree.add(this.ranks[lower], 1)
-      }
+      left = this.addBelow(point, left, middle)
       this.counts[point] += this.tree.countBelow(this.ranks[point])
     }
     for (let undo = from; undo < left; undo++) {

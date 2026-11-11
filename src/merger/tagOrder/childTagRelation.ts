@@ -44,22 +44,32 @@ const firstOf = (
   return ancestor[next] < ancestor[tag] ? tag : next
 }
 
+// The pairs of one tag with every tag after it.
+const countFrom = (
+  tag: number,
+  positions: SharedPositions,
+  { before, after }: Standing
+): void => {
+  const size = positions.local.length
+  for (let next = tag + 1; next < size; next++) {
+    const first = firstOf(tag, next, positions)
+    if (first === CONTESTED) continue
+    after[first]++
+    before[first === tag ? next : tag]++
+  }
+}
+
 // Counts each pair once, from its first tag. Time is quadratic in the shared
 // tags.
 export const pairStanding = (positions: SharedPositions): Standing => {
   const size = positions.local.length
-  const before = new Array<number>(size).fill(0)
-  const after = new Array<number>(size).fill(0)
-  // Stryker disable next-line EqualityOperator: a tag at size leaves the inner loop empty
-  for (let tag = 0; tag < size; tag++) {
-    for (let next = tag + 1; next < size; next++) {
-      const first = firstOf(tag, next, positions)
-      if (first === CONTESTED) continue
-      after[first]++
-      before[first === tag ? next : tag]++
-    }
+  const standing = {
+    before: new Array<number>(size).fill(0),
+    after: new Array<number>(size).fill(0),
   }
-  return { before, after }
+  // Stryker disable next-line EqualityOperator: a tag at size leaves the inner loop empty
+  for (let tag = 0; tag < size; tag++) countFrom(tag, positions, standing)
+  return standing
 }
 
 const negated = (values: ArrayLike<number>): Int32Array => {
@@ -142,14 +152,16 @@ const isLeadingUnion = (
   total: number
 ): boolean => balance === count * (total - count)
 
+const standingOf = (positions: SharedPositions): Standing =>
+  // Stryker disable next-line ConditionalExpression,EqualityOperator: pairStanding and sweepStanding count the same standing, the sweep is the O(n log n) form
+  positions.local.length < SWEEP_FROM
+    ? pairStanding(positions)
+    : sweepStanding(positions)
+
 // The strongly connected components of that relation, in the order they must
 // come. It is complete: every pair of tags has at least one direction.
 export const orderedComponents = (positions: SharedPositions): number[][] => {
-  const { before, after } =
-    // Stryker disable next-line ConditionalExpression,EqualityOperator: pairStanding and sweepStanding count the same standing, the sweep is the O(n log n) form
-    positions.local.length < SWEEP_FROM
-      ? pairStanding(positions)
-      : sweepStanding(positions)
+  const { before, after } = standingOf(positions)
   const total = before.length
   const components: number[][] = []
   let component: number[] = []
