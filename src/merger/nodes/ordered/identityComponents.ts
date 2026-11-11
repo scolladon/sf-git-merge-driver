@@ -14,58 +14,62 @@ type Alternatives = readonly PointSet[]
 
 export type Tuple = readonly number[]
 
-interface Candidate extends Point {
-  readonly stretch: number
-  readonly alternative: number
-  readonly fixed: boolean
-}
-
-// A candidate between two empty splits belongs to the gap they bound.
-interface Placed extends Candidate {
-  readonly label: number
-}
-
 const byAncestor = (left: Point, right: Point): number =>
   left.ancestor - right.ancestor
+
+const addTo = <Key, Item>(
+  groups: Map<Key, Item[]>,
+  key: Key,
+  item: Item
+): void => {
+  const group = groups.get(key)
+  if (group === undefined) groups.set(key, [item])
+  else group.push(item)
+}
 
 const grouped = <Item, Key>(
   items: readonly Item[],
   keyOf: (item: Item) => Key
 ): ReadonlyMap<Key, readonly Item[]> => {
   const groups = new Map<Key, Item[]>()
-  for (const item of items) {
-    const key = keyOf(item)
-    const group = groups.get(key)
-    if (group === undefined) groups.set(key, [item])
-    else group.push(item)
-  }
+  for (const item of items) addTo(groups, keyOf(item), item)
   return groups
 }
 
-const candidatesOf = (
-  alternatives: Alternatives,
-  stretch: number,
-  side: LiveSide
-): readonly Candidate[] =>
-  alternatives.flatMap((set, alternative) =>
-    set[side].map(({ ancestor, position }) => ({
-      ancestor,
-      position,
-      stretch,
-      alternative,
-      fixed: alternatives.length === 1,
-    }))
-  )
-
-const candidatesOn = (
+function* pointsOn(
   stretches: readonly Alternatives[],
   side: LiveSide
-): readonly Candidate[] =>
-  stretches
-    .flatMap((alternatives, stretch) =>
-      candidatesOf(alternatives, stretch, side)
-    )
-    .sort(byAncestor)
+): Generator<Point> {
+  for (const alternatives of stretches) {
+    for (const set of alternatives) yield* set[side]
+  }
+}
+
+// The positions the candidates of one ancestor copy take on a side, whatever
+// the alternative.
+interface Span {
+  readonly lowest: number
+  readonly highest: number
+}
+
+const widened = (span: Span | undefined, position: number): Span =>
+  span === undefined
+    ? { lowest: position, highest: position }
+    : {
+        lowest: Math.min(span.lowest, position),
+        highest: Math.max(span.highest, position),
+      }
+
+const spansOn = (
+  stretches: readonly Alternatives[],
+  side: LiveSide
+): ReadonlyMap<number, Span> => {
+  const spans = new Map<number, Span>()
+  for (const { ancestor, position } of pointsOn(stretches, side)) {
+    spans.set(ancestor, widened(spans.get(ancestor), position))
+  }
+  return spans
+}
 
 // The lowest position from each index on, +infinity past the end.
 const suffixMinima = (positions: readonly number[]): readonly number[] => {
@@ -76,27 +80,6 @@ const suffixMinima = (positions: readonly number[]): readonly number[] => {
   return lowest
 }
 
-// Where every candidate before lies below every candidate after on both
-// coordinates, the longest increasing runs add up across the boundary: the
-// plane splits there. A fixed point every other candidate lies below or above
-// on both coordinates opens a split before and after itself, so it needs no
-// test of its own.
-const emptySplits = (sorted: readonly Candidate[]): ReadonlySet<Candidate> => {
-  const lowestFrom = suffixMinima(sorted.map(({ position }) => position))
-  const splits = new Set<Candidate>()
-  let highest = Number.NEGATIVE_INFINITY
-  for (const [at, candidate] of sorted.entries()) {
-    const previous = sorted[at - 1]
-    const opens =
-      at > 0 &&
-      previous.ancestor < candidate.ancestor &&
-      highest < lowestFrom[at]
-    if (opens) splits.add(candidate)
-    highest = Math.max(highest, candidate.position)
-  }
-  return splits
-}
-
 const SIDE_COUNT = LIVE_SIDES.length
 
 // One label per gap of each side: a gap is shared by the keys whose moves it
@@ -104,61 +87,113 @@ const SIDE_COUNT = LIVE_SIDES.length
 const labelOf = (side: LiveSide, gap: number): number =>
   gap * SIDE_COUNT + LIVE_SIDES.indexOf(side)
 
-const placedOn = (
+// Where every candidate before lies below every candidate after on both
+// coordinates, the longest increasing runs add up across the boundary: the
+// plane splits there. A fixed point every other candidate lies below or above
+// on both coordinates opens a split before and after itself, so it needs no
+// test of its own. The candidates of one ancestor copy share a coordinate, so
+// they share a gap: the splits are looked for between the copies, never
+// between the candidates.
+const labelsOn = (
   stretches: readonly Alternatives[],
   side: LiveSide
-): readonly Placed[] => {
-  const sorted = candidatesOn(stretches, side)
-  const splits = emptySplits(sorted)
-  const placed: Placed[] = []
+): ReadonlyMap<number, number> => {
+  const spans = [...spansOn(stretches, side)].sort(
+    ([left], [right]) => left - right
+  )
+  const lowestFrom = suffixMinima(spans.map(([, { lowest }]) => lowest))
+  const labels = new Map<number, number>()
   let gap = 0
-  for (const candidate of sorted) {
-    if (splits.has(candidate)) gap++
-    placed.push({ ...candidate, label: labelOf(side, gap) })
+  let reached = Number.NEGATIVE_INFINITY
+  for (const [at, [ancestor, { highest }]] of spans.entries()) {
+    if (at > 0 && reached < lowestFrom[at]) gap++
+    labels.set(ancestor, labelOf(side, gap))
+    reached = Math.max(reached, highest)
   }
-  return placed
+  return labels
+}
+
+// The gap each ancestor copy lies in, per side.
+type Labels = Readonly<Record<LiveSide, ReadonlyMap<number, number>>>
+
+// Every point was spanned, so its ancestor copy holds a label.
+const labelIn = (labels: Labels, side: LiveSide, point: Point): number =>
+  labels[side].get(point.ancestor) as number
+
+// Adds the points of an alternative to the gaps they lie in.
+const gather = (
+  into: Map<number, Point[]>,
+  set: PointSet,
+  labels: Labels
+): void => {
+  for (const side of LIVE_SIDES) {
+    for (const point of set[side]) {
+      addTo(into, labelIn(labels, side, point), point)
+    }
+  }
+}
+
+const fixedPoints = (
+  stretches: readonly Alternatives[],
+  labels: Labels
+): ReadonlyMap<number, readonly Point[]> => {
+  const fixed = new Map<number, Point[]>()
+  for (const alternatives of stretches) {
+    if (alternatives.length === 1) gather(fixed, alternatives[0], labels)
+  }
+  return fixed
+}
+
+const NO_GAP: ReadonlySet<number> = new Set()
+
+// The gaps the alternatives of a stretch reach: none matter for a stretch
+// with a single alternative, which trades no move.
+const gapsOf = (
+  alternatives: Alternatives,
+  labels: Labels
+): ReadonlySet<number> => {
+  if (alternatives.length <= 1) return NO_GAP
+  const gaps = new Set<number>()
+  for (const side of LIVE_SIDES) {
+    for (const point of pointsOn([alternatives], side)) {
+      gaps.add(labelIn(labels, side, point))
+    }
+  }
+  return gaps
 }
 
 // Stretches owning candidates in a common gap are decided together.
-const classesOf = (size: number, placed: readonly Placed[]): UnionFind => {
-  const classes = new UnionFind(size)
+const classesOf = (gaps: readonly ReadonlySet<number>[]): UnionFind => {
+  const classes = new UnionFind(gaps.length)
   const owners = new Map<number, number>()
-  for (const { label, stretch } of placed) {
-    const owner = owners.get(label) ?? stretch
-    owners.set(label, owner)
-    classes.union(owner, stretch)
-  }
+  gaps.forEach((labels, stretch) => {
+    for (const label of labels) {
+      const owner = owners.get(label) ?? stretch
+      owners.set(label, owner)
+      classes.union(owner, stretch)
+    }
+  })
   return classes
 }
 
 interface Layout {
-  readonly placements: readonly (readonly (readonly Placed[])[])[]
-  readonly fixedIn: ReadonlyMap<number, readonly Placed[]>
+  readonly labels: Labels
+  readonly gaps: readonly ReadonlySet<number>[]
+  readonly fixedIn: ReadonlyMap<number, readonly Point[]>
   readonly classes: UnionFind
 }
 
-const placementsOf = (
-  stretches: readonly Alternatives[],
-  placed: readonly Placed[]
-): readonly (readonly (readonly Placed[])[])[] => {
-  const slots = stretches.map(alternatives =>
-    alternatives.map((): Placed[] => [])
-  )
-  for (const point of placed)
-    slots[point.stretch][point.alternative].push(point)
-  return slots
-}
-
 const layoutOf = (stretches: readonly Alternatives[]): Layout => {
-  const placed = LIVE_SIDES.flatMap(side => placedOn(stretches, side))
-  const variable = placed.filter(({ fixed }) => !fixed)
+  const labels = {
+    local: labelsOn(stretches, 'local'),
+    other: labelsOn(stretches, 'other'),
+  }
+  const gaps = stretches.map(alternatives => gapsOf(alternatives, labels))
   return {
-    placements: placementsOf(stretches, placed),
-    fixedIn: grouped(
-      placed.filter(({ fixed }) => fixed),
-      ({ label }) => label
-    ),
-    classes: classesOf(stretches.length, variable),
+    labels,
+    gaps,
+    fixedIn: fixedPoints(stretches, labels),
+    classes: classesOf(gaps),
   }
 }
 
@@ -178,13 +213,7 @@ const componentsOf = (
   const byRoot = grouped(variable, stretch => layout.classes.find(stretch))
   return [...byRoot.values()].map(members => ({
     members,
-    labels: [
-      ...new Set(
-        members.flatMap(member =>
-          layout.placements[member].flat().map(({ label }) => label)
-        )
-      ),
-    ],
+    labels: [...new Set(members.flatMap(member => [...layout.gaps[member]]))],
     sizes: members.map(member => stretches[member].length),
   }))
 }
@@ -195,14 +224,12 @@ const movesIn = (points: readonly Point[]): number => {
 }
 
 const costOf =
-  (component: Component, layout: Layout) =>
+  (stretches: readonly Alternatives[], component: Component, layout: Layout) =>
   (tuple: Tuple): number => {
-    const chosen = grouped(
-      component.members.flatMap(
-        (member, at) => layout.placements[member][tuple[at]]
-      ),
-      ({ label }) => label
-    )
+    const chosen = new Map<number, Point[]>()
+    component.members.forEach((member, at) => {
+      gather(chosen, stretches[member][tuple[at]], layout.labels)
+    })
     return component.labels.reduce(
       (total, label) =>
         total +
@@ -244,8 +271,12 @@ export const isTied = (component: TieComponent): boolean =>
   component.minimal.length >= FEWEST_TIED_TUPLES
 
 // Every minimal tuple stays, in lexicographic order.
-const minimise = (component: Component, layout: Layout): TieComponent => {
-  const costOfTuple = costOf(component, layout)
+const minimise = (
+  stretches: readonly Alternatives[],
+  component: Component,
+  layout: Layout
+): TieComponent => {
+  const costOfTuple = costOf(stretches, component, layout)
   let least = Number.POSITIVE_INFINITY
   let minimal: Tuple[] = []
   for (const tuple of tuplesOf(component.sizes)) {
@@ -391,7 +422,7 @@ export const tieComponents = (
 ): readonly TieComponent[] => {
   const layout = layoutOf(stretches)
   return componentsOf(stretches, layout).map(component =>
-    minimise(component, layout)
+    minimise(stretches, component, layout)
   )
 }
 
