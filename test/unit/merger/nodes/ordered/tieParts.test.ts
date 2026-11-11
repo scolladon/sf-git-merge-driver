@@ -251,6 +251,27 @@ describe('given a unique key one side moves past the unique key between two repe
   })
 })
 
+describe.each([
+  ['local', 'A A X C B B', 'A C X B', 'A A X B B Z'],
+  ['other', 'A A X C B B', 'A A X B B Z', 'A C X B'],
+])(
+  'given a key only %s moves ahead of a unique key, the other side dropping it',
+  (_side, ancestor, local, other) => {
+    describe('when finding the tie parts', () => {
+      it('then the unique key is no cut and the repeated keys share one part', () => {
+        // Arrange
+        const sides = [ancestor, local, other] as const
+
+        // Act
+        const sut = partsOfTokens(...sides)
+
+        // Assert
+        expect(sut.tied).toEqual([[0, 1]])
+      })
+    })
+  }
+)
+
 describe('given a repeated key copied past the unique key on local', () => {
   describe('when finding the tie parts', () => {
     it('then no key is a cut', () => {
