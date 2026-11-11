@@ -106,7 +106,9 @@ const labelsOn = (
   let gap = 0
   let reached = Number.NEGATIVE_INFINITY
   for (const [at, [ancestor, { highest }]] of spans.entries()) {
-    if (at > 0 && reached < lowestFrom[at]) gap++
+    // A gap is numbered after the copy that opens it: nothing is reached before
+    // the first copy, which opens the first gap
+    if (reached < lowestFrom[at]) gap = at
     labels.set(ancestor, labelOf(side, gap))
     reached = Math.max(reached, highest)
   }
