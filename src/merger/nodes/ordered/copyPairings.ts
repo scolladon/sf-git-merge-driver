@@ -6,6 +6,7 @@ import {
   type SideGroups,
   surplusMatchings,
 } from '../keyedReadings.js'
+import type { Point } from './identityComponents.js'
 import type { LiveSide } from './orderedEntry.js'
 
 export interface Slot {
@@ -41,6 +42,22 @@ interface SidePairing {
   readonly restValues: readonly JsonObject[]
 }
 
+// The points of a side pairing, known to every alternative sharing it
+export type KnownPoints = Map<SidePairing, readonly Point[]>
+
+// One way to read a key's entries, its drafts and points built when asked for
+export interface Alternative {
+  readonly key: string
+  drafts(): readonly Draft[]
+  pointsOn(side: LiveSide, known: KnownPoints): readonly Point[]
+}
+
+// The signature of each copy of a key on a live side, by copy index
+export interface SideSignatures {
+  readonly local: readonly string[]
+  readonly other: readonly string[]
+}
+
 // A rest pair holds [local rest index, other rest index]
 const PAIR_PLACE: Readonly<Record<LiveSide, 0 | 1>> = { local: 0, other: 1 }
 
@@ -69,6 +86,35 @@ function* sidePairings(slots: Slots, side: LiveSide): Generator<SidePairing> {
   }
 }
 
+const pairedPoints = (
+  slots: Slots,
+  side: LiveSide,
+  pairing: SidePairing
+): readonly Point[] => {
+  const points: Point[] = []
+  for (const [ancestor, copy] of pairing.copyAt.entries()) {
+    if (copy === NO_COPY) continue
+    points.push({
+      ancestor: slots.ancestor[ancestor].pos,
+      position: slots[side][copy].pos,
+    })
+  }
+  return points
+}
+
+// The copies of the entries both sides hold: [local copy, other copy]
+function* sharedCopies(
+  local: SidePairing,
+  other: SidePairing,
+  rest: Matching
+): Generator<readonly [number, number]> {
+  for (const [ancestor, copy] of local.copyAt.entries()) {
+    const twin = other.copyAt[ancestor]
+    if (copy !== NO_COPY && twin !== NO_COPY) yield [copy, twin]
+  }
+  for (const [left, right] of rest) yield [local.rest[left], other.rest[right]]
+}
+
 const NO_PAIRS: Matching = []
 
 // A side with no copy left pairs none: the one empty matching
@@ -89,7 +135,10 @@ const loneDraft = (key: string, side: LiveSide, slot: Slot): Draft => ({
 })
 
 // One way to read a key's copies as the same entries on the three sides
-export class PairedCopies {
+export class PairedCopies implements Alternative {
+  // Built when a reading first takes the alternative: few are ever read
+  private built: readonly Draft[] | undefined
+
   constructor(
     private readonly group: KeySlots,
     private readonly local: SidePairing,
@@ -97,8 +146,37 @@ export class PairedCopies {
     private readonly rest: Matching
   ) {}
 
-  // In the order the readings of the copies give them
+  get key(): string {
+    return this.group.key
+  }
+
   drafts(): readonly Draft[] {
+    this.built ??= this.build()
+    return this.built
+  }
+
+  // A side pairing's points are built once for all the alternatives sharing it
+  pointsOn(side: LiveSide, known: KnownPoints): readonly Point[] {
+    const pairing = this[side]
+    const points =
+      known.get(pairing) ?? pairedPoints(this.group.slots, side, pairing)
+    known.set(pairing, points)
+    return points
+  }
+
+  // An alternative loses a value when no entry shared by both sides carries it
+  loses(held: ReadonlySet<string>, signatures: SideSignatures): boolean {
+    const missing = new Set(held)
+    const shared = sharedCopies(this.local, this.other, this.rest)
+    for (const [local, other] of shared) {
+      missing.delete(signatures.local[local])
+      missing.delete(signatures.other[other])
+    }
+    return missing.size > 0
+  }
+
+  // In the order the readings of the copies give them
+  private build(): readonly Draft[] {
     const drafts = this.ancestorDrafts()
     pushAll(
       drafts,

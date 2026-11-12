@@ -3,8 +3,12 @@ import { signatureOf } from '../../../utils/jsonSignature.js'
 import type { KeyedSides } from '../KeyedArrayIndex.js'
 import { groupSides } from '../keyedReadings.js'
 import {
+  type Alternative,
   type Draft,
+  type KnownPoints,
+  type PairedCopies,
   pairedCopiesOf,
+  type SideSignatures,
   type Slot,
   type Slots,
 } from './copyPairings.js'
@@ -51,16 +55,51 @@ const uniqueDraft = (key: string, slots: Slots): Draft => ({
   other: slots.other[0],
 })
 
-type Alternatives = readonly (readonly Draft[])[]
+const pointsOn = (drafts: readonly Draft[], side: LiveSide): Point[] => {
+  const points: Point[] = []
+  for (const draft of drafts) {
+    const { ancestor } = draft
+    const slot = draft[side]
+    if (ancestor && slot) {
+      points.push({ ancestor: ancestor.pos, position: slot.pos })
+    }
+  }
+  return points
+}
 
-const alternativesOf = (key: string, slots: Slots): Alternatives =>
-  pairedCopiesOf(key, slots).map(paired => paired.drafts())
+// The one alternative of keys held at most once per side
+class FusedRun implements Alternative {
+  constructor(private readonly run: readonly Draft[]) {}
 
-// A fused run of keys held at most once per side has one alternative and no
-// slots to choose from.
+  get key(): string {
+    return this.run[0].key
+  }
+
+  drafts(): readonly Draft[] {
+    return this.run
+  }
+
+  pointsOn(side: LiveSide): readonly Point[] {
+    return pointsOn(this.run, side)
+  }
+}
+
+type Alternatives = readonly Alternative[]
+
+interface RepeatedKey {
+  readonly pairings: readonly PairedCopies[]
+  readonly slots: Slots
+}
+
+// A fused run has one alternative and no repeated key to choose from.
 interface Stretch {
   readonly alternatives: Alternatives
-  readonly slots: Slots | undefined
+  readonly repeated: RepeatedKey | undefined
+}
+
+const repeatedStretch = (key: string, slots: Slots): Stretch => {
+  const pairings = pairedCopiesOf(key, slots)
+  return { alternatives: pairings, repeated: { pairings, slots } }
 }
 
 // Keys with a single alternative fuse into one stretch: recursing over every
@@ -71,7 +110,7 @@ const stretchesOf = (groups: SlotsByKey): readonly Stretch[] => {
   const closeRun = (): void => {
     // Stryker disable next-line ConditionalExpression: an empty fused run adds a segment yielding the empty draft list, the identity of the cross product
     if (run.length === 0) return
-    stretches.push({ alternatives: [run], slots: undefined })
+    stretches.push({ alternatives: [new FusedRun(run)], repeated: undefined })
     run = []
   }
   for (const [key, slots] of groups) {
@@ -80,7 +119,7 @@ const stretchesOf = (groups: SlotsByKey): readonly Stretch[] => {
       continue
     }
     closeRun()
-    stretches.push({ alternatives: alternativesOf(key, slots), slots })
+    stretches.push(repeatedStretch(key, slots))
   }
   closeRun()
   return stretches
@@ -105,45 +144,25 @@ const entryOf = (draft: Draft, id: number): OrderedEntry => {
 
 const toReading = (drafts: readonly Draft[]): Reading => drafts.map(entryOf)
 
+const signaturesOf = (slots: Slots): SideSignatures => {
+  const signed = (side: readonly Slot[]): string[] =>
+    side.map(slot => signatureOf(slot.value))
+  return { local: signed(slots.local), other: signed(slots.other) }
+}
+
 const valuesBothSidesHold = (
-  local: JsonArray,
-  other: JsonArray
+  signatures: SideSignatures
 ): ReadonlySet<string> => {
-  const otherSignatures = new Set((other as JsonObject[]).map(signatureOf))
-  return new Set(
-    (local as JsonObject[]).map(signatureOf).filter(s => otherSignatures.has(s))
-  )
+  const otherSignatures = new Set(signatures.other)
+  return new Set(signatures.local.filter(s => otherSignatures.has(s)))
 }
-
-const isOnBothSides = (entry: OrderedEntry): boolean =>
-  entry.local !== undefined && entry.other !== undefined
-
-const sharedSignatures = (reading: Reading): ReadonlySet<string> => {
-  const shared = new Set<string>()
-  for (const entry of reading.filter(isOnBothSides)) {
-    shared.add(signatureOf(entry.local as JsonObject))
-    shared.add(signatureOf(entry.other as JsonObject))
-  }
-  return shared
-}
-
-// A reading loses a value when no entry shared by both sides carries it.
-const losesAValue = (reading: Reading, held: ReadonlySet<string>): boolean => {
-  const shared = sharedSignatures(reading)
-  return [...held].some(signature => !shared.has(signature))
-}
-
-const valuesOf = (slots: readonly Slot[]): JsonArray =>
-  slots.map(slot => slot.value)
 
 // Exact per key: the values a key's entries carry belong to it alone.
-const noLossOf = (stretch: Stretch): Alternatives => {
-  const { alternatives, slots } = stretch
-  if (slots === undefined) return alternatives
-  const held = valuesBothSidesHold(valuesOf(slots.local), valuesOf(slots.other))
-  return alternatives.filter(
-    alternative => !losesAValue(toReading(alternative), held)
-  )
+const noLossOf = ({ alternatives, repeated }: Stretch): Alternatives => {
+  if (repeated === undefined) return alternatives
+  const signatures = signaturesOf(repeated.slots)
+  const held = valuesBothSidesHold(signatures)
+  return repeated.pairings.filter(paired => !paired.loses(held, signatures))
 }
 
 const withoutLosses = (
@@ -156,23 +175,6 @@ const withoutLosses = (
     ? kept
     : stretches.map(stretch => stretch.alternatives)
 }
-
-const pointsOn = (drafts: readonly Draft[], side: LiveSide): Point[] => {
-  const points: Point[] = []
-  for (const draft of drafts) {
-    const { ancestor } = draft
-    const slot = draft[side]
-    if (ancestor && slot) {
-      points.push({ ancestor: ancestor.pos, position: slot.pos })
-    }
-  }
-  return points
-}
-
-const pointsOf =
-  (drafts: readonly Draft[]): PointSet =>
-  side =>
-    pointsOn(drafts, side)
 
 const hasOneAlternative = (stretch: Stretch): boolean =>
   stretch.alternatives.length === 1
@@ -231,9 +233,9 @@ const tiesOver = (
   components: readonly TieComponent[]
 ): GroupedTies => {
   const first = firstChoice(kept.length, components)
-  const keyOf = (stretch: number): string => kept[stretch][0][0].key
+  const keyOf = (stretch: number): string => kept[stretch][0].key
   const readingOf = (tuple: Tuple): Reading =>
-    toReading(tuple.flatMap((choice, at) => kept[at][choice]))
+    toReading(tuple.flatMap((choice, at) => kept[at][choice].drafts()))
   return {
     first,
     components,
@@ -265,6 +267,14 @@ export const identityTies = (
     )
   }
   const kept = withoutLosses(stretches)
-  const points = kept.map(alternatives => alternatives.map(pointsOf))
+  // Dies with this call: the points are read by tieComponents only
+  const known: KnownPoints = new Map()
+  const points = kept.map(alternatives =>
+    alternatives.map(
+      (alternative): PointSet =>
+        side =>
+          alternative.pointsOn(side, known)
+    )
+  )
   return tiesOver(kept, tieComponents(points))
 }

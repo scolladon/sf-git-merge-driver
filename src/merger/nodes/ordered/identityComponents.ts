@@ -9,9 +9,8 @@ export interface Point {
 }
 
 /**
- * The points of one alternative on a live side, built when asked for and
- * never held: a repeated key has more alternatives than a merge can keep the
- * points of.
+ * The points of one alternative on a live side, built when a pass asks for
+ * them. Alternatives that pair a side alike hand the same array.
  */
 export type PointSet = (side: LiveSide) => readonly Point[]
 

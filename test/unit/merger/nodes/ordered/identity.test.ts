@@ -7,6 +7,7 @@ import {
   surplusMatchings,
 } from '../../../../../src/merger/nodes/keyedReadings.js'
 import { collapsibleKeys } from '../../../../../src/merger/nodes/ordered/collapsible.js'
+import { PairedCopies } from '../../../../../src/merger/nodes/ordered/copyPairings.js'
 import {
   type GroupedTies,
   identityTies,
@@ -1232,6 +1233,20 @@ describe('identityTies', () => {
       })
     })
 
+    describe('when asking the key of a stretch of unique keys', () => {
+      it('then it is the first key of the stretch', () => {
+        // Arrange
+        const sut = tiesOf(ancestor, local, other)
+        const fusedStretches = [1, 3]
+
+        // Act
+        const result = fusedStretches.map(sut.keyOf)
+
+        // Assert
+        expect(result).toEqual(['C', 'Z'])
+      })
+    })
+
     describe('when walking one component around a base choosing the second tuple of the other', () => {
       it('then the choice of the base stays', () => {
         // Arrange
@@ -1502,6 +1517,27 @@ describe('identityTies', () => {
         // Assert
         expectSameTies(sut, expected, collapsibleKeys(sides))
         expect([...sut.readings()]).toHaveLength(16)
+      })
+    })
+
+    describe('when the tie set is built', () => {
+      afterEach(() => {
+        vi.restoreAllMocks()
+      })
+
+      it('then no alternative builds its drafts until a reading takes it', () => {
+        // Arrange
+        const drafts = vi.spyOn(PairedCopies.prototype, 'drafts')
+        const sut = tiesOver(sides)
+        const builtBeforeReading = drafts.mock.calls.length
+
+        // Act
+        const readings = [...sut.readings()]
+
+        // Assert
+        expect(builtBeforeReading).toBe(0)
+        expect(readings).toHaveLength(16)
+        expect(drafts).toHaveBeenCalledTimes(16)
       })
     })
 
