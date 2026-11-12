@@ -14,12 +14,9 @@ import { mergeElementPresence } from './elementPresence.js'
 import { type Entries, mergeEntryContent } from './entryContent.js'
 import type { KeyedSides } from './KeyedArrayIndex.js'
 import type { KeyedArrayMergeStrategy } from './KeyedArrayMergeStrategy.js'
-import type { KeyCopies, Pairing } from './keyedReadings.js'
+import type { KeyCopies, KeyGroup, Pairing } from './keyedReadings.js'
 import { groupByKey, readings } from './keyedReadings.js'
 import { defaultNodeFactory } from './MergeNodeFactory.js'
-
-const isSingleCopy = ({ ancestor, local, other }: KeyCopies): boolean =>
-  ancestor.length <= 1 && local.length <= 1 && other.length <= 1
 
 const sortedItems = (result: MergeResult): string[] =>
   result.output.map(item => JSON.stringify(item)).sort()
@@ -44,7 +41,7 @@ export class UnorderedKeyedArrayMergeStrategy
     const results = Array.from(groups.keys())
       .sort()
       .map(key =>
-        this.mergeKey(config, orchestrator, groups.get(key) as KeyCopies)
+        this.mergeKey(config, orchestrator, groups.get(key) as KeyGroup)
       )
     return combineResults(results)
   }
@@ -52,18 +49,14 @@ export class UnorderedKeyedArrayMergeStrategy
   private mergeKey(
     config: MergeConfig,
     orchestrator: MergeOrchestrator,
-    copies: KeyCopies
+    group: KeyGroup
   ): MergeResult {
-    if (isSingleCopy(copies)) {
-      return this.mergeEntry(config, orchestrator, {
-        ancestor: copies.ancestor[0],
-        local: copies.local[0],
-        other: copies.other[0],
-      })
+    if (group.copies === undefined) {
+      return this.mergeEntry(config, orchestrator, group)
     }
     return (
-      this.takeAgreedCopies(copies) ??
-      this.mergeRepeatedKey(config, orchestrator, copies)
+      this.takeAgreedCopies(group.copies) ??
+      this.mergeRepeatedKey(config, orchestrator, group.copies)
     )
   }
 

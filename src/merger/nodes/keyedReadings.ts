@@ -188,14 +188,94 @@ export const groupSides = <T>(
   return groups
 }
 
+type KeyedSide = (typeof KEYED_SIDES)[number]
+
+/** A key each side holds at most once: its entry on each side. */
+export interface SingleCopy {
+  readonly ancestor: JsonObject | undefined
+  readonly local: JsonObject | undefined
+  readonly other: JsonObject | undefined
+  readonly copies: undefined
+}
+
+/** A key a side holds more than once: every copy, in written order. */
+export interface RepeatedCopies {
+  readonly copies: KeyCopies
+}
+
+export type KeyGroup = SingleCopy | RepeatedCopies
+
+type SingleDraft = { -readonly [Field in keyof SingleCopy]: SingleCopy[Field] }
+
+interface RepeatedDraft {
+  readonly copies: Record<KeyedSide, JsonObject[]>
+}
+
+type KeyGroupDrafts = Map<string, SingleDraft | RepeatedDraft>
+
+// Every field written, in one order: the single groups share one shape.
+const holding = (side: KeyedSide, entry: JsonObject): SingleDraft => {
+  const group: SingleDraft = {
+    ancestor: undefined,
+    local: undefined,
+    other: undefined,
+    copies: undefined,
+  }
+  group[side] = entry
+  return group
+}
+
+const listOf = (entry: JsonObject | undefined): JsonObject[] =>
+  entry === undefined ? [] : [entry]
+
+const repeating = (
+  single: SingleDraft,
+  side: KeyedSide,
+  entry: JsonObject
+): RepeatedDraft => {
+  const copies = {
+    ancestor: listOf(single.ancestor),
+    local: listOf(single.local),
+    other: listOf(single.other),
+  }
+  copies[side].push(entry)
+  return { copies }
+}
+
+// Lists are built only from a side's second copy of the key: most keys
+// appear at most once per side and never need them.
+const place = (
+  groups: KeyGroupDrafts,
+  key: string,
+  side: KeyedSide,
+  entry: JsonObject
+): void => {
+  const group = groups.get(key)
+  if (group === undefined) {
+    groups.set(key, holding(side, entry))
+  } else if (group.copies !== undefined) {
+    group.copies[side].push(entry)
+  } else if (group[side] === undefined) {
+    group[side] = entry
+  } else {
+    groups.set(key, repeating(group, side, entry))
+  }
+}
+
 export const groupByKey = (
   ancestor: JsonArray,
   local: JsonArray,
   other: JsonArray,
   keys: KeyedSides
-): ReadonlyMap<string, KeyCopies> => {
+): ReadonlyMap<string, KeyGroup> => {
   const sides = { ancestor, local, other }
-  return groupSides(keys, (side, index) => sides[side][index] as JsonObject)
+  const groups: KeyGroupDrafts = new Map()
+  for (const side of KEYED_SIDES) {
+    keys[side].forEach((key, index) => {
+      place(groups, key, side, sides[side][index] as JsonObject)
+    })
+  }
+  return groups
 }
 
 const classesOf = (
