@@ -2,15 +2,16 @@ import fc from 'fast-check'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { KeyedSides } from '../../../../../src/merger/nodes/KeyedArrayIndex.js'
 import {
-  type KeyCopies,
-  type Pairing,
-  readings,
+  type Matching,
+  matchingsOf,
+  surplusMatchings,
 } from '../../../../../src/merger/nodes/keyedReadings.js'
 import { collapsibleKeys } from '../../../../../src/merger/nodes/ordered/collapsible.js'
 import {
   type GroupedTies,
   identityTies,
 } from '../../../../../src/merger/nodes/ordered/identity.js'
+import { mergeOrderedArrays } from '../../../../../src/merger/nodes/ordered/mergeOrdered.js'
 import {
   ABSENT_POSITION,
   type OrderedEntry,
@@ -21,6 +22,7 @@ import type {
   JsonObject,
 } from '../../../../../src/types/jsonTypes.js'
 import { signatureOf } from '../../../../../src/utils/jsonSignature.js'
+import { identityTies as draftTies } from '../../../../utils/oracles/draftIdentity/identity.js'
 import * as reference from '../../../../utils/oracles/enumeratedIdentity.js'
 import {
   identify as streamIdentify,
@@ -42,7 +44,13 @@ import {
   LAYOUT_SHAPES,
   layoutSides,
 } from '../../../../utils/orderedCuts.js'
-import { orderedSides, readingsOf } from '../../../../utils/orderedTokens.js'
+import {
+  formatResult,
+  ORDERED_ATTRIBUTE,
+  orderedSides,
+  readingsOf,
+} from '../../../../utils/orderedTokens.js'
+import { defaultConfig } from '../../../../utils/testConfig.js'
 
 vi.mock(
   '../../../../../src/merger/nodes/keyedReadings.js',
@@ -51,9 +59,32 @@ vi.mock(
       await importOriginal<
         typeof import('../../../../../src/merger/nodes/keyedReadings.js')
       >()
-    return { ...original, readings: vi.fn(original.readings) }
+    return {
+      ...original,
+      matchingsOf: vi.fn(original.matchingsOf),
+      surplusMatchings: vi.fn(original.surplusMatchings),
+    }
   }
 )
+
+function* replayed(matchings: readonly Matching[]): Generator<Matching> {
+  yield* matchings
+}
+
+// The mock receives the sides' own entries: local's first one tells it apart
+const craftSideMatchings = (
+  sides: ReturnType<typeof orderedSides>,
+  local: readonly Matching[],
+  other: readonly Matching[]
+): void => {
+  vi.mocked(matchingsOf).mockImplementation((_ancestor, side) =>
+    replayed(side[0] === sides.local[0] ? local : other)
+  )
+}
+
+const craftRestMatchings = (rest: readonly Matching[]): void => {
+  vi.mocked(surplusMatchings).mockImplementation(() => replayed(rest))
+}
 
 // The stream of readings, as the merge walks it
 const identify = (
@@ -326,44 +357,6 @@ const startsWithAncestorLabel = (entry: OrderedEntry): boolean => {
   )
 }
 
-const CRAFTED_KEY = 'A'
-
-type Crafted = (copies: KeyCopies) => Generator<readonly Pairing[]>
-
-// Every other key keeps the real pairings
-const craftPairingsOfKeyA = async (crafted: Crafted): Promise<void> => {
-  const original = await vi.importActual<
-    typeof import('../../../../../src/merger/nodes/keyedReadings.js')
-  >('../../../../../src/merger/nodes/keyedReadings.js')
-  vi.mocked(readings).mockImplementation(copies =>
-    copies.ancestor[0]?.['fullName'] === CRAFTED_KEY
-      ? crafted(copies)
-      : original.readings(copies)
-  )
-}
-
-// Each pairing leaves the values both sides hold on entries of one side
-// only, so whichever one is picked, a value both sides hold is lost.
-function* losingPairings(copies: KeyCopies): Generator<readonly Pairing[]> {
-  const [first, second] = copies.ancestor
-  const [local] = copies.local
-  const [other] = copies.other
-  yield [{ ancestor: first, local }, { ancestor: second }, { other }]
-  yield [{ ancestor: first }, { ancestor: second, other }, { local }]
-}
-
-// The first pairing shares the value both sides hold, the second loses it.
-function* oneKeepingPairing(copies: KeyCopies): Generator<readonly Pairing[]> {
-  const [first, second] = copies.ancestor
-  const [local] = copies.local
-  const [other] = copies.other
-  yield [{ ancestor: first }, { ancestor: second, local, other }]
-  yield [
-    { ancestor: first, local },
-    { ancestor: second, other },
-  ]
-}
-
 const LAYOUT_COPIES = [2, 3]
 const LAYOUT_GADGETS = [1, 2, 3, 4]
 
@@ -420,7 +413,7 @@ describe('identify', () => {
       sut('A B', 'A B', 'A B')
 
       // Assert
-      expect(readings).not.toHaveBeenCalled()
+      expect(matchingsOf).not.toHaveBeenCalled()
     })
   })
 
@@ -900,46 +893,62 @@ describe('identify', () => {
     })
   })
 
-  describe('given crafted pairings for a key', () => {
-    afterEach(() => {
-      vi.mocked(readings).mockReset()
-    })
-
-    describe('when every pairing loses a value both sides hold', () => {
-      it('then the readings equal the reference, which keeps every pairing', async () => {
+  describe('given a key repeated on the ancestor and edited apart on both sides', () => {
+    describe('when identified', () => {
+      it("then each side's copies are matched once", () => {
         // Arrange
-        await craftPairingsOfKeyA(losingPairings)
-        const sides = orderedSides('A A B B', 'A* B B', 'A* B B')
-        const expected = referenceReadings(sides)
+        const sides = orderedSides('A A', 'A* A+', 'A* A+')
 
         // Act
-        const sut = [
-          ...identify(sides.ancestor, sides.local, sides.other, sides.keys),
-        ]
+        identifiedFrom(sides)
 
         // Assert
-        expect(sut).toStrictEqual(expected)
-      })
-    })
-
-    describe('when one pairing alone keeps every value both sides hold', () => {
-      it('then it is the one reading, equal to the reference', async () => {
-        // Arrange
-        await craftPairingsOfKeyA(oneKeepingPairing)
-        const sides = orderedSides('A A', 'A*', 'A*')
-        const expected = referenceReadings(sides)
-
-        // Act
-        const sut = [
-          ...identify(sides.ancestor, sides.local, sides.other, sides.keys),
-        ]
-
-        // Assert
-        expect(sut).toStrictEqual(expected)
-        expect(sut).toHaveLength(1)
+        expect(matchingsOf).toHaveBeenCalledTimes(2)
       })
     })
   })
+
+  describe('given crafted matchings for a key', () => {
+    afterEach(() => {
+      vi.mocked(matchingsOf).mockReset()
+      vi.mocked(surplusMatchings).mockReset()
+    })
+
+    describe('when every alternative loses a value both sides hold', () => {
+      it('then every alternative stays', () => {
+        // Arrange
+        const sides = orderedSides('A A', 'A*', 'A*')
+        craftSideMatchings(sides, [[[0, 0]], []], [[], [[1, 0]]])
+        craftRestMatchings([[]])
+
+        // Act
+        const sut = identifiedFrom(sides)
+
+        // Assert
+        expect(sut.map(shapeOf)).toEqual([
+          'A@0,0,- A@1,-,- A@-,-,0',
+          'A@0,0,- A@1,-,0',
+          'A@0,-,- A@1,-,- A@-,0,- A@-,-,0',
+          'A@0,-,- A@1,-,0 A@-,0,-',
+        ])
+      })
+    })
+
+    describe('when one alternative alone keeps every value', () => {
+      it('then it is the one reading', () => {
+        // Arrange
+        const sides = orderedSides('A A', 'A*', 'A*')
+        craftSideMatchings(sides, [[[0, 0]]], [[[1, 0]], [[0, 0]]])
+
+        // Act
+        const sut = identifiedFrom(sides)
+
+        // Assert
+        expect(sut.map(shapeOf)).toEqual(['A@0,0,0 A@1,-,-'])
+      })
+    })
+  })
+
   describe('given the distinct grid', () => {
     describe.each(COPY_COUNTS)('at r = %i', copies => {
       describe.each([1, 12, 40])('and m = %i', keys => {
@@ -1135,6 +1144,29 @@ const keysOfSides = (
     ...sides.keys.other,
   ]),
 ]
+
+const draftTiesOver = (sides: ReturnType<typeof orderedSides>): GroupedTies =>
+  draftTies(sides.ancestor, sides.local, sides.other, sides.keys)
+
+// The draft-built tie set walks every reading of every generated case twice
+const DRAFT_ORACLE_TIMEOUT_MS = 60_000
+
+const expectSameTies = (
+  actual: GroupedTies,
+  expected: GroupedTies,
+  keys: ReadonlySet<string>
+): void => {
+  const readings = [...actual.readings()]
+  expect(actual.first).toStrictEqual(expected.first)
+  expect(actual.components).toStrictEqual(expected.components)
+  expect(readings).toStrictEqual([...expected.readings()])
+  expect(readings.map(fieldOrderOf)).toEqual(
+    [...expected.readings()].map(fieldOrderOf)
+  )
+  expect([...actual.representatives(keys)]).toStrictEqual([
+    ...expected.representatives(keys),
+  ])
+}
 
 const withAnyKeys = (cases: fc.Arbitrary<Case>) =>
   cases.chain(tokens => {
@@ -1413,6 +1445,81 @@ describe('identityTies', () => {
       })
     }
   )
+
+  describe('given generated sides', () => {
+    describe('when building the tie set', () => {
+      it.each(GENERATED_CASES)(
+        'then the tie set of %s equals the draft-built tie set',
+        (_name, cases) => {
+          fc.assert(
+            fc.property(withAnyKeys(cases), ({ sides, keys }) => {
+              // Arrange
+              const expected = draftTiesOver(sides)
+
+              // Act
+              const sut = tiesOver(sides)
+
+              // Assert
+              expectSameTies(sut, expected, keys)
+            })
+          )
+        },
+        DRAFT_ORACLE_TIMEOUT_MS
+      )
+    })
+  })
+
+  describe.each(LAYOUT_CELLS)(
+    'given the %s layout at r = %i, m = %i',
+    (shape, copies, gadgets) => {
+      describe('when building the tie set', () => {
+        it('then it equals the draft-built tie set', () => {
+          // Arrange
+          const sides = layoutSides(shape, copies, gadgets)
+          const expected = draftTiesOver(sides)
+
+          // Act
+          const sut = tiesOver(sides)
+
+          // Assert
+          expectSameTies(sut, expected, collapsibleKeys(sides))
+        })
+      })
+    }
+  )
+
+  describe('given a key repeated four times that one side edits and the other drops', () => {
+    const sides = orderedSides('Ua A A A A Ub', 'Ua A* A A Ub', 'Ua A A A Ub')
+
+    describe('when building the tie set', () => {
+      it('then it holds the sixteen readings of the draft-built tie set', () => {
+        // Arrange
+        const expected = draftTiesOver(sides)
+
+        // Act
+        const sut = tiesOver(sides)
+
+        // Assert
+        expectSameTies(sut, expected, collapsibleKeys(sides))
+        expect([...sut.readings()]).toHaveLength(16)
+      })
+    })
+
+    describe('when merging', () => {
+      it('then the whole array conflicts', () => {
+        // Arrange
+        const sut = mergeOrderedArrays
+
+        // Act
+        const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
+
+        // Assert
+        expect(formatResult(result)).toBe(
+          '<Ua,A*,A,A,Ub|Ua,A,A,A,A,Ub|Ua,A,A,A,Ub>'
+        )
+      })
+    })
+  })
 
   describe('given unique keys only', () => {
     describe('when grouping by one of them', () => {

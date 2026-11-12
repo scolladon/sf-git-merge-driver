@@ -1,12 +1,13 @@
 import type { JsonArray, JsonObject } from '../../../types/jsonTypes.js'
 import { signatureOf } from '../../../utils/jsonSignature.js'
 import type { KeyedSides } from '../KeyedArrayIndex.js'
+import { groupSides } from '../keyedReadings.js'
 import {
-  groupSides,
-  type Pairing,
-  readings,
-  type SideGroups,
-} from '../keyedReadings.js'
+  type Draft,
+  pairedCopiesOf,
+  type Slot,
+  type Slots,
+} from './copyPairings.js'
 import {
   firstChoice,
   type Point,
@@ -24,13 +25,6 @@ import {
   type Reading,
 } from './orderedEntry.js'
 
-interface Slot {
-  readonly pos: number
-  readonly value: JsonObject
-}
-
-type Slots = SideGroups<Slot>
-
 type SlotsByKey = ReadonlyMap<string, Slots>
 
 const groupSlots = (
@@ -45,51 +39,10 @@ const groupSlots = (
 const positionOf = (slot: Slot | undefined): number =>
   slot?.pos ?? ABSENT_POSITION
 
-interface Draft {
-  readonly key: string
-  readonly ancestor: Slot | undefined
-  readonly local: Slot | undefined
-  readonly other: Slot | undefined
-}
-
 const isUnique = (slots: Slots): boolean =>
   slots.ancestor.length <= 1 &&
   slots.local.length <= 1 &&
   slots.other.length <= 1
-
-interface Clones {
-  readonly copies: Readonly<Record<keyof Slots, JsonObject[]>>
-  readonly slotOf: ReadonlyMap<JsonObject, Slot>
-}
-
-const cloneSlots = (slots: Slots): Clones => {
-  const slotOf = new Map<JsonObject, Slot>()
-  const cloned = (side: readonly Slot[]): JsonObject[] =>
-    side.map(slot => {
-      const clone = { ...slot.value }
-      slotOf.set(clone, slot)
-      return clone
-    })
-  const copies = {
-    ancestor: cloned(slots.ancestor),
-    local: cloned(slots.local),
-    other: cloned(slots.other),
-  }
-  return { copies, slotOf }
-}
-
-// readings() pairs values and may meet two equal ones: distinct clones tell
-// the copies apart so each pairing finds back its slot.
-function* pairingDrafts(key: string, slots: Slots): Generator<Draft[]> {
-  const { copies, slotOf } = cloneSlots(slots)
-  const draftOf = (pairing: Pairing): Draft => ({
-    key,
-    ancestor: pairing.ancestor && slotOf.get(pairing.ancestor),
-    local: pairing.local && slotOf.get(pairing.local),
-    other: pairing.other && slotOf.get(pairing.other),
-  })
-  for (const pairings of readings(copies)) yield pairings.map(draftOf)
-}
 
 const uniqueDraft = (key: string, slots: Slots): Draft => ({
   key,
@@ -99,6 +52,9 @@ const uniqueDraft = (key: string, slots: Slots): Draft => ({
 })
 
 type Alternatives = readonly (readonly Draft[])[]
+
+const alternativesOf = (key: string, slots: Slots): Alternatives =>
+  pairedCopiesOf(key, slots).map(paired => paired.drafts())
 
 // A fused run of keys held at most once per side has one alternative and no
 // slots to choose from.
@@ -124,7 +80,7 @@ const stretchesOf = (groups: SlotsByKey): readonly Stretch[] => {
       continue
     }
     closeRun()
-    stretches.push({ alternatives: [...pairingDrafts(key, slots)], slots })
+    stretches.push({ alternatives: alternativesOf(key, slots), slots })
   }
   closeRun()
   return stretches

@@ -206,7 +206,7 @@ const classesOf = (
   return [classes.slice(0, ancestor.length), classes.slice(ancestor.length)]
 }
 
-const matchingsOf = (
+export const matchingsOf = (
   ancestor: readonly JsonObject[],
   side: readonly JsonObject[]
 ): Generator<Matching> => matchings(...classesOf(ancestor, side))
@@ -287,7 +287,7 @@ function* enumeratedFromBoth(
 // lists as long are each enumerated in turn, a matching both give coming
 // once: enumerating from one alone would leave out the readings only the
 // other tells apart.
-function* surplusMatchings(
+export function* surplusMatchings(
   restLocal: readonly JsonObject[],
   restOther: readonly JsonObject[]
 ): Generator<Matching> {
