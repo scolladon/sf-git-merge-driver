@@ -1,8 +1,9 @@
 import fc from 'fast-check'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { collapsibleKeys } from '../../../../../src/merger/nodes/ordered/collapsible.js'
 import type { OrderedSides } from '../../../../../src/merger/nodes/ordered/orderedSides.js'
 import { jsonIdentical } from '../../../../../src/utils/jsonEqual.js'
+import { collapsibleKeys as everyKeyVariedCollapsibleKeys } from '../../../../utils/oracles/everyKeyVaried.js'
 import {
   type Case,
   caseArb,
@@ -22,6 +23,14 @@ import {
   orderedSides,
   REORDERED_MARK,
 } from '../../../../utils/orderedTokens.js'
+
+vi.mock('../../../../../src/utils/jsonEqual.js', async importOriginal => {
+  const original =
+    await importOriginal<
+      typeof import('../../../../../src/utils/jsonEqual.js')
+    >()
+  return { ...original, jsonIdentical: vi.fn(original.jsonIdentical) }
+})
 
 type Row = readonly [
   name: string,
@@ -54,6 +63,13 @@ const ACCEPTED_ROWS: readonly Row[] = [
     'K K U^',
     ['K'],
   ],
+  [
+    'a key held once edited on a side next to the copies',
+    'K K U',
+    'K U*',
+    'K K U',
+    ['K'],
+  ],
 ]
 
 const REFUSED_BY_THE_COPIES_ROWS: readonly Row[] = [
@@ -69,6 +85,7 @@ const REFUSED_BY_THE_COPIES_ROWS: readonly Row[] = [
   ['a kept copy edited', 'K K U', 'K* U', 'K K U', []],
   ['a side adding a copy', 'K K U', 'K K K U', 'K U', []],
   ['both sides dropping copies', 'K K K U', 'K U', 'K K U', []],
+  ['a repeated key with one copy reordered', 'K K U', 'K U', 'K^ K U', []],
 ]
 
 // Edit marks stay at the end of a renamed token: 'K*' becomes 'RK*'
@@ -270,6 +287,53 @@ describe('collapsibleKeys', () => {
         // Assert
         expect(result).toStrictEqual(expected)
       })
+    })
+  })
+
+  describe('given sides whose keys are each held once', () => {
+    describe('when deciding the collapsible keys', () => {
+      it('then no copy is compared', () => {
+        // Arrange
+        const sides = orderedSides('A B', 'A B', 'A B')
+        vi.mocked(jsonIdentical).mockClear()
+
+        const sut = collapsibleKeys
+
+        // Act
+        sut(sides)
+
+        // Assert
+        expect(jsonIdentical).not.toHaveBeenCalled()
+      })
+    })
+  })
+
+  describe('given generated sides', () => {
+    describe('when deciding which keys are interchangeable', () => {
+      it.each(GENERATED_CASES)(
+        'then the keys of %s are those every compared key gives',
+        (_name, cases) => {
+          fc.assert(
+            fc.property(cases, ([ancestor, local, other]) => {
+              // Arrange
+              const sides = orderedSides(
+                ancestor.join(' '),
+                local.join(' '),
+                other.join(' ')
+              )
+              const expected = [...everyKeyVariedCollapsibleKeys(sides)].sort()
+
+              const sut = collapsibleKeys
+
+              // Act
+              const result = [...sut(sides)].sort()
+
+              // Assert
+              expect(result).toEqual(expected)
+            })
+          )
+        }
+      )
     })
   })
 

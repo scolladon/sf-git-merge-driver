@@ -3,6 +3,7 @@ import { jsonIdentical } from '../../../utils/jsonEqual.js'
 import type { KeyedSides } from '../KeyedArrayIndex.js'
 import { LIVE_SIDES } from './orderedEntry.js'
 import {
+  type KeySpan,
   type OrderedSides,
   SIDES,
   type Side,
@@ -19,37 +20,72 @@ const MOST_DROPPING_SIDES = 1
 interface Facts {
   readonly keys: KeyedSides
   readonly spans: SideSpans
+  readonly repeated: ReadonlySet<string>
   readonly varied: ReadonlySet<string>
 }
 
-const copiesOn = (sides: OrderedSides): (readonly [string, JsonValue])[] =>
-  SIDES.flatMap(side =>
-    sides.keys[side].map((key, at) => [key, sides[side][at]] as const)
-  )
+const repeatedOn = (spans: ReadonlyMap<string, KeySpan>): readonly string[] => {
+  const repeated: string[] = []
+  for (const [key, span] of spans) {
+    if (span.count >= REPEATED_COUNT) repeated.push(key)
+  }
+  return repeated
+}
+
+const repeatedKeys = (spans: SideSpans): ReadonlySet<string> =>
+  new Set(SIDES.flatMap(side => repeatedOn(spans[side])))
+
+const copiesOn = (
+  sides: OrderedSides,
+  side: Side,
+  repeated: ReadonlySet<string>
+): (readonly [string, JsonValue])[] => {
+  const keys = sides.keys[side]
+  const copies: (readonly [string, JsonValue])[] = []
+  for (let at = 0; at < keys.length; at++) {
+    if (repeated.has(keys[at])) copies.push([keys[at], sides[side][at]])
+  }
+  return copies
+}
+
+// Only a repeated key is ever asked whether its copies vary
+const copiesOf = (
+  sides: OrderedSides,
+  repeated: ReadonlySet<string>
+): (readonly [string, JsonValue])[] =>
+  SIDES.flatMap(side => copiesOn(sides, side, repeated))
 
 // The merge reads a copy's fields in order, so copies listing them in another
 // order are different values
-const variedKeys = (sides: OrderedSides): ReadonlySet<string> => {
+const variedKeys = (
+  sides: OrderedSides,
+  repeated: ReadonlySet<string>
+): ReadonlySet<string> => {
   const firstCopies = new Map<string, JsonValue>()
   const varied = new Set<string>()
-  for (const [key, copy] of copiesOn(sides)) {
+  for (const [key, copy] of copiesOf(sides, repeated)) {
     if (!firstCopies.has(key)) firstCopies.set(key, copy)
     else if (!jsonIdentical(firstCopies.get(key), copy)) varied.add(key)
   }
   return varied
 }
 
-const factsOf = (sides: OrderedSides): Facts => ({
-  keys: sides.keys,
-  spans: sideSpans(sides.keys),
-  varied: variedKeys(sides),
-})
+const factsOf = (sides: OrderedSides): Facts => {
+  const spans = sideSpans(sides.keys)
+  const repeated = repeatedKeys(spans)
+  return {
+    keys: sides.keys,
+    spans,
+    repeated,
+    varied: variedKeys(sides, repeated),
+  }
+}
 
 const countOf = (facts: Facts, side: Side, key: string): number =>
   facts.spans[side].get(key)?.count ?? 0
 
 const isRepeated = (facts: Facts, key: string): boolean =>
-  SIDES.some(side => countOf(facts, side, key) >= REPEATED_COUNT)
+  facts.repeated.has(key)
 
 const isAddedBy = (facts: Facts, side: Side, key: string): boolean =>
   countOf(facts, side, key) > countOf(facts, 'ancestor', key)
@@ -110,8 +146,9 @@ const isQuiet = (facts: Facts, key: string): boolean =>
  */
 export const collapsibleKeys = (sides: OrderedSides): ReadonlySet<string> => {
   const facts = factsOf(sides)
-  const keys = new Set(SIDES.flatMap(side => sides.keys[side]))
   return new Set(
-    [...keys].filter(key => isExempt(facts, key) && isQuiet(facts, key))
+    [...facts.repeated].filter(
+      key => isExempt(facts, key) && isQuiet(facts, key)
+    )
   )
 }
