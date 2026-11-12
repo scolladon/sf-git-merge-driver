@@ -325,6 +325,52 @@ const swapsWithin = (copies: Reading): number =>
     0
   )
 
+const byLocalPosition = (first: OrderedEntry, second: OrderedEntry): number =>
+  first.localPos - second.localPos
+
+// Per entry, the furthest place on other of the entries local writes before.
+const furthestBefore = (inLocalOrder: Reading): readonly number[] => {
+  let furthest = Number.NEGATIVE_INFINITY
+  return inLocalOrder.map(entry => {
+    const before = furthest
+    furthest = Math.max(furthest, entry.otherPos)
+    return before
+  })
+}
+
+// Per entry, the nearest place on other of the entries local writes after.
+const nearestAfter = (inLocalOrder: Reading): readonly number[] => {
+  const after: number[] = new Array(inLocalOrder.length)
+  let nearest = Number.POSITIVE_INFINITY
+  for (let at = inLocalOrder.length - 1; at >= 0; at--) {
+    after[at] = nearest
+    nearest = Math.min(nearest, (inLocalOrder[at] as OrderedEntry).otherPos)
+  }
+  return after
+}
+
+// A swap takes two entries the sides order differently: an entry every other
+// one stands on the same side of, on local and on other, counts in none.
+const crossedIds = (shared: Reading): ReadonlySet<number> => {
+  const inLocalOrder = shared.slice().sort(byLocalPosition)
+  const before = furthestBefore(inLocalOrder)
+  const after = nearestAfter(inLocalOrder)
+  const crossed = new Set<number>()
+  inLocalOrder.forEach((entry, at) => {
+    const isCrossed =
+      (before[at] as number) > entry.otherPos ||
+      (after[at] as number) < entry.otherPos
+    if (isCrossed) crossed.add(entry.id)
+  })
+  return crossed
+}
+
+const swapsAcross = (copies: ReadonlyMap<string, OrderedEntry[]>): number =>
+  Array.from(copies.values()).reduce(
+    (total, group) => total + swapsWithin(group),
+    0
+  )
+
 /**
  * Pairs of interchangeable shared copies the sides order differently. A
  * reading that only works by swapping such copies is not a reading (ADR 068).
@@ -333,10 +379,10 @@ export const phantomSwaps = (
   view: Reading,
   statuses: readonly EntryStatus[]
 ): number => {
+  const shared = view.filter(entry => isSharedAndClean(entry, statuses))
+  const crossed = crossedIds(shared)
   const copies = new Map<string, OrderedEntry[]>()
-  for (const entry of view.filter(shared =>
-    isSharedAndClean(shared, statuses)
-  )) {
+  for (const entry of shared.filter(candidate => crossed.has(candidate.id))) {
     const output = (statuses[entry.id] as { output: JsonArray }).output
     const signature = signatureOf({ output })
     // Stryker disable next-line ArrayDeclaration: a stray string has no positions: both comparisons are false, so it never counts as a swap
@@ -344,8 +390,5 @@ export const phantomSwaps = (
     group.push(entry)
     copies.set(signature, group)
   }
-  return Array.from(copies.values()).reduce(
-    (total, group) => total + swapsWithin(group),
-    0
-  )
+  return swapsAcross(copies)
 }

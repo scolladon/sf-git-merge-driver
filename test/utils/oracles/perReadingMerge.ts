@@ -53,7 +53,6 @@ import {
 import {
   type OrderingView,
   orderingView,
-  phantomSwaps,
 } from '../../../src/merger/nodes/ordered/replacement.js'
 import type { MergeConfig } from '../../../src/types/conflictTypes.js'
 import type { JsonArray, JsonObject } from '../../../src/types/jsonTypes.js'
@@ -65,6 +64,7 @@ import {
 import { pushAll } from '../../../src/utils/arrayUtils.js'
 import { jsonIdentical } from '../../../src/utils/jsonEqual.js'
 import { identify } from './enumeratedIdentity.js'
+import { phantomSwaps } from './signedSwaps.js'
 
 type Wrapped = Pick<OrderedSides, 'ancestor' | 'local' | 'other'>
 

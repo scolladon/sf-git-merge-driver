@@ -55,7 +55,6 @@ import {
 import {
   type OrderingView,
   orderingView,
-  phantomSwaps,
 } from '../../../../src/merger/nodes/ordered/replacement.js'
 import {
   combineReadings,
@@ -72,6 +71,7 @@ import {
 } from '../../../../src/types/mergeResult.js'
 import { pushAll } from '../../../../src/utils/arrayUtils.js'
 import { jsonIdentical } from '../../../../src/utils/jsonEqual.js'
+import { phantomSwaps } from '../signedSwaps.js'
 import { TieScan } from '../tieScanMerge.js'
 import { identityTies } from './identity.js'
 
