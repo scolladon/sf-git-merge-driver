@@ -102,19 +102,6 @@ const pairedPoints = (
   return points
 }
 
-// The copies of the entries both sides hold: [local copy, other copy]
-function* sharedCopies(
-  local: SidePairing,
-  other: SidePairing,
-  rest: Matching
-): Generator<readonly [number, number]> {
-  for (const [ancestor, copy] of local.copyAt.entries()) {
-    const twin = other.copyAt[ancestor]
-    if (copy !== NO_COPY && twin !== NO_COPY) yield [copy, twin]
-  }
-  for (const [left, right] of rest) yield [local.rest[left], other.rest[right]]
-}
-
 const NO_PAIRS: Matching = []
 
 // A side with no copy left pairs none: the one empty matching
@@ -167,12 +154,34 @@ export class PairedCopies implements Alternative {
   // An alternative loses a value when no entry shared by both sides carries it
   loses(held: ReadonlySet<string>, signatures: SideSignatures): boolean {
     const missing = new Set(held)
-    const shared = sharedCopies(this.local, this.other, this.rest)
-    for (const [local, other] of shared) {
-      missing.delete(signatures.local[local])
-      missing.delete(signatures.other[other])
-    }
+    this.dropCarriedByAncestorCopies(missing, signatures)
+    this.dropCarriedByRestPairs(missing, signatures)
     return missing.size > 0
+  }
+
+  // Asked of every alternative of a key: the shared copies are walked in
+  // place, never listed
+  private dropCarriedByAncestorCopies(
+    missing: Set<string>,
+    signatures: SideSignatures
+  ): void {
+    const twins = this.other.copyAt
+    this.local.copyAt.forEach((copy, ancestor) => {
+      const twin = twins[ancestor]
+      if (copy === NO_COPY || twin === NO_COPY) return
+      missing.delete(signatures.local[copy])
+      missing.delete(signatures.other[twin])
+    })
+  }
+
+  private dropCarriedByRestPairs(
+    missing: Set<string>,
+    signatures: SideSignatures
+  ): void {
+    for (const [left, right] of this.rest) {
+      missing.delete(signatures.local[this.local.rest[left]])
+      missing.delete(signatures.other[this.other.rest[right]])
+    }
   }
 
   // In the order the readings of the copies give them
