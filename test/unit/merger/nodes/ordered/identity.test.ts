@@ -100,6 +100,10 @@ const sameValueReferences = (
     )
   )
 
+// toStrictEqual ignores the order of the fields, the hidden class keeps it
+const fieldOrderOf = (reading: Reading): readonly string[][] =>
+  reading.map(entry => Object.keys(entry))
+
 type GridVariant = 'identical' | 'distinct'
 
 type GridSide = 'ancestor' | 'local' | 'other'
@@ -436,6 +440,28 @@ describe('identify', () => {
     })
   })
 
+  describe('given a key only local adds', () => {
+    it('then its entry holds the local value and no other side, fields in reading order', () => {
+      // Arrange
+      const sut = readingsOf
+
+      // Act
+      const [reading] = sut('A', 'A X', 'A')
+
+      // Assert
+      const added = reading[1]
+      expect(Object.keys(added)).toEqual([
+        'id',
+        'key',
+        'local',
+        'ancestorPos',
+        'localPos',
+        'otherPos',
+      ])
+      expect('other' in added).toBe(false)
+    })
+  })
+
   describe('given a key repeated on the ancestor and edited on one side', () => {
     it('then every pairing of its copies is a reading', () => {
       // Arrange
@@ -744,6 +770,7 @@ describe('identify', () => {
               // Assert
               expect(sut).toStrictEqual(expected)
               expect(sameValueReferences(sut, expected)).toBe(true)
+              expect(sut.map(fieldOrderOf)).toEqual(expected.map(fieldOrderOf))
             }
           )
         )

@@ -130,19 +130,24 @@ const stretchesOf = (groups: SlotsByKey): readonly Stretch[] => {
   return stretches
 }
 
-const toReading = (drafts: readonly Draft[]): Reading =>
-  drafts.map(
-    (draft, id): OrderedEntry => ({
-      id,
-      key: draft.key,
-      ...(draft.ancestor && { ancestor: draft.ancestor.value }),
-      ...(draft.local && { local: draft.local.value }),
-      ...(draft.other && { other: draft.other.value }),
-      ancestorPos: positionOf(draft.ancestor),
-      localPos: positionOf(draft.local),
-      otherPos: positionOf(draft.other),
-    })
-  )
+type EntryInTheMaking = {
+  -readonly [Field in keyof OrderedEntry]?: OrderedEntry[Field]
+}
+
+// The fields come in the order the reading always gave them, a side's value
+// only when the side holds the entry
+const entryOf = (draft: Draft, id: number): OrderedEntry => {
+  const entry: EntryInTheMaking = { id, key: draft.key }
+  if (draft.ancestor) entry.ancestor = draft.ancestor.value
+  if (draft.local) entry.local = draft.local.value
+  if (draft.other) entry.other = draft.other.value
+  entry.ancestorPos = positionOf(draft.ancestor)
+  entry.localPos = positionOf(draft.local)
+  entry.otherPos = positionOf(draft.other)
+  return entry as OrderedEntry
+}
+
+const toReading = (drafts: readonly Draft[]): Reading => drafts.map(entryOf)
 
 const valuesBothSidesHold = (
   local: JsonArray,
