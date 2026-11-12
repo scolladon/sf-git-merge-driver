@@ -6,6 +6,14 @@ import {
   type SideGroups,
 } from '../../../../src/merger/nodes/keyedReadings.js'
 import {
+  ABSENT_POSITION,
+  type LiveSide,
+  type OrderedEntry,
+  type Reading,
+} from '../../../../src/merger/nodes/ordered/orderedEntry.js'
+import type { JsonArray, JsonObject } from '../../../../src/types/jsonTypes.js'
+import { signatureOf } from '../../../../src/utils/jsonSignature.js'
+import {
   firstChoice,
   type Point,
   type PointSet,
@@ -14,15 +22,7 @@ import {
   type Tuple,
   tieComponents,
   walkAround,
-} from '../../../../src/merger/nodes/ordered/identityComponents.js'
-import {
-  ABSENT_POSITION,
-  type LiveSide,
-  type OrderedEntry,
-  type Reading,
-} from '../../../../src/merger/nodes/ordered/orderedEntry.js'
-import type { JsonArray, JsonObject } from '../../../../src/types/jsonTypes.js'
-import { signatureOf } from '../../../../src/utils/jsonSignature.js'
+} from './identityComponents.js'
 
 interface Slot {
   readonly pos: number

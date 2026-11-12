@@ -1,5 +1,5 @@
 import fc from 'fast-check'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   firstChoice,
   isTied,
@@ -16,6 +16,21 @@ import {
   LIVE_SIDES,
   type LiveSide,
 } from '../../../../../src/merger/nodes/ordered/orderedEntry.js'
+import {
+  tieComponents as referenceComponents,
+  isTied as referenceIsTied,
+} from '../../../../utils/oracles/draftIdentity/identityComponents.js'
+
+vi.mock(
+  '../../../../../src/merger/nodes/ordered/orderAxis.js',
+  async importOriginal => {
+    const original =
+      await importOriginal<
+        typeof import('../../../../../src/merger/nodes/ordered/orderAxis.js')
+      >()
+    return { ...original, lisLength: vi.fn(original.lisLength) }
+  }
+)
 
 // The whole walk: every component from its least tuple.
 const fewestMoves = (
@@ -881,6 +896,116 @@ describe('walkAround', () => {
           [1, 0, 0],
           [1, 0, 1],
         ])
+      })
+    })
+  })
+})
+
+describe('tieComponents over shared points arrays', () => {
+  // Alternative i takes local array i mod 2 and other array floor(i / 2) mod 2
+  // of its stretch: the pairings repeat across alternatives, as a repeated
+  // key's do.
+  const SHARED_ARRAYS_PER_SIDE = 2
+
+  const sharingSides = (alternatives: readonly PointSet[]): PointSet[] => {
+    const locals = alternatives.map(set => set('local'))
+    const others = alternatives.map(set => set('other'))
+    return alternatives.map((_, at) => {
+      const points = {
+        local: locals[at % SHARED_ARRAYS_PER_SIDE],
+        other:
+          others[
+            Math.floor(at / SHARED_ARRAYS_PER_SIDE) % SHARED_ARRAYS_PER_SIDE
+          ],
+      }
+      return side => points[side]
+    })
+  }
+
+  const freshCopies = (alternatives: readonly PointSet[]): PointSet[] =>
+    alternatives.map(set => side => [...set(side)])
+
+  describe('given stretches whose alternatives share points arrays per side', () => {
+    describe('when the components are built', () => {
+      it('then they equal the reference over fresh arrays', () => {
+        fc.assert(
+          fc.property(stretchesArb, stretches => {
+            // Arrange
+            const shared = stretches.map(sharingSides)
+            const reference = referenceComponents(shared.map(freshCopies))
+
+            // Act
+            const sut = tieComponents(shared)
+
+            // Assert
+            expect(sut).toStrictEqual(reference)
+            expect(sut.map(isTied)).toEqual(reference.map(referenceIsTied))
+          })
+        )
+      })
+    })
+  })
+
+  interface Counted {
+    readonly array: readonly Point[]
+    readonly traversals: { count: number }
+  }
+
+  // An array counting the passes that iterate it.
+  const counted = (pairs: readonly Pair[]): Counted => {
+    const points = [...pointsOf(pairs)]
+    const traversals = { count: 0 }
+    const iterate = points[Symbol.iterator].bind(points)
+    points[Symbol.iterator] = () => {
+      traversals.count++
+      return iterate()
+    }
+    return { array: points, traversals }
+  }
+
+  describe('given four alternatives handing one local array', () => {
+    describe('when the components are built', () => {
+      it('then the array is read once per layout pass and once for the cost', () => {
+        // Arrange
+        // Read by the spans of the local side, by the gaps of the stretch, and
+        // by the first tuple's local moves: the other tuples hand the same
+        // array, whose moves are known.
+        const READS = 3
+        const { array: local, traversals } = counted([
+          [0, 0],
+          [1, 1],
+        ])
+        const sut = [0, 1, 2, 3].map(at => {
+          const other = pointsOf([[at % 2, at]])
+          const points = { local, other }
+          return (side: LiveSide) => points[side]
+        })
+
+        // Act
+        tieComponents([sut])
+
+        // Assert
+        expect(traversals.count).toBe(READS)
+      })
+    })
+  })
+
+  describe('given two alternatives with points on both sides', () => {
+    describe('when the components are built', () => {
+      it('then each side measures its own gap only', () => {
+        // Arrange
+        // One gap per side; each tuple measures its local gap and its other
+        // gap once: two tuples, two measures each.
+        const MEASURES = 4
+        const sut = [
+          [alternative([[0, 0]], [[0, 1]]), alternative([[0, 1]], [[0, 0]])],
+        ]
+
+        // Act
+        tieComponents(sut)
+
+        // Assert
+        expect(lisLength).toHaveBeenCalledTimes(MEASURES)
       })
     })
   })

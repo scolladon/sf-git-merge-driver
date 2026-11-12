@@ -40,12 +40,23 @@ const grouped = <Item, Key>(
   return groups
 }
 
+function* unread(
+  points: readonly Point[],
+  read: Set<readonly Point[]>
+): Generator<Point> {
+  if (read.has(points)) return
+  read.add(points)
+  yield* points
+}
+
+// Alternatives that pair a side alike hand the same array: it is read once.
 function* pointsOn(
   stretches: readonly Alternatives[],
   side: LiveSide
 ): Generator<Point> {
+  const read = new Set<readonly Point[]>()
   for (const alternatives of stretches) {
-    for (const set of alternatives) yield* set(side)
+    for (const set of alternatives) yield* unread(set(side), read)
   }
 }
 
@@ -229,23 +240,88 @@ const movesIn = (points: readonly Point[]): number => {
   return sorted.length - lisLength(sorted.map(({ position }) => position))
 }
 
-const costOf =
-  (stretches: readonly Alternatives[], component: Component, layout: Layout) =>
-  (tuple: Tuple): number => {
-    const chosen = new Map<number, Point[]>()
-    component.members.forEach((member, at) => {
-      gather(chosen, stretches[member][tuple[at]], layout.labels)
-    })
-    return component.labels.reduce(
-      (total, label) =>
-        total +
-        movesIn([
-          ...(layout.fixedIn.get(label) ?? []),
-          ...(chosen.get(label) ?? []),
-        ]),
-      0
-    )
+const sideOf = (label: number): LiveSide => LIVE_SIDES[label % SIDE_COUNT]
+
+const pointsIn = (
+  layout: Layout,
+  byGap: ReadonlyMap<number, readonly Point[]>,
+  label: number
+): readonly Point[] => [
+  ...(layout.fixedIn.get(label) ?? []),
+  ...(byGap.get(label) ?? []),
+]
+
+// The moves the chosen points of one side add up to over the side's gaps.
+const movesOn = (
+  side: LiveSide,
+  labels: readonly number[],
+  layout: Layout,
+  chosen: readonly (readonly Point[])[]
+): number => {
+  const byGap = new Map<number, Point[]>()
+  for (const points of chosen) {
+    for (const point of points) {
+      addTo(byGap, labelIn(layout.labels, side, point), point)
+    }
   }
+  return labels.reduce(
+    (total, label) => total + movesIn(pointsIn(layout, byGap, label)),
+    0
+  )
+}
+
+type Cost = (tuple: Tuple) => number
+
+// The same points make the same moves: tuples handing an array already
+// counted reuse its count.
+const oncePerPoints = (
+  pointsOf: (tuple: Tuple) => readonly Point[],
+  count: (points: readonly Point[]) => number
+): Cost => {
+  const known = new WeakMap<readonly Point[], number>()
+  return tuple => {
+    const points = pointsOf(tuple)
+    const moves = known.get(points)
+    if (moves !== undefined) return moves
+    const counted = count(points)
+    known.set(points, counted)
+    return counted
+  }
+}
+
+// A gap belongs to one side, so a side's moves read that side's points only.
+// A component of one key is counted once per points array; the arrays of
+// several keys combine, so they are counted per tuple.
+const sideCostOf = (
+  stretches: readonly Alternatives[],
+  component: Component,
+  layout: Layout,
+  side: LiveSide
+): Cost => {
+  const labels = component.labels.filter(label => sideOf(label) === side)
+  const count = (chosen: readonly (readonly Point[])[]): number =>
+    movesOn(side, labels, layout, chosen)
+  const { members } = component
+  if (members.length !== 1) {
+    return tuple =>
+      count(members.map((member, at) => stretches[member][tuple[at]](side)))
+  }
+  const [lone] = members
+  return oncePerPoints(
+    tuple => stretches[lone][tuple[0]](side),
+    points => count([points])
+  )
+}
+
+const costOf = (
+  stretches: readonly Alternatives[],
+  component: Component,
+  layout: Layout
+): Cost => {
+  const local = sideCostOf(stretches, component, layout, 'local')
+  const other = sideCostOf(stretches, component, layout, 'other')
+  return tuple => local(tuple) + other(tuple)
+}
 
 const following = (tuple: Tuple, sizes: Tuple): Tuple | undefined => {
   const next = [...tuple]
