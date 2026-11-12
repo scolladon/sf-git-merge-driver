@@ -2,6 +2,7 @@ import type { MergeConfig } from '../../../types/conflictTypes.js'
 import { type MergeResult, noConflict } from '../../../types/mergeResult.js'
 import { jsonIdentical } from '../../../utils/jsonEqual.js'
 import { collapsibleKeys } from './collapsible.js'
+import { entryStatusesBy, rememberingKept } from './content.js'
 import { type GroupedTies, identityTies } from './identity.js'
 import { isTied } from './identityComponents.js'
 import { type MergedReading, mergeReading } from './mergeReading.js'
@@ -82,6 +83,7 @@ interface Tied {
   readonly wrap: WrapSides
   readonly ties: GroupedTies
   readonly merge: (reading: Reading) => MergedReading
+  readonly mergeAmongTies: (reading: Reading) => MergedReading
 }
 
 // A group has several readings only when a tied component holds an
@@ -98,25 +100,37 @@ const holdsCollapsible = (
 
 // Without a group of several readings the stream merges them all, with its
 // early exit
-const mergeTied = ({ sides, wrap, ties, merge }: Tied): MergeResult => {
+const mergeTied = (tied: Tied): MergeResult => {
+  const { sides, wrap, ties } = tied
   const collapsible = collapsibleKeys(sides)
   const grouped = holdsCollapsible(ties, collapsible)
-    ? mergeRepresentatives(wrap, ties.representatives(collapsible), merge)
+    ? mergeRepresentatives(wrap, ties.representatives(collapsible), tied.merge)
     : null
-  return grouped ?? mergeStream(wrap, ties.readings(), merge)
+  return grouped ?? mergeStream(wrap, ties.readings(), tied.mergeAmongTies)
 }
 
 // Two tied parts need two tied components: with fewer, the cuts are not even
 // looked for.
 const mergePartwiseOf = (
-  { sides, wrap, ties, merge }: Tied,
+  { sides, wrap, ties, mergeAmongTies }: Tied,
   tiedComponents: number
 ): MergeResult | null => {
   if (tiedComponents < FEWEST_TIED_PARTS) return null
   const parts = tiePartsOf(sides, ties)
   return parts.tied.length >= FEWEST_TIED_PARTS
-    ? mergePartwise({ wrapped: wrap(), ties, parts, merge })
+    ? mergePartwise({ wrapped: wrap(), ties, parts, merge: mergeAmongTies })
     : null
+}
+
+// The readings of one tie set pair most ancestor entries with the same
+// copies: they share the statuses they settle. A representative stands alone
+// in its group, so its merge keeps none.
+const amongTies = (
+  attribute: string,
+  config: MergeConfig
+): ((reading: Reading) => MergedReading) => {
+  const statusesOf = entryStatusesBy(rememberingKept())
+  return reading => mergeReading(reading, attribute, config, statusesOf)
 }
 
 const tiesOf = (sides: OrderedSides): GroupedTies =>
@@ -137,6 +151,7 @@ export const mergeOrderedArrays = (
   const tiedComponents = ties.components.filter(isTied).length
   // One reading: nothing to group or to split, the stream merges it once
   if (tiedComponents === 0) return mergeStream(wrap, ties.readings(), merge)
-  const tied = { sides, wrap, ties, merge }
+  const mergeAmongTies = amongTies(attribute, config)
+  const tied = { sides, wrap, ties, merge, mergeAmongTies }
   return mergePartwiseOf(tied, tiedComponents) ?? mergeTied(tied)
 }

@@ -29,6 +29,13 @@ export interface StatusInput {
   readonly mergeEntry: EntryMerger
 }
 
+export type KeptStatus = (
+  entry: Required<OrderedEntry>,
+  input: StatusInput
+) => EntryStatus
+
+export type StatusesOf = (input: StatusInput) => readonly EntryStatus[]
+
 const GONE: EntryStatus = { kind: 'gone' }
 export const PRESENCE_CONFLICT: EntryStatus = { kind: 'presenceConflict' }
 
@@ -42,11 +49,8 @@ const fromMerge = (result: MergeResult): EntryStatus =>
     ? { kind: 'contentConflict', output: result.output }
     : { kind: 'clean', output: result.output }
 
-const keptByAllStatus = (
-  entry: OrderedEntry,
-  input: StatusInput
-): EntryStatus => {
-  const { ancestor, local, other } = entry as Required<OrderedEntry>
+const keptByAllStatus: KeptStatus = (entry, input) => {
+  const { ancestor, local, other } = entry
   if (jsonIdentical(local, ancestor)) return clean(input.attribute, other)
   if (jsonIdentical(other, ancestor) || jsonIdentical(local, other)) {
     return clean(input.attribute, local)
@@ -77,12 +81,42 @@ const insertedStatus = (
   return fromMerge(input.mergeEntry(undefined, local, other))
 }
 
-const statusOf = (entry: OrderedEntry, input: StatusInput): EntryStatus => {
+const statusOf = (
+  entry: OrderedEntry,
+  input: StatusInput,
+  keptByAll: KeptStatus
+): EntryStatus => {
   if (entry.ancestor === undefined) return insertedStatus(entry, input)
   const liveSides = LIVE_SIDES.filter(side => isOn(entry, side)).length
-  if (liveSides === 2) return keptByAllStatus(entry, input)
+  if (liveSides === 2) return keptByAll(entry as Required<OrderedEntry>, input)
   return liveSides === 0 ? GONE : deletedBySideStatus(entry, input)
 }
 
-export const entryStatuses = (input: StatusInput): readonly EntryStatus[] =>
-  input.reading.map(entry => statusOf(entry, input))
+interface Settled {
+  readonly local: JsonObject
+  readonly other: JsonObject
+  readonly status: EntryStatus
+}
+
+// The tied readings of one merge pair an ancestor entry with the same two
+// copies but on the tied keys: its status is settled once, by ancestor place.
+export const rememberingKept = (): KeptStatus => {
+  const settled: (Settled | undefined)[] = []
+  return (entry, input) => {
+    const held = settled[entry.ancestorPos]
+    if (held?.local === entry.local && held.other === entry.other) {
+      return held.status
+    }
+    const status = keptByAllStatus(entry, input)
+    const { local, other } = entry
+    settled[entry.ancestorPos] = { local, other, status }
+    return status
+  }
+}
+
+export const entryStatusesBy =
+  (keptByAll: KeptStatus): StatusesOf =>
+  input =>
+    input.reading.map(entry => statusOf(entry, input, keptByAll))
+
+export const entryStatuses: StatusesOf = entryStatusesBy(keptByAllStatus)

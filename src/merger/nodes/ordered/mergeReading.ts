@@ -9,7 +9,12 @@ import { defaultNodeFactory } from '../MergeNodeFactory.js'
 import { type Ambiguity, withAgreedReplacements } from './agreedReplacement.js'
 import { buildBlocks, type OrderedBlock, type OrderedItem } from './blocks.js'
 import { type ConflictMarks, ConflictSeeds, NO_MARKS } from './conflictSeeds.js'
-import { type EntryMerger, type EntryStatus, entryStatuses } from './content.js'
+import {
+  type EntryMerger,
+  type EntryStatus,
+  entryStatuses,
+  type StatusesOf,
+} from './content.js'
 import { placeOneSided } from './oneSidedPlacement.js'
 import { everyEntry, possiblyMoved } from './orderAxis.js'
 import { buildOrderedContext, type OrderedContext } from './orderedContext.js'
@@ -115,13 +120,14 @@ const once = (count: () => number): (() => number) => {
 const settledStatuses = (
   reading: Reading,
   attribute: string,
-  config: MergeConfig
+  config: MergeConfig,
+  statusesOf: StatusesOf
 ): Ambiguity => {
   const movedOwn = {
     local: possiblyMoved(reading, 'local', everyEntry),
     other: possiblyMoved(reading, 'other', everyEntry),
   }
-  const statuses = entryStatuses({
+  const statuses = statusesOf({
     reading,
     movedOwn,
     attribute,
@@ -158,9 +164,10 @@ const placeEntries = (
 export const mergeReading = (
   reading: Reading,
   attribute: string,
-  config: MergeConfig
+  config: MergeConfig,
+  statusesOf: StatusesOf = entryStatuses
 ): MergedReading => {
-  const ambiguity = settledStatuses(reading, attribute, config)
+  const ambiguity = settledStatuses(reading, attribute, config, statusesOf)
   const { statuses } = ambiguity
   const ordering = orderingView(reading, statuses)
   const ctx = buildOrderedContext(reading, statuses, ordering)
