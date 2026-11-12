@@ -143,9 +143,10 @@ export const sweepScores = (
 }
 
 // Below this many kept entries other moved, correcting pair by pair costs
-// less than the two dominance sweeps. Measured on unique-key arrays of 50 to
-// 4 000 entries: from 128 the sweeps are never more than 5 % slower.
-const SCORE_SWEEP_FROM = 128
+// less than the two dominance sweeps. Measured on unique-key arrays of up to
+// 4 000 entries: at 64 the sweeps are up to 14 % slower, from 80 they are
+// never slower.
+const SCORE_SWEEP_FROM = 80
 
 const movedByOtherCount = (ctx: OrderedContext): number =>
   ctx.keptByAll.filter(entry => ctx.moved.other.has(entry.id)).length
