@@ -321,7 +321,7 @@ const fewestPhantomSwaps = (
 
 // No reading has fewer than zero swaps: once one has none, the readings with
 // none are exactly those fewestPhantomSwaps keeps, whatever comes later.
-class TieScan {
+export class TieScan {
   private readonly merged: MergedReading[] = []
   private first: JsonArray | undefined
   private differs = false

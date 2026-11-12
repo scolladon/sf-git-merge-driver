@@ -60,7 +60,6 @@ import {
 import {
   combineReadings,
   fewestPhantomSwaps,
-  TieScan,
   wholeConflict,
 } from '../../../../src/merger/nodes/ordered/tieCombination.js'
 import { tiePartsOf } from '../../../../src/merger/nodes/ordered/tieParts.js'
@@ -73,6 +72,7 @@ import {
 } from '../../../../src/types/mergeResult.js'
 import { pushAll } from '../../../../src/utils/arrayUtils.js'
 import { jsonIdentical } from '../../../../src/utils/jsonEqual.js'
+import { TieScan } from '../tieScanMerge.js'
 import { identityTies } from './identity.js'
 
 const wrapAll = (attribute: string, side: JsonArray): JsonArray =>

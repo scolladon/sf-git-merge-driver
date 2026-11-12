@@ -1,3 +1,4 @@
+import fc from 'fast-check'
 import { describe, expect, it, vi } from 'vitest'
 import { buildConflictMarkers } from '../../../../../src/merger/ConflictMarkerBuilder.js'
 import type { MergedReading } from '../../../../../src/merger/nodes/ordered/mergeReading.js'
@@ -16,6 +17,7 @@ import {
   noConflict,
   withConflict,
 } from '../../../../../src/types/mergeResult.js'
+import { TieScan as FullTieScan } from '../../../../utils/oracles/tieScanMerge.js'
 import { ORDERED_ATTRIBUTE, toEntry } from '../../../../utils/orderedTokens.js'
 
 // A spread passes one argument per reading and overflows the stack from about
@@ -121,6 +123,42 @@ const readingOf = (
   { hasConflict = false, swaps = 0 } = {}
 ) => ({ output, hasConflict, phantomSwaps: vi.fn(() => swaps) })
 
+// Readings compete from two on: a lone one is never measured.
+const FEWEST_COMPETING_READINGS = 2
+
+// Two swaps leave room for a reading beaten by one that is itself beaten.
+const MOST_SWAPS = 2
+
+// A tie set holds at least one reading; eight leave room for several lowerings
+// of the least count within one stream.
+const FEWEST_READINGS = 1
+const MOST_READINGS = 8
+
+const readingShape = fc.record({
+  swaps: fc.integer({ min: 0, max: MOST_SWAPS }),
+  hasConflict: fc.boolean(),
+  output: fc.constantFrom<JsonArray>(
+    [itemOf('A')],
+    [itemOf('B')],
+    [itemOf('A'), itemOf('B')]
+  ),
+})
+
+type ReadingShape = { swaps: number; hasConflict: boolean; output: JsonArray }
+
+// Each scan measures its own copies, so the call counts stay its own
+const readingsOf = (shapes: readonly ReadingShape[]) =>
+  shapes.map(({ output, ...shape }) => readingOf(output, shape))
+
+const flagsOf = (
+  scan: Pick<TieScan, 'add' | 'isWholeConflict'>,
+  readings: readonly MergedReading[]
+): readonly boolean[] =>
+  readings.map(reading => {
+    scan.add(reading)
+    return scan.isWholeConflict()
+  })
+
 describe('TieScan', () => {
   describe.each([
     [
@@ -180,7 +218,7 @@ describe('TieScan', () => {
 
         // Assert
         expect(sut.isWholeConflict()).toBe(expected)
-        expect(sut.readings()).toEqual(readings)
+        expect(sut.results()).toEqual(fewestPhantomSwaps(readings))
       })
     })
   })
@@ -198,6 +236,94 @@ describe('TieScan', () => {
         // Assert
         expect(lone.phantomSwaps).not.toHaveBeenCalled()
         expect(sut.isWholeConflict()).toBe(false)
+      })
+
+      it('then its result is kept without measuring its swaps', () => {
+        // Arrange
+        const lone = readingOf([itemOf('A')], { hasConflict: true })
+        const sut = new TieScan()
+        sut.add(lone)
+
+        // Act
+        const result = sut.results()
+
+        // Assert
+        expect(result).toStrictEqual([withConflict([itemOf('A')])])
+        expect(lone.phantomSwaps).not.toHaveBeenCalled()
+      })
+    })
+  })
+
+  describe('given readings with two, none and one swaps of distinct outputs', () => {
+    describe('when scanning them', () => {
+      it('then only the result of the reading without swaps is kept', () => {
+        // Arrange
+        const sut = new TieScan()
+        sut.add(readingOf([itemOf('A')], { swaps: 2 }))
+        sut.add(readingOf([itemOf('B')], { swaps: 0 }))
+        sut.add(readingOf([itemOf('C')], { swaps: 1 }))
+
+        // Act
+        const result = sut.results()
+
+        // Assert
+        expect(result).toStrictEqual([noConflict([itemOf('B')])])
+      })
+    })
+  })
+
+  describe('given two readings tied at one swap', () => {
+    describe('when scanning them', () => {
+      it('then both results are kept in order', () => {
+        // Arrange
+        const sut = new TieScan()
+        sut.add(readingOf([itemOf('A')], { swaps: 1 }))
+        sut.add(readingOf([itemOf('B')], { swaps: 1 }))
+
+        // Act
+        const result = sut.results()
+
+        // Assert
+        expect(result).toStrictEqual([
+          noConflict([itemOf('A')]),
+          noConflict([itemOf('B')]),
+        ])
+      })
+    })
+  })
+
+  describe('given any stream of merged readings', () => {
+    describe('when scanning it', () => {
+      it('then it flags and keeps what the scan of every reading does, measuring each once', () => {
+        fc.assert(
+          fc.property(
+            fc.array(readingShape, {
+              minLength: FEWEST_READINGS,
+              maxLength: MOST_READINGS,
+            }),
+            shapes => {
+              // Arrange
+              const readings = readingsOf(shapes)
+              const expectedFlags = flagsOf(
+                new FullTieScan(),
+                readingsOf(shapes)
+              )
+              const expected = fewestPhantomSwaps(readingsOf(shapes))
+              const sut = new TieScan()
+
+              // Act
+              const flags = flagsOf(sut, readings)
+
+              // Assert
+              expect(flags).toStrictEqual(expectedFlags)
+              expect(sut.results()).toEqual(expected)
+              for (const reading of readings)
+                expect(reading.phantomSwaps).toHaveBeenCalledTimes(
+                  readings.length >= FEWEST_COMPETING_READINGS ? 1 : 0
+                )
+            }
+          )
+        )
       })
     })
   })

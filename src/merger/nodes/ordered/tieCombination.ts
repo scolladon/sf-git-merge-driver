@@ -104,17 +104,25 @@ const FEWEST_COMPETING_READINGS = 2
 // No reading has fewer than zero swaps: once one has none, the readings with
 // none are exactly those fewestPhantomSwaps keeps, whatever comes later.
 export class TieScan {
-  private readonly merged: MergedReading[] = []
+  // The first reading, kept whole until a second one makes the swaps count
+  private lone: MergedReading | undefined
+  private count = 0
+  private least = Number.POSITIVE_INFINITY
+  private fewest: MergeResult[] = []
   private first: JsonArray | undefined
   private differs = false
   private conflicts = false
 
   add(reading: MergedReading): void {
-    this.merged.push(reading)
-    const count = this.merged.length
+    this.count++
+    if (this.count < FEWEST_COMPETING_READINGS) {
+      this.lone = reading
+      return
+    }
     // The second reading brings the first along
-    if (count === FEWEST_COMPETING_READINGS) this.see(this.merged[0])
-    if (count >= FEWEST_COMPETING_READINGS) this.see(reading)
+    if (this.lone !== undefined) this.measure(this.lone)
+    this.lone = undefined
+    this.measure(reading)
   }
 
   // combineReadings would build the block of the whole array, which reads the
@@ -123,12 +131,22 @@ export class TieScan {
     return this.differs && this.conflicts
   }
 
-  readings(): readonly MergedReading[] {
-    return this.merged
+  // The readings fewestPhantomSwaps would keep of all those added, in order
+  results(): readonly MergeResult[] {
+    return this.lone === undefined ? this.fewest : [asResult(this.lone)]
   }
 
-  private see(reading: MergedReading): void {
-    if (reading.phantomSwaps() !== 0) return
+  private measure(reading: MergedReading): void {
+    const swaps = reading.phantomSwaps()
+    if (swaps < this.least) {
+      this.least = swaps
+      this.fewest = []
+    }
+    if (swaps === this.least) this.fewest.push(asResult(reading))
+    if (swaps === 0) this.see(reading)
+  }
+
+  private see(reading: MergeResult): void {
     this.conflicts ||= reading.hasConflict
     if (this.first === undefined) this.first = reading.output
     else this.differs ||= !jsonIdentical(reading.output, this.first)

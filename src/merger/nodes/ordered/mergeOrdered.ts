@@ -53,7 +53,7 @@ const mergeStream = (
     scan.add(merge(reading))
     if (scan.isWholeConflict()) return wholeConflict(wrap())
   }
-  return combineReadings(wrap, fewestPhantomSwaps(scan.readings()))
+  return combineReadings(wrap, scan.results())
 }
 
 // One merge stands for its group because the merge treats the exchanged
