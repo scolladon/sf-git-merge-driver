@@ -264,3 +264,78 @@ describe('jsonIdenticalUpToAttributeOrder', () => {
     })
   })
 })
+
+describe('jsonEqual where a difference is read', () => {
+  describe.each([
+    ['lists differing in their first item only', ['a', 'b'], ['x', 'b']],
+    ['a list against a map holding a length', [], { length: 0 }],
+    ['a map against a list holding the same items', { 0: 'a' }, ['a']],
+    ['a leaf against a map below the root', { a: 1 }, { a: {} }],
+    ['a leaf against a map inside a list', [1], [{}]],
+    [
+      'lists of nested lists differing in their last leaf',
+      [
+        [['a'], ['b']],
+        [['c'], ['d']],
+      ],
+      [
+        [['a'], ['b']],
+        [['c'], ['e']],
+      ],
+    ],
+  ])('given %s', (_, left, right) => {
+    describe('when compared', () => {
+      it('then they are not equal', () => {
+        // Arrange
+        const sut = jsonEqual
+
+        // Act
+        const result = sut(left, right)
+
+        // Assert
+        expect(result).toBe(false)
+      })
+    })
+  })
+
+  describe('given nested maps holding the same members in another order', () => {
+    describe('when compared with and without key order', () => {
+      it('then they are equal but not identical', () => {
+        // Arrange
+        const left = { outer: [{ a: '1', b: { c: '2', d: '3' } }] }
+        const right = { outer: [{ b: { d: '3', c: '2' }, a: '1' }] }
+        const sut = [jsonEqual, jsonIdentical]
+
+        // Act
+        const result = sut.map(equality => equality(left, right))
+
+        // Assert
+        expect(result).toEqual([true, false])
+      })
+    })
+  })
+
+  describe('given lists of entries differing in their first entry', () => {
+    describe('when compared', () => {
+      it('then no later entry is read', () => {
+        // Arrange
+        let reads = 0
+        const counted = () => ({
+          get field() {
+            reads++
+            return 'B'
+          },
+        })
+        const left = [{ field: 'A', editable: 'true' }, counted(), counted()]
+        const right = [{ field: 'A', editable: 'false' }, counted(), counted()]
+        const sut = jsonEqual
+
+        // Act
+        const result = sut(left, right)
+
+        // Assert
+        expect({ result, reads }).toEqual({ result: false, reads: 0 })
+      })
+    })
+  })
+})
