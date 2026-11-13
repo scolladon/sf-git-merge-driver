@@ -600,15 +600,8 @@ const writeRepeats = (
   }
 }
 
-// After a child element the close tag starts a line of its own
-const closeBody = (st: WalkState, name: string, parentDepth: number): void => {
-  append(
-    st,
-    st.endedWithGt ? `${getIndent(parentDepth)}</${name}>` : `</${name}>`
-  )
-  st.depth = parentDepth
-}
-
+// Every child written here is an element, a leaf or a conflict block, and
+// each ends its line: the close tag always starts a line of its own.
 const writeElementsOnly = (
   st: WalkState,
   name: string,
@@ -624,7 +617,8 @@ const writeElementsOnly = (
   for (let i = 0; i < keys.length; i++) {
     writeRepeats(st, keys[i]!, body[keys[i]!] as JsonValue, markers)
   }
-  closeBody(st, name, parentDepth)
+  append(st, `${getIndent(parentDepth)}</${name}>`)
+  st.depth = parentDepth
   st.endedWithGt = true
 }
 
@@ -638,7 +632,11 @@ const writeBody = (
   st.depth = parentDepth + 1
   st.endedWithGt = false
   writeChildren(st, children, markers)
-  closeBody(st, name, parentDepth)
+  append(
+    st,
+    st.endedWithGt ? `${getIndent(parentDepth)}</${name}>` : `</${name}>`
+  )
+  st.depth = parentDepth
 }
 
 // `<name>text</name>`: the text follows the opening on its line and the close
