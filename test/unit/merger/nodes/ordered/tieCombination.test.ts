@@ -254,6 +254,21 @@ describe('TieScan', () => {
     })
   })
 
+  describe('given no reading', () => {
+    describe('when reading the results', () => {
+      it('then none is kept', () => {
+        // Arrange
+        const sut = new TieScan()
+
+        // Act
+        const result = sut.results()
+
+        // Assert
+        expect(result).toStrictEqual([])
+      })
+    })
+  })
+
   describe('given readings with two, none and one swaps of distinct outputs', () => {
     describe('when scanning them', () => {
       it('then only the result of the reading without swaps is kept', () => {

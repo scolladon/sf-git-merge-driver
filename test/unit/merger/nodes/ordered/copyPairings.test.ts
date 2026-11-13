@@ -1,9 +1,10 @@
 import fc from 'fast-check'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   type KeyCopies,
   type Pairing,
   readings,
+  surplusMatchings,
 } from '../../../../../src/merger/nodes/keyedReadings.js'
 import {
   type Draft,
@@ -14,6 +15,17 @@ import {
   type Slots,
 } from '../../../../../src/merger/nodes/ordered/copyPairings.js'
 import type { JsonObject } from '../../../../../src/types/jsonTypes.js'
+
+vi.mock(
+  '../../../../../src/merger/nodes/keyedReadings.js',
+  async importOriginal => {
+    const original =
+      await importOriginal<
+        typeof import('../../../../../src/merger/nodes/keyedReadings.js')
+      >()
+    return { ...original, surplusMatchings: vi.fn(original.surplusMatchings) }
+  }
+)
 
 const KEY = 'a'
 
@@ -144,6 +156,26 @@ describe('pairedCopiesOf', () => {
 
         // Assert
         expect(second).toBe(first)
+      })
+    })
+  })
+
+  describe.each([
+    ['local', copiesOf([''], [''], ['', 'apart'])],
+    ['other', copiesOf([''], ['', 'edited'], [''])],
+  ])('given %s pairing every copy it holds', (_side, copies) => {
+    describe('when pairing the copies', () => {
+      it('then no surplus matching is enumerated', () => {
+        // Arrange
+        vi.mocked(surplusMatchings).mockClear()
+
+        const sut = pairedCopiesOf
+
+        // Act
+        sut(KEY, slotsOf(copies))
+
+        // Assert
+        expect(surplusMatchings).not.toHaveBeenCalled()
       })
     })
   })
