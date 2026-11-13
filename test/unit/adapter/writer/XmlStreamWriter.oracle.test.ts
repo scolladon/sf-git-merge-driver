@@ -581,6 +581,22 @@ describe('XmlStreamWriter against the wrapper walk', () => {
           '<a>\n    <b>v1\n   \nv2</b>\n<<<<<<< ours\n    <c>L</c>\n||||||| base\n=======\n    <c>O</c>\n>>>>>>> theirs\n</a>'
         ),
       ],
+      // After a sibling's `>`, a body opening on a conflict block still puts
+      // its first marker right under the opening tag
+      [
+        { Root: { x: 'y', a: { b: block } } },
+        false,
+        documentOf(
+          '<Root>\n    <x>y</x>\n    <a>\n<<<<<<< ours\n        <c>L</c>\n        ||||||| base\n=======\n        <c>O</c>\n        >>>>>>> theirs\n    </a>\n</Root>'
+        ),
+      ],
+      [
+        { Root: { x: 'y', a: { b: block } } },
+        true,
+        documentOf(
+          '<Root>\n    <x>y</x>\n    <a>\n<<<<<<< ours\n        <c>L</c>\n||||||| base\n=======\n        <c>O</c>\n>>>>>>> theirs\n    </a>\n</Root>'
+        ),
+      ],
     ])(
       'when %j is written with conflict flag %s then it reads as the reference',
       async (tree, hasConflict, expected) => {

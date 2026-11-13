@@ -558,6 +558,76 @@ const writeOpening = (
   appendValue(st, opening, indent.length)
 }
 
+const AT_SIGN = 64
+const HASH = 35
+const UNDERSCORE = 95
+
+// Neither an attribute (`@_`), nor text, comment or CDATA (`#text`,
+// `#xml__comment`, `__cdata`), nor the conflict flag (`__conflict`).
+const isElementKey = (key: string): boolean => {
+  const first = key.charCodeAt(0)
+  return first !== AT_SIGN && first !== HASH && first !== UNDERSCORE
+}
+
+const isEmptyRepeat = (value: JsonValue | undefined): boolean =>
+  Array.isArray(value) && value.length === 0
+
+// The keys of a body that holds child elements only, at least one of which
+// is written; undefined for every other body, which takes the general walk.
+const elementKeysOf = (body: JsonValue): readonly string[] | undefined => {
+  if (!isObject(body)) return undefined
+  const keys = Object.keys(body)
+  let written = false
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i]!
+    if (!isElementKey(key)) return undefined
+    written = written || !isEmptyRepeat(body[key])
+  }
+  return written ? keys : undefined
+}
+
+const writeRepeats = (
+  st: WalkState,
+  tagName: string,
+  value: JsonValue,
+  markers: ConflictMarkers
+): void => {
+  if (!Array.isArray(value)) {
+    return writeElement(st, tagName, value, NO_ROOT, markers)
+  }
+  for (let i = 0; i < value.length; i++) {
+    writeElement(st, tagName, value[i] as JsonValue, NO_ROOT, markers)
+  }
+}
+
+// After a child element the close tag starts a line of its own
+const closeBody = (st: WalkState, name: string, parentDepth: number): void => {
+  append(
+    st,
+    st.endedWithGt ? `${getIndent(parentDepth)}</${name}>` : `</${name}>`
+  )
+  st.depth = parentDepth
+}
+
+const writeElementsOnly = (
+  st: WalkState,
+  name: string,
+  body: JsonObject,
+  keys: readonly string[],
+  slot: RootSlot,
+  markers: ConflictMarkers
+): void => {
+  writeOpening(st, name, slot, markers, EMPTY_ATTRS, START_TAG_END)
+  const parentDepth = st.depth
+  st.depth = parentDepth + 1
+  st.endedWithGt = false
+  for (let i = 0; i < keys.length; i++) {
+    writeRepeats(st, keys[i]!, body[keys[i]!] as JsonValue, markers)
+  }
+  closeBody(st, name, parentDepth)
+  st.endedWithGt = true
+}
+
 const writeBody = (
   st: WalkState,
   name: string,
@@ -568,11 +638,7 @@ const writeBody = (
   st.depth = parentDepth + 1
   st.endedWithGt = false
   writeChildren(st, children, markers)
-  append(
-    st,
-    st.endedWithGt ? `${getIndent(parentDepth)}</${name}>` : `</${name}>`
-  )
-  st.depth = parentDepth
+  closeBody(st, name, parentDepth)
 }
 
 const writeElement = (
@@ -584,7 +650,20 @@ const writeElement = (
 ): void => {
   if (CONTENT_NAMES.has(name)) return writeContent(st, name, body, markers)
   if (isConflictBlock(body)) return writeConflict(st, body, markers)
+  const keys = elementKeysOf(body)
+  if (keys !== undefined) {
+    return writeElementsOnly(st, name, body as JsonObject, keys, slot, markers)
+  }
+  writeGeneralElement(st, name, body, slot, markers)
+}
 
+const writeGeneralElement = (
+  st: WalkState,
+  name: string,
+  body: JsonValue,
+  slot: RootSlot,
+  markers: ConflictMarkers
+): void => {
   const { attrs: sourceAttrs, children } = splitAttrsAndChildren(body)
   const attrs = attributesOf(st, markers, sourceAttrs)
   // Empty elements self-close (`<tag/>`): `sf project retrieve` never emits
