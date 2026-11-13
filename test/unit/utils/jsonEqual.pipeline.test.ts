@@ -140,33 +140,17 @@ const pairArb: fc.Arbitrary<Pair> = fc.oneof(
   valuePairArb
 )
 
+const PAIR_FAMILIES: readonly (readonly [string, fc.Arbitrary<Pair>])[] = [
+  ['two values', pairArb],
+  ['a leaf, a map or a list against another at the same place', kindPairArb],
+]
+
 describe('jsonEqual', () => {
-  describe('given two values', () => {
+  describe.each(PAIR_FAMILIES)('given %s', (_name, pairs) => {
     describe('when compared in either order', () => {
       it('then each of the three equalities answers as the pair-stack walk', () => {
         fc.assert(
-          fc.property(pairArb, ([left, right]) => {
-            for (const [sut, oracle] of EQUALITIES) {
-              // Arrange
-              const expected = [oracle(left, right), oracle(right, left)]
-
-              // Act
-              const result = [sut(left, right), sut(right, left)]
-
-              // Assert
-              expect(result).toEqual(expected)
-            }
-          })
-        )
-      })
-    })
-  })
-
-  describe('given a leaf, a map or a list against another at the same place', () => {
-    describe('when compared in either order', () => {
-      it('then each of the three equalities answers as the pair-stack walk', () => {
-        fc.assert(
-          fc.property(kindPairArb, ([left, right]) => {
+          fc.property(pairs, ([left, right]) => {
             for (const [sut, oracle] of EQUALITIES) {
               // Arrange
               const expected = [oracle(left, right), oracle(right, left)]
