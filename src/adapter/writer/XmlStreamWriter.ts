@@ -817,6 +817,20 @@ const getIndent = (depth: number): string => {
   return cached
 }
 
+const SPACE_CODE = 32
+const TAB_CODE = 9
+const LINE_FEED = '\n'
+// The document's last line: writeTo appends the trailing newline itself
+const NO_LINE_END = ''
+
+// Index of the first character that is neither a space nor a tab.
+const indentEndOf = (line: string): number => {
+  let at = 0
+  let code = line.charCodeAt(0)
+  while (code === SPACE_CODE || code === TAB_CODE) code = line.charCodeAt(++at)
+  return at
+}
+
 // Design §6.3.3 line-state machine: strip horizontal whitespace before
 // a marker on the same line (pass 1), drop whitespace-only lines
 // (pass 2), but never a line of a value. Newline belongs to the line it
@@ -847,17 +861,15 @@ class ConflictLineFilter {
     // previous "no-newline fast path" went dead once the per-chunk
     // generator pipeline was replaced by buffered serialization.
     const out: string[] = []
-    let working = chunk
-    while (true) {
-      const nl = working.indexOf('\n')
-      if (nl < 0) {
-        this.buf += working
-        break
-      }
-      this.buf += working.slice(0, nl)
-      this.flushLine(out, true)
-      working = working.slice(nl + 1)
+    let from = 0
+    let nl = chunk.indexOf('\n')
+    while (nl >= 0) {
+      this.buf += chunk.slice(from, nl)
+      this.flushLine(out, LINE_FEED)
+      from = nl + 1
+      nl = chunk.indexOf('\n', from)
     }
+    this.buf += chunk.slice(from)
     return out.join('')
   }
 
@@ -867,7 +879,7 @@ class ConflictLineFilter {
     // carries residual content. flushLine is a no-op when buf is
     // empty (blank-line branch drops it), so this stays correct.
     const out: string[] = []
-    this.flushLine(out, false)
+    this.flushLine(out, NO_LINE_END)
     return out.join('')
   }
 
@@ -885,24 +897,35 @@ class ConflictLineFilter {
     return range !== undefined && range[0] <= lineStart
   }
 
-  private flushLine(out: string[], withNewline: boolean): void {
-    let line = this.buf
+  // Pass 1: strip horizontal whitespace directly before a marker on
+  // this line. Mirrors ConflictMarkerFormatter.indentRegex semantics, whose
+  // `.` refuses a line holding \r, U+2028 or U+2029 after the marker.
+  private withoutMarkerIndent(line: string, indentEnd: number): string {
+    if (indentEnd === 0 || !this.startsWithMarkerAt(line, indentEnd)) {
+      return line
+    }
+    const leadingWs = /^([ \t]+)(.*)$/.exec(line)
+    return leadingWs === null ? line : leadingWs[2]!
+  }
+
+  private startsWithMarkerAt(line: string, at: number): boolean {
+    for (let i = 0; i < this.markers.length; i++) {
+      if (line.startsWith(this.markers[i]!, at)) return true
+    }
+    return false
+  }
+
+  private flushLine(out: string[], lineEnd: string): void {
+    const line = this.buf
     this.skipValuesBefore(this.lineStart)
     const isValueLine = this.isInValue(this.lineStart)
     this.lineStart += line.length + 1
     this.buf = ''
-    // Pass 1: strip horizontal whitespace directly before a marker on
-    // this line. Mirrors ConflictMarkerFormatter.indentRegex semantics.
-    const leadingWs = /^([ \t]+)(.*)$/.exec(line)
-    if (
-      leadingWs !== null &&
-      this.markers.some(m => leadingWs[2]!.startsWith(m))
-    ) {
-      line = leadingWs[2]!
-    }
-    // Pass 2: drop whitespace-only lines (including their '\n').
-    if (!isValueLine && /^[ \t]*$/.test(line)) return
-    out.push(withNewline ? `${line}\n` : line)
+    const indentEnd = indentEndOf(line)
+    // Pass 2: drop whitespace-only lines (including their '\n'), save a line
+    // of a value; a line pass 1 would rewrite starts with a marker, never blank
+    if (!isValueLine && indentEnd === line.length) return
+    out.push(`${this.withoutMarkerIndent(line, indentEnd)}${lineEnd}`)
   }
 }
 
