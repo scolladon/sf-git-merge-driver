@@ -641,6 +641,22 @@ const writeBody = (
   closeBody(st, name, parentDepth)
 }
 
+// `<name>text</name>`: the text follows the opening on its line and the close
+// follows the text, as the general walk writes a lone text child.
+const writeLeaf = (
+  st: WalkState,
+  name: string,
+  text: string,
+  slot: RootSlot,
+  markers: ConflictMarkers
+): void => {
+  writeOpening(st, name, slot, markers, EMPTY_ATTRS, START_TAG_END)
+  st.endedWithGt = false
+  writeText(st, contentOf(st, markers, text))
+  append(st, `</${name}>`)
+  st.endedWithGt = true
+}
+
 const writeElement = (
   st: WalkState,
   name: string,
@@ -649,6 +665,9 @@ const writeElement = (
   markers: ConflictMarkers
 ): void => {
   if (CONTENT_NAMES.has(name)) return writeContent(st, name, body, markers)
+  if (typeof body === 'string' && body !== '') {
+    return writeLeaf(st, name, body, slot, markers)
+  }
   if (isConflictBlock(body)) return writeConflict(st, body, markers)
   const keys = elementKeysOf(body)
   if (keys !== undefined) {
