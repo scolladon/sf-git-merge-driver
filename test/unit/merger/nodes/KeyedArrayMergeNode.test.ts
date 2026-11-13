@@ -1715,7 +1715,7 @@ describe('KeyedArrayMergeNode', () => {
 
   describe('given an unordered keyed array dispatched by key', () => {
     describe('when no side repeats a key', () => {
-      it('then the keys merge without enumerating readings', () => {
+      it('then each key takes the one change made to it', () => {
         // Arrange
         const sut = keyedNode('A:f B:f', 'A:t B:f', 'A:f B:t C:f')
 
@@ -1725,6 +1725,19 @@ describe('KeyedArrayMergeNode', () => {
         // Assert
         expect(result.hasConflict).toBe(false)
         expect(tokens(result.output)).toBe('A:t,B:t,C:f')
+      })
+    })
+
+    describe('when the sides add one copy of a key each, with different content', () => {
+      it('then the key conflicts without enumerating readings', () => {
+        // Arrange
+        const sut = keyedNode('', 'A:t', 'A:f')
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result.hasConflict).toBe(true)
         expect(readings).not.toHaveBeenCalled()
       })
     })

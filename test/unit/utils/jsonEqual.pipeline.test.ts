@@ -117,6 +117,20 @@ const valuePairArb: fc.Arbitrary<Pair> = valueArb.chain(left =>
   )
 )
 
+const emptyNodeArb = fc.constantFrom<unknown>({}, [], Object.create(null))
+const anyKindArb = fc.oneof(leafArb, emptyNodeArb)
+
+// A value of one kind against a value of another at the same place: the
+// generated documents almost never set a leaf against a node, or a map
+// against a list
+const kindPairArb: fc.Arbitrary<Pair> = fc
+  .tuple(anyKindArb, anyKindArb, fc.constantFrom('root', 'member', 'item'))
+  .map(([left, right, place]): Pair => {
+    if (place === 'root') return [left, right]
+    if (place === 'member') return [{ field: left }, { field: right }]
+    return [[left], [right]]
+  })
+
 const pairArb: fc.Arbitrary<Pair> = fc.oneof(
   ...SPECS.map(spec => fc.tuple(sideArb(spec), sideArb(spec))),
   ...SPECS.map(spec => sidesArb(spec).chain(pairOfSides)),
@@ -132,6 +146,27 @@ describe('jsonEqual', () => {
       it('then each of the three equalities answers as the pair-stack walk', () => {
         fc.assert(
           fc.property(pairArb, ([left, right]) => {
+            for (const [sut, oracle] of EQUALITIES) {
+              // Arrange
+              const expected = [oracle(left, right), oracle(right, left)]
+
+              // Act
+              const result = [sut(left, right), sut(right, left)]
+
+              // Assert
+              expect(result).toEqual(expected)
+            }
+          })
+        )
+      })
+    })
+  })
+
+  describe('given a leaf, a map or a list against another at the same place', () => {
+    describe('when compared in either order', () => {
+      it('then each of the three equalities answers as the pair-stack walk', () => {
+        fc.assert(
+          fc.property(kindPairArb, ([left, right]) => {
             for (const [sut, oracle] of EQUALITIES) {
               // Arrange
               const expected = [oracle(left, right), oracle(right, left)]

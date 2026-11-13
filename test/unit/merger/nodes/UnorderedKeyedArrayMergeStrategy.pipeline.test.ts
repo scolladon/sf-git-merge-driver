@@ -18,7 +18,13 @@ import {
   groupByKey as listGroupByKey,
 } from '../../../utils/oracles/listGroupedUnorderedMerge.js'
 import { defaultConfig } from '../../../utils/testConfig.js'
-import { dupSidesArb, keyed, sidesArb } from '../laws/arbitraries.js'
+import {
+  dupSidesArb,
+  KEYS,
+  keyed,
+  type Side,
+  sidesArb,
+} from '../laws/arbitraries.js'
 
 type Sides = readonly [JsonArray, JsonArray, JsonArray]
 
@@ -34,8 +40,30 @@ const keysOf = ([ancestor, local, other]: Sides): KeyedSides | undefined => {
   return a && l && o ? { ancestor: a, local: l, other: o } : undefined
 }
 
+const MOST_COPIES = 3
+const MOST_REPEATED_KEYS = 2
+
+// A key held up to three times on a side: the shared arbitraries stop at two
+// copies, and the third is the first a list of two does not hold
+const repeatingSideArb: fc.Arbitrary<Side> = fc
+  .shuffledSubarray(KEYS, { maxLength: MOST_REPEATED_KEYS })
+  .chain(keys =>
+    fc.tuple(
+      ...keys.map(key =>
+        fc.array(keyed.entry(key), { minLength: 1, maxLength: MOST_COPIES })
+      )
+    )
+  )
+  .map(copies => copies.flat())
+
+const repeatingSidesArb = fc.tuple(
+  repeatingSideArb,
+  repeatingSideArb,
+  repeatingSideArb
+)
+
 const keyedCases = fc
-  .oneof(sidesArb(keyed), dupSidesArb(keyed))
+  .oneof(sidesArb(keyed), dupSidesArb(keyed), repeatingSidesArb)
   .map(sides => sides as Sides)
   .map(sides => ({ sides, keys: keysOf(sides) }))
   .filter(

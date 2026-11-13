@@ -12,6 +12,7 @@ import {
   type GroupedTies,
   identityTies,
 } from '../../../../../src/merger/nodes/ordered/identity.js'
+import { isTied } from '../../../../../src/merger/nodes/ordered/identityComponents.js'
 import { mergeOrderedArrays } from '../../../../../src/merger/nodes/ordered/mergeOrdered.js'
 import {
   ABSENT_POSITION,
@@ -1488,7 +1489,7 @@ describe('identityTies', () => {
     'given the %s layout at r = %i, m = %i',
     (shape, copies, gadgets) => {
       describe('when building the tie set', () => {
-        it('then it equals the draft-built tie set', () => {
+        it('then it equals the draft-built tie set: one tied component per gadget, r to the power m readings', () => {
           // Arrange
           const sides = layoutSides(shape, copies, gadgets)
           const expected = draftTiesOver(sides)
@@ -1498,6 +1499,8 @@ describe('identityTies', () => {
 
           // Assert
           expectSameTies(sut, expected, collapsibleKeys(sides))
+          expect(sut.components.filter(isTied)).toHaveLength(gadgets)
+          expect([...sut.readings()]).toHaveLength(copies ** gadgets)
         })
       })
     }
@@ -1515,8 +1518,15 @@ describe('identityTies', () => {
         const sut = tiesOver(sides)
 
         // Assert
+        const shapes = [...sut.readings()].map(shapeOf)
         expectSameTies(sut, expected, collapsibleKeys(sides))
-        expect([...sut.readings()]).toHaveLength(16)
+        expect(shapes).toHaveLength(16)
+        expect(shapes[0]).toBe(
+          'Ua@0,0,0 A@1,1,1 A@2,2,2 A@3,3,3 A@4,-,- Ub@5,4,4'
+        )
+        expect(shapes[15]).toBe(
+          'Ua@0,0,0 A@1,-,- A@2,1,1 A@3,2,2 A@4,3,3 Ub@5,4,4'
+        )
       })
     })
 
