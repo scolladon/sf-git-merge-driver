@@ -35,6 +35,24 @@ describe('lexOpenTag', () => {
     })
   })
 
+  describe('given two tags with no attribute', () => {
+    it('when lexOpenTag then both share one frozen attrs bag with no prototype', () => {
+      // Arrange
+      const first = lexOpenTag('<b>', 0)
+
+      // Act
+      const sut = lexOpenTag('<c>', 0)
+
+      // Assert
+      if (first.kind !== 'tag' || sut.kind !== 'tag') {
+        throw new Error('expected two tags')
+      }
+      expect(sut.attrs).toBe(first.attrs)
+      expect(Object.isFrozen(first.attrs)).toBe(true)
+      expect(Object.getPrototypeOf(first.attrs)).toBeNull()
+    })
+  })
+
   describe('given a self-closing tag with no attributes', () => {
     it('when lexOpenTag then selfClosing is true', () => {
       // Arrange
