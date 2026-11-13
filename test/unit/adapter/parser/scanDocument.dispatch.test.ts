@@ -46,41 +46,41 @@ describe('scanDocument dispatch', () => {
   describe('given two text leaves under the root', () => {
     it('when scanned then only the sentinel and root frames are built', () => {
       // Arrange
-      const sut = '<a><b>x</b><c>y</c></a>'
+      const xml = '<a><b>x</b><c>y</c></a>'
 
       // Act
-      const result = framesBuiltBy(sut)
+      const sut = framesBuiltBy(xml)
 
       // Assert
-      expect(result.frames).toBe(2)
-      expect(result.outcome).toEqual(parsedContent({ a: { b: 'x', c: 'y' } }))
+      expect(sut.frames).toBe(2)
+      expect(sut.outcome).toEqual(parsedContent({ a: { b: 'x', c: 'y' } }))
     })
   })
 
   describe('given a text leaf with an attribute under the root', () => {
     it('when scanned then the leaf keeps its frame', () => {
       // Arrange
-      const sut = '<a><b x="1">x</b></a>'
+      const xml = '<a><b x="1">x</b></a>'
 
       // Act
-      const result = framesBuiltBy(sut)
+      const sut = framesBuiltBy(xml)
 
       // Assert
-      expect(result.frames).toBe(3)
+      expect(sut.frames).toBe(3)
     })
   })
 
   describe('given text followed by an open tag whose name ends with the element name', () => {
     it('when scanned then the element keeps its frame', () => {
       // Arrange
-      const sut = '<a><b>x<cb>y</cb></b></a>'
+      const xml = '<a><b>x<cb>y</cb></b></a>'
 
       // Act
-      const result = framesBuiltBy(sut)
+      const sut = framesBuiltBy(xml)
 
       // Assert
-      expect(result.frames).toBe(3)
-      expect(result.outcome).toEqual(
+      expect(sut.frames).toBe(3)
+      expect(sut.outcome).toEqual(
         parsedContent({ a: { b: { cb: 'y', '#text': 'x' } } })
       )
     })
@@ -89,14 +89,14 @@ describe('scanDocument dispatch', () => {
   describe('given a root that holds only text', () => {
     it('when scanned then the root keeps its frame', () => {
       // Arrange
-      const sut = '<a>x</a>'
+      const xml = '<a>x</a>'
 
       // Act
-      const result = framesBuiltBy(sut)
+      const sut = framesBuiltBy(xml)
 
       // Assert
-      expect(result.frames).toBe(2)
-      expect(result.outcome).toEqual(parsedContent({ a: 'x' }))
+      expect(sut.frames).toBe(2)
+      expect(sut.outcome).toEqual(parsedContent({ a: 'x' }))
     })
   })
 })

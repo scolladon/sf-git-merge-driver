@@ -109,7 +109,12 @@ const OPENING_ATTRIBUTES: readonly JsonObject[] = [
   { '@_x': 'v\nw' },
 ]
 const OPENING_BODIES: readonly JsonValue[] = ['x', '', { c: 'y' }]
-const OPENING_ROOT_ATTRIBUTES: JsonObject = { '@_xmlns': 'u' }
+// The second line of `a` reads as a marker: under the conflict flag the root
+// slot's attributes are escaped like any value
+const OPENING_ROOT_ATTRIBUTES: JsonObject = {
+  '@_xmlns': 'u',
+  '@_a': 'x\n=======',
+}
 const CONTESTED_ROOT = {
   local: { '@_xmlns': 'u' },
   ancestor: { '@_xmlns': 'v' },
@@ -119,7 +124,9 @@ const CONTESTED_ROOT = {
 // A carriage return or a line separator after the marker keeps the indent
 // regex from matching the rest of its line
 const LINE_TAGS = ['base', 'base\r', 'base ', 'base\u2028']
-const LINE_TEXTS = ['v1\n   \nv2', '\t\n', 'x']
+// The last text is the word a marker read past the end of the marker list
+// would match: a line starting with it must keep its indent
+const LINE_TEXTS = ['v1\n   \nv2', '\t\n', 'x', 'undefined']
 const LINE_NAMES = ['b\n\t<<<<<<< q', 'b\n  ', 'b']
 
 // The filter reads the document in 16 KiB windows: padding of about that
@@ -596,6 +603,12 @@ describe('XmlStreamWriter against the wrapper walk', () => {
         documentOf(
           '<Root>\n    <x>y</x>\n    <a>\n<<<<<<< ours\n        <c>L</c>\n||||||| base\n=======\n        <c>O</c>\n>>>>>>> theirs\n    </a>\n</Root>'
         ),
+      ],
+      // An indented line starting with the word `undefined` is no marker line
+      [
+        { Root: [{ b: 'x' }, 'undefined'] },
+        true,
+        documentOf('<Root>\n    <b>x</b>\n    undefined</Root>'),
       ],
     ])(
       'when %j is written with conflict flag %s then it reads as the reference',
