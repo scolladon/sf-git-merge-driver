@@ -1,4 +1,14 @@
+import { Writable } from 'node:stream'
 import fc from 'fast-check'
+import type {
+  WriteOptions,
+  XmlSerializer,
+} from '../../src/adapter/XmlSerializer.js'
+import type {
+  JsonArray,
+  JsonObject,
+  JsonValue,
+} from '../../src/types/jsonTypes.js'
 import { PARSER_BEHAVIOUR_CHANGES } from './parserBehaviourChanges.js'
 import { listParityInputs, type ParityParser } from './parserParity.js'
 
@@ -242,3 +252,237 @@ export const parseSeeds = (): readonly string[] => {
     .filter(xml => xml.length < SEED_SIZE_LIMIT)
   return edges.map(xmlOfRow).concat(behaviourChanges, smallFiles, HAND_SHAPES)
 }
+
+// The sink keeps every chunk apart: how the writer cuts its output is part of
+// what it does
+const chunkSinkOf = (chunks: string[]): Writable =>
+  new Writable({
+    decodeStrings: false,
+    write: (chunk: string, _encoding, callback) => {
+      chunks.push(String(chunk))
+      callback()
+    },
+  })
+
+// The chunks a writer hands its sink, in order, or the class and message of
+// the error it throws
+export const writeOutcomeOf = async (
+  writer: XmlSerializer,
+  ordered: JsonArray,
+  rootAttributes: JsonObject,
+  options: WriteOptions
+): Promise<string> => {
+  const chunks: string[] = []
+  try {
+    await writer.writeTo(chunkSinkOf(chunks), ordered, rootAttributes, options)
+    return `ok:${JSON.stringify(chunks)}`
+  } catch (error) {
+    return `throw:${errorTextOf(error)}`
+  }
+}
+
+export interface WriterCase {
+  readonly ordered: JsonArray
+  readonly rootAttributes: JsonObject
+  readonly options: WriteOptions
+}
+
+// Every key the general walk tells apart: attribute, content, conflict and
+// prototype names, and names made odd by a line break or by being empty
+const WRITER_KEYS = [
+  'a',
+  'b',
+  'fullName',
+  'label',
+  '@_x',
+  '@_xsi:nil',
+  '#text',
+  '__cdata',
+  '#xml__comment',
+  '__conflict',
+  '__proto__',
+  '',
+  'a\nb',
+  ':@',
+  '@x',
+  '_u',
+  '#h',
+  '1',
+  'toString',
+]
+
+// Values that read as markers, comment or CDATA ends, quotes, line breaks and
+// blank lines
+const WRITER_STRINGS = [
+  'x',
+  '',
+  '  ',
+  'true',
+  'line1\nline2',
+  '<<<<<<< ours',
+  'a\n<<<<<<< ours\nb',
+  'a\n    =======\n',
+  '\n>>>>>>> theirs',
+  '--',
+  '-',
+  'x-->y',
+  ']]>',
+  '"q"',
+  '<',
+  'a\r\nb',
+  ' x',
+  'tab\there',
+  ' \t',
+  '\n',
+  '   \n   ',
+  '||||||| base',
+]
+
+// undefined is not JSON, yet a merged tree can hold it
+const WRITER_SCALARS = [0, 1.5, true, false, null, undefined] as JsonValue[]
+
+const WRITER_ROOT_ATTRIBUTES: JsonObject[] = [
+  {},
+  { '@_xmlns': 'u' },
+  { '@_xmlns': 'u', '@_a': 'x\ny"<' },
+]
+
+const WRITER_TOP_KEYS = ['Root', 'a', '#text', '__cdata']
+
+// Deep enough for an element inside a conflict side inside an element
+const WRITER_MAX_DEPTH = 4
+
+// Weights of the general walk's draw: as many leaves as objects, fewer
+// arrays and conflict blocks
+const LEAF_WEIGHT = 40
+const ARRAY_WEIGHT = 12
+const CONFLICT_WEIGHT = 8
+const OBJECT_WEIGHT = 40
+const STRING_WEIGHT = 85
+const SCALAR_WEIGHT = 15
+const WRAPPED_ITEM_WEIGHT = 85
+const BARE_ITEM_WEIGHT = 15
+const MAX_ARRAY_LENGTH = 3
+const MAX_OBJECT_KEYS = 4
+const MAX_SIDE_LENGTH = 2
+const BLANK_SIDE_WEIGHT = 1
+const FILLED_SIDE_WEIGHT = 4
+const MAX_ORDERED_ITEMS = 2
+
+// An own property, even for `__proto__`, on a bag with or without a prototype
+const bagOf = (
+  prototype: object | null,
+  entries: ReadonlyArray<readonly [string, JsonValue]>
+): JsonObject => {
+  const bag: JsonObject = Object.create(prototype)
+  for (const [key, value] of entries) {
+    Object.defineProperty(bag, key, {
+      value,
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    })
+  }
+  return bag
+}
+
+// Objects drawn from the given keys and values, with and without a prototype
+export const bagArb = (
+  keys: readonly string[],
+  value: fc.Arbitrary<JsonValue>
+): fc.Arbitrary<JsonObject> =>
+  fc
+    .tuple(
+      fc.constantFrom<object | null>(Object.prototype, null),
+      fc.array(fc.tuple(fc.constantFrom(...keys), value), {
+        maxLength: MAX_OBJECT_KEYS,
+      })
+    )
+    .map(([prototype, entries]) => bagOf(prototype, entries))
+
+const blankSideArb: fc.Arbitrary<JsonArray> = fc
+  .constantFrom<() => JsonArray>(
+    () => [],
+    () => [{}],
+    () => [Object.create(null)]
+  )
+  .map(build => build())
+
+const conflictSideArb = (
+  value: fc.Arbitrary<JsonValue>
+): fc.Arbitrary<JsonArray> =>
+  fc.oneof(
+    { weight: BLANK_SIDE_WEIGHT, arbitrary: blankSideArb },
+    {
+      weight: FILLED_SIDE_WEIGHT,
+      arbitrary: fc.array(value, { minLength: 1, maxLength: MAX_SIDE_LENGTH }),
+    }
+  )
+
+const writerConflictArb = (
+  value: fc.Arbitrary<JsonValue>
+): fc.Arbitrary<JsonValue> =>
+  fc.record({
+    __conflict: fc.constantFrom<true | 'true'>(true, 'true'),
+    local: conflictSideArb(value),
+    ancestor: conflictSideArb(value),
+    other: conflictSideArb(value),
+  })
+
+const writerLeafArb: fc.Arbitrary<JsonValue> = fc.oneof(
+  { weight: STRING_WEIGHT, arbitrary: fc.constantFrom(...WRITER_STRINGS) },
+  { weight: SCALAR_WEIGHT, arbitrary: fc.constantFrom(...WRITER_SCALARS) }
+)
+
+const writerValueArb: fc.Arbitrary<JsonValue> = fc.letrec<{
+  value: JsonValue
+}>(tie => ({
+  value: fc.oneof(
+    { maxDepth: WRITER_MAX_DEPTH, depthIdentifier: 'writer' },
+    { weight: LEAF_WEIGHT, arbitrary: writerLeafArb },
+    {
+      weight: ARRAY_WEIGHT,
+      arbitrary: fc.array(tie('value'), { maxLength: MAX_ARRAY_LENGTH }),
+    },
+    { weight: CONFLICT_WEIGHT, arbitrary: writerConflictArb(tie('value')) },
+    { weight: OBJECT_WEIGHT, arbitrary: bagArb(WRITER_KEYS, tie('value')) }
+  ),
+})).value
+
+const orderedItemArb: fc.Arbitrary<JsonValue> = fc.oneof(
+  {
+    weight: WRAPPED_ITEM_WEIGHT,
+    arbitrary: fc
+      .tuple(fc.constantFrom(...WRITER_TOP_KEYS), writerValueArb)
+      .map(([key, value]) => ({ [key]: value })),
+  },
+  { weight: BARE_ITEM_WEIGHT, arbitrary: writerValueArb }
+)
+
+const rootAttributesArb = fc.constantFrom(...WRITER_ROOT_ATTRIBUTES)
+
+const rootSidesArb = fc.record({
+  local: rootAttributesArb,
+  ancestor: rootAttributesArb,
+  other: rootAttributesArb,
+})
+
+const writeOptionsArb: fc.Arbitrary<WriteOptions> = fc.record(
+  {
+    hasConflict: fc.boolean(),
+    eol: fc.constantFrom<'\n' | '\r\n'>('\n', '\r\n'),
+    contested: rootSidesArb,
+    sides: rootSidesArb,
+  },
+  { requiredKeys: ['hasConflict', 'eol'] }
+)
+
+// Trees with every key and value the general walk special-cases
+export const writerCaseArb: fc.Arbitrary<WriterCase> = fc.record({
+  ordered: fc.array(orderedItemArb, {
+    minLength: 1,
+    maxLength: MAX_ORDERED_ITEMS,
+  }),
+  rootAttributes: rootAttributesArb,
+  options: writeOptionsArb,
+})
