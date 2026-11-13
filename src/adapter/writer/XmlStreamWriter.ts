@@ -534,6 +534,20 @@ const attributeString = (slot: RootSlot, attrs: Attributes): string =>
     ? attrsToString(attrs)
     : attrsToString(slot.attrs) + attrsToString(attrs)
 
+// The root slot's attributes, then the element's own
+const attributeTextOf = (
+  st: WalkState,
+  markers: ConflictMarkers,
+  slot: RootSlot,
+  attrs: Attributes
+): string =>
+  attributeString(
+    { ...slot, attrs: attributesOf(st, markers, slot.attrs) },
+    attrs
+  )
+
+// An opening with no attribute outside the root slot holds no value: unless
+// its name breaks the line, no line of it needs the value-range bookkeeping
 const writeOpening = (
   st: WalkState,
   name: string,
@@ -544,18 +558,15 @@ const writeOpening = (
 ): void => {
   const indent = st.isFirstTopLevelAfterDecl ? '' : getIndent(st.depth)
   st.isFirstTopLevelAfterDecl = false
-  const opening = openingOf(
-    slot.contested,
-    markers,
-    indent,
-    name,
-    attributeString(
-      { ...slot, attrs: attributesOf(st, markers, slot.attrs) },
-      attrs
-    ),
-    terminator
+  if (slot === NO_ROOT && attrs.length === 0 && !name.includes('\n')) {
+    return append(st, `${indent}<${name}${terminator}`)
+  }
+  const attrText = attributeTextOf(st, markers, slot, attrs)
+  appendValue(
+    st,
+    openingOf(slot.contested, markers, indent, name, attrText, terminator),
+    indent.length
   )
-  appendValue(st, opening, indent.length)
 }
 
 const AT_SIGN = 64
