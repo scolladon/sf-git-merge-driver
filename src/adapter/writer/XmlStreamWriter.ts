@@ -534,7 +534,9 @@ const attributeString = (slot: RootSlot, attrs: Attributes): string =>
     ? attrsToString(attrs)
     : attrsToString(slot.attrs) + attrsToString(attrs)
 
-// The root slot's attributes, then the element's own
+// The slot's attributes come straight from the source root, so their lines
+// are escaped here like any value when the document holds a conflict; the
+// element's own were escaped by the caller.
 const attributeTextOf = (
   st: WalkState,
   markers: ConflictMarkers,
@@ -573,8 +575,10 @@ const AT_SIGN = 64
 const HASH = 35
 const UNDERSCORE = 95
 
-// Neither an attribute (`@_`), nor text, comment or CDATA (`#text`,
-// `#xml__comment`, `__cdata`), nor the conflict flag (`__conflict`).
+// Tested on the first character only: an attribute (`@_`), text, a comment
+// or CDATA (`#text`, `#xml__comment`, `__cdata`) and the conflict flag
+// (`__conflict`) are refused, and so is an element whose name starts with
+// `_`, which takes the general walk and is written the same.
 const isElementKey = (key: string): boolean => {
   const first = key.charCodeAt(0)
   return first !== AT_SIGN && first !== HASH && first !== UNDERSCORE
@@ -583,8 +587,9 @@ const isElementKey = (key: string): boolean => {
 const isEmptyRepeat = (value: JsonValue | undefined): boolean =>
   Array.isArray(value) && value.length === 0
 
-// The keys of a body that holds child elements only, at least one of which
-// is written; undefined for every other body, which takes the general walk.
+// The keys of a body the direct walk serves: every key an element key, one
+// child at least written; undefined for every other body, which takes the
+// general walk.
 const elementKeysOf = (body: JsonValue): readonly string[] | undefined => {
   if (!isObject(body)) return undefined
   const keys = Object.keys(body)
@@ -763,9 +768,9 @@ const writeChildren = (
     if (keys.length === 1) {
       // Canonical merger output: single-key wrapper. Treat the value as
       // the body of one `<tagName>` element (writer semantic). An inner
-      // parser-shape multi-key object is handled by the next recursion
-      // into writeChildren via splitAttrsAndChildren / the multi-key
-      // branch below.
+      // parser-shape multi-key object is handled by writeElement: key by
+      // key when it holds child elements only, else through
+      // splitAttrsAndChildren and the multi-key branch below.
       const tagName = keys[0]!
       writeElement(st, tagName, child[tagName] as JsonValue, childSlot, markers)
       continue
@@ -834,7 +839,6 @@ const LINE_FEED = '\n'
 // The document's last line: writeTo appends the trailing newline itself
 const NO_LINE_END = ''
 
-// Index of the first character that is neither a space nor a tab.
 const indentEndOf = (line: string): number => {
   let at = 0
   let code = line.charCodeAt(0)
@@ -909,8 +913,8 @@ class ConflictLineFilter {
   }
 
   // Pass 1: strip horizontal whitespace directly before a marker on
-  // this line. Mirrors ConflictMarkerFormatter.indentRegex semantics, whose
-  // `.` refuses a line holding \r, U+2028 or U+2029 after the marker.
+  // this line. The expression's `.` refuses a line holding \r, U+2028 or
+  // U+2029 after the marker, so such a line keeps its indent.
   private withoutMarkerIndent(line: string, indentEnd: number): string {
     if (indentEnd === 0 || !this.startsWithMarkerAt(line, indentEnd)) {
       return line
@@ -980,8 +984,7 @@ export class XmlStreamWriter implements XmlSerializer {
     // When the merge produced no conflicts, the ConflictLineFilter has
     // nothing to do (its only job is to clean indentation and blank
     // lines around marker tokens, none of which are emitted). Skipping
-    // it removes ~20 % of serialize CPU on conflict-free documents
-    // (newline scan + two regexes per line).
+    // it saves a newline scan and an indent scan per line.
     const markers = buildConflictMarkers(this.config)
     const st: WalkState = {
       buf: '',

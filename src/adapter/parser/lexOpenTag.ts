@@ -218,7 +218,7 @@ const lexAttrs = (
   return { end: pos, attrs, hasAttrs, strayQuote }
 }
 
-// Shared by every tag with no attribute: the bag is only read with for…in,
+// Shared by every bare `<name>` tag: the bag is only read with for…in,
 // so one frozen empty bag serves them all.
 const NO_ATTRIBUTES: OpenTagAttrs = Object.freeze(Object.create(null))
 

@@ -16,9 +16,10 @@ export const NO_ATTRS: AttrSet = Object.freeze({
 })
 
 // Per-open-element accumulator the scanner pushes on `<name` and pops
-// on the matching close. `body` stays undefined until the first
-// element, comment or CDATA child arrives, so a leaf — the dominant
-// node shape in Salesforce metadata — never allocates an object.
+// on the matching close, for every element it does not take in one step
+// as a text leaf. `body` stays undefined until the first element, comment
+// or CDATA child arrives, so a leaf with no attribute never allocates an
+// object.
 export class ElementFrame {
   readonly name: string
   private readonly attrs: ElementAttrs

@@ -63,7 +63,8 @@ const failed = (message: string): ScanOutcome => ({ kind: 'failed', message })
 
 const NO_EXACT_CLOSE = -1
 
-// Position right after `</name>` when exactly that sits at `lt`.
+// Only the element's own close in its exact spelling counts: a lax close
+// (`</b >`, `</bx>`) stays with the frame path, which decides what it means.
 const exactCloseEnd = (xml: string, lt: number, name: string): number => {
   const nameStart = lt + CLOSE_TAG_OPEN.length
   const gt = nameStart + name.length
