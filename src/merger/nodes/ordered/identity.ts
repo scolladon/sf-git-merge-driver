@@ -125,9 +125,14 @@ const stretchesOf = (groups: SlotsByKey): readonly Stretch[] => {
   return stretches
 }
 
-type EntryInTheMaking = {
-  -readonly [Field in keyof OrderedEntry]?: OrderedEntry[Field]
-}
+type Positions = 'ancestorPos' | 'localPos' | 'otherPos'
+
+type Writable<Shape> = { -readonly [Field in keyof Shape]: Shape[Field] }
+
+// Only the positions are owed when the entry is handed out: every other
+// required field is checked where the entry is first written
+type EntryInTheMaking = Writable<Omit<OrderedEntry, Positions>> &
+  Partial<Writable<Pick<OrderedEntry, Positions>>>
 
 // The fields come in the order the reading always gave them, a side's value
 // only when the side holds the entry
@@ -247,6 +252,21 @@ const tiesOver = (
   }
 }
 
+// One memory of the points for the tie set: tieComponents reads them and
+// lets go
+const pointSetsOf = (
+  kept: readonly Alternatives[]
+): readonly (readonly PointSet[])[] => {
+  const known: KnownPoints = new Map()
+  return kept.map(alternatives =>
+    alternatives.map(
+      (alternative): PointSet =>
+        side =>
+          alternative.pointsOn(side, known)
+    )
+  )
+}
+
 // Each stretch keeps its no-loss alternatives; the fewest-move choices are
 // decided per group of stretches that share a gap, and walked back in the
 // order of the cross product of the alternatives.
@@ -267,14 +287,5 @@ export const identityTies = (
     )
   }
   const kept = withoutLosses(stretches)
-  // Dies with this call: the points are read by tieComponents only
-  const known: KnownPoints = new Map()
-  const points = kept.map(alternatives =>
-    alternatives.map(
-      (alternative): PointSet =>
-        side =>
-          alternative.pointsOn(side, known)
-    )
-  )
-  return tiesOver(kept, tieComponents(points))
+  return tiesOver(kept, tieComponents(pointSetsOf(kept)))
 }
