@@ -62,6 +62,20 @@ const LEAF_CLOSES = [
 ]
 const LEAF_TRAILERS = ['', '<b>z</b>', 't']
 
+// A close naming another element of the same length: only the name
+// comparison tells it from the leaf's own close
+const OTHER_NAME_PLACEHOLDER = 'OTHER'
+const OTHER_NAME_ENDING = 'z'
+const BARE_LEAF_CLOSES = [
+  '</NAME>',
+  '</NAME >',
+  '</NAMEx>',
+  '</OTHER>',
+  '</ NAME>',
+  '</NAME',
+  '',
+]
+
 const CHILDREN = [
   '<b>1</b>',
   '<b>2</b>',
@@ -114,6 +128,26 @@ const leafDocumentArb = leafArb.map(leaf => {
   const element = `<${leaf.name}${leaf.attr}>${leaf.text}${leaf.middle}${close}${leaf.trailer}`
   return leaf.wrapped ? `<a>${element}</a>` : element
 })
+
+const otherNameOf = (name: string): string =>
+  `${name.slice(0, -1)}${OTHER_NAME_ENDING}`
+
+// The wide leaf documents spread over seven choices, so a leaf with no
+// attribute and no child, the only shape whose close is compared with its
+// name, comes up about once in a hundred: here every document is one
+const bareLeafDocumentArb = fc
+  .record({
+    name: fc.constantFrom(...LEAF_NAMES),
+    text: fc.constantFrom(...LEAF_TEXTS),
+    close: fc.constantFrom(...BARE_LEAF_CLOSES),
+    trailer: fc.constantFrom(...LEAF_TRAILERS),
+  })
+  .map(({ name, text, close, trailer }) => {
+    const closed = close
+      .replace(NAME_PLACEHOLDER, name)
+      .replace(OTHER_NAME_PLACEHOLDER, otherNameOf(name))
+    return `<a><${name}>${text}${closed}${trailer}</a>`
+  })
 
 const childStoreDocumentArb = fc
   .record({
@@ -210,6 +244,16 @@ describe('CompactXmlParser against the frame-per-element scan', () => {
     it('when parsed then the outcome is the reference outcome', () => {
       // Arrange
       const property = fc.property(leafDocumentArb, expectOracleOutcome)
+
+      // Act & Assert
+      fc.assert(property)
+    })
+  })
+
+  describe('given a text leaf below the root closed every way', () => {
+    it('when parsed then the outcome is the reference outcome', () => {
+      // Arrange
+      const property = fc.property(bareLeafDocumentArb, expectOracleOutcome)
 
       // Act & Assert
       fc.assert(property)
