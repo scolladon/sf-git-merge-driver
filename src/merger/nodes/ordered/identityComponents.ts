@@ -40,24 +40,27 @@ const grouped = <Item, Key>(
   return groups
 }
 
-function* unread(
-  points: readonly Point[],
+// Alternatives that pair a side alike hand the same array: it is read once.
+function* unreadIn(
+  alternatives: Alternatives,
+  side: LiveSide,
   read: Set<readonly Point[]>
 ): Generator<Point> {
-  if (read.has(points)) return
-  read.add(points)
-  yield* points
+  for (const set of alternatives) {
+    const points = set(side)
+    if (read.has(points)) continue
+    read.add(points)
+    yield* points
+  }
 }
 
-// Alternatives that pair a side alike hand the same array: it is read once.
 function* pointsOn(
   stretches: readonly Alternatives[],
   side: LiveSide
 ): Generator<Point> {
   const read = new Set<readonly Point[]>()
-  for (const alternatives of stretches) {
-    for (const set of alternatives) yield* unread(set(side), read)
-  }
+  for (const alternatives of stretches)
+    yield* unreadIn(alternatives, side, read)
 }
 
 // The positions the candidates of one ancestor copy take on a side, whatever
