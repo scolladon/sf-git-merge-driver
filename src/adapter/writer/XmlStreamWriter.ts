@@ -671,6 +671,30 @@ const writeLeaf = (
   st.endedWithGt = true
 }
 
+// The opening tag of a body none of the shortcuts serve, and the children
+// left to write: none for an empty element, which self-closes (`<tag/>`)
+// because `sf project retrieve` never emits the expanded `<tag></tag>` form,
+// so the merge output converges to its byte shape. It returns before any
+// child is written: a nested document then stacks writeElement, writeBody
+// and writeChildren per level and nothing else, and the stack is what
+// bounds how deep a document can nest.
+const writeGeneralOpening = (
+  st: WalkState,
+  name: string,
+  body: JsonValue,
+  slot: RootSlot,
+  markers: ConflictMarkers
+): JsonArray | undefined => {
+  const { attrs: sourceAttrs, children } = splitAttrsAndChildren(body)
+  const attrs = attributesOf(st, markers, sourceAttrs)
+  const isEmpty = isEmptyElementBody(children)
+  const terminator = isEmpty ? EMPTY_TAG_END : START_TAG_END
+  writeOpening(st, name, slot, markers, attrs, terminator)
+  return isEmpty ? undefined : children
+}
+
+// Every form ends on a `>`, so the parent always sees endedWithGt = true,
+// whatever the body's terminating chunk was.
 const writeElement = (
   st: WalkState,
   name: string,
@@ -687,27 +711,8 @@ const writeElement = (
   if (keys !== undefined) {
     return writeElementsOnly(st, name, body as JsonObject, keys, slot, markers)
   }
-  writeGeneralElement(st, name, body, slot, markers)
-}
-
-const writeGeneralElement = (
-  st: WalkState,
-  name: string,
-  body: JsonValue,
-  slot: RootSlot,
-  markers: ConflictMarkers
-): void => {
-  const { attrs: sourceAttrs, children } = splitAttrsAndChildren(body)
-  const attrs = attributesOf(st, markers, sourceAttrs)
-  // Empty elements self-close (`<tag/>`): `sf project retrieve` never emits
-  // the expanded `<tag></tag>` form, so the merge output converges to its
-  // byte shape.
-  const isEmpty = isEmptyElementBody(children)
-  const terminator = isEmpty ? EMPTY_TAG_END : START_TAG_END
-  writeOpening(st, name, slot, markers, attrs, terminator)
-  if (!isEmpty) writeBody(st, name, children, markers)
-  // Both forms end on a `>`, so the parent frame always sees
-  // endedWithGt=true, whatever the body's terminating chunk was.
+  const children = writeGeneralOpening(st, name, body, slot, markers)
+  if (children !== undefined) writeBody(st, name, children, markers)
   st.endedWithGt = true
 }
 
