@@ -675,9 +675,8 @@ const writeLeaf = (
 // left to write: none for an empty element, which self-closes (`<tag/>`)
 // because `sf project retrieve` never emits the expanded `<tag></tag>` form,
 // so the merge output converges to its byte shape. It returns before any
-// child is written: a nested document then stacks writeElement, writeBody
-// and writeChildren per level and nothing else, and the stack is what
-// bounds how deep a document can nest.
+// child is written, so it adds no frame of its own to a nested document:
+// the stack is what bounds how deep a document can nest.
 const writeGeneralOpening = (
   st: WalkState,
   name: string,
@@ -693,8 +692,8 @@ const writeGeneralOpening = (
   return isEmpty ? undefined : children
 }
 
-// Every form ends on a `>`, so the parent always sees endedWithGt = true,
-// whatever the body's terminating chunk was.
+// Self-closed or expanded, the general element ends on a `>`: the parent
+// sees endedWithGt = true whatever the body's terminating chunk was.
 const writeElement = (
   st: WalkState,
   name: string,
