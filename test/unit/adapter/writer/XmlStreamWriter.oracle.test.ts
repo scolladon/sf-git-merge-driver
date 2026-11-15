@@ -619,22 +619,34 @@ describe('XmlStreamWriter against the wrapper walk', () => {
     )
   })
 
-  describe('given an ancestor tag ending on a carriage return', () => {
-    it('when a conflict is written then the indent before its marker stays', async () => {
-      // Arrange
-      const pair = pairOf({ ...defaultConfig, ancestorConflictTag: 'base\r' })
-      const expected = documentOf(
-        '<a>\n<<<<<<< ours\n    <c>L</c>\n    ||||||| base\r\n=======\n    <c>O</c>\n>>>>>>> theirs\n</a>'
-      )
+  // A blank and a word after the carriage return would match an expression
+  // not anchored to the line start, which would cut the line down to the word
+  describe('given an ancestor tag holding a carriage return', () => {
+    it.each([
+      [
+        'base\r',
+        '<a>\n<<<<<<< ours\n    <c>L</c>\n    ||||||| base\r\n=======\n    <c>O</c>\n>>>>>>> theirs\n</a>',
+      ],
+      [
+        'base\r x',
+        '<a>\n<<<<<<< ours\n    <c>L</c>\n    ||||||| base\r x\n=======\n    <c>O</c>\n>>>>>>> theirs\n</a>',
+      ],
+    ])(
+      'when a conflict is written with tag %j then the indent before its marker stays',
+      async (ancestorConflictTag, written) => {
+        // Arrange
+        const pair = pairOf({ ...defaultConfig, ancestorConflictTag })
+        const expected = documentOf(written)
 
-      // Act & Assert
-      await expectLiteral(
-        pair,
-        { a: { b: block } },
-        { hasConflict: true },
-        expected
-      )
-    })
+        // Act & Assert
+        await expectLiteral(
+          pair,
+          { a: { b: block } },
+          { hasConflict: true },
+          expected
+        )
+      }
+    )
   })
 
   describe('given a root attribute whose second line reads as a marker', () => {
