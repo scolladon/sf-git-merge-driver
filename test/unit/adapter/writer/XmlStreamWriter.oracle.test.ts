@@ -510,6 +510,12 @@ describe('XmlStreamWriter against the wrapper walk', () => {
         [{ a: null }, '<a/>'],
         [{ a: { b: 'l1\nl2' } }, '<a>\n    <b>l1\nl2</b>\n</a>'],
         [{ a: { 'b\nc': 'x' } }, '<a>\n    <b\nc>x</b\nc>\n</a>'],
+        // An indented line starting with the word `undefined` is no marker
+        // line
+        [
+          { Root: [{ b: 'x' }, 'undefined'] },
+          '<Root>\n    <b>x</b>\n    undefined</Root>',
+        ],
       ])
     )(
       'when %j is written with conflict flag %s then it reads as the reference',
@@ -604,12 +610,6 @@ describe('XmlStreamWriter against the wrapper walk', () => {
           '<Root>\n    <x>y</x>\n    <a>\n<<<<<<< ours\n        <c>L</c>\n||||||| base\n=======\n        <c>O</c>\n>>>>>>> theirs\n    </a>\n</Root>'
         ),
       ],
-      // An indented line starting with the word `undefined` is no marker line
-      [
-        { Root: [{ b: 'x' }, 'undefined'] },
-        true,
-        documentOf('<Root>\n    <b>x</b>\n    undefined</Root>'),
-      ],
     ])(
       'when %j is written with conflict flag %s then it reads as the reference',
       async (tree, hasConflict, expected) => {
@@ -633,6 +633,32 @@ describe('XmlStreamWriter against the wrapper walk', () => {
         { a: { b: block } },
         { hasConflict: true },
         expected
+      )
+    })
+  })
+
+  describe('given a root attribute whose second line reads as a marker', () => {
+    it('when written with the conflict flag then that line is escaped', async () => {
+      // Arrange
+      const ordered = [{ Root: { b: 'x' } }]
+      const options: WriteOptions = { hasConflict: true }
+      const expected = documentOf(
+        '<Root xmlns="u" a="x\n&#61;======">\n    <b>x</b>\n</Root>'
+      )
+
+      // Act
+      const result = await serializeToString(
+        sut,
+        ordered,
+        OPENING_ROOT_ATTRIBUTES,
+        options
+      )
+
+      // Assert
+      expect(result).toBe(expected)
+      await expectOracleOutcomes(
+        writers,
+        casesOf(ordered, OPENING_ROOT_ATTRIBUTES, [options])
       )
     })
   })

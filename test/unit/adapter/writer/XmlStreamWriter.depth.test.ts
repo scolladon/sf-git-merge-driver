@@ -18,6 +18,7 @@ type Wrap = (child: JsonValue) => JsonValue
 
 const insideAnAttributedElement: Wrap = child => ({ '@_k': 'v', a: child })
 const insideAnElementOnlyBody: Wrap = child => ({ a: child })
+const insideARepeatedElement: Wrap = child => ({ a: [child] })
 
 // Read as an attribute value at the innermost element, it records how many
 // frames the walk has stacked by then
@@ -63,6 +64,7 @@ describe('XmlStreamWriter nesting', () => {
   describe.each([
     ['elements carrying an attribute', insideAnAttributedElement],
     ['elements holding child elements only', insideAnElementOnlyBody],
+    ['repeated elements holding child elements only', insideARepeatedElement],
   ])('given nested %s', (_shape, wrap) => {
     it('when written then each nesting level costs three frames', async () => {
       // Arrange
