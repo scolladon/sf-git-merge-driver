@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791487724724,
+  "lastUpdate": 1795192311305,
   "repoUrl": "https://github.com/scolladon/sf-git-merge-driver",
   "entries": {
     "Binary Size Benchmark": [
@@ -608,6 +608,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "bin/merge-driver.cjs",
             "value": 39623,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "colladonsebastien@gmail.com",
+            "name": "Sebastien",
+            "username": "scolladon"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e6f1d964728649459bab677fca61c09f6780d878",
+          "message": "feat(merger): merge by doctrine, enforced by fast-check laws (#227)",
+          "timestamp": "2026-11-20T17:27:35+01:00",
+          "tree_id": "ef31b83b9a6850dd6f9b00f698cf394a50c3f021",
+          "url": "https://github.com/scolladon/sf-git-merge-driver/commit/e6f1d964728649459bab677fca61c09f6780d878"
+        },
+        "date": 1795192311230,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "bin/merge-driver.cjs",
+            "value": 79052,
             "unit": "bytes"
           }
         ]
