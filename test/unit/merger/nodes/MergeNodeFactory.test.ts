@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { buildConflictMarkers } from '../../../../src/merger/ConflictMarkerBuilder.js'
 import { KeyedArrayMergeNode } from '../../../../src/merger/nodes/KeyedArrayMergeNode.js'
 import { defaultNodeFactory } from '../../../../src/merger/nodes/MergeNodeFactory.js'
 import { PropertyMergeNode } from '../../../../src/merger/nodes/PropertyMergeNode.js'
@@ -29,6 +30,25 @@ describe('MergeNodeFactory', () => {
         // Assert
         expect(node).toBeInstanceOf(TextArrayMergeNode)
       })
+
+      it.each([
+        ['__cdata', ['x]]', '>y']],
+        ['#xml__comment', ['c1', 'c2']],
+      ])(
+        'given the parts of %s beside child tags when createNode then returns TextMergeNode',
+        (attribute, parts) => {
+          // Arrange
+          const ancestor = parts
+          const local = [...parts].reverse()
+          const other = undefined
+
+          // Act
+          const node = factory.createNode(ancestor, local, other, attribute)
+
+          // Assert
+          expect(node).toBeInstanceOf(TextMergeNode)
+        }
+      )
 
       it('given one string array when createNode then returns TextArrayMergeNode', () => {
         // Arrange
@@ -73,9 +93,9 @@ describe('MergeNodeFactory', () => {
         expect(node).toBeInstanceOf(TextArrayMergeNode)
       })
 
-      it('given attribute=members with exactly one object side when createNode then returns PropertyMergeNode', () => {
-        // Arrange — regression guard: isKnownObject must fire on *any*
-        // object side, not only when every side is one.
+      it('given attribute=members with exactly one object side when createNode then returns TextMergeNode', () => {
+        // Arrange — an element against text is two kinds of value: it is
+        // merged whole, never as the text array the schema override names.
         const ancestor = { sub: 'a' }
         const local = 'b'
         const other = 'c'
@@ -84,7 +104,7 @@ describe('MergeNodeFactory', () => {
         const node = factory.createNode(ancestor, local, other, 'members')
 
         // Assert
-        expect(node).toBeInstanceOf(PropertyMergeNode)
+        expect(node).toBeInstanceOf(TextMergeNode)
       })
 
       it('given an unrelated attribute with scalar values on all three sides then still returns TextMergeNode', () => {
@@ -150,7 +170,7 @@ describe('MergeNodeFactory', () => {
         expect(node).toBeInstanceOf(TextMergeNode)
       })
 
-      it('given one object side when createNode then it takes the object route, not the scalar exit', () => {
+      it('given one object side against text when createNode then the value is merged whole', () => {
         // Arrange
         const ancestor = { a: 1 }
         const local = 'b'
@@ -160,7 +180,7 @@ describe('MergeNodeFactory', () => {
         const node = factory.createNode(ancestor, local, other, 'attr')
 
         // Assert
-        expect(node).toBeInstanceOf(PropertyMergeNode)
+        expect(node).toBeInstanceOf(TextMergeNode)
       })
 
       it('given attribute=members with object-shaped values then returns PropertyMergeNode, not TextArrayMergeNode', () => {
@@ -484,7 +504,7 @@ describe('MergeNodeFactory', () => {
         const sut = defaultNodeFactory
 
         describe('when merging the node the factory creates', () => {
-          it('should treat a null ancestor and an undefined other as empty objects', () => {
+          it('then the present side is taken whole when the ancestor is null and other is undefined', () => {
             // Arrange
             const ancestor = null
             const local = { a: 1 }
@@ -497,12 +517,12 @@ describe('MergeNodeFactory', () => {
 
             // Assert
             expect(result).toEqual({
-              output: [{ attr: [{ a: 1 }] }],
+              output: [{ attr: { a: 1 } }],
               hasConflict: false,
             })
           })
 
-          it('should treat an undefined ancestor and an undefined local as empty objects', () => {
+          it('then the present side is taken whole when the ancestor and local are undefined', () => {
             // Arrange
             const ancestor = undefined as never
             const local = undefined as never
@@ -515,7 +535,7 @@ describe('MergeNodeFactory', () => {
 
             // Assert
             expect(result).toEqual({
-              output: [{ attr: [{ a: 1 }] }],
+              output: [{ attr: { a: 1 } }],
               hasConflict: false,
             })
           })
@@ -535,10 +555,8 @@ describe('MergeNodeFactory', () => {
             expect(result).toEqual({ output: [], hasConflict: false })
           })
 
-          it('should leave a scalar side to the character-indexed path it already took', () => {
-            // Arrange — a text-bodied element against a child-bearing one is a
-            // separate, pre-existing shape; normalising an absent side must not
-            // quietly change how it merges.
+          it('then a scalar ancestor deleted by other against a changed local is one element block', () => {
+            // Arrange
             const ancestor = 'ab'
             const local = { a: 1 }
             const other = undefined as never
@@ -548,9 +566,17 @@ describe('MergeNodeFactory', () => {
               .createNode(ancestor, local, other, 'attr')
               .merge(defaultConfig)
 
-            // Assert — the scalar's characters still take part as keys
-            expect(result.hasConflict).toBe(false)
-            expect(JSON.stringify(result.output)).toContain('"a"')
+            // Assert
+            expect(result).toEqual({
+              output: [
+                buildConflictMarkers(
+                  [{ attr: { a: 1 } }],
+                  [{ attr: 'ab' }],
+                  []
+                ),
+              ],
+              hasConflict: true,
+            })
           })
 
           it('should not resurrect a deleted element through an inherited key name', () => {

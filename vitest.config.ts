@@ -14,12 +14,19 @@ export default defineConfig({
       '.stryker-tmp',
     ],
     clearMocks: true,
+    setupFiles: ['test/utils/fastCheckSetup.ts'],
     coverage: {
       provider: 'v8',
       reportsDirectory: 'reports/coverage',
       exclude: [
         'node_modules/**',
         'test/utils/**',
+        // Generators shared by the law suites: test infrastructure, whose
+        // branches only the generated cases reach
+        'test/unit/merger/laws/arbitraries.ts',
+        // The naive model the child-tag order is checked against: test
+        // infrastructure, exercised only through the suites that compare to it
+        'test/unit/merger/laws/childTagReference.ts',
         // Fixture generators reused by test/utils/parserParity.ts, whose
         // exports test/unit pins directly — that import chain pulls this
         // module into the v8 coverage run even though it is test

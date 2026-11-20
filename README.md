@@ -43,7 +43,7 @@ sequenceDiagram
 
 This merge driver follows the **zdiff3** conflict style philosophy:
 
-- **Shows the most compact diff possible**: Only the specific conflicting elements are marked, not entire file sections
+- **Shows the most compact diff possible**: Entries the two branches changed independently merge; where they overlap, the conflict shows the smallest block in zdiff3 style, not entire file sections
 - **Includes ancestor context**: Conflicts display the base (ancestor) version alongside local and remote changes
 - **Respects Git configuration**: Conflict marker size and labels are configurable via Git's standard parameters (`-L`, `-S`, `-X`, `-Y` flags)
 
@@ -59,6 +59,8 @@ Example conflict output:
 >>>>>>> theirs
 ```
 
+Every marker sits alone on its own line, so the file stays easy to resolve in any editor and a close tag never ends up glued to a marker.
+
 This approach helps you understand:
 
 1. What the original value was (`base`)
@@ -67,11 +69,32 @@ This approach helps you understand:
 
 ## Deterministic Ordering
 
-For metadata types where **element order matters** (like picklist values), the merge driver preserves ordering while intelligently merging changes:
+For metadata types where **element order matters** (like picklist values), the merge driver preserves ordering while intelligently merging changes. The rule is one sentence: changes that do not overlap are all applied, and changes that overlap conflict in the smallest block that decides them.
 
-- **Disjoint reorderings merge automatically**: If one branch reorders elements A↔B and another reorders C↔D, both changes are preserved
-- **Conflicting reorderings trigger conflict**: If both branches move the same element to different positions, a conflict is raised for manual resolution
-- **Additions respect position**: New elements are inserted at their intended position
+- **Disjoint changes merge automatically**: If one branch reorders elements A↔B and another reorders C↔D, both changes are preserved. Entries that sit next to each other do not overlap just by being adjacent: a deletion beside an insertion merges
+- **An entry both branches kept, edited on different fields, merges**: One branch changes `default`, the other changes `label` of the same value, and the result holds both
+- **Conflicting reorderings trigger conflict**: If both branches move the same element against different partners, or insert at different positions, a conflict is raised for manual resolution
+- **Root attributes merge like fields**: an attribute only one branch changed is kept, and attributes changed on different branches both apply. When both branches change the same attribute differently, the root start tag is the conflict, each branch's tag between the markers, so keeping either gives a well-formed file
+- **Delete versus move conflicts**: If one branch deletes an element and the other moves it, the driver does not guess which intent wins (nor does it resurrect the element): it shows the element in a conflict
+- **One-sided changes are kept as written**: If only one branch changed the list, or both branches made the same change, that list is kept exactly as written
+- **Branch roles do not matter**: Swapping which branch is merged into which gives the same list, and the same conflicts with their sides swapped
+- **No order is ever decided by sorting**: When nothing in the files says where an entry goes, you get a conflict, not an alphabetical guess
+- **Nothing is dropped silently**: An entry one branch edited is either kept or shown in a conflict, never lost from a clean merge (entries sharing a key follow the rule in [Entries sharing a key](#entries-sharing-a-key))
+
+For example, with a value set `A, B, C` where `ours` deletes `B` and `theirs` moves it to the end, the unchanged `A` and `C` stay outside the conflict, which holds only `B`:
+
+```xml
+<value>A</value>
+<value>C</value>
+<<<<<<< ours
+||||||| base
+<value>B</value>
+=======
+<value>B</value>
+>>>>>>> theirs
+```
+
+Likewise, with `A, C` where `ours` inserts `B` between them and `theirs` inserts it after `C`, the two branches disagree on where `B` goes, so the conflict shows the slice each wrote, `B, C` against `C, B`.
 
 **Supported ordered metadata:**
 
@@ -90,6 +113,11 @@ Separately from the ordered *element* types above, the driver also merges the or
 > Wherever any side's file constrains the order of two tags, that constraint wins. A tag introduced by one branch keeps the position that branch gave it.
 
 So a permission set where your branch adds `<classAccesses>` between `<description>` and `<tabSettings>` keeps it there, rather than having it relocated to the end of the file. The result is also independent of direction — a `git merge` and the `git rebase` that swaps the same two branches produce identical output.
+
+A reorder one branch made is kept, and reorders on different pairs of tags both apply. A reorder counts as a change: when one branch deletes an entry (a `fieldPermissions`, a `customValue`…) and the other only reorders that entry's tags, the merge conflicts, as it does for a deletion against an edit. When no order can hold what both branches wrote — reorders that contradict each other in a cycle, or a tag both branches add at positions that disagree — the level decides:
+
+- **Direct children of the root element** (`<Profile>`, `<PermissionSet>`, `<CustomObject>`…): the metadata type has a canonical order, `fullName` first and then alphabetical by code point, which is how a retrieve writes them. The tags involved are written in that order where the contradiction stood, and merge without a conflict. The canonical order only settles what the branches contradict: a reorder one branch made on its own is still kept as written.
+- **Nested elements** (the children of a `fieldPermissions` entry, of a `nameField`, of a Flow element…): no rule holds there, so the tags involved conflict as one smallest block, each side as it wrote them.
 
 One case has no answer in the data: when **both** branches introduce *different* new tags at the *same* position, no file says which of the two comes first. There the driver falls back to alphabetical order. Two consequences worth knowing:
 
@@ -289,6 +317,8 @@ node "$DRIVER" -O base.xml -A local.xml -B other.xml -P merged.xml
 - `1` — merge completed with conflict markers in the output.
 - `2` — usage error (missing/unreadable file, bad flag, unsupported Node version).
 
+Input the driver refuses (see [Files the driver refuses](#files-the-driver-refuses)) also exits `1`, with your version of the file untouched.
+
 **Example — batch-resolve all profile conflicts in the working tree:**
 
 ```bash
@@ -311,8 +341,7 @@ done
 
 ## Behavior when the merge driver does not know the key
 
-If the merge driver encounters a list of elements (like fields in a profile, or permissions in a permission set) but does not know which field acts as the "key" (unique identifier) for that type, it will fallback to standard conflict behavior.
-This means you might see a conflict block containing the entire array instead of a smart merge of individual elements.
+If the merge driver encounters a list of elements (like fields in a profile, or permissions in a permission set) but does not know which field acts as the "key" (unique identifier) for that type, it merges the list entry by entry as an ordered list of whole entries (see [Entries without their key](#entries-without-their-key)), instead of matching entries by key.
 
 **If you encounter this behavior for a Salesforce metadata type the driver is supposed to handle, please open an issue!** We can add the missing key definition to support smart merging for that type.
 
@@ -320,11 +349,35 @@ This means you might see a conflict block containing the entire array instead of
 
 ### Entries sharing a key
 
-When several entries of a list share the same key, the driver keeps the last one's content, which is what a deploy does.
+When several entries of a list share the same key, the driver keeps every copy. Entries are identified by their key plus which copy they are, and identical copies are matched first. When only one branch changed the key's copies, or both made the same change, they are kept as written. When both branches changed the copies of a key differently, or the copies cannot be told apart (each branch edited a different one of two identical copies, say), the driver does not guess: the key's copies are one conflict block listing each branch's copies. Other keys of the same list still merge.
+
+Text lists such as the `members` of a `package.xml` follow the same rule: a repeated value keeps its copies. If `theirs` appends `c` to `a, a, b`, the result is `a, a, b, c`, not `a, b, c`.
 
 ### Entries without their key
 
-When two or more entries of a list lack the field the driver uses as key, the driver merges the list as a whole. The same applies when one entry lacks its key and another entry's key is the text `undefined`. The merge is clean when only one branch changed the list, or both changed it the same way. Otherwise you get a conflict listing every entry. Nothing is dropped.
+When two or more entries of a list lack the field the driver uses as key, the driver merges the list as an ordered list of whole entries. The same applies when one entry lacks its key and another entry's key is the text `undefined`. Identical entries are matched first; edits to different entries merge, and the rest conflicts in the smallest block. For example, with entries `a, b, c` where `ours` edits `b` and `theirs` appends `d`, the result is `a, b (edited), c, d` with no conflict. Nothing is dropped.
+
+## What conflicts
+
+- **A file deleted on one branch and changed on the other**: the whole file conflicts, each branch's version between the markers. Any change counts (an entry, a root attribute, an emptied root); reordering attributes does not. A deletion against an unchanged file is a deletion.
+- **A value that is text on one branch and elements on the other**, a text that holds CDATA sections or comments, and an element carrying XML attributes (`<description xsi:nil="true"/>`): each is one value. A change on one branch, or the same change on both, merges; different changes conflict as the whole value, each branch's version between the markers.
+- **A conflict never splits a value**: lines of a value that look like a marker (`=======`) are written with a character reference (`&#61;======`), which XML reads as the same text, so the only marker lines in the file are the real ones.
+
+The merged file takes its line endings (LF or CRLF) from the first of ours, theirs and base that has content.
+
+## Files the driver refuses
+
+Where the driver cannot rewrite a file without changing or dropping something, it refuses to merge: it exits `1` and leaves your version of the file untouched. It refuses a file with:
+
+- a malformed attribute (no value, a name starting with a character that is not a letter, a stray character between attributes) or an invalid element name;
+- more than one root element, or text, CDATA, comments, processing instructions or a DOCTYPE outside the root element;
+- processing instructions or a DOCTYPE inside the root element;
+- an XML declaration anywhere but the start of the document;
+- a root element renamed on one of the branches;
+- a comment or CDATA line that looks like a conflict marker, when the file holds a conflict;
+- an encoding other than UTF-8: a declaration naming another encoding (`ISO-8859-1`, `windows-1252`, `Shift_JIS`…), bytes that are not valid UTF-8, or UTF-16 (the message says so). Without the refusal every non-ASCII character would be replaced.
+
+Spaces, tabs and line breaks around a value are not part of it; a no-break space is. A byte order mark at the start of a file is skipped.
 
 ## Troubleshooting
 

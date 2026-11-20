@@ -45,4 +45,30 @@ describe('jsonTypes.toJsonObjectOrEmpty', () => {
     const sut: JsonArray = ['x', 'y']
     expect(toJsonObjectOrEmpty(sut)).toEqual({})
   })
+
+  describe.each([
+    ['a string', 'x'],
+    ['an empty string', ''],
+    ['a number', 1],
+    ['a boolean', true],
+    ['null', null],
+    ['an absent side', undefined],
+  ])('Given %s', (_, value) => {
+    it('When narrowing, Then returns an empty object that reads no inherited property', () => {
+      // Act
+      const sut = toJsonObjectOrEmpty(value)
+
+      // Assert
+      expect(Object.keys(sut)).toEqual([])
+      expect(sut['toString']).toBeUndefined()
+      expect(sut['0']).toBeUndefined()
+    })
+  })
+
+  it('Given a JsonArray, When narrowing, Then the stand-in inherits nothing', () => {
+    const sut: JsonArray = ['x']
+    const narrowed = toJsonObjectOrEmpty(sut)
+    expect(Object.getPrototypeOf(narrowed)).toBeNull()
+    expect(narrowed['constructor']).toBeUndefined()
+  })
 })

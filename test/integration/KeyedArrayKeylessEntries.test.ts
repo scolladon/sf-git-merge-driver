@@ -11,7 +11,7 @@ const keyless = (editable = 'false', readable = 'false'): string =>
   `<fieldPermissions><editable>${editable}</editable><readable>${readable}</readable></fieldPermissions>`
 const keyed = (editable: string, field = 'Account.X__c'): string =>
   `<fieldPermissions><editable>${editable}</editable><field>${field}</field></fieldPermissions>`
-const keyedLikeFallback = (editable: string): string =>
+const keyedAsUndefined = (editable: string): string =>
   keyed(editable, 'undefined')
 const second = keyless('false', 'true')
 const secondEdited = keyless('true', 'true')
@@ -56,25 +56,25 @@ describe('given repeated entries without their key field', () => {
       ],
       ['ours adds the pair', doc(''), doc(pair), doc(''), doc(pair)],
       [
-        'each side edits the lone entry differently',
-        doc(keyless()),
-        doc(keyless('true')),
-        doc(keyless('false', 'true')),
-        doc(keyless('true', 'true')),
+        'each side edits another entry and an entry stands between them',
+        doc(pair + keyless('maybe', 'maybe')),
+        doc(keyless('true') + second + keyless('maybe', 'maybe')),
+        doc(pair + keyless('maybe', 'maybe')),
+        doc(keyless('true') + second + keyless('maybe', 'maybe')),
       ],
       [
         'an entry key is repeated',
         doc(keyed('false') + keyed('true')),
         doc(keyed('false') + keyed('true'), 'true'),
         doc(keyed('false') + keyed('true')),
-        doc(keyed('true'), 'true'),
+        doc(keyed('false') + keyed('true'), 'true'),
       ],
       [
-        'a real key is spelled like the fallback key of a keyless entry',
-        doc(keyedLikeFallback('false') + keyless()),
-        doc(keyedLikeFallback('false') + keyless(), 'true'),
-        doc(keyedLikeFallback('true') + keyless()),
-        doc(keyedLikeFallback('true') + keyless(), 'true'),
+        'a real key is spelled "undefined" beside a keyless entry',
+        doc(keyedAsUndefined('false') + keyless()),
+        doc(keyedAsUndefined('false') + keyless(), 'true'),
+        doc(keyedAsUndefined('true') + keyless()),
+        doc(keyedAsUndefined('true') + keyless(), 'true'),
       ],
     ])(
       'then it preserves every entry when %s',
@@ -92,8 +92,8 @@ describe('given repeated entries without their key field', () => {
     )
   })
 
-  describe('when each side edits a different entry', () => {
-    it('then the conflict lists both entries on every side', async () => {
+  describe('when each side edits a neighbouring entry', () => {
+    it('then each replacement keeps the place of its entry and both merge', async () => {
       // Arrange
       const ours = keyless('true') + second
       const theirs = keyless() + secondEdited
@@ -107,13 +107,31 @@ describe('given repeated entries without their key field', () => {
       )
 
       // Assert
+      expect(result.hasConflict).toBe(false)
+      expect(parser.parseString(result.output)).toEqual(
+        parser.parseString(doc(keyless('true') + secondEdited))
+      )
+    })
+  })
+
+  describe('when each side edits the lone entry differently', () => {
+    it('then the two replacements of its content conflict at one place', async () => {
+      // Act
+      const result = await mergeXmlStrings(
+        sut,
+        doc(keyless()),
+        doc(keyless('true')),
+        doc(keyless('false', 'true'))
+      )
+
+      // Assert
       expect(result.hasConflict).toBe(true)
-      expect(conflictSides(result.output).map(countOpenTags)).toEqual([2, 2, 2])
+      expect(conflictSides(result.output).map(countOpenTags)).toEqual([1, 1, 1])
     })
   })
 
   describe('when ours deletes the array and theirs edits an entry', () => {
-    it('then the ours side of the conflict is empty', async () => {
+    it('then it merges as the entry removed and the edit added', async () => {
       // Arrange
       const theirs = keyless('true') + second
 
@@ -121,13 +139,15 @@ describe('given repeated entries without their key field', () => {
       const result = await mergeXmlStrings(sut, doc(pair), doc(''), doc(theirs))
 
       // Assert
-      expect(result.hasConflict).toBe(true)
-      expect(conflictSides(result.output).map(countOpenTags)).toEqual([0, 2, 2])
+      expect(result.hasConflict).toBe(false)
+      expect(parser.parseString(result.output)).toEqual(
+        parser.parseString(doc(keyless('true')))
+      )
     })
   })
 
   describe('when only the ancestor holds both entries and each side deletes a different one', () => {
-    it('then the conflict keeps the surviving entry of each side', async () => {
+    it('then both deletions apply and no entry is left', async () => {
       // Arrange
       const ours = keyless()
       const theirs = second
@@ -141,21 +161,20 @@ describe('given repeated entries without their key field', () => {
       )
 
       // Assert
-      expect(result.hasConflict).toBe(true)
-      expect(conflictSides(result.output).map(countOpenTags)).toEqual([1, 2, 1])
+      expect(result.hasConflict).toBe(false)
+      expect(result.output).not.toContain('<fieldPermissions>')
     })
   })
 
   describe('when the entries are ordered', () => {
-    it('then divergent edits conflict with both entries per side', async () => {
-      // Arrange
-      const root = (body: string) =>
-        `<GlobalValueSet xmlns="http://soap.sforce.com/2006/04/metadata">${body}<sorted>false</sorted></GlobalValueSet>`
-      const value = (label: string) =>
-        `<customValue><label>${label}</label></customValue>`
-      const labels = (side: string) =>
-        Array.from(side.matchAll(/<label>([^<]*)<\/label>/g), m => m[1])
+    const root = (body: string) =>
+      `<GlobalValueSet xmlns="http://soap.sforce.com/2006/04/metadata">${body}<sorted>false</sorted></GlobalValueSet>`
+    const value = (label: string) =>
+      `<customValue><label>${label}</label></customValue>`
+    const labels = (side: string) =>
+      Array.from(side.matchAll(/<label>([^<]*)<\/label>/g), m => m[1])
 
+    it('then edits of neighbours on each side both merge', async () => {
       // Act
       const result = await mergeXmlStrings(
         sut,
@@ -165,12 +184,22 @@ describe('given repeated entries without their key field', () => {
       )
 
       // Assert
-      expect(result.hasConflict).toBe(true)
-      expect(conflictSides(result.output).map(labels)).toEqual([
-        ['x2', 'y'],
-        ['x', 'y'],
-        ['x', 'y2'],
-      ])
+      expect(result.hasConflict).toBe(false)
+      expect(labels(result.output)).toEqual(['x2', 'y2'])
+    })
+
+    it('then divergent edits standing apart merge', async () => {
+      // Act
+      const result = await mergeXmlStrings(
+        sut,
+        root(value('x') + value('m') + value('y')),
+        root(value('x2') + value('m') + value('y')),
+        root(value('x') + value('m') + value('y2'))
+      )
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      expect(labels(result.output)).toEqual(['x2', 'm', 'y2'])
     })
   })
 })

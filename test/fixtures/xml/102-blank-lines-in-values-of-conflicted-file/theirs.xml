@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Profile xmlns="http://soap.sforce.com/2006/04/metadata">
+    <big>l1
+
+   
+l2
+	
+l3</big>
+    <raw><![CDATA[c1
+
+   
+c2]]></raw>
+    <note><!--n1
+
+   
+n2--></note>
+    <attr at="a1
+
+   
+a2">v</attr>
+    <d>c</d>
+</Profile>

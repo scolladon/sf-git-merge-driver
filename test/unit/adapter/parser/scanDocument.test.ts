@@ -19,6 +19,44 @@ describe('scanDocument', () => {
     })
   })
 
+  describe.each([
+    ['a no-break space', ' '],
+    ['a byte order mark', '﻿'],
+    ['a line separator', ' '],
+    ['an em space', ' '],
+  ])(
+    'given text that ends with %s, which XML does not count as whitespace',
+    (_, char) => {
+      it('when scanning then the character is kept', () => {
+        // Arrange
+        const xml = `<r><v>Price:${char}</v><c><![CDATA[${char}x${char}]]></c></r>`
+
+        // Act
+        const outcome = scanDocument(xml)
+
+        // Assert
+        if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+        expect(outcome.result.content).toEqual({
+          r: { v: `Price:${char}`, c: { __cdata: `${char}x${char}` } },
+        })
+      })
+    }
+  )
+
+  describe('given text surrounded by every XML whitespace character', () => {
+    it('when scanning then that whitespace is trimmed', () => {
+      // Arrange
+      const xml = '<r><v> \t\r\nx \t\r\n</v></r>'
+
+      // Act
+      const outcome = scanDocument(xml)
+
+      // Assert
+      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
+      expect(outcome.result.content).toEqual({ r: { v: 'x' } })
+    })
+  })
+
   describe('given text on both sides of an element, each with surrounding whitespace', () => {
     it('when scanning then each segment is trimmed before concatenation', () => {
       // Arrange
@@ -93,7 +131,7 @@ describe('scanDocument', () => {
     })
   })
 
-  describe('given an open frame named `<` and a close tag with an empty name', () => {
+  describe('given an element named `<` and a close tag with an empty name', () => {
     it('when scanning then the `</` opener is not matched as part of the name', () => {
       // Arrange
       const xml = '<<>x</>'
@@ -104,7 +142,7 @@ describe('scanDocument', () => {
       // Assert
       expect(outcome).toEqual({
         kind: 'failed',
-        message: 'Unexpected close tag\nLine: 0\nColumn: 7\nChar: >',
+        message: 'XML parse error: invalid element name',
       })
     })
   })
@@ -290,7 +328,7 @@ describe('scanDocument', () => {
   })
 
   describe('given a comment before the root element', () => {
-    it('when scanning then it is discarded and the root is still found', () => {
+    it('when scanning then it is refused as outside the root', () => {
       // Arrange
       const xml = '<!-- preamble --><r><v>1</v></r>'
 
@@ -298,9 +336,7 @@ describe('scanDocument', () => {
       const outcome = scanDocument(xml)
 
       // Assert
-      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
-      expect(outcome.result.content).toEqual({ r: { v: '1' } })
-      expect(outcome.needsOracle).toBe(false)
+      expect(outcome.kind).toBe('failed')
     })
   })
 
@@ -349,7 +385,7 @@ describe('scanDocument', () => {
   })
 
   describe('given a CDATA section at the top level, before the root', () => {
-    it('when scanning then it is discarded like top-level text', () => {
+    it('when scanning then it is content outside the root, like top-level text', () => {
       // Arrange
       const xml = '<![CDATA[x]]><a>1</a>'
 
@@ -357,8 +393,26 @@ describe('scanDocument', () => {
       const outcome = scanDocument(xml)
 
       // Assert
-      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
-      expect(outcome.result.content).toEqual({ a: '1' })
+      expect(outcome).toEqual({
+        kind: 'failed',
+        message: 'XML parse error: content outside the single root element',
+      })
+    })
+  })
+
+  describe('given a CDATA section at the top level, after the root', () => {
+    it('when scanning then it is content outside the root', () => {
+      // Arrange
+      const xml = '<a>1</a><![CDATA[x]]>'
+
+      // Act
+      const outcome = scanDocument(xml)
+
+      // Assert
+      expect(outcome).toEqual({
+        kind: 'failed',
+        message: 'XML parse error: content outside the single root element',
+      })
     })
   })
 
@@ -395,22 +449,25 @@ describe('scanDocument', () => {
     })
   })
 
-  describe('given a DOCTYPE prologue', () => {
-    it('when scanning then it is skipped and the root is parsed normally', () => {
-      // Arrange
-      const xml = '<!DOCTYPE r SYSTEM "x.dtd"><r><v>1</v></r>'
-
+  describe.each([
+    ['a DOCTYPE before the root', '<!DOCTYPE r SYSTEM "x.dtd"><r><v>1</v></r>'],
+    ['a DOCTYPE after the root', '<r><v>1</v></r><!DOCTYPE r>'],
+    ['a DOCTYPE with a quoted >', '<!DOCTYPE a "x>y"><a><b>x</b></a>'],
+  ])('given %s', (_, xml) => {
+    it('when scanning then it is content outside the root, like a comment', () => {
       // Act
       const outcome = scanDocument(xml)
 
       // Assert
-      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
-      expect(outcome.result.content).toEqual({ r: { v: '1' } })
+      expect(outcome).toEqual({
+        kind: 'failed',
+        message: 'XML parse error: content outside the single root element',
+      })
     })
   })
 
   describe('given a DOCTYPE with an internal subset', () => {
-    it('when scanning then the quote-aware scan resumes after the real >', () => {
+    it('when scanning then the leftover subset text is content outside the root', () => {
       // Arrange
       const xml = '<!DOCTYPE a [ <!ENTITY e "v"> ]><a>x</a>'
 
@@ -418,72 +475,45 @@ describe('scanDocument', () => {
       const outcome = scanDocument(xml)
 
       // Assert
-      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
-      expect(outcome.result.content).toEqual({ a: 'x' })
-    })
-  })
-
-  describe('given a declaration inside an element, followed by a comment', () => {
-    it('when scanning then both are skipped and the sibling text is kept', () => {
-      // Arrange
-      const xml = '<a><!foo--><!-- c -->t</a>'
-
-      // Act
-      const outcome = scanDocument(xml)
-
-      // Assert
-      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
-      expect(outcome.result.content).toEqual({
-        a: { '#xml__comment': ' c ', '#text': 't' },
+      expect(outcome).toEqual({
+        kind: 'failed',
+        message: 'XML parse error: content outside the single root element',
       })
     })
   })
 
-  describe('given a doctype quoted gt containing >', () => {
-    it('when scanning then the quote-aware scan does not stop early', () => {
-      // Arrange
-      const xml = '<!DOCTYPE a "x>y"><a><b>x</b></a>'
-
+  describe.each([
+    ['followed by a comment', '<a><!foo--><!-- c -->t</a>'],
+    ['with a quoted > inside', '<a><!x "y>z">t</a>'],
+  ])('given a declaration inside an element, %s', (_, xml) => {
+    it('when scanning then it is refused instead of dropped', () => {
       // Act
       const outcome = scanDocument(xml)
 
       // Assert
-      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
-      expect(outcome.result.content).toEqual({ a: { b: 'x' } })
-    })
-  })
-
-  describe('given a declaration with a quoted > inside a captured element', () => {
-    it('when scanning then the quote-aware skip lands past the quoted value, not on it', () => {
-      // Arrange — unlike the DOCTYPE-before-root case, this one is
-      // inside the root, so a wrong (too-early) skip would leave a
-      // leftover fragment in the captured text instead of being
-      // silently dropped as top-level garbage.
-      const xml = '<a><!x "y>z">t</a>'
-
-      // Act
-      const outcome = scanDocument(xml)
-
-      // Assert
-      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
-      expect(outcome.result.content).toEqual({ a: 't' })
+      expect(outcome).toEqual({
+        kind: 'failed',
+        message: 'XML parse error: <! declaration inside the root element',
+      })
     })
   })
 
   describe('given a comment opener with only one dash after the bang', () => {
-    it('when scanning then it is not mistaken for a comment and is skipped as a declaration', () => {
+    it('when scanning then it is not mistaken for a comment and is refused as a declaration', () => {
       // Arrange — the char at pos+2 is '-' (the comment fast-path
       // check alone would accept it), but the token does not actually
-      // start with '<!--', so it must fall through to the generic
-      // declaration skip instead of being read as a comment body.
+      // start with '<!--', so it must fall through to the declaration
+      // branch instead of being read as a comment body.
       const xml = '<a><!- x --></a>'
 
       // Act
       const outcome = scanDocument(xml)
 
       // Assert
-      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
-      expect(outcome.result.content).toEqual({ a: '' })
+      expect(outcome).toEqual({
+        kind: 'failed',
+        message: 'XML parse error: <! declaration inside the root element',
+      })
     })
   })
 
@@ -523,11 +553,76 @@ describe('scanDocument', () => {
     })
   })
 
-  describe('given a processing instruction inside an element and before the root', () => {
-    it('when scanning then both are skipped, nothing counted', () => {
-      // Arrange
-      const xml = '<?foo?><a><?pi?>x</a>'
+  describe.each([
+    ['after the XML declaration', '<?xml version="1.0"?><a><?pi?>x</a>'],
+    ['an XML declaration', '<a><?xml version="1.0"?>x</a>'],
+  ])('given a processing instruction inside an element, %s', (_, xml) => {
+    it('when scanning then it is refused instead of dropped', () => {
+      // Act
+      const outcome = scanDocument(xml)
 
+      // Assert
+      expect(outcome).toEqual({
+        kind: 'failed',
+        message:
+          'XML parse error: processing instruction inside the root element',
+      })
+    })
+  })
+
+  describe.each([
+    [
+      'a second declaration',
+      '<?xml version="1.0"?><?xml version="1.0"?><a>x</a>',
+    ],
+    ['a declaration after the root', '<a>x</a><?xml version="1.0"?>'],
+    ['a declaration after whitespace', '\n<?xml version="1.0"?><a>x</a>'],
+    [
+      'a declaration after a BOM and whitespace',
+      '\uFEFF <?xml version="1.0"?><a>x</a>',
+    ],
+  ])('given %s', (_, xml) => {
+    it('when scanning then it is refused as not at the start of the document', () => {
+      // Act
+      const outcome = scanDocument(xml)
+
+      // Assert
+      expect(outcome).toEqual({
+        kind: 'failed',
+        message:
+          'XML parse error: XML declaration not at the start of the document',
+      })
+    })
+  })
+
+  describe.each([
+    ['before the root', '<?foo?><a>x</a>'],
+    ['after the root', '<a>x</a><?foo?>'],
+    ['a stylesheet', '<?xml-stylesheet href="a.css"?><a>x</a>'],
+    ['a name that starts like the declaration', '<?xmlfoo?><a>x</a>'],
+    [
+      'a name that is the declaration, in capitals',
+      '<?XML version="1.0"?><a>x</a>',
+    ],
+  ])('given a processing instruction: %s', (_, xml) => {
+    it('when scanning then it is content outside the root, like a comment', () => {
+      // Act
+      const outcome = scanDocument(xml)
+
+      // Assert
+      expect(outcome).toEqual({
+        kind: 'failed',
+        message: 'XML parse error: content outside the single root element',
+      })
+    })
+  })
+
+  describe.each([
+    ['with attributes', '<?xml version="1.0"?><a>x</a>'],
+    ['closing at once', '<?xml?><a>x</a>'],
+    ['split by a line break', '<?xml\nversion="1.0"?><a>x</a>'],
+  ])('given an XML declaration %s', (_, xml) => {
+    it('when scanning then it is accepted', () => {
       // Act
       const outcome = scanDocument(xml)
 
@@ -537,19 +632,21 @@ describe('scanDocument', () => {
     })
   })
 
-  describe('given a processing instruction preceded by a stray literal ?>', () => {
+  describe('given an unterminated processing instruction preceded by a stray literal ?>', () => {
     it('when scanning then the PI search does not latch onto the earlier ?>', () => {
       // Arrange — searching from `pos - 2` instead of `pos + 2` would
-      // find the stray "?>" that precedes the real PI and never make
-      // forward progress.
-      const xml = '<a>?><?pi?>z</a>'
+      // find the stray "?>" that precedes the real PI and miss that it
+      // never closes.
+      const xml = '<a>?><?pi'
 
       // Act
       const outcome = scanDocument(xml)
 
       // Assert
-      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
-      expect(outcome.result.content).toEqual({ a: '?>z' })
+      expect(outcome).toEqual({
+        kind: 'failed',
+        message: 'XML parse error: unterminated <? ?>',
+      })
     })
   })
 
@@ -641,11 +738,49 @@ describe('scanDocument', () => {
     })
   })
 
-  describe('given two well-formed top-level elements', () => {
-    it('when scanning then only the first becomes the root and the second is dropped', () => {
-      // Arrange
-      const xml = '<a>1</a><b>2</b>'
+  describe.each([
+    ['two well-formed top-level elements', '<a>1</a><b>2</b>'],
+    [
+      'two top-level elements declaring a namespace',
+      '<a xmlns="x"/><b xmlns="y"/>',
+    ],
+    ['a second root opened after a self-closed one', '<a/><b>2</b>'],
+    ['a second root after a nested first one', '<a><c/></a><a>2</a>'],
+  ])('given %s', (_, xml) => {
+    it('when scanning then the document is refused', () => {
+      // Act
+      const outcome = scanDocument(xml)
 
+      // Assert
+      expect(outcome).toEqual({
+        kind: 'failed',
+        message: 'XML parse error: content outside the single root element',
+      })
+    })
+  })
+
+  describe.each([
+    ['text before the root', 'hello<a/>'],
+    ['text after the root', '<a/>hello'],
+    ['text only', 'hello'],
+  ])('given %s', (_, xml) => {
+    it('when scanning then the document is refused', () => {
+      // Act
+      const outcome = scanDocument(xml)
+
+      // Assert
+      expect(outcome).toEqual({
+        kind: 'failed',
+        message: 'XML parse error: content outside the single root element',
+      })
+    })
+  })
+
+  describe.each([
+    ['at the start', '<?xml version="1.0"?>\n<a>1</a>\n'],
+    ['after a byte order mark', '\uFEFF<?xml version="1.0"?>\n<a>1</a>\n'],
+  ])('given a declaration %s of the document', (_, xml) => {
+    it('when scanning then the root is parsed', () => {
       // Act
       const outcome = scanDocument(xml)
 
@@ -655,17 +790,21 @@ describe('scanDocument', () => {
     })
   })
 
-  describe('given two top-level elements each declaring a namespace', () => {
-    it('when scanning then the namespaces come from the root, not the dropped element', () => {
-      // Arrange
-      const xml = '<a xmlns="http://a"/><b xmlns="http://b"/>'
-
+  describe.each([
+    ['a comment before', '<!-- c -->\n<a>1</a>'],
+    ['a comment after', '<a>1</a>\n<!-- d -->\n'],
+    ['an empty comment before', '<!---->\n<a>1</a>'],
+    ['an empty comment after', '<a>1</a><!---->'],
+  ])('given %s the root', (_, xml) => {
+    it('when scanning then the content is refused as outside the root', () => {
       // Act
       const outcome = scanDocument(xml)
 
       // Assert
-      if (outcome.kind !== 'parsed') throw new Error('expected parsed')
-      expect(outcome.result.rootAttributes).toEqual({ '@_xmlns': 'http://a' })
+      expect(outcome).toEqual({
+        kind: 'failed',
+        message: 'XML parse error: content outside the single root element',
+      })
     })
   })
 
@@ -740,7 +879,7 @@ describe('scanDocument', () => {
   describe('given no root element at all', () => {
     it('when scanning then content and rootAttributes are both empty', () => {
       // Arrange
-      const xml = 'hello'
+      const xml = '<?xml nothing?>'
 
       // Act
       const outcome = scanDocument(xml)

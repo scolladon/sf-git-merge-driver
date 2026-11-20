@@ -66,7 +66,7 @@ describe('given a CustomMetadata record with values entries', () => {
         doc(str('A__c', 'a') + str('A__c', 'a2')),
         doc(str('A__c', 'a') + str('A__c', 'a2'), 'Renamed'),
         doc(str('A__c', 'a') + str('A__c', 'a2')),
-        doc(str('A__c', 'a2'), 'Renamed'),
+        doc(str('A__c', 'a') + str('A__c', 'a2'), 'Renamed'),
       ],
       [
         'the only entry is nilled by ours and theirs edits another element',

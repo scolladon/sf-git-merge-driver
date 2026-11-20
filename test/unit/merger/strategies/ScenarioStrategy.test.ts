@@ -1,7 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { MergeContext } from '../../../../src/merger/MergeContext.js'
 import { defaultNodeFactory } from '../../../../src/merger/nodes/MergeNodeFactory.js'
 import { getScenarioStrategy } from '../../../../src/merger/strategies/ScenarioStrategy.js'
+import { ContestedTagOrder } from '../../../../src/merger/tagOrder/contestedTagOrder.js'
+import { TagOrderCache } from '../../../../src/merger/tagOrder/tagOrderCache.js'
+import type { JsonValue } from '../../../../src/types/jsonTypes.js'
 import { MergeScenario } from '../../../../src/types/mergeScenario.js'
 import { defaultConfig } from '../../../utils/testConfig.js'
 
@@ -12,9 +15,10 @@ const createContext = (
   ancestor: {},
   local: {},
   other: {},
-  attribute: undefined,
   nodeFactory: defaultNodeFactory,
   rootKey: undefined,
+  contestedTagOrder: ContestedTagOrder.CONFLICT,
+  tagOrders: new TagOrderCache(),
   ...overrides,
 })
 
@@ -75,18 +79,6 @@ describe('ScenarioStrategy', () => {
           existsInOther: true,
         },
       })
-
-      // Act
-      const result = strategy.execute(context)
-
-      // Assert
-      expect(result.output).toEqual([])
-      expect(result.hasConflict).toBe(false)
-    })
-
-    it('should ignore attribute', () => {
-      // Arrange
-      const context = createContext({ attribute: 'testAttr' })
 
       // Act
       const result = strategy.execute(context)
@@ -544,68 +536,6 @@ describe('ScenarioStrategy', () => {
       })
     })
 
-    describe('with attribute', () => {
-      it('should return conflict wrapping output with attribute key', () => {
-        // Arrange
-        const context = createContext({
-          ancestor: { key: 'ancestorValue' },
-          local: { key: 'localValue' },
-          attribute: 'testAttr',
-        })
-
-        // Act
-        const result = strategy.execute(context)
-
-        // Assert
-        expect(result.hasConflict).toBe(true)
-        const outputStr = JSON.stringify(result.output)
-        expect(outputStr).toContain('testAttr')
-      })
-
-      it('given no attribute when target differs from ancestor then produces conflict without attribute wrapping', () => {
-        // Arrange
-        const context = createContext({
-          ancestor: { key: 'ancestorValue' },
-          local: { key: 'localValue' },
-        })
-
-        // Act
-        const result = strategy.execute(context)
-
-        // Assert
-        expect(result.hasConflict).toBe(true)
-        const outputStr = JSON.stringify(result.output)
-        expect(outputStr).not.toContain('testAttr')
-      })
-
-      it('given attribute when target differs from ancestor then wraps output as object with attribute key', () => {
-        // Arrange
-        const context = createContext({
-          ancestor: { key: 'ancestorValue' },
-          local: { key: 'localValue' },
-          attribute: 'myAttr',
-        })
-
-        // Act
-        const result = strategy.execute(context)
-
-        // Assert
-        expect(result.hasConflict).toBe(true)
-        // Verify the conflict block contains objects with the attribute key (not arrays)
-        const conflictBlock = result.output[0] as Record<string, unknown>
-        expect(conflictBlock).toHaveProperty('__conflict', true)
-        const localSide = conflictBlock['local'] as Record<string, unknown>[]
-        expect(localSide[0]).toHaveProperty('myAttr')
-        expect(Array.isArray(localSide[0])).toBe(false)
-        const ancestorSide = conflictBlock['ancestor'] as Record<
-          string,
-          unknown
-        >[]
-        expect(ancestorSide[0]).toHaveProperty('myAttr')
-        expect(Array.isArray(ancestorSide[0])).toBe(false)
-      })
-    })
-
     describe('with rootKey', () => {
       it('should return empty key when other missing and local unchanged', () => {
         // Arrange
@@ -664,6 +594,30 @@ describe('ScenarioStrategy', () => {
         // Assert
         expect(result.output).toEqual([{ testKey: expect.any(Array) }])
       })
+
+      it.each(['constructor', 'toString', 'valueOf'])(
+        'should delete the unchanged inherited-looking tag %s when other empties the root',
+        tag => {
+          // Arrange
+          const context = createContext({
+            ancestor: { [tag]: 'v', kept: 'v' },
+            local: { [tag]: 'v', added: 'n' },
+            other: undefined,
+            rootKey: {
+              name: 'testKey',
+              existsInLocal: true,
+              existsInOther: true,
+            },
+          })
+
+          // Act
+          const result = strategy.execute(context)
+
+          // Assert
+          expect(result.hasConflict).toBe(false)
+          expect(result.output).toEqual([{ testKey: [{ added: 'n' }] }])
+        }
+      )
 
       it('should return empty key when other exists but nested result is empty', () => {
         // Arrange
@@ -732,53 +686,6 @@ describe('ScenarioStrategy', () => {
 
         // Assert
         expect(result.hasConflict).toBe(true)
-      })
-    })
-
-    describe('with attribute', () => {
-      it('should return conflict wrapping output with attribute key', () => {
-        // Arrange
-        const context = createContext({
-          ancestor: { key: 'ancestorValue' },
-          other: { key: 'otherValue' },
-          attribute: 'testAttr',
-        })
-
-        // Act
-        const result = strategy.execute(context)
-
-        // Assert
-        expect(result.hasConflict).toBe(true)
-        const outputStr = JSON.stringify(result.output)
-        expect(outputStr).toContain('testAttr')
-      })
-    })
-
-    describe('with attribute', () => {
-      it('given attribute when target differs from ancestor then wraps output as object with attribute key', () => {
-        // Arrange
-        const context = createContext({
-          ancestor: { key: 'ancestorValue' },
-          other: { key: 'otherValue' },
-          attribute: 'myAttr',
-        })
-
-        // Act
-        const result = strategy.execute(context)
-
-        // Assert
-        expect(result.hasConflict).toBe(true)
-        const conflictBlock = result.output[0] as Record<string, unknown>
-        expect(conflictBlock).toHaveProperty('__conflict', true)
-        const otherSide = conflictBlock['other'] as Record<string, unknown>[]
-        expect(otherSide[0]).toHaveProperty('myAttr')
-        expect(Array.isArray(otherSide[0])).toBe(false)
-        const ancestorSide = conflictBlock['ancestor'] as Record<
-          string,
-          unknown
-        >[]
-        expect(ancestorSide[0]).toHaveProperty('myAttr')
-        expect(Array.isArray(ancestorSide[0])).toBe(false)
       })
     })
 
@@ -866,6 +773,49 @@ describe('ScenarioStrategy', () => {
   describe('AllPresentStrategy', () => {
     const strategy = getScenarioStrategy(MergeScenario.ALL)
 
+    describe('given the sides reorder child tags into a cycle', () => {
+      const element = (text: string) =>
+        Object.fromEntries([...text].map(tag => [tag, tag]))
+      const cycle = (contestedTagOrder: ContestedTagOrder) =>
+        createContext({
+          ancestor: element('abc'),
+          local: element('bac'),
+          other: element('acb'),
+          contestedTagOrder,
+        })
+
+      it('when contested tags are to be written in canonical order then the tags merge without conflict in that order', () => {
+        // Arrange
+        const context = cycle(ContestedTagOrder.CANONICAL)
+
+        // Act
+        const sut = strategy.execute(context)
+
+        // Assert
+        expect(sut.hasConflict).toBe(false)
+        expect(sut.output).toEqual([{ a: 'a' }, { b: 'b' }, { c: 'c' }])
+      })
+
+      it('when contested tags are to conflict then one block holds them, each side as written', () => {
+        // Arrange
+        const context = cycle(ContestedTagOrder.CONFLICT)
+
+        // Act
+        const sut = strategy.execute(context)
+
+        // Assert
+        expect(sut.hasConflict).toBe(true)
+        expect(sut.output).toEqual([
+          {
+            __conflict: true,
+            local: [element('bac')],
+            ancestor: [element('abc')],
+            other: [element('acb')],
+          },
+        ])
+      })
+    })
+
     describe('without rootKey', () => {
       it('should merge all children', () => {
         // Arrange
@@ -911,6 +861,41 @@ describe('ScenarioStrategy', () => {
         // Assert
         expect(result.hasConflict).toBe(false)
         expect(result.output).toBeDefined()
+      })
+
+      it('should return that order early when both sides reorder the ancestor the same way', () => {
+        // Arrange
+        const context = createContext({
+          ancestor: { a: '1', b: '2' },
+          local: { b: '2', a: '1' },
+          other: { b: '2', a: '1' },
+        })
+        const merged = vi.spyOn(defaultNodeFactory, 'createNode')
+
+        // Act
+        const sut = strategy.execute(context)
+
+        // Assert
+        expect(merged).not.toHaveBeenCalled()
+        expect(sut.hasConflict).toBe(false)
+        expect(Object.keys(sut.output[0] as object)).toEqual(['b', 'a'])
+      })
+
+      it('should keep the reorder one side made when the other side kept the ancestor order', () => {
+        // Arrange
+        const context = createContext({
+          ancestor: { a: '1', b: '2', c: '3' },
+          local: { b: '2', a: '1', c: '3' },
+          other: { a: '1', b: '2', c: '3' },
+        })
+
+        // Act
+        const sut = strategy.execute(context)
+
+        // Assert
+        expect(sut.output.flatMap(item => Object.keys(item as object))).toEqual(
+          ['b', 'a', 'c']
+        )
       })
 
       it('should detect conflict when both sides change differently', () => {
@@ -986,5 +971,223 @@ describe('ScenarioStrategy', () => {
         expect(result.hasConflict).toBe(false)
       })
     })
+  })
+  describe('given a reorder of an unordered type against a deletion', () => {
+    const entry = (fullName: string, value = 'v') => ({ fullName, value })
+    const ancestor = { labels: [entry('A'), entry('B', 'w')] }
+    const reordered = { labels: [entry('B', 'w'), entry('A')] }
+    const present = {
+      name: 'CustomLabels',
+      existsInLocal: true,
+      existsInOther: true,
+    }
+
+    describe('when local reorders and other deletes every entry', () => {
+      it('should take the deletion without conflict', () => {
+        // Arrange
+        const sut = getScenarioStrategy(MergeScenario.ANCESTOR_AND_LOCAL)
+        const context = createContext({
+          ancestor,
+          local: reordered,
+          other: undefined,
+          rootKey: { ...present, existsInOther: false },
+        })
+
+        // Act
+        const result = sut.execute(context)
+
+        // Assert
+        expect(result).toEqual({ output: [], hasConflict: false })
+      })
+    })
+
+    describe('when other reorders and local deletes every entry', () => {
+      it('should take the deletion without conflict', () => {
+        // Arrange
+        const sut = getScenarioStrategy(MergeScenario.ANCESTOR_AND_OTHER)
+        const context = createContext({
+          ancestor,
+          local: undefined,
+          other: reordered,
+          rootKey: { ...present, existsInLocal: false },
+        })
+
+        // Act
+        const result = sut.execute(context)
+
+        // Assert
+        expect(result).toEqual({ output: [], hasConflict: false })
+      })
+    })
+
+    describe('when the reordered type is ordered', () => {
+      it('should still conflict with the deletion', () => {
+        // Arrange
+        const sut = getScenarioStrategy(MergeScenario.ANCESTOR_AND_LOCAL)
+        const values = [{ fullName: 'a' }, { fullName: 'b' }]
+        const context = createContext({
+          ancestor: { customValue: values },
+          local: { customValue: [...values].reverse() },
+          other: undefined,
+          rootKey: {
+            name: 'GlobalValueSet',
+            existsInLocal: true,
+            existsInOther: false,
+          },
+        })
+
+        // Act
+        const result = sut.execute(context)
+
+        // Assert
+        expect(result.hasConflict).toBe(true)
+      })
+    })
+
+    describe('when an entry is edited besides the reorder', () => {
+      it('should hold only the edited entry in the block', () => {
+        // Arrange
+        const sut = getScenarioStrategy(MergeScenario.ANCESTOR_AND_LOCAL)
+        const local = { labels: [entry('A'), entry('B', 'edited')] }
+        const context = createContext({
+          ancestor,
+          local,
+          other: [],
+          rootKey: present,
+        })
+
+        // Act
+        const result = sut.execute(context)
+
+        // Assert
+        const [wrapper] = result.output as { CustomLabels: unknown[] }[]
+        const [block] = wrapper.CustomLabels as {
+          local: unknown[]
+          ancestor: unknown[]
+        }[]
+        expect(block.local).toEqual([{ labels: local.labels[1] }])
+        expect(block.ancestor).toEqual([{ labels: ancestor.labels[1] }])
+      })
+    })
+
+    describe('when the root is missing on the other side and a local entry is edited', () => {
+      it('should render every entry of each side as its own element', () => {
+        // Arrange
+        const sut = getScenarioStrategy(MergeScenario.ANCESTOR_AND_LOCAL)
+        const local = { labels: [entry('A'), entry('B', 'edited')] }
+        const context = createContext({
+          ancestor,
+          local,
+          other: undefined,
+          rootKey: { ...present, existsInOther: false },
+        })
+
+        // Act
+        const result = sut.execute(context)
+
+        // Assert
+        const [block] = result.output as { local: unknown[] }[]
+        expect(block.local).toEqual([
+          { CustomLabels: local.labels.map(labels => ({ labels })) },
+        ])
+      })
+    })
+  })
+
+  describe('given a target that does not exist', () => {
+    describe('when ancestor and local are the only sides and no root key frames them', () => {
+      it('should conflict with an empty local side', () => {
+        // Arrange
+        const sut = getScenarioStrategy(MergeScenario.ANCESTOR_AND_LOCAL)
+        const context = createContext({
+          ancestor: { a: '1' },
+          local: undefined,
+          other: undefined,
+        })
+
+        // Act
+        const result = sut.execute(context)
+
+        // Assert
+        expect(result.hasConflict).toBe(true)
+        expect((result.output[0] as { local: unknown[] }).local).toEqual([])
+      })
+    })
+
+    describe('when the root key frames a target that does not exist', () => {
+      it('should conflict with an empty local side', () => {
+        // Arrange
+        const sut = getScenarioStrategy(MergeScenario.ANCESTOR_AND_LOCAL)
+        const context = createContext({
+          ancestor: { a: '1' },
+          local: undefined,
+          other: undefined,
+          rootKey: { name: 'Root', existsInLocal: false, existsInOther: false },
+        })
+
+        // Act
+        const result = sut.execute(context)
+
+        // Assert
+        expect(result.hasConflict).toBe(true)
+      })
+    })
+  })
+
+  describe('given a root key present on both sides that kept it', () => {
+    const rootKey = { name: 'r', existsInLocal: true, existsInOther: true }
+
+    it.each([
+      [MergeScenario.ANCESTOR_AND_LOCAL, '', 'x', '', ['x']],
+      [MergeScenario.ANCESTOR_AND_LOCAL, null, {}, 'x', ['x']],
+      [MergeScenario.ANCESTOR_AND_LOCAL, {}, '', '', []],
+      [MergeScenario.ANCESTOR_AND_LOCAL, {}, {}, {}, []],
+      [MergeScenario.ANCESTOR_AND_LOCAL, '', {}, {}, []],
+      [MergeScenario.ANCESTOR_AND_LOCAL, 'x', {}, {}, []],
+      [MergeScenario.ANCESTOR_AND_OTHER, {}, '', {}, []],
+      [MergeScenario.ANCESTOR_AND_OTHER, '', {}, {}, []],
+    ])(
+      'when the scenario is %s over ancestor %j, local %j and other %j then the root holds %j',
+      (scenario, ancestor, local, other, held) => {
+        // Arrange
+        const sut = getScenarioStrategy(scenario)
+        const context = createContext({
+          ancestor: ancestor as JsonValue,
+          local: local as JsonValue,
+          other: other as JsonValue,
+          rootKey,
+        })
+
+        // Act
+        const result = sut.execute(context)
+
+        // Assert
+        expect(result).toEqual({ output: [{ r: held }], hasConflict: false })
+      }
+    )
+  })
+
+  describe('given local and other that wrote the same thing over a different ancestor', () => {
+    it.each([
+      ['an empty text', '', {}, {}],
+      ['an empty element', {}, '', ''],
+    ])(
+      'when the ancestor is %s then the sides are merged child by child',
+      (_, ancestor, local, other) => {
+        // Arrange
+        const sut = getScenarioStrategy(MergeScenario.ALL)
+        const context = createContext({
+          ancestor: ancestor as JsonValue,
+          local: local as JsonValue,
+          other: other as JsonValue,
+        })
+
+        // Act
+        const result = sut.execute(context)
+
+        // Assert
+        expect(result).toEqual({ output: [], hasConflict: false })
+      }
+    )
   })
 })

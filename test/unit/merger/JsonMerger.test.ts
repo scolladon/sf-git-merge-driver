@@ -75,43 +75,39 @@ describe('JsonMerger', () => {
         {
           Profile: [
             {
-              fieldPermissions: [
-                { field: 'Account.AllAndAncestorAndOther' },
-                { editable: 'true' },
-                { readable: 'true' },
-              ],
+              fieldPermissions: {
+                editable: 'true',
+                field: 'Account.AllAndAncestorAndOther',
+                readable: 'true',
+              },
             },
             {
-              fieldPermissions: [
-                {
-                  editable: 'false',
-                  field: 'Account.Industry',
-                  readable: 'true',
-                },
-              ],
+              fieldPermissions: {
+                editable: 'false',
+                field: 'Account.Industry',
+                readable: 'true',
+              },
             },
             {
-              fieldPermissions: [
-                {
-                  editable: 'false',
-                  field: 'Account.LocalAndOther',
-                  readable: 'true',
-                },
-              ],
+              fieldPermissions: {
+                editable: 'false',
+                field: 'Account.LocalAndOther',
+                readable: 'true',
+              },
             },
             {
-              fieldPermissions: [
-                { field: 'Account.Name' },
-                { editable: 'true' },
-                { readable: 'true' },
-              ],
+              fieldPermissions: {
+                editable: 'true',
+                field: 'Account.Name',
+                readable: 'true',
+              },
             },
             {
-              fieldPermissions: [
-                { field: 'Account.Type' },
-                { editable: 'false' },
-                { readable: 'false' },
-              ],
+              fieldPermissions: {
+                editable: 'false',
+                field: 'Account.Type',
+                readable: 'false',
+              },
             },
           ],
         },
@@ -200,20 +196,18 @@ describe('JsonMerger', () => {
         {
           Profile: [
             {
-              fieldPermissions: [
-                { field: 'Account.Name' },
-                { editable: 'true' },
-                { readable: 'true' },
-              ],
+              fieldPermissions: {
+                editable: 'true',
+                field: 'Account.Name',
+                readable: 'true',
+              },
             },
             {
-              fieldPermissions: [
-                {
-                  editable: 'false',
-                  field: 'Account.Type',
-                  readable: 'true',
-                },
-              ],
+              fieldPermissions: {
+                editable: 'false',
+                field: 'Account.Type',
+                readable: 'true',
+              },
             },
           ],
         },
@@ -272,13 +266,11 @@ describe('JsonMerger', () => {
               ],
             },
             {
-              fieldPermissions: [
-                {
-                  editable: 'false',
-                  field: 'Account.Type',
-                  readable: 'true',
-                },
-              ],
+              fieldPermissions: {
+                editable: 'false',
+                field: 'Account.Type',
+                readable: 'true',
+              },
             },
             { label: 'Their Label' },
           ],
@@ -384,39 +376,35 @@ describe('JsonMerger', () => {
         {
           Profile: [
             {
-              fieldPermissions: [
-                {
-                  editable: 'false',
-                  field: 'Account.Industry',
-                  readable: 'true',
-                },
-              ],
+              fieldPermissions: {
+                editable: 'false',
+                field: 'Account.Industry',
+                readable: 'true',
+              },
             },
             {
               fieldPermissions: [
                 { field: 'Account.Name' },
                 {
                   __conflict: true,
-                  ancestor: [{}],
+                  ancestor: [],
                   local: [{ editable: 'true' }],
                   other: [{ editable: 'false' }],
                 },
                 {
                   __conflict: true,
-                  ancestor: [{}],
+                  ancestor: [],
                   local: [{ readable: 'true' }],
                   other: [{ readable: 'false' }],
                 },
               ],
             },
             {
-              fieldPermissions: [
-                {
-                  editable: 'false',
-                  field: 'Account.Type',
-                  readable: 'true',
-                },
-              ],
+              fieldPermissions: {
+                editable: 'false',
+                field: 'Account.Type',
+                readable: 'true',
+              },
             },
             { description: 'Their description' },
           ],
@@ -459,7 +447,7 @@ describe('JsonMerger', () => {
                 { field: 'Account.Name' },
                 {
                   __conflict: true,
-                  ancestor: [{}],
+                  ancestor: [],
                   local: [{ editable: 'true' }],
                   other: [{ editable: 'false' }],
                 },
@@ -472,7 +460,7 @@ describe('JsonMerger', () => {
       expect(result.hasConflict).toBe(true)
     })
 
-    it('should generate block-level conflict markers when merging changes with an unknown property name', () => {
+    it('should generate an entry-level conflict when both sides insert different entries under an unknown property name', () => {
       // Arrange
       const ancestor: JsonValue = {
         Profile: {},
@@ -503,12 +491,12 @@ describe('JsonMerger', () => {
           Profile: [
             {
               __conflict: true,
-              ancestor: [{}],
+              ancestor: [],
               local: [
                 {
                   unknown: {
-                    editable: 'true',
                     field: 'Account.Name',
+                    editable: 'true',
                     readable: 'true',
                   },
                 },
@@ -516,8 +504,8 @@ describe('JsonMerger', () => {
               other: [
                 {
                   unknown: {
-                    editable: 'false',
                     field: 'Account.Name',
+                    editable: 'false',
                     readable: 'true',
                   },
                 },
@@ -564,27 +552,23 @@ describe('JsonMerger', () => {
               __conflict: true,
               ancestor: [
                 {
-                  fieldPermissions: [
-                    {
-                      editable: 'true',
-                      field: 'Account.Name',
-                      readable: 'true',
-                    },
-                  ],
+                  fieldPermissions: {
+                    editable: 'true',
+                    field: 'Account.Name',
+                    readable: 'true',
+                  },
                 },
               ],
               local: [
                 {
-                  fieldPermissions: [
-                    {
-                      editable: 'false',
-                      field: 'Account.Name',
-                      readable: 'true',
-                    },
-                  ],
+                  fieldPermissions: {
+                    editable: 'false',
+                    field: 'Account.Name',
+                    readable: 'true',
+                  },
                 },
               ],
-              other: [{}],
+              other: [],
             },
           ],
         },
@@ -643,23 +627,25 @@ describe('JsonMerger', () => {
           ],
           local: [
             {
-              Profile: {
-                fieldPermissions: [
-                  {
+              Profile: [
+                {
+                  fieldPermissions: {
                     editable: 'true',
                     field: 'Account.Name',
                     readable: 'true',
                   },
-                  {
+                },
+                {
+                  fieldPermissions: {
                     editable: 'false',
                     field: 'Account.Type',
                     readable: 'true',
                   },
-                ],
-              },
+                },
+              ],
             },
           ],
-          other: [{}],
+          other: [],
         },
       ])
       expect(result.hasConflict).toBe(true)
@@ -700,25 +686,21 @@ describe('JsonMerger', () => {
               __conflict: true,
               ancestor: [
                 {
-                  fieldPermissions: [
-                    {
-                      editable: 'true',
-                      field: 'Account.Name',
-                      readable: 'true',
-                    },
-                  ],
+                  fieldPermissions: {
+                    editable: 'true',
+                    field: 'Account.Name',
+                    readable: 'true',
+                  },
                 },
               ],
-              local: [{}],
+              local: [],
               other: [
                 {
-                  fieldPermissions: [
-                    {
-                      editable: 'false',
-                      field: 'Account.Name',
-                      readable: 'true',
-                    },
-                  ],
+                  fieldPermissions: {
+                    editable: 'false',
+                    field: 'Account.Name',
+                    readable: 'true',
+                  },
                 },
               ],
             },
@@ -777,23 +759,25 @@ describe('JsonMerger', () => {
               },
             },
           ],
-          local: [{}],
+          local: [],
           other: [
             {
-              Profile: {
-                fieldPermissions: [
-                  {
+              Profile: [
+                {
+                  fieldPermissions: {
                     editable: 'true',
                     field: 'Account.Name',
                     readable: 'true',
                   },
-                  {
+                },
+                {
+                  fieldPermissions: {
                     editable: 'false',
                     field: 'Account.Type',
                     readable: 'true',
                   },
-                ],
-              },
+                },
+              ],
             },
           ],
         },
@@ -1073,7 +1057,7 @@ describe('JsonMerger', () => {
           Profile: [
             {
               __conflict: true,
-              ancestor: [{}],
+              ancestor: [],
               local: [{ description: 'Our description' }],
               other: [{ description: 'Their description' }],
             },
@@ -1111,7 +1095,7 @@ describe('JsonMerger', () => {
             {
               __conflict: true,
               ancestor: [{ description: 'Original description' }],
-              local: [{}],
+              local: [],
               other: [{ description: 'Their description' }],
             },
           ],
@@ -1149,7 +1133,7 @@ describe('JsonMerger', () => {
               __conflict: true,
               ancestor: [{ description: 'Original description' }],
               local: [{ description: 'Our description' }],
-              other: [{}],
+              other: [],
             },
           ],
         },
@@ -1247,7 +1231,7 @@ describe('JsonMerger', () => {
               loginHours: { fridayEnd: 400, fridayStart: 300 },
             },
             {
-              loginHours: [{ mondayStart: 200 }, { mondayEnd: 400 }],
+              loginHours: { mondayEnd: 400, mondayStart: 200 },
             },
             {
               loginHours: { thursdayEnd: 400, thursdayStart: 300 },
@@ -1256,7 +1240,7 @@ describe('JsonMerger', () => {
               loginHours: { tuesdayEnd: 400, tuesdayStart: 300 },
             },
             {
-              loginHours: [{ wednesdayStart: 300 }, { wednesdayEnd: 500 }],
+              loginHours: { wednesdayEnd: 500, wednesdayStart: 300 },
             },
           ],
         },
@@ -1310,13 +1294,11 @@ describe('JsonMerger', () => {
         {
           Profile: [
             {
-              loginIpRanges: [
-                {
-                  description: 'description',
-                  endAddress: '10.0.0.2',
-                  startAddress: '192.168.1.1',
-                },
-              ],
+              loginIpRanges: {
+                description: 'description',
+                endAddress: '10.0.0.2',
+                startAddress: '192.168.1.1',
+              },
             },
           ],
         },
@@ -1366,13 +1348,13 @@ describe('JsonMerger', () => {
         {
           Profile: [
             {
-              loginHours: [{ fridayEnd: 400, fridayStart: 300 }],
+              loginHours: { fridayEnd: 400, fridayStart: 300 },
             },
             {
               loginHours: { mondayEnd: 400, mondayStart: 300 },
             },
             {
-              loginHours: [{ thursdayEnd: 400, thursdayStart: 300 }],
+              loginHours: { thursdayEnd: 400, thursdayStart: 300 },
             },
             {
               loginHours: { tuesdayEnd: 400, tuesdayStart: 300 },
@@ -1426,19 +1408,19 @@ describe('JsonMerger', () => {
         {
           Profile: [
             {
-              loginHours: [{ fridayEnd: 400, fridayStart: 300 }],
+              loginHours: { fridayEnd: 400, fridayStart: 300 },
             },
             {
-              loginHours: [{ mondayStart: 300 }, { mondayEnd: 500 }],
+              loginHours: { mondayEnd: 500, mondayStart: 300 },
             },
             {
-              loginHours: [{ thursdayEnd: 400, thursdayStart: 300 }],
+              loginHours: { thursdayEnd: 400, thursdayStart: 300 },
             },
             {
               loginHours: { tuesdayEnd: 400, tuesdayStart: 300 },
             },
             {
-              loginHours: [{ wednesdayEnd: 400, wednesdayStart: 300 }],
+              loginHours: { wednesdayEnd: 400, wednesdayStart: 300 },
             },
           ],
         },
@@ -1818,5 +1800,381 @@ describe('JsonMerger', () => {
       const keys = profile.map(entry => Object.keys(entry)[0])
       expect(keys).toEqual(['description', 'custom', 'userLicense'])
     })
+  })
+  describe('given one side reordering the tags of an object the other left alone', () => {
+    const doc = (order: string[]): JsonValue => ({
+      CustomObject: {
+        nameField: Object.fromEntries(order.map(tag => [tag, tag])),
+      },
+    })
+    const tagsOf = (output: JsonValue[]): string[] => {
+      const root = (output[0] as JsonObject)['CustomObject'] as JsonObject[]
+      const field = root[0]['nameField'] as JsonObject[]
+      return field.flatMap(entry => Object.keys(entry))
+    }
+    const unchanged = doc(['E', 'B', 'D', 'A', 'C'])
+    const reordered = doc(['B', 'E', 'D', 'A', 'C'])
+
+    it.each([
+      ['other', unchanged, reordered],
+      ['local', reordered, unchanged],
+    ])('should keep the reorder when %s made it', (_side, local, other) => {
+      // Act
+      const result = sut.mergeThreeWay(
+        unchanged as JsonObject,
+        local as JsonObject,
+        other as JsonObject
+      )
+
+      // Assert
+      expect(tagsOf(result.output)).toEqual(['B', 'E', 'D', 'A', 'C'])
+      expect(result.hasConflict).toBe(false)
+    })
+  })
+
+  describe('given many identical keyless entries edited on both sides', () => {
+    const COPIES = 24
+    const BUDGET_MS = 2000
+    const permission = (editable: string, readable: string) => ({
+      editable,
+      readable,
+    })
+    const copies = (edit: (index: number) => JsonValue) =>
+      Array.from({ length: COPIES }, (_, index) => edit(index))
+
+    it('should merge them in bounded time', { timeout: BUDGET_MS }, () => {
+      // Arrange
+      const ancestor = {
+        Profile: { fieldPermissions: copies(() => permission('true', 'true')) },
+      }
+      const local = {
+        Profile: {
+          fieldPermissions: copies(index =>
+            permission(index === 0 ? 'false' : 'true', 'true')
+          ),
+        },
+      }
+      const other = {
+        Profile: {
+          fieldPermissions: copies(index =>
+            permission('true', index === COPIES - 1 ? 'false' : 'true')
+          ),
+        },
+      }
+
+      // Act
+      const result = sut.mergeThreeWay(ancestor, local, other)
+
+      // Assert
+      expect(result.output).toBeDefined()
+    })
+  })
+
+  describe('given both sides reordering child tags of one element into a cycle', () => {
+    const profile = (text: string, rest: JsonObject = {}): JsonObject => ({
+      Profile: {
+        ...Object.fromEntries([...text].map(key => [key, key])),
+        ...rest,
+      },
+    })
+
+    it.each([
+      ['local first', 'bac', 'acb'],
+      ['other first', 'acb', 'bac'],
+    ])(
+      'given %s when merging then the root element children stand in canonical order without conflict',
+      (_side, local, other) => {
+        // Arrange
+        const ancestor = profile('abc')
+
+        // Act
+        const result = sut.mergeThreeWay(
+          ancestor,
+          profile(local),
+          profile(other)
+        )
+
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(result.output).toEqual([
+          { Profile: [{ a: 'a' }, { b: 'b' }, { c: 'c' }] },
+        ])
+      }
+    )
+
+    it.each([
+      ['local first', 'bac', 'acb'],
+      ['other first', 'acb', 'bac'],
+    ])(
+      'given %s: the cycle among the children of a nested element when merging then the element holds one block with each side as written',
+      (_side, local, other) => {
+        // Arrange
+        const nested = (text: string) => profile('', { N: body(text) })
+        const body = (text: string) =>
+          Object.fromEntries([...text].map(key => [key, key]))
+
+        // Act
+        const result = sut.mergeThreeWay(
+          nested('abc'),
+          nested(local),
+          nested(other)
+        )
+
+        // Assert
+        expect(result.hasConflict).toBe(true)
+        expect(result.output).toEqual([
+          {
+            Profile: [
+              {
+                N: [
+                  {
+                    __conflict: true,
+                    local: [body(local)],
+                    ancestor: [body('abc')],
+                    other: [body(other)],
+                  },
+                ],
+              },
+            ],
+          },
+        ])
+      }
+    )
+
+    it.each([
+      ['local first', 'bacd', 'abdc'],
+      ['other first', 'abdc', 'bacd'],
+    ])(
+      'given %s: swaps on disjoint pairs when merging then both swaps hold without conflict',
+      (_side, local, other) => {
+        // Act
+        const result = sut.mergeThreeWay(
+          profile('abcd'),
+          profile(local),
+          profile(other)
+        )
+
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(result.output).toEqual([
+          { Profile: [{ b: 'b' }, { a: 'a' }, { d: 'd' }, { c: 'c' }] },
+        ])
+      }
+    )
+  })
+
+  describe('given a cycle among some child tags of an element', () => {
+    const body = (text: string): JsonObject =>
+      Object.fromEntries([...text].map(key => [key, key]))
+    const blockOf = (local: string, other: string, ancestor: string) => ({
+      __conflict: true,
+      local: [body(local)],
+      ancestor: [body(ancestor)],
+      other: [body(other)],
+    })
+    const mirrored = (block: ReturnType<typeof blockOf>) => ({
+      ...block,
+      local: block.other,
+      other: block.local,
+    })
+    const inProfile = (element: JsonObject): JsonObject => ({
+      Profile: { E: element },
+    })
+    const merged = (ancestor: string, local: string, other: string) =>
+      sut.mergeThreeWay(
+        inProfile(body(ancestor)),
+        inProfile(body(local)),
+        inProfile(body(other))
+      )
+
+    it.each([
+      ['local first', 'bacd', 'acbd', false],
+      ['other first', 'acbd', 'bacd', true],
+    ])(
+      'given %s: a key no side moved when merging then only the cycle is in the block',
+      (_side, local, other, flipped) => {
+        // Act
+        const result = merged('abcd', local, other)
+
+        // Assert
+        const block = blockOf('bac', 'acb', 'abc')
+        expect(result.hasConflict).toBe(true)
+        expect(result.output).toEqual([
+          {
+            Profile: [{ E: [flipped ? mirrored(block) : block, { d: 'd' }] }],
+          },
+        ])
+      }
+    )
+
+    it.each([
+      ['local first', 'bacedf', 'acbdfe', false],
+      ['other first', 'acbdfe', 'bacedf', true],
+    ])(
+      'given %s: two separate cycles when merging then each is its own block',
+      (_side, local, other, flipped) => {
+        // Act
+        const result = merged('abcdef', local, other)
+
+        // Assert
+        const first = blockOf('bac', 'acb', 'abc')
+        const second = blockOf('edf', 'dfe', 'def')
+        expect(result.output).toEqual([
+          {
+            Profile: [
+              {
+                E: flipped
+                  ? [mirrored(first), mirrored(second)]
+                  : [first, second],
+              },
+            ],
+          },
+        ])
+      }
+    )
+
+    it.each([
+      ['local first', 'fdcu', 'fcud', false],
+      ['other first', 'fcud', 'fdcu', true],
+    ])(
+      'given %s: untouched repeated entries around the cycle when merging then they stay outside the block',
+      (_side, local, other, flipped) => {
+        // Arrange
+        const names: Record<string, JsonValue> = {
+          f: [{ field: 'A' }, { field: 'B' }],
+          c: 'custom',
+          d: 'description',
+          u: 'userLicense',
+        }
+        const labels: Record<string, string> = {
+          f: 'fieldPermissions',
+          c: 'custom',
+          d: 'description',
+          u: 'userLicense',
+        }
+        const profile = (text: string): JsonObject => ({
+          Profile: {
+            N: Object.fromEntries(
+              [...text].map(key => [labels[key], names[key]])
+            ),
+          },
+        })
+        const inner = (text: string): JsonObject =>
+          Object.fromEntries(
+            [...text.replace('f', '')].map(key => [labels[key], names[key]])
+          )
+        const block = {
+          __conflict: true,
+          local: [inner(flipped ? other : local)],
+          ancestor: [inner('fcdu')],
+          other: [inner(flipped ? local : other)],
+        }
+
+        // Act
+        const result = sut.mergeThreeWay(
+          profile('fcdu'),
+          profile(local),
+          profile(other)
+        )
+
+        // Assert
+        expect(result.hasConflict).toBe(true)
+        expect(result.output).toEqual([
+          {
+            Profile: [
+              {
+                N: [
+                  { fieldPermissions: { field: 'A' } },
+                  { fieldPermissions: { field: 'B' } },
+                  block,
+                ],
+              },
+            ],
+          },
+        ])
+      }
+    )
+  })
+
+  describe('given a cycle among some child tags of the root element', () => {
+    const root = (...tags: [string, JsonValue][]): JsonObject => ({
+      Profile: Object.fromEntries(tags),
+    })
+    const entries: [string, JsonValue] = [
+      'fieldPermissions',
+      [{ field: 'A' }, { field: 'B' }],
+    ]
+
+    it.each([
+      ['local first', ['d', 'c', 'u'], ['c', 'u', 'd']],
+      ['other first', ['c', 'u', 'd'], ['d', 'c', 'u']],
+    ])(
+      'given %s: untouched repeated entries ahead of it when merging then they stay put and the cycle is written in canonical order',
+      (_side, local, other) => {
+        // Arrange
+        const labels: Record<string, string> = {
+          c: 'custom',
+          d: 'description',
+          u: 'userLicense',
+        }
+        const profile = (order: string[]): JsonObject =>
+          root(
+            entries,
+            ...order.map((key): [string, JsonValue] => [labels[key], key])
+          )
+
+        // Act
+        const result = sut.mergeThreeWay(
+          profile(['c', 'd', 'u']),
+          profile(local),
+          profile(other)
+        )
+
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(result.output).toEqual([
+          {
+            Profile: [
+              { fieldPermissions: { field: 'A' } },
+              { fieldPermissions: { field: 'B' } },
+              { custom: 'c' },
+              { description: 'd' },
+              { userLicense: 'u' },
+            ],
+          },
+        ])
+      }
+    )
+  })
+
+  describe('given a document whose top-level tags are reordered into a cycle', () => {
+    const document = (text: string): JsonObject =>
+      Object.fromEntries([...text].map(key => [key, key]))
+
+    it.each([
+      ['local first', 'bac', 'acb'],
+      ['other first', 'acb', 'bac'],
+    ])(
+      'given %s when merging then the whole document is one block',
+      (_side, local, other) => {
+        // Act
+        const result = sut.mergeThreeWay(
+          document('abc'),
+          document(local),
+          document(other)
+        )
+
+        // Assert
+        expect(result.hasConflict).toBe(true)
+        expect(result.output).toEqual([
+          {
+            __conflict: true,
+            local: [document(local)],
+            ancestor: [document('abc')],
+            other: [document(other)],
+          },
+        ])
+      }
+    )
   })
 })

@@ -1,26 +1,37 @@
 import {
+  createEmptyBody,
   type JsonArray,
   type JsonObject,
+  type JsonValue,
   toJsonObjectOrEmpty,
 } from '../../types/jsonTypes.js'
 import type { MergeResult } from '../../types/mergeResult.js'
 import {
   buildEarlyResult,
   combineResults,
+  expandRepeatedChild,
   noConflict,
   withConflict,
   wrapWithRootKey,
 } from '../../types/mergeResult.js'
 import { MergeScenario } from '../../types/mergeScenario.js'
-import { jsonEqual } from '../../utils/jsonEqual.js'
+import { jsonEqual, jsonIdentical } from '../../utils/jsonEqual.js'
 import { buildConflictMarkers } from '../ConflictMarkerBuilder.js'
 import type { MergeContext, RootKeyInfo } from '../MergeContext.js'
 import { MergeOrchestrator } from '../MergeOrchestrator.js'
-import { mergePropertyOrder } from '../mergePropertyOrder.js'
+import { sameContent } from '../sameContent.js'
+import { mergePropertyOrder } from '../tagOrder/mergePropertyOrder.js'
+import { mergeTagsInOrder } from '../tagOrder/propertyOrderConflict.js'
 
 // ============================================================================
 // Strategy Interface
 // ============================================================================
+
+interface ElementSides {
+  readonly ancestor: JsonObject | undefined
+  readonly local: JsonObject
+  readonly other: JsonObject
+}
 
 interface ScenarioStrategy {
   execute(context: MergeContext): MergeResult
@@ -35,33 +46,48 @@ abstract class AbstractMergeStrategy implements ScenarioStrategy {
 
   protected mergeChildren(
     context: MergeContext,
-    ancestor?: JsonObject | JsonArray
+    ancestor?: JsonValue
   ): MergeResult {
-    const local = context.local as JsonObject | JsonArray
-    const other = context.other as JsonObject | JsonArray
-
     // Narrow once up front; direct indexing in the loop avoids a per-key
     // Array.isArray on the hot path.
-    const localObj = toJsonObjectOrEmpty(local)
-    const otherObj = toJsonObjectOrEmpty(other)
-    const ancestorObj =
-      ancestor === undefined ? undefined : toJsonObjectOrEmpty(ancestor)
+    const sides = {
+      ancestor:
+        // Stryker disable next-line ConditionalExpression: an absent ancestor and an empty body have no keys, no tag, and the same empty view in a conflict block
+        ancestor === undefined ? undefined : toJsonObjectOrEmpty(ancestor),
+      local: toJsonObjectOrEmpty(context.local),
+      other: toJsonObjectOrEmpty(context.other),
+    }
+    const results = mergeTagsInOrder(
+      mergePropertyOrder(
+        sides.ancestor,
+        sides.local,
+        sides.other,
+        context.contestedTagOrder,
+        context.tagOrders
+      ),
+      sides,
+      key => this.mergeTag(context, sides, key)
+    )
 
-    const props = mergePropertyOrder(ancestor, local, other)
-    const results: MergeResult[] = []
+    return this.rooted(context, combineResults(results))
+  }
 
-    for (const key of props) {
-      const childNode = context.nodeFactory.createNode(
-        ancestorObj === undefined ? undefined : ancestorObj[key],
-        localObj[key],
-        otherObj[key],
+  private mergeTag(
+    context: MergeContext,
+    sides: ElementSides,
+    key: string
+  ): MergeResult {
+    return context.nodeFactory
+      .createNode(
+        sides.ancestor?.[key],
+        sides.local[key],
+        sides.other[key],
         key
       )
-      const childResult = childNode.merge(context.config)
-      results.push(childResult)
-    }
+      .merge(context.config)
+  }
 
-    const result = combineResults(results)
+  private rooted(context: MergeContext, result: MergeResult): MergeResult {
     if (context.rootKey) {
       return wrapWithRootKey(result, context.rootKey.name)
     }
@@ -69,10 +95,21 @@ abstract class AbstractMergeStrategy implements ScenarioStrategy {
   }
 }
 
+// A side that does not exist contests as an empty one
+const present = (value: JsonValue | undefined): JsonValue => value ?? null
+
+const isBody = (
+  value: JsonValue | undefined
+): value is JsonObject | JsonArray =>
+  typeof value === 'object' && value !== null
+
+const asBody = (value: JsonValue | undefined): JsonObject | JsonArray =>
+  isBody(value) ? value : createEmptyBody()
+
 abstract class AbstractAncestorStrategy implements ScenarioStrategy {
   execute(context: MergeContext): MergeResult {
     const target = this.getTarget(context)
-    const targetUnchanged = jsonEqual(context.ancestor, target)
+    const targetUnchanged = sameContent(context.ancestor, target)
 
     if (context.rootKey) {
       return this.executeWithRootKey(
@@ -89,7 +126,7 @@ abstract class AbstractAncestorStrategy implements ScenarioStrategy {
   private executeWithRootKey(
     context: MergeContext,
     rootKey: RootKeyInfo,
-    target: unknown,
+    target: JsonValue | undefined,
     targetUnchanged: boolean
   ): MergeResult {
     const { name } = rootKey
@@ -100,49 +137,52 @@ abstract class AbstractAncestorStrategy implements ScenarioStrategy {
     }
 
     if (!existsInSecondary) {
-      const targetObj = { [name]: target as JsonObject | JsonArray }
+      const targetObj = { [name]: expandRepeatedChild(present(target)) }
       const ancestorObj = {
-        [name]: context.ancestor as JsonObject | JsonArray,
+        [name]: expandRepeatedChild(present(context.ancestor)),
       }
       return withConflict(this.buildConflict(context, targetObj, ancestorObj))
     }
 
-    return wrapWithRootKey(this.executeNested(context), name)
+    return wrapWithRootKey(this.executeNested(context, targetUnchanged), name)
   }
 
   private executeWithoutRootKey(
     context: MergeContext,
-    target: unknown,
+    target: JsonValue | undefined,
     targetUnchanged: boolean
   ): MergeResult {
     if (targetUnchanged) {
       return noConflict([])
     }
 
-    if (context.attribute) {
-      return this.executeWithAttribute(context, context.attribute)
-    }
-
     return withConflict(
       this.buildConflict(
         context,
-        target as JsonObject | JsonArray,
-        context.ancestor as JsonObject | JsonArray
+        expandRepeatedChild(present(target)),
+        expandRepeatedChild(present(context.ancestor))
       )
     )
   }
 
-  protected abstract getTarget(context: MergeContext): unknown
+  protected abstract getTarget(context: MergeContext): JsonValue | undefined
 
   protected abstract getExistsInSecondary(rootKey: RootKeyInfo): boolean
 
   protected abstract buildConflict(
     context: MergeContext,
-    targetObj: JsonObject | JsonArray,
-    ancestorObj: JsonObject | JsonArray
+    targetObj: JsonValue,
+    ancestorObj: JsonValue
   ): JsonArray
 
-  private executeNested(context: MergeContext): MergeResult {
+  private executeNested(
+    context: MergeContext,
+    targetUnchanged: boolean
+  ): MergeResult {
+    const target = this.getTarget(context)
+    if (!targetUnchanged && isBody(context.ancestor) && isBody(target)) {
+      return this.mergeAgainstEmptied(context)
+    }
     const orchestrator = new MergeOrchestrator(
       context.config,
       context.nodeFactory
@@ -150,32 +190,17 @@ abstract class AbstractAncestorStrategy implements ScenarioStrategy {
     return orchestrator.merge(context.ancestor, context.local, context.other)
   }
 
-  private executeWithAttribute(
-    context: MergeContext,
-    attribute: string
-  ): MergeResult {
-    const orchestrator = new MergeOrchestrator(
-      context.config,
-      context.nodeFactory
-    )
-    const targetResult = this.mergeTarget(orchestrator, context)
-    const ancestorResult = orchestrator.merge(
-      {},
-      context.ancestor,
-      {},
-      undefined
-    )
-
-    const targetProp = { [attribute]: targetResult.output }
-    const ancestorProp = { [attribute]: ancestorResult.output }
-
-    return withConflict(this.buildConflict(context, targetProp, ancestorProp))
+  // The type, not an unrelated sibling, decides how entries merge (ADR 072):
+  // a side that empties the root is merged entry by entry, so only the
+  // entries the other side changed conflict (ADR 053).
+  private mergeAgainstEmptied(context: MergeContext): MergeResult {
+    return getScenarioStrategy(MergeScenario.ALL).execute({
+      ...context,
+      local: asBody(context.local),
+      other: asBody(context.other),
+      rootKey: undefined,
+    })
   }
-
-  protected abstract mergeTarget(
-    orchestrator: MergeOrchestrator,
-    context: MergeContext
-  ): MergeResult
 }
 
 // ============================================================================
@@ -202,11 +227,8 @@ class LocalOnlyStrategy implements ScenarioStrategy {
 
 class LocalAndOtherStrategy extends AbstractMergeStrategy {
   execute(context: MergeContext): MergeResult {
-    const local = context.local as JsonObject | JsonArray
-    const other = context.other as JsonObject | JsonArray
-
-    if (jsonEqual(local, other)) {
-      return buildEarlyResult(local, context.rootKey?.name)
+    if (jsonIdentical(context.local, context.other)) {
+      return buildEarlyResult(context.local, context.rootKey?.name)
     }
 
     return this.mergeChildren(context, undefined)
@@ -227,7 +249,7 @@ class AncestorOnlyStrategy implements ScenarioStrategy {
 }
 
 class AncestorAndLocalStrategy extends AbstractAncestorStrategy {
-  protected getTarget(context: MergeContext): unknown {
+  protected getTarget(context: MergeContext): JsonValue | undefined {
     return context.local
   }
 
@@ -237,22 +259,15 @@ class AncestorAndLocalStrategy extends AbstractAncestorStrategy {
 
   protected buildConflict(
     _context: MergeContext,
-    targetObj: JsonObject,
-    ancestorObj: JsonObject
+    targetObj: JsonValue,
+    ancestorObj: JsonValue
   ): JsonArray {
     return [buildConflictMarkers(targetObj, ancestorObj, {})]
-  }
-
-  protected mergeTarget(
-    orchestrator: MergeOrchestrator,
-    context: MergeContext
-  ): MergeResult {
-    return orchestrator.merge({}, context.local, {}, undefined)
   }
 }
 
 class AncestorAndOtherStrategy extends AbstractAncestorStrategy {
-  protected getTarget(context: MergeContext): unknown {
+  protected getTarget(context: MergeContext): JsonValue | undefined {
     return context.other
   }
 
@@ -262,33 +277,28 @@ class AncestorAndOtherStrategy extends AbstractAncestorStrategy {
 
   protected buildConflict(
     _context: MergeContext,
-    targetObj: JsonObject | JsonArray,
-    ancestorObj: JsonObject | JsonArray
+    targetObj: JsonValue,
+    ancestorObj: JsonValue
   ): JsonArray {
     return [buildConflictMarkers({}, ancestorObj, targetObj)]
   }
-
-  protected mergeTarget(
-    orchestrator: MergeOrchestrator,
-    context: MergeContext
-  ): MergeResult {
-    return orchestrator.merge({}, {}, context.other, undefined)
-  }
 }
+
+// Local and other write the same thing, which is the ancestor up to the order
+// of its tags: each child merges to that, so the merge is already known. The
+// order-blind comparison only runs when the cheap one fails.
+const bothSidesMadeTheSameChange = (context: MergeContext): boolean =>
+  jsonIdentical(context.local, context.other) &&
+  (jsonIdentical(context.ancestor, context.local) ||
+    jsonEqual(context.ancestor, context.local))
 
 class AllPresentStrategy extends AbstractMergeStrategy {
   execute(context: MergeContext): MergeResult {
-    if (
-      jsonEqual(context.ancestor, context.local) &&
-      jsonEqual(context.local, context.other)
-    ) {
+    if (bothSidesMadeTheSameChange(context)) {
       return buildEarlyResult(context.local, context.rootKey?.name)
     }
 
-    return this.mergeChildren(
-      context,
-      context.ancestor as JsonObject | JsonArray
-    )
+    return this.mergeChildren(context, context.ancestor)
   }
 }
 

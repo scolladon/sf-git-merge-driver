@@ -2,12 +2,43 @@ import { describe, expect, it } from 'vitest'
 import { KeyedArrayMergeNode } from '../../../../src/merger/nodes/KeyedArrayMergeNode.js'
 import { MetadataService } from '../../../../src/service/MetadataService.js'
 import { isConflictBlock } from '../../../../src/types/conflictBlock.js'
-import type { JsonArray } from '../../../../src/types/jsonTypes.js'
+import type { JsonArray, JsonObject } from '../../../../src/types/jsonTypes.js'
 import { defaultConfig } from '../../../utils/testConfig.js'
 
 const fieldPermissionsKey =
   MetadataService.getKeyFieldExtractor('fieldPermissions')
 const picklistValueKey = MetadataService.getKeyFieldExtractor('value')
+
+const permission = (token: string) => {
+  const [field, editable] = token.split(':')
+  return { field, editable: editable === 't' ? 'true' : 'false' }
+}
+
+const entriesOf = (spec: string) =>
+  spec === '' ? [] : spec.split(' ').map(permission)
+
+const wrapTokens = (spec: string) =>
+  entriesOf(spec).map(entry => ({ fieldPermissions: entry }))
+
+const keyedNode = (ancestor: string, local: string, other: string) =>
+  new KeyedArrayMergeNode(
+    entriesOf(ancestor),
+    entriesOf(local),
+    entriesOf(other),
+    'fieldPermissions',
+    fieldPermissionsKey,
+    false
+  )
+
+const tokens = (output: JsonArray): string =>
+  output
+    .map(item => {
+      const { field, editable } = (
+        item as { fieldPermissions: { field: string; editable: string } }
+      ).fieldPermissions
+      return `${field}:${editable === 'true' ? 't' : 'f'}`
+    })
+    .join(',')
 
 describe('KeyedArrayMergeNode', () => {
   describe('merge with key field (fieldPermissions)', () => {
@@ -600,8 +631,10 @@ describe('KeyedArrayMergeNode', () => {
 
   describe('given an array without a key extractor', () => {
     describe('when every side changed it differently', () => {
-      it('then each side of the conflict lists one element per entry', () => {
+      it('then one block holds the three versions of the replaced entries', () => {
         // Arrange
+        const wrapped = (...names: string[]) =>
+          names.map(name => ({ unknownAttribute: { name } }))
         const sut = new KeyedArrayMergeNode(
           [{ name: 'a' }, { name: 'b' }],
           [{ name: 'c' }, { name: 'd' }],
@@ -615,28 +648,22 @@ describe('KeyedArrayMergeNode', () => {
         const result = sut.merge(defaultConfig)
 
         // Assert
-        const [block] = result.output
-        expect(result.output).toHaveLength(1)
-        expect(isConflictBlock(block)).toBe(true)
-        expect(block).toMatchObject({
-          local: [
-            { unknownAttribute: { name: 'c' } },
-            { unknownAttribute: { name: 'd' } },
+        expect(result).toEqual({
+          output: [
+            {
+              __conflict: true,
+              local: wrapped('c', 'd'),
+              ancestor: wrapped('a', 'b'),
+              other: wrapped('e', 'f'),
+            },
           ],
-          ancestor: [
-            { unknownAttribute: { name: 'a' } },
-            { unknownAttribute: { name: 'b' } },
-          ],
-          other: [
-            { unknownAttribute: { name: 'e' } },
-            { unknownAttribute: { name: 'f' } },
-          ],
+          hasConflict: true,
         })
       })
     })
 
     describe('when the ancestor was empty', () => {
-      it('then the ancestor side is a single empty element', () => {
+      it('then both sides inserted an entry in one block with an empty ancestor', () => {
         // Arrange
         const sut = new KeyedArrayMergeNode(
           [],
@@ -651,8 +678,17 @@ describe('KeyedArrayMergeNode', () => {
         const result = sut.merge(defaultConfig)
 
         // Assert
-        const block = result.output.find(isConflictBlock)
-        expect(block?.ancestor).toEqual([{}])
+        expect(result).toEqual({
+          output: [
+            {
+              __conflict: true,
+              local: [{ unknownAttribute: { name: 'c' } }],
+              ancestor: [],
+              other: [{ unknownAttribute: { name: 'e' } }],
+            },
+          ],
+          hasConflict: true,
+        })
       })
     })
   })
@@ -922,7 +958,7 @@ describe('KeyedArrayMergeNode', () => {
     })
 
     describe('when two entries share no key and each side edits another', () => {
-      it('then it conflicts on the whole array with both entries per side', () => {
+      it('then each replacement keeps the place of its entry and both merge', () => {
         // Arrange
         const sut = build(
           [entry1, entry2],
@@ -934,11 +970,150 @@ describe('KeyedArrayMergeNode', () => {
         const result = sut.merge(defaultConfig)
 
         // Assert
-        expect(result.hasConflict).toBe(true)
-        const block = result.output.find(isConflictBlock)
-        expect(block?.local).toEqual(wrap(edited1, entry2))
-        expect(block?.ancestor).toEqual(wrap(entry1, entry2))
-        expect(block?.other).toEqual(wrap(entry1, edited2))
+        expect(result.hasConflict).toBe(false)
+        expect(result.output).toEqual(wrap(edited1, edited2))
+      })
+    })
+
+    describe('when keyless entries stand apart and each side edits another', () => {
+      it('then both edits merge', () => {
+        // Arrange
+        const middle = { editable: 'false', readable: 'maybe' }
+        const sut = build(
+          [entry1, middle, entry2],
+          [edited1, middle, entry2],
+          [entry1, middle, edited2]
+        )
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(result.output).toEqual(wrap(edited1, middle, edited2))
+      })
+    })
+
+    describe('when one side deletes an entry that the other edits', () => {
+      it('then it merges as the entry removed and the edit added', () => {
+        // Arrange
+        const sut = build([entry1, entry2], [entry2], [edited1, entry2])
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(result.output).toEqual(wrap(edited1, entry2))
+      })
+    })
+
+    describe('when both sides edit one entry differently', () => {
+      it('then the two edits are insertions at the place of the removed entry', () => {
+        // Arrange
+        const otherEdit = { ...entry1, readable: 'maybe' }
+        const sut = build(
+          [entry1, entry2],
+          [edited1, entry2],
+          [otherEdit, entry2]
+        )
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result.output[0]).toEqual({
+          __conflict: true,
+          local: wrap(edited1),
+          ancestor: wrap(entry1),
+          other: wrap(otherEdit),
+        })
+      })
+    })
+
+    describe('when keyed entries sit among keyless ones', () => {
+      const keyedA = { field: 'A', editable: 'false' }
+      const keyedB = { field: 'B', editable: 'false' }
+
+      it('then a swap of edited keyed entries keeps each conflict on its entry', () => {
+        // Arrange
+        const edited = (entry: JsonObject, editable: string) => ({
+          ...entry,
+          editable,
+        })
+        const sut = build(
+          [keyedA, keyedB, entry1, entry2],
+          [edited(keyedB, 'true'), edited(keyedA, 'true'), entry1, entry2],
+          [edited(keyedA, 'maybe'), keyedB, entry1, entry2]
+        )
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result.output).toEqual([
+          ...wrap(edited(keyedB, 'true')),
+          {
+            fieldPermissions: [
+              { field: 'A' },
+              {
+                __conflict: true,
+                local: [{ editable: 'true' }],
+                ancestor: [{ editable: 'false' }],
+                other: [{ editable: 'maybe' }],
+              },
+            ],
+          },
+          ...wrap(entry1, entry2),
+        ])
+      })
+
+      it('then both sides editing one keyed entry conflict inside that entry', () => {
+        // Arrange
+        const sut = build(
+          [keyedA, entry1, entry2],
+          [{ ...keyedA, editable: 'true' }, entry1, entry2],
+          [{ ...keyedA, editable: 'maybe' }, entry1, entry2]
+        )
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result.output[0]).toEqual({
+          fieldPermissions: [
+            { field: 'A' },
+            {
+              __conflict: true,
+              local: [{ editable: 'true' }],
+              ancestor: [{ editable: 'false' }],
+              other: [{ editable: 'maybe' }],
+            },
+          ],
+        })
+      })
+    })
+
+    describe('when a real key is spelled like the signature of a keyless entry', () => {
+      it('then the keyed entry stays distinct from that entry', () => {
+        // Arrange
+        const lookalike = {
+          field: JSON.stringify(entry1),
+          editable: 'true',
+        }
+        const edited = { ...lookalike, editable: 'false' }
+        const sut = build(
+          [lookalike, entry1, entry2],
+          [edited, edited1, entry2],
+          [lookalike, entry2]
+        )
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(result.output).toEqual(wrap(edited, edited1, entry2))
       })
     })
 
@@ -957,7 +1132,7 @@ describe('KeyedArrayMergeNode', () => {
     })
 
     describe('when local deleted the array and other edits an entry', () => {
-      it('then it conflicts with an empty local side', () => {
+      it('then the edit is the only entry left and nothing conflicts', () => {
         // Arrange
         const sut = build([entry1, entry2], [], [edited1, entry2])
 
@@ -965,9 +1140,8 @@ describe('KeyedArrayMergeNode', () => {
         const result = sut.merge(defaultConfig)
 
         // Assert
-        expect(result.hasConflict).toBe(true)
-        const block = result.output.find(isConflictBlock)
-        expect(block?.local).toEqual([{}])
+        expect(result.hasConflict).toBe(false)
+        expect(result.output).toEqual(wrap(edited1))
       })
     })
 
@@ -990,7 +1164,7 @@ describe('KeyedArrayMergeNode', () => {
       const xEdited = { label: 'x2' }
       const yEdited = { label: 'y2' }
 
-      it('then divergent edits conflict on the whole array', () => {
+      it('then edits of neighbours on each side both merge', () => {
         // Arrange
         const sut = buildOrdered([x, y], [xEdited, y], [x, yEdited])
 
@@ -998,11 +1172,8 @@ describe('KeyedArrayMergeNode', () => {
         const result = sut.merge(defaultConfig)
 
         // Assert
-        expect(result.hasConflict).toBe(true)
-        const block = result.output.find(isConflictBlock)
-        expect(block?.local).toHaveLength(2)
-        expect(block?.ancestor).toHaveLength(2)
-        expect(block?.other).toHaveLength(2)
+        expect(result.hasConflict).toBe(false)
+        expect(result.output).toEqual([{ value: xEdited }, { value: yEdited }])
       })
 
       it('then a one-sided edit resolves with both entries', () => {
@@ -1019,29 +1190,42 @@ describe('KeyedArrayMergeNode', () => {
     })
 
     describe('when each side holds a lone keyless entry', () => {
-      it('then it matches them by the lone key without conflict', () => {
+      it('then divergent replacements of the content conflict at one place', () => {
         // Arrange
-        const sut = build(
-          [entry1],
-          [edited1],
-          [{ ...entry1, readable: 'true' }]
-        )
+        const otherEdit = { ...entry1, readable: 'true' }
+        const sut = build([entry1], [edited1], [otherEdit])
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result.output).toEqual([
+          {
+            __conflict: true,
+            local: [{ fieldPermissions: edited1 }],
+            ancestor: [{ fieldPermissions: entry1 }],
+            other: [{ fieldPermissions: otherEdit }],
+          },
+        ])
+      })
+
+      it('then a one-sided edit is the old content removed and the new added', () => {
+        // Arrange
+        const sut = build([entry1], [edited1], [entry1])
 
         // Act
         const result = sut.merge(defaultConfig)
 
         // Assert
         expect(result.hasConflict).toBe(false)
-        expect(result.output).toEqual([
-          { fieldPermissions: [{ editable: 'true' }, { readable: 'true' }] },
-        ])
+        expect(result.output).toEqual([{ fieldPermissions: edited1 }])
       })
     })
   })
 
   describe('given entries sharing a real key', () => {
     describe('when unordered', () => {
-      it('then the last entry wins once and nothing conflicts', () => {
+      it('then every copy is kept', () => {
         // Arrange
         const first = { field: 'Account.X__c', editable: 'false' }
         const last = { field: 'Account.X__c', editable: 'true' }
@@ -1060,13 +1244,67 @@ describe('KeyedArrayMergeNode', () => {
 
         // Assert
         expect(result.hasConflict).toBe(false)
-        expect(result.output[0]).toEqual({ fieldPermissions: last })
-        expect(result.output).toHaveLength(2)
+        expect(result.output).toEqual([
+          { fieldPermissions: first },
+          { fieldPermissions: last },
+          { fieldPermissions: added },
+        ])
+      })
+
+      describe.each([
+        ['A:f A:t', 'A:f A:t', 'A:f A:t', 'A:f,A:t'],
+        ['A:f A:t', 'A:f A:t', 'A:f A:t B:f', 'A:f,A:t,B:f'],
+        ['A:f A:t', 'A:t', 'A:f A:f', 'A:f'],
+        ['A:f A:t', 'A:f A:t', 'A:t', 'A:t'],
+        ['A:f A:t', 'A:t A:f', 'A:f A:t', 'A:t,A:f'],
+        ['A:f A:t', 'A:f A:t', 'A:t A:f', 'A:t,A:f'],
+        ['', 'A:f A:t', '', 'A:f,A:t'],
+        ['', 'A:f A:t A:f', 'A:f', 'A:f,A:t,A:f'],
+        ['', 'A:f', 'A:f A:t', 'A:f,A:t'],
+        ['A:f A:f', 'A:f', 'A:f B:f', 'A:f,B:f'],
+      ])('given %s / %s / %s', (ancestor, local, other, expected) => {
+        it('then the clean outcome is the settled copies', () => {
+          // Arrange
+          const sut = keyedNode(ancestor, local, other)
+
+          // Act
+          const result = sut.merge(defaultConfig)
+
+          // Assert
+          expect(result.hasConflict).toBe(false)
+          expect(tokens(result.output)).toBe(expected)
+        })
+      })
+
+      describe.each([
+        ['A:f A:f', 'A:t A:f', 'A:f A:t'],
+        ['A:f A:f', 'A:t', 'A:f'],
+        ['A:f A:f', 'A:f', 'A:t'],
+        ['A:f', '', 'A:t A:t'],
+      ])('given %s / %s / %s', (ancestor, local, other) => {
+        it('then the key is one block of its written copies', () => {
+          // Arrange
+          const sut = keyedNode(ancestor, local, other)
+
+          // Act
+          const result = sut.merge(defaultConfig)
+
+          // Assert
+          expect(result.hasConflict).toBe(true)
+          expect(result.output).toHaveLength(1)
+          const [block] = result.output
+          expect(isConflictBlock(block)).toBe(true)
+          expect(block).toMatchObject({
+            local: wrapTokens(local),
+            ancestor: wrapTokens(ancestor),
+            other: wrapTokens(other),
+          })
+        })
       })
     })
 
     describe('when ordered', () => {
-      it('then the last entry is written once per occurrence', () => {
+      it('then every entry is written as given', () => {
         // Arrange
         const a1 = { fullName: 'A', label: 'A1' }
         const a2 = { fullName: 'A', label: 'A2' }
@@ -1086,10 +1324,379 @@ describe('KeyedArrayMergeNode', () => {
         // Assert
         expect(result.hasConflict).toBe(false)
         expect(result.output).toEqual([
-          { customValue: a2 },
+          { customValue: a1 },
           { customValue: a2 },
           { customValue: b },
         ])
+      })
+    })
+  })
+
+  describe('given an unordered keyed array', () => {
+    const entry = (field: string, editable = 'false') => ({ field, editable })
+    const whole = (item: object) => ({ fieldPermissions: item })
+    const mergeUnordered = (
+      ancestor: JsonArray,
+      local: JsonArray,
+      other: JsonArray
+    ) =>
+      new KeyedArrayMergeNode(
+        ancestor,
+        local,
+        other,
+        'fieldPermissions',
+        fieldPermissionsKey,
+        false
+      ).merge(defaultConfig)
+
+    describe('when local deletes an entry that other edits', () => {
+      it('then one block holds the whole entry at array level', () => {
+        // Arrange
+        const ancestor = [entry('A'), entry('B')]
+        const local = [entry('B')]
+        const other = [entry('A', 'true'), entry('B')]
+
+        // Act
+        const result = mergeUnordered(ancestor, local, other)
+
+        // Assert
+        expect(result).toEqual({
+          output: [
+            {
+              __conflict: true,
+              local: [],
+              ancestor: [whole(entry('A'))],
+              other: [whole(entry('A', 'true'))],
+            },
+            whole(entry('B')),
+          ],
+          hasConflict: true,
+        })
+      })
+    })
+
+    describe('when other deletes an entry that local edits', () => {
+      it('then one block holds the whole entry at array level', () => {
+        // Arrange
+        const ancestor = [entry('A'), entry('B')]
+        const local = [entry('A', 'true'), entry('B')]
+        const other = [entry('B')]
+
+        // Act
+        const result = mergeUnordered(ancestor, local, other)
+
+        // Assert
+        expect(result).toEqual({
+          output: [
+            {
+              __conflict: true,
+              local: [whole(entry('A', 'true'))],
+              ancestor: [whole(entry('A'))],
+              other: [],
+            },
+            whole(entry('B')),
+          ],
+          hasConflict: true,
+        })
+      })
+    })
+
+    describe('when only other edited an entry', () => {
+      it('then the entry is emitted whole', () => {
+        // Arrange
+        const ancestor = [entry('A')]
+        const local = [entry('A')]
+        const other = [entry('A', 'true')]
+
+        // Act
+        const result = mergeUnordered(ancestor, local, other)
+
+        // Assert
+        expect(result).toEqual({
+          output: [whole(entry('A', 'true'))],
+          hasConflict: false,
+        })
+      })
+    })
+
+    describe('when local deletes an entry that other edited with a hidden field', () => {
+      it('then one block holds the entry', () => {
+        // Arrange
+        const hidden = { field: 'A', editable: 'false', hidden: 'true' }
+
+        // Act
+        const result = mergeUnordered([entry('A')], [], [hidden])
+
+        // Assert
+        expect(result.output).toEqual([
+          {
+            __conflict: true,
+            local: [],
+            ancestor: [whole(entry('A'))],
+            other: [whole(hidden)],
+          },
+        ])
+      })
+    })
+
+    describe('when both sides insert one entry with different content', () => {
+      it('then one field block sits inside the entry', () => {
+        // Arrange
+        const ancestor = [entry('A')]
+        const local = [entry('A'), entry('C', 'true')]
+        const other = [entry('A'), entry('C', 'maybe')]
+
+        // Act
+        const result = mergeUnordered(ancestor, local, other)
+
+        // Assert
+        expect(result.hasConflict).toBe(true)
+        expect(result.output).toHaveLength(2)
+        expect(result.output[0]).toEqual(whole(entry('A')))
+        const inserted = (result.output[1] as { fieldPermissions: JsonArray })
+          .fieldPermissions
+        expect(inserted.filter(isConflictBlock)).toHaveLength(1)
+      })
+    })
+
+    describe('when each side deletes a different field of a keyless entry', () => {
+      it('then both replacements of the content conflict at one place', () => {
+        // Arrange
+        const ancestor = [{ editable: 'true', readable: 'true' }]
+        const local = [{ editable: 'true' }]
+        const other = [{ readable: 'true' }]
+
+        // Act
+        const result = mergeUnordered(ancestor, local, other)
+
+        // Assert
+        expect(result).toEqual({
+          hasConflict: true,
+          output: [
+            {
+              __conflict: true,
+              local: [{ fieldPermissions: local[0] }],
+              ancestor: [{ fieldPermissions: ancestor[0] }],
+              other: [{ fieldPermissions: other[0] }],
+            },
+          ],
+        })
+      })
+    })
+
+    describe('when both sides edit one entry carrying attributes', () => {
+      it('then the entry conflicts as one text unit with its attributes', () => {
+        // Arrange
+        const item = (editable: string) => ({
+          '@_n1:nil': 'false',
+          field: 'A',
+          editable,
+        })
+
+        // Act
+        const result = mergeUnordered([item('f')], [item('t')], [item('m')])
+
+        // Assert
+        expect(result).toEqual({
+          output: [
+            {
+              __conflict: true,
+              local: [whole(item('t'))],
+              ancestor: [whole(item('f'))],
+              other: [whole(item('m'))],
+            },
+          ],
+          hasConflict: true,
+        })
+      })
+    })
+
+    describe('when both sides edit one entry on different fields', () => {
+      it('then both edits merge without conflict', () => {
+        // Arrange
+        const base = { field: 'A', editable: 'false', readable: 'false' }
+        const local = { ...base, editable: 'true' }
+        const other = { ...base, readable: 'true' }
+
+        // Act
+        const result = mergeUnordered([base], [local], [other])
+
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(JSON.stringify(result.output)).toContain('"editable":"true"')
+        expect(JSON.stringify(result.output)).toContain('"readable":"true"')
+      })
+    })
+  })
+
+  describe('given a keyless list of twelve entries', () => {
+    // Linear code takes a few ms here, even under coverage; the version that
+    // paired every edited entry with every unused ancestor copy cannot finish.
+    const SIZE = 12
+    const BUDGET_MS = 500
+    const TEST_TIMEOUT_MS = 20_000
+    const entry = (index: number, edit = '') => ({ name: `e${index}${edit}` })
+    const ancestor = Array.from({ length: SIZE }, (_, index) => entry(index))
+    const editedBy = (edit: string) =>
+      ancestor.map((_, index) => entry(index, edit))
+    const timedMerge = (local: JsonArray, other: JsonArray): number => {
+      const sut = new KeyedArrayMergeNode(
+        ancestor,
+        local,
+        other,
+        'unknownThing',
+        undefined,
+        false
+      )
+      const start = performance.now()
+      sut.merge(defaultConfig)
+      return performance.now() - start
+    }
+
+    describe('when one side edits every entry', () => {
+      it(
+        'then it merges within the budget',
+        () => {
+          // Arrange
+          const local = editedBy('-local')
+
+          // Act
+          const elapsed = timedMerge(local, ancestor)
+
+          // Assert
+          expect(elapsed).toBeLessThan(BUDGET_MS)
+        },
+        TEST_TIMEOUT_MS
+      )
+    })
+
+    describe('when both sides edit every entry', () => {
+      it(
+        'then it merges within the budget',
+        () => {
+          // Arrange
+          const local = editedBy('-local')
+          const other = editedBy('-other')
+
+          // Act
+          const elapsed = timedMerge(local, other)
+
+          // Assert
+          expect(elapsed).toBeLessThan(BUDGET_MS)
+        },
+        TEST_TIMEOUT_MS
+      )
+    })
+  })
+
+  describe('given entries of equal content whose child tags are in different orders', () => {
+    const inOrder = (tags: readonly string[], values: JsonObject) =>
+      Object.fromEntries(tags.map(tag => [tag, values[tag]]))
+    const unorderedKeyed = (trio: readonly [JsonArray, JsonArray, JsonArray]) =>
+      new KeyedArrayMergeNode(
+        ...trio,
+        'fieldPermissions',
+        fieldPermissionsKey,
+        false
+      )
+    const orderedKeyed = (trio: readonly [JsonArray, JsonArray, JsonArray]) =>
+      new KeyedArrayMergeNode(...trio, 'value', picklistValueKey, true)
+    const keyless = (trio: readonly [JsonArray, JsonArray, JsonArray]) =>
+      new KeyedArrayMergeNode(...trio, 'thing', undefined, false)
+    const SHAPES = [
+      ['an unordered keyed array', unorderedKeyed, 'field'],
+      ['an ordered keyed array', orderedKeyed, 'fullName'],
+      ['a keyless array', keyless, 'label'],
+    ] as const
+    const ANCESTOR = ['a', 'b', 'c']
+    const OURS = ['b', 'a', 'c']
+    const THEIRS = ['a', 'c', 'b']
+    const values = { a: '1', b: '2', c: '3', field: 'F', fullName: 'F' }
+
+    const entriesIn = (keyTag: string, tags: readonly string[]): JsonArray => [
+      inOrder([keyTag, ...tags], values),
+    ]
+
+    describe('when a key is repeated in an unordered keyed array', () => {
+      it('then the cycle among the tag orders of the copies conflicts', () => {
+        // Arrange
+        const twice = (tags: readonly string[]): JsonArray => [
+          ...entriesIn('field', tags),
+          ...entriesIn('field', tags),
+        ]
+        const sut = unorderedKeyed([
+          twice(ANCESTOR),
+          twice(OURS),
+          twice(THEIRS),
+        ])
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result.hasConflict).toBe(true)
+      })
+    })
+
+    describe.each(SHAPES)('when %s', (_shape, build, keyTag) => {
+      it.each([
+        ['ours', OURS, THEIRS],
+        ['theirs', THEIRS, OURS],
+      ])(
+        'then the cycle among the tag orders conflicts whichever side is %s',
+        (_side, local, other) => {
+          // Arrange
+          const sut = build([
+            entriesIn(keyTag, ANCESTOR),
+            entriesIn(keyTag, local),
+            entriesIn(keyTag, other),
+          ])
+
+          // Act
+          const result = sut.merge(defaultConfig)
+
+          // Assert
+          expect(result.hasConflict).toBe(true)
+        }
+      )
+
+      it('then an entry both sides add with disagreeing tag orders conflicts', () => {
+        // Arrange
+        const sut = build([
+          [],
+          entriesIn(keyTag, OURS),
+          entriesIn(keyTag, THEIRS),
+        ])
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result.hasConflict).toBe(true)
+      })
+
+      it('then a reorder only one side made is kept', () => {
+        // Arrange
+        const sut = build([
+          entriesIn(keyTag, ANCESTOR),
+          entriesIn(keyTag, OURS),
+          entriesIn(keyTag, ANCESTOR),
+        ])
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(JSON.stringify(result.output)).toBe(
+          JSON.stringify(
+            build([
+              entriesIn(keyTag, OURS),
+              entriesIn(keyTag, OURS),
+              entriesIn(keyTag, OURS),
+            ]).merge(defaultConfig).output
+          )
+        )
       })
     })
   })

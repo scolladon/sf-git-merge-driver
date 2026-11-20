@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { peekEol } from '../../../src/utils/peekEol.js'
+import { peekDocumentEol, peekEol } from '../../../src/utils/peekEol.js'
 
 describe('peekEol', () => {
   let tmpRoot: string
@@ -122,6 +122,57 @@ describe('peekEol', () => {
         vi.doUnmock('node:fs/promises')
         vi.resetModules()
       }
+    })
+  })
+
+  describe('peekDocumentEol', () => {
+    describe('given ours is empty and theirs holds CRLF', () => {
+      it('when peeked then theirs decides: CRLF', async () => {
+        const ours = await write('doc-empty.xml', '')
+        const theirs = await write('doc-crlf.xml', 'a\r\nb\r\n')
+        const ancestor = await write('doc-anc-lf.xml', 'a\nb\n')
+        expect(await peekDocumentEol([ours, theirs, ancestor])).toBe('\r\n')
+      })
+    })
+
+    describe('given ours and theirs are empty and the ancestor holds CRLF', () => {
+      it('when peeked then the ancestor decides: CRLF', async () => {
+        const ours = await write('doc-e1.xml', '')
+        const theirs = await write('doc-e2.xml', '')
+        const ancestor = await write('doc-anc-crlf.xml', 'a\r\n')
+        expect(await peekDocumentEol([ours, theirs, ancestor])).toBe('\r\n')
+      })
+    })
+
+    describe('given ours holds LF and theirs holds CRLF', () => {
+      it('when peeked then ours decides: LF', async () => {
+        const ours = await write('doc-lf.xml', 'a\nb\n')
+        const theirs = await write('doc-crlf2.xml', 'a\r\nb\r\n')
+        expect(await peekDocumentEol([ours, theirs])).toBe('\n')
+      })
+    })
+
+    describe('given ours holds a single line with no newline and theirs holds CRLF', () => {
+      it('when peeked then ours still decides: LF', async () => {
+        const ours = await write('doc-oneline.xml', '<a/>')
+        const theirs = await write('doc-crlf3.xml', 'a\r\nb\r\n')
+        expect(await peekDocumentEol([ours, theirs])).toBe('\n')
+      })
+    })
+
+    describe('given every side is empty', () => {
+      it('when peeked then it defaults to LF', async () => {
+        const ours = await write('doc-e3.xml', '')
+        expect(await peekDocumentEol([ours])).toBe('\n')
+      })
+    })
+
+    describe('given a side that cannot be read', () => {
+      it('when peeked then the error propagates', async () => {
+        await expect(
+          peekDocumentEol([join(tmpRoot, 'missing.xml')])
+        ).rejects.toMatchObject({ code: 'ENOENT' })
+      })
     })
   })
 })

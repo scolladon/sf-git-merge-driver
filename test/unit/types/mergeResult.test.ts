@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildEarlyResult,
   combineResults,
+  expandRepeatedChild,
   isNonEmpty,
   noConflict,
   withConflict,
@@ -313,6 +314,30 @@ describe('mergeResult', () => {
 
       // Act & Assert
       expect(isNonEmpty(result)).toBe(false)
+    })
+  })
+
+  describe('expandRepeatedChild', () => {
+    it.each([
+      ['a string', 'text'],
+      ['a null', null],
+      ['an array', ['a', 'b']],
+      ['an object with several keys', { a: ['1', '2'], b: '3' }],
+      ['an object with a single repeat', { a: ['1'] }],
+    ])('given %s when expanding then returns it unchanged', (_name, value) => {
+      // Act
+      const sut = expandRepeatedChild(value)
+
+      // Assert
+      expect(sut).toBe(value)
+    })
+
+    it('given an object holding several repeats of one child when expanding then returns one wrapper per repeat', () => {
+      // Act
+      const sut = expandRepeatedChild({ a: ['1', '2'] })
+
+      // Assert
+      expect(sut).toEqual([{ a: '1' }, { a: '2' }])
     })
   })
 })

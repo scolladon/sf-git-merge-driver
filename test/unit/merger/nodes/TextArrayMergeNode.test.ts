@@ -1,5 +1,13 @@
-import { describe, expect, it } from 'vitest'
-import { TextArrayMergeNode } from '../../../../src/merger/nodes/TextArrayMergeNode.js'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { buildConflictMarkers } from '../../../../src/merger/ConflictMarkerBuilder.js'
+import {
+  type Pairing,
+  readings,
+} from '../../../../src/merger/nodes/keyedReadings.js'
+import {
+  mergedCount,
+  TextArrayMergeNode,
+} from '../../../../src/merger/nodes/TextArrayMergeNode.js'
 import type { JsonArray, JsonValue } from '../../../../src/types/jsonTypes.js'
 import { defaultConfig } from '../../../utils/testConfig.js'
 
@@ -163,7 +171,7 @@ describe('TextArrayMergeNode', () => {
       expect(result.output).toEqual([])
     })
 
-    it('should deduplicate elements', () => {
+    it('should keep a one-sided extra copy', () => {
       // Arrange
       const ancestor = ['a']
       const local = ['a', 'a']
@@ -175,7 +183,7 @@ describe('TextArrayMergeNode', () => {
 
       // Assert
       expect(result.hasConflict).toBe(false)
-      expect(result.output).toHaveLength(1)
+      expect(result.output).toEqual([{ items: 'a' }, { items: 'a' }])
     })
 
     it('should handle arrays with null values added by both sides', () => {
@@ -226,6 +234,138 @@ describe('TextArrayMergeNode', () => {
       expect(result.output).toHaveLength(2) // a, b (deduplicated)
     })
 
+    it('should keep a repeated value when the other side appends', () => {
+      // Arrange
+      const node = new TextArrayMergeNode(
+        ['a', 'a', 'b'],
+        ['a', 'a', 'b'],
+        ['a', 'a', 'b', 'c'],
+        'items'
+      )
+
+      // Act
+      const result = node.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(false)
+      expect(result.output).toEqual([
+        { items: 'a' },
+        { items: 'a' },
+        { items: 'b' },
+        { items: 'c' },
+      ])
+    })
+
+    it('should add every copy a side adds', () => {
+      // Arrange
+      const sut = new TextArrayMergeNode([], [], ['a', 'a'], 'items')
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.output).toEqual([{ items: 'a' }, { items: 'a' }])
+    })
+
+    it('should drop one copy when one side removes it and the other appends', () => {
+      // Arrange
+      const sut = new TextArrayMergeNode(
+        ['a', 'a', 'b'],
+        ['a', 'b'],
+        ['a', 'a', 'b', 'c'],
+        'items'
+      )
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.output).toEqual([
+        { items: 'a' },
+        { items: 'b' },
+        { items: 'c' },
+      ])
+    })
+
+    it('should drop one copy when both sides remove it', () => {
+      // Arrange
+      const sut = new TextArrayMergeNode(
+        ['a', 'a', 'b'],
+        ['a', 'b'],
+        ['a', 'b', 'c'],
+        'items'
+      )
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.output).toEqual([
+        { items: 'a' },
+        { items: 'b' },
+        { items: 'c' },
+      ])
+    })
+
+    it('should ignore order changes', () => {
+      // Arrange
+      const sut = new TextArrayMergeNode(
+        ['b', 'a'],
+        ['a', 'b'],
+        ['b', 'a', 'c'],
+        'items'
+      )
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.output).toEqual([
+        { items: 'a' },
+        { items: 'b' },
+        { items: 'c' },
+      ])
+    })
+
+    it('should keep disjoint deletions', () => {
+      // Arrange
+      const sut = new TextArrayMergeNode(
+        ['a', 'b', 'c'],
+        ['b', 'c'],
+        ['a', 'c'],
+        'items'
+      )
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.output).toEqual([{ items: 'c' }])
+    })
+
+    it('should conflict when the sides keep different numbers of copies', () => {
+      // Arrange
+      const sut = new TextArrayMergeNode(
+        ['a', 'a', 'a'],
+        ['a'],
+        ['a', 'a'],
+        'items'
+      )
+
+      // Act
+      const result = sut.merge(defaultConfig)
+
+      // Assert
+      expect(result.hasConflict).toBe(true)
+      expect(result.output).toEqual([
+        buildConflictMarkers(
+          [{ items: 'a' }],
+          [{ items: 'a' }, { items: 'a' }, { items: 'a' }],
+          [{ items: 'a' }, { items: 'a' }]
+        ),
+      ])
+    })
+
     it('should handle duplicate values in local array', () => {
       // Arrange - covers seen.has(item) branch for duplicates in local
       const ancestor: string[] = []
@@ -238,7 +378,12 @@ describe('TextArrayMergeNode', () => {
 
       // Assert
       expect(result.hasConflict).toBe(false)
-      expect(result.output).toHaveLength(3) // a, b, c (deduplicated)
+      expect(result.output).toEqual([
+        { items: 'a' },
+        { items: 'a' },
+        { items: 'b' },
+        { items: 'c' },
+      ])
     })
 
     it('should handle duplicate values in other array', () => {
@@ -253,7 +398,12 @@ describe('TextArrayMergeNode', () => {
 
       // Assert
       expect(result.hasConflict).toBe(false)
-      expect(result.output).toHaveLength(3) // a, b, c (deduplicated)
+      expect(result.output).toEqual([
+        { items: 'a' },
+        { items: 'b' },
+        { items: 'b' },
+        { items: 'c' },
+      ])
     })
 
     it('should correctly sort equal values', () => {
@@ -268,7 +418,7 @@ describe('TextArrayMergeNode', () => {
 
       // Assert
       expect(result.hasConflict).toBe(false)
-      expect(result.output).toHaveLength(1) // deduplicated to single 'same'
+      expect(result.output).toEqual([{ items: 'same' }, { items: 'same' }])
     })
 
     it('should sort items in ascending order', () => {
@@ -402,6 +552,89 @@ describe('TextArrayMergeNode', () => {
       // Assert
       expect(result.hasConflict).toBe(false)
       expect(result.output).toContainEqual({ items: nullProtoItem })
+    })
+  })
+
+  describe('given a machine whose locale sorts ä after z', () => {
+    const swedish = new Intl.Collator('sv')
+
+    beforeEach(() => {
+      vi.spyOn(String.prototype, 'localeCompare').mockImplementation(function (
+        this: string,
+        that: string
+      ) {
+        return swedish.compare(this, that)
+      })
+    })
+
+    afterEach(() => {
+      vi.restoreAllMocks()
+    })
+
+    describe('when each side adds one of the two values', () => {
+      it('then the values come out in the same order as on any machine', () => {
+        // Arrange
+        const sut = new TextArrayMergeNode([], ['z'], ['ä'], 'items')
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result.output).toEqual([{ items: 'ä' }, { items: 'z' }])
+      })
+    })
+  })
+
+  describe('mergedCount', () => {
+    const MAX_COPIES = 5
+    const copiesOf = (count: number) =>
+      Array.from({ length: count }, () => ({ v: 'a' }))
+    const survives = (pairing: Pairing): boolean =>
+      pairing.ancestor === undefined ||
+      (pairing.local !== undefined && pairing.other !== undefined)
+    // Two sides that agree decide alone.
+    const enumerate = (
+      ancestor: number,
+      local: number,
+      other: number
+    ): number | 'conflict' => {
+      if (local === other) return local
+      const survivors = new Set(
+        Array.from(
+          readings({
+            ancestor: copiesOf(ancestor),
+            local: copiesOf(local),
+            other: copiesOf(other),
+          }),
+          reading => reading.filter(survives).length
+        )
+      )
+      return survivors.size === 1 ? [...survivors][0] : 'conflict'
+    }
+
+    describe('given every count triple up to five copies per side', () => {
+      it('should equal the enumeration of the identity readings', () => {
+        // Arrange
+        const sut = mergedCount
+        const counts = Array.from({ length: MAX_COPIES + 1 }, (_, n) => n)
+        const triples = counts.flatMap(ancestor =>
+          counts.flatMap(local =>
+            counts.map(other => ({ ancestor, local, other }))
+          )
+        )
+
+        // Act
+        const mismatches = triples.filter(
+          triple =>
+            sut(triple) !==
+            enumerate(triple.ancestor, triple.local, triple.other)
+        )
+
+        // Assert
+        expect(triples).toHaveLength(216)
+        expect(mismatches).toEqual([])
+        expect(triples.filter(t => sut(t) === 'conflict')).toHaveLength(20)
+      })
     })
   })
 })

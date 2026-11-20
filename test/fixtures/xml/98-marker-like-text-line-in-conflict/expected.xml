@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Profile xmlns="http://soap.sforce.com/2006/04/metadata">
+<<<<<<< ours
+    <description>b
+&#61;======
+&#62;>>>>>> theirs
+x</description>
+||||||| base
+    <description>a</description>
+=======
+    <description>c</description>
+>>>>>>> theirs
+    <custom>false</custom>
+</Profile>

@@ -1,9 +1,10 @@
 import type { Readable } from 'node:stream'
 import type { NormalisedParseResult, XmlParser } from '../XmlParser.js'
 import { assertBalancedTags } from './balanceOracle.js'
+import { decodeXmlBytes } from './decodeXmlBytes.js'
 import { scanDocument } from './scanDocument.js'
 
-// Drain a Readable into a single UTF-8 string. The deliberate
+// Drain a Readable into a single UTF-8 string, refusing other encodings. The deliberate
 // full-buffer approach matches the writer's: SF metadata files are
 // KB-MB, and parseString is synchronous, so chunked feeding would add
 // no value while complicating error paths.
@@ -13,7 +14,7 @@ const readStreamAsUtf8 = async (source: Readable): Promise<string> => {
     // Stryker disable next-line ConditionalExpression: Buffer.from copies a Buffer chunk byte for byte
     chunks.push(typeof c === 'string' ? Buffer.from(c) : (c as Buffer))
   }
-  return Buffer.concat(chunks).toString('utf8')
+  return decodeXmlBytes(Buffer.concat(chunks))
 }
 
 export class CompactXmlParser implements XmlParser {

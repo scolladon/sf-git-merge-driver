@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Profile xmlns="http://soap.sforce.com/2006/04/metadata">
+    <userPermissions>
+        <name>ViewAllData</name>
+<<<<<<< ours
+        <enabled>true</enabled>
+||||||| base
+        <enabled>false</enabled>
+=======
+        <enabled>maybe</enabled>
+>>>>>>> theirs
+        <!--reviewed-->
+    </userPermissions>
+    <custom>false</custom>
+</Profile>

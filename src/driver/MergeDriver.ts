@@ -7,7 +7,7 @@ import { XmlMerger } from '../merger/XmlMerger.js'
 import type { MergeConfig } from '../types/conflictTypes.js'
 import { log } from '../utils/LoggingDecorator.js'
 import { Logger } from '../utils/LoggingService.js'
-import { peekEol } from '../utils/peekEol.js'
+import { peekDocumentEol } from '../utils/peekEol.js'
 
 const TMP_SUFFIX = '.sf-merge-tmp'
 
@@ -50,7 +50,11 @@ export class MergeDriver {
     Logger.info(`pipeline=streaming v=${PIPELINE_VERSION}`)
 
     try {
-      const eol = await peekEol(oursPath)
+      const eol = await peekDocumentEol([
+        oursPath,
+        normalize(theirFile),
+        normalize(ancestorFile),
+      ])
 
       const [ancRS, oursRS, theirsRS] = [ancestorFile, ourFile, theirFile]
         .map(normalize)

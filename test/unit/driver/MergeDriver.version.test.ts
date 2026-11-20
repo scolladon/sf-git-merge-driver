@@ -31,7 +31,7 @@ vi.mock('node:fs/promises', async () => {
   }
 })
 vi.mock('../../../src/utils/peekEol.js', () => ({
-  peekEol: async () => '\n',
+  peekDocumentEol: async () => '\n',
 }))
 vi.mock('../../../src/merger/XmlMerger.js', () => {
   const XmlMerger = vi.fn()

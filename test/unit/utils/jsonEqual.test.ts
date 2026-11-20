@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { JsonValue } from '../../../src/types/jsonTypes.js'
-import { jsonEqual } from '../../../src/utils/jsonEqual.js'
+import {
+  jsonEqual,
+  jsonIdentical,
+  jsonIdenticalUpToAttributeOrder,
+} from '../../../src/utils/jsonEqual.js'
 
 describe('jsonEqual', () => {
   describe('primitive equality', () => {
@@ -143,6 +147,120 @@ describe('jsonEqual', () => {
       const c: JsonValue = { outer: { inner: [1, 3], tag: 'x' } }
       expect(jsonEqual(a, b)).toBe(true)
       expect(jsonEqual(a, c)).toBe(false)
+    })
+  })
+})
+
+describe('jsonIdentical', () => {
+  describe('given objects holding the same keys in a different order', () => {
+    it('should be false where jsonEqual is true', () => {
+      // Arrange
+      const left = { outer: { a: '1', b: '2' } }
+      const right = { outer: { b: '2', a: '1' } }
+
+      // Act
+      const sut = jsonIdentical(left, right)
+
+      // Assert
+      expect(sut).toBe(false)
+      expect(jsonEqual(left, right)).toBe(true)
+    })
+  })
+
+  describe('given objects holding the same keys in the same order', () => {
+    it('should be true', () => {
+      // Act
+      const sut = jsonIdentical(
+        { a: ['1', { b: '2' }] },
+        { a: ['1', { b: '2' }] }
+      )
+
+      // Assert
+      expect(sut).toBe(true)
+    })
+  })
+
+  describe('given objects holding different keys', () => {
+    it('should be false', () => {
+      // Act
+      const sut = jsonIdentical({ a: '1' }, { b: '1' })
+
+      // Assert
+      expect(sut).toBe(false)
+    })
+  })
+
+  describe('given objects of different sizes', () => {
+    it('should be false', () => {
+      // Act
+      const sut = jsonIdentical({ a: '1' }, { a: '1', b: '2' })
+
+      // Assert
+      expect(sut).toBe(false)
+    })
+  })
+})
+
+describe('jsonIdenticalUpToAttributeOrder', () => {
+  describe.each([
+    [
+      'attributes listed in another order',
+      { '@_a': '1', '@_b': '2', child: 'x' },
+      { '@_b': '2', '@_a': '1', child: 'x' },
+      true,
+    ],
+    [
+      'attributes reordered below a child tag',
+      { child: { '@_a': '1', '@_b': '2' } },
+      { child: { '@_b': '2', '@_a': '1' } },
+      true,
+    ],
+    [
+      'attributes interleaved with child tags',
+      { '@_a': '1', first: 'x', '@_b': '2', second: 'y' },
+      { first: 'x', '@_b': '2', '@_a': '1', second: 'y' },
+      true,
+    ],
+    [
+      'child tags listed in another order',
+      { first: 'x', second: 'y' },
+      { second: 'y', first: 'x' },
+      false,
+    ],
+    ['an attribute value that differs', { '@_a': '1' }, { '@_a': '2' }, false],
+    [
+      'a different attribute',
+      { '@_a': '1', child: 'x' },
+      { '@_b': '1', child: 'x' },
+      false,
+    ],
+    [
+      'a different number of keys',
+      { '@_a': '1' },
+      { '@_a': '1', '@_b': '2' },
+      false,
+    ],
+  ])('given %s', (_, left, right, expected) => {
+    it(`should be ${expected}`, () => {
+      // Act
+      const sut = jsonIdenticalUpToAttributeOrder(left, right)
+
+      // Assert
+      expect(sut).toBe(expected)
+    })
+  })
+
+  describe('objects with as many keys but other names', () => {
+    it('Given keys that hold no value, When comparing, Then returns false', () => {
+      // Arrange
+      const left = { a: undefined } as unknown as JsonValue
+      const right = { b: undefined } as unknown as JsonValue
+
+      // Act
+      const sut = [jsonEqual(left, right), jsonIdentical(left, right)]
+
+      // Assert
+      expect(sut).toEqual([false, false])
     })
   })
 })

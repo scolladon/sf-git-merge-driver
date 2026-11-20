@@ -1,5 +1,6 @@
 import { PassThrough } from 'node:stream'
 import type { XmlStreamWriter } from '../../src/adapter/writer/XmlStreamWriter.js'
+import type { WriteOptions } from '../../src/adapter/XmlSerializer.js'
 import type { JsonArray, JsonObject } from '../../src/types/jsonTypes.js'
 
 // Test-only helper: run writeTo into a PassThrough and concatenate the
@@ -9,11 +10,12 @@ import type { JsonArray, JsonObject } from '../../src/types/jsonTypes.js'
 export const serializeToString = async (
   writer: XmlStreamWriter,
   ordered: JsonArray,
-  rootAttributes: JsonObject
+  rootAttributes: JsonObject,
+  options: WriteOptions = {}
 ): Promise<string> => {
   const sink = new PassThrough()
   const chunks: Buffer[] = []
   sink.on('data', (c: Buffer) => chunks.push(c))
-  await writer.writeTo(sink, ordered, rootAttributes)
+  await writer.writeTo(sink, ordered, rootAttributes, options)
   return Buffer.concat(chunks).toString('utf8')
 }

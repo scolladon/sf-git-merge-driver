@@ -1,17 +1,18 @@
-import { ATTR_PREFIX } from '../../constant/parserConstant.js'
+import {
+  CDATA_PROP_NAME,
+  XML_COMMENT_PROP_NAME,
+} from '../../constant/parserConstant.js'
 import { MetadataService } from '../../service/MetadataService.js'
-import type { JsonArray, JsonObject, JsonValue } from '../../types/jsonTypes.js'
+import type { JsonArray, JsonValue } from '../../types/jsonTypes.js'
 import { KeyedArrayMergeNode } from './KeyedArrayMergeNode.js'
 import type { MergeNode } from './MergeNode.js'
 import { PropertyMergeNode } from './PropertyMergeNode.js'
 import { TextArrayMergeNode } from './TextArrayMergeNode.js'
 import { TextMergeNode } from './TextMergeNode.js'
+import { isObject, isPureObject, isSingleValueTrio } from './valueKind.js'
 
 const toArray = (v: JsonValue | undefined): JsonArray =>
   v == null ? [] : Array.isArray(v) ? (v as JsonArray) : ([v] as JsonArray)
-
-const isObject = (val: unknown): boolean =>
-  typeof val === 'object' && val !== null
 
 const isKnownObject = (...values: (JsonValue | undefined | null)[]): boolean =>
   values.some(isObject)
@@ -22,29 +23,6 @@ const isStringArray = (...values: (JsonValue | undefined | null)[]): boolean =>
       Array.isArray(value) &&
       (value as unknown[]).every(el => typeof el === 'string')
   )
-
-const isPureObject = (val: JsonValue | undefined | null): boolean =>
-  // Stryker disable next-line ConditionalExpression: only read once a side is an object or array, so with no array one is a pure object
-  // Stryker disable next-line LogicalOperator: only read once a side is an object or array, so with no array one is a pure object
-  isObject(val) && !Array.isArray(val)
-
-// undefined is scalar: an absent side carries no object or array shape
-// either, so it must not block the early exit below.
-const isScalar = (val: JsonValue | undefined): boolean =>
-  val === null || typeof val !== 'object'
-
-// Shared, frozen and prototype-free. The parser builds every node with
-// Object.create(null) so that an untrusted XML tag name cannot resolve
-// through Object.prototype; a plain {} here would reintroduce that chain
-// and make a side that dropped an element look like it still carried
-// `constructor`, `toString` and their siblings.
-const NO_PROPERTIES: JsonObject = Object.freeze(Object.create(null))
-
-// Only an absent side is normalised. A scalar side is passed through so a
-// text-bodied element keeps merging exactly as it did before this helper
-// existed; isPureUnknown has already ruled out arrays.
-const toPropertyObject = (val: JsonValue | undefined): JsonObject =>
-  val == null ? NO_PROPERTIES : (val as JsonObject)
 
 const isPureUnknown = (
   values: (JsonValue | undefined | null)[],
@@ -69,45 +47,12 @@ type Side = JsonValue | undefined
 
 const toArrays = (...sides: Side[]): JsonArray[] => sides.map(toArray)
 
-// A leaf trio skips the shape probes below entirely: it is the dominant
-// case in Salesforce metadata and can only ever be a TextMergeNode.
-const isScalarTrio = (
-  ancestor: Side,
-  local: Side,
-  other: Side,
-  attribute: string
-): boolean =>
-  isScalar(ancestor) &&
-  isScalar(local) &&
-  isScalar(other) &&
-  !MetadataService.isTextArrayAttribute(attribute)
-
-const hasAttributes = (val: Side): boolean => {
-  // Stryker disable next-line ConditionalExpression: for-in over a scalar only yields index keys, never an `@_` one; the guard skips that walk
-  if (!isPureObject(val)) return false
-  for (const key in val as JsonObject) {
-    if (key.startsWith(ATTR_PREFIX)) return true
-  }
-  return false
-}
-
-// An attribute only exists on its own element's open tag, so an element
-// carrying one (e.g. `<label xsi:nil="true"/>`, parsed as
-// `{ '@_xsi:nil': 'true', '#text': '' }`) is merged as one value. A
-// property-by-property merge would hand each `@_name` key back to the
-// writer as a child element of its own (`<@_xsi:nil>true</@_xsi:nil>`),
-// and a text-bodied side would be indexed character by character. A
-// repeated element (array side) keeps the array routes below; after matching
-// keys, the unordered array strategy applies this rule to each entry too.
-export const isAttributedTrio = (
-  ancestor: Side,
-  local: Side,
-  other: Side
-): boolean =>
-  !Array.isArray(ancestor) &&
-  !Array.isArray(local) &&
-  !Array.isArray(other) &&
-  (hasAttributes(ancestor) || hasAttributes(local) || hasAttributes(other))
+// The CDATA sections, or the comments, beside child tags: the parser keeps
+// them under one content key, as an array when adjacent. Its parts are one
+// ordered value, never a set of items to sort and union: a CDATA escape split
+// across two sections would be reordered into another text.
+const isContentParts = (attribute: string): boolean =>
+  attribute === CDATA_PROP_NAME || attribute === XML_COMMENT_PROP_NAME
 
 // The schema override defeats an incidental cardinality check, not the
 // shape checks: TextArrayMergeNode compares items by reference and sorts
@@ -137,13 +82,7 @@ const toPropertyNode = (
   local: Side,
   other: Side,
   attribute: string
-): MergeNode =>
-  new PropertyMergeNode(
-    toPropertyObject(ancestor),
-    toPropertyObject(local),
-    toPropertyObject(other),
-    attribute
-  )
+): MergeNode => new PropertyMergeNode(ancestor, local, other, attribute)
 
 // Reached only when at least one side is an object or array: the scalar
 // and text-array routes have already claimed every all-scalar trio.
@@ -172,8 +111,8 @@ class DefaultMergeNodeFactory implements MergeNodeFactory {
     attribute: string
   ): MergeNode {
     if (
-      isScalarTrio(ancestor, local, other, attribute) ||
-      isAttributedTrio(ancestor, local, other)
+      isContentParts(attribute) ||
+      isSingleValueTrio(ancestor, local, other, attribute)
     ) {
       return new TextMergeNode(ancestor, local, other, attribute)
     }

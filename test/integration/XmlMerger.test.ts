@@ -240,10 +240,10 @@ describe('XmlMerger integration', () => {
       )
     })
 
-    it('given an empty ancestor file but both sides add the same empty root then preserves the root (scans past the keyless side)', async () => {
+    it('given an empty ancestor file but both sides add the same empty root then keeps the root', async () => {
       // ancestor parses to {} (no root); ours/theirs each add an empty
-      // SharingRules. preserveEmptyRoot must scan past the keyless ancestor
-      // to find the root on a later side.
+      // SharingRules. The root they add is kept although the ancestor holds
+      // none.
       const root = `<?xml version="1.0" encoding="UTF-8"?>\n<SharingRules xmlns="${NS}"/>`
       const result = await mergeXmlStrings(sut, '', root, root)
       expect(result.output).toBe(

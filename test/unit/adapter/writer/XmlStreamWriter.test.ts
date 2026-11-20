@@ -75,8 +75,7 @@ describe('XmlStreamWriter', () => {
           },
         ],
         {},
-        '\n',
-        true
+        { eol: '\n', hasConflict: true }
       )
       sink.end()
       const out = Buffer.concat(chunks).toString('utf8')
@@ -87,7 +86,12 @@ describe('XmlStreamWriter', () => {
       const sink = new PassThrough()
       const chunks: Buffer[] = []
       sink.on('data', (c: Buffer) => chunks.push(c))
-      await sut.writeTo(sink, [{ Root: [{ v: '1' }] }], {}, '\r\n', false)
+      await sut.writeTo(
+        sink,
+        [{ Root: [{ v: '1' }] }],
+        {},
+        { eol: '\r\n', hasConflict: false }
+      )
       sink.end()
       const out = Buffer.concat(chunks).toString('utf8')
       expect(out.endsWith('</Root>\r\n')).toBe(true)
@@ -116,8 +120,7 @@ describe('XmlStreamWriter', () => {
           },
         ],
         {},
-        '\r\n',
-        true
+        { eol: '\r\n', hasConflict: true }
       )
       sink.end()
       const out = Buffer.concat(chunks).toString('utf8')
@@ -247,8 +250,7 @@ describe('XmlStreamWriter', () => {
         sink,
         ['raw' as unknown as never, { Root: [{ v: '1' }] }],
         {},
-        '\n',
-        false
+        { eol: '\n', hasConflict: false }
       )
       const out = Buffer.concat(chunks).toString('utf8')
       expect(out).toBe(`${DECL}\nraw<Root>\n    <v>1</v>\n</Root>\n`)
@@ -257,19 +259,18 @@ describe('XmlStreamWriter', () => {
   })
 
   describe('given an object body whose comment-keyed value is an array (parser shape)', () => {
-    it('when serialized then splitAttrsAndChildren keeps the comment array as ONE comment element', async () => {
+    it('when serialized then splitAttrsAndChildren writes each comment of the array as a comment of its own', async () => {
       // Pins `key !== XML_COMMENT_PROP_NAME` in splitAttrsAndChildren
       // (distinct from the writeUnfoldedChild guard already covered
       // above). Without it, the array unfolds inside the object body
-      // into per-segment wrappers and the writer emits `<!--c1--><!--c2-->`
-      // instead of one combined comment.
+      // into per-segment wrappers instead of comments.
       const out = await serializeToString(
         sut,
         [{ Root: [{ p: { '#xml__comment': ['c1', 'c2'], name: 'X' } }] }],
         {}
       )
-      expect(out).not.toContain('<!--c1--><!--c2-->')
-      expect(out).toContain('<!--c1,c2-->')
+      expect(out).toContain('<!--c1--><!--c2-->')
+      expect(out).not.toContain('c1,c2')
     })
   })
 
@@ -389,25 +390,24 @@ describe('XmlStreamWriter', () => {
       )
     })
 
-    it('when a multi-key wrapper carries a CDATA-keyed array sibling then segments stay inside ONE CDATA element', async () => {
+    it('when a multi-key wrapper carries a CDATA-keyed array sibling then the sections stay adjacent on one line', async () => {
       // Pins the `tagName !== CDATA_PROP_NAME` guard inside
       // writeUnfoldedChild. The wrapper-array shape forces the
       // multi-key iteration path (writeChildren → writeUnfoldedChild).
       // Without the guard, `__cdata: ['seg1','seg2']` would unfold into
-      // two `<![CDATA[seg1]]><![CDATA[seg2]]>` blocks instead of being
-      // passed straight to writeElement which joins them.
+      // two sections with an indentation between them instead of being
+      // passed straight to writeElement which keeps them adjacent.
       const out = await serializeToString(
         sut,
         [{ Root: [{ __cdata: ['seg1', 'seg2'], name: 'X' }] }],
         {}
       )
-      expect(out).not.toContain('<![CDATA[seg1]]><![CDATA[seg2]]>')
       expect(out).toBe(
-        `${DECL}\n<Root><![CDATA[seg1seg2]]>\n    <name>X</name>\n</Root>\n`
+        `${DECL}\n<Root><![CDATA[seg1]]><![CDATA[seg2]]>\n    <name>X</name>\n</Root>\n`
       )
     })
 
-    it('when a multi-key wrapper carries a comment-keyed array sibling then ONE comment is emitted (not unfolded into two)', async () => {
+    it('when a multi-key wrapper carries a comment-keyed array sibling then each comment is emitted as a comment, not unfolded into wrappers', async () => {
       // Pins the `tagName !== XML_COMMENT_PROP_NAME` guard inside
       // writeUnfoldedChild — same reasoning as the CDATA case.
       const out = await serializeToString(
@@ -415,9 +415,8 @@ describe('XmlStreamWriter', () => {
         [{ Root: [{ '#xml__comment': ['c1', 'c2'], name: 'X' }] }],
         {}
       )
-      expect(out).not.toContain('<!--c1--><!--c2-->')
       expect(out).toBe(
-        `${DECL}\n<Root><!--c1,c2-->\n    <name>X</name>\n</Root>\n`
+        `${DECL}\n<Root><!--c1--><!--c2-->\n    <name>X</name>\n</Root>\n`
       )
     })
 
@@ -493,7 +492,7 @@ describe('XmlStreamWriter', () => {
   })
 
   describe('given text containing a conflict marker with leading indent', () => {
-    it('when serialized then pass-1 strips the horizontal whitespace', async () => {
+    it('when serialized then each marker-like line is escaped, wherever it sits', async () => {
       const out = await serializeToString(
         sut,
         [
@@ -507,20 +506,20 @@ describe('XmlStreamWriter', () => {
         ],
         {}
       )
-      const mkEscaped = localMk.replace(/\|/g, '\\|')
-      expect(out).not.toMatch(new RegExp(` {4}${mkEscaped}`))
-      expect(out).toContain(`${localMk} ours`)
+      expect(out).toContain(`&#${sepMk.charCodeAt(0)};${sepMk.slice(1)}`)
+      expect(out).toContain(`&#${ancMk.charCodeAt(0)};${ancMk.slice(1)}`)
+      expect(out).not.toMatch(new RegExp(`^ *${sepMk}$`, 'm'))
     })
   })
 
-  describe('given text chunks that produce whitespace-only lines', () => {
-    it('when serialized then the blank lines are dropped but content preserved in order', async () => {
+  describe('given a text value with a whitespace-only line, in a file holding a conflict', () => {
+    it('when serialized then the line stays in the value', async () => {
       const out = await serializeToString(
         sut,
         [{ Root: [{ '#text': 'a\n   \nb' }] }],
         {}
       )
-      expect(out).toBe(`${DECL}\n<Root>a\nb</Root>\n`)
+      expect(out).toBe(`${DECL}\n<Root>a\n   \nb</Root>\n`)
     })
   })
 
@@ -536,7 +535,7 @@ describe('XmlStreamWriter', () => {
       const sink = new PassThrough()
       const chunks: Buffer[] = []
       sink.on('data', (c: Buffer) => chunks.push(c))
-      await sut.writeTo(sink, tree, {}, '\n', hasConflict)
+      await sut.writeTo(sink, tree, {}, { hasConflict })
       return Buffer.concat(chunks).toString('utf8')
     }
 
@@ -547,11 +546,10 @@ describe('XmlStreamWriter', () => {
 
     it('when hasConflict=true then the filter actively rewrites the same input (proves the bypass is what skipped the rewrite)', async () => {
       const filtered = await collect(true)
-      // Filter strips leading whitespace before the marker and drops
-      // the whitespace-only line — output must differ from the bypass.
+      // The marker-like line is escaped — output must differ from the bypass.
       expect(filtered).not.toBe(`${DECL}\n<Root>\n    ${sepMk}\n   \n</Root>\n`)
-      expect(filtered).toContain(`\n${sepMk}\n`)
-      expect(filtered).not.toContain('   \n')
+      expect(filtered).toContain(`&#${sepMk.charCodeAt(0)};${sepMk.slice(1)}`)
+      expect(filtered).toContain('   \n')
     })
   })
 
@@ -561,7 +559,7 @@ describe('XmlStreamWriter', () => {
       const sink = new PassThrough()
       const chunks: Buffer[] = []
       sink.on('data', (c: Buffer) => chunks.push(c))
-      await writer.writeTo(sink, [{ Root: [{ v: '1' }] }], {}, '\r\n')
+      await writer.writeTo(sink, [{ Root: [{ v: '1' }] }], {}, { eol: '\r\n' })
       const out = Buffer.concat(chunks).toString('utf8')
       expect(out).toBe(`${DECL}\r\n<Root>\r\n    <v>1</v>\r\n</Root>\r\n`)
     })
@@ -604,7 +602,12 @@ describe('XmlStreamWriter', () => {
       const written: string[] = []
       const throttled = buildThrottled(written)
       const writer = new XmlStreamWriter(defaultConfig)
-      await writer.writeTo(throttled, [{ Root: [{ v: '1' }] }], {}, '\n', false)
+      await writer.writeTo(
+        throttled,
+        [{ Root: [{ v: '1' }] }],
+        {},
+        { eol: '\n', hasConflict: false }
+      )
       expect(written.join('')).toBe(`${DECL}\n<Root>\n    <v>1</v>\n</Root>\n`)
     })
   })
@@ -824,7 +827,7 @@ describe('XmlStreamWriter', () => {
 
         // Assert
         expect(result).toBe(
-          `${DECL}\n<Root xmlns="http://x">\n${localLine}\n    <v>L</v>\n${ancestorLine}\n    <v>A</v>\n${sepMk}\n    <v>O</v>\n${otherLine}</Root>\n`
+          `${DECL}\n<Root xmlns="http://x">\n${localLine}\n    <v>L</v>\n${ancestorLine}\n    <v>A</v>\n${sepMk}\n    <v>O</v>\n${otherLine}\n</Root>\n`
         )
       })
     })
@@ -848,7 +851,7 @@ describe('XmlStreamWriter', () => {
 
         // Assert
         expect(result).toBe(
-          `${DECL}\n<Root xmlns="http://x">\n${localLine}\n${localLine}\n    <deep>dL</deep>\n${ancestorLine}\n    <deep>dA</deep>\n${sepMk}\n    <deep>dO</deep>\n${otherLine}${ancestorLine}\n    <s>A</s>\n${sepMk}\n    <s>O</s>\n${otherLine}</Root>\n`
+          `${DECL}\n<Root xmlns="http://x">\n${localLine}\n${localLine}\n    <deep>dL</deep>\n${ancestorLine}\n    <deep>dA</deep>\n${sepMk}\n    <deep>dO</deep>\n${otherLine}\n${ancestorLine}\n    <s>A</s>\n${sepMk}\n    <s>O</s>\n${otherLine}\n</Root>\n`
         )
       })
     })
@@ -1149,6 +1152,114 @@ describe('XmlStreamWriter', () => {
       expect(result).toContain('<A>1</A>')
       expect(result).toContain('<B>2</B>')
       expect(result).toContain(`<R xmlns="http://x">O</R>`)
+    })
+  })
+})
+
+describe('given a conflict that closes its parent element', () => {
+  const escapeRegex = (m: string): string =>
+    m.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const markerLine = new RegExp(
+    `^(${[localMk, ancMk, sepMk, otherMk].map(escapeRegex).join('|')})( .*)?$`
+  )
+  const isMarkerLine = (line: string): boolean =>
+    [localMk, ancMk, sepMk, otherMk].some(m => line.startsWith(m))
+
+  const resolveKeepingLocal = (text: string): string => {
+    const kept: string[] = []
+    let side: 'local' | 'other' | 'none' = 'none'
+    for (const line of text.split('\n')) {
+      if (line.startsWith(localMk)) side = 'local'
+      else if (line.startsWith(ancMk)) side = 'other'
+      else if (line.startsWith(sepMk)) side = 'other'
+      else if (line.startsWith(otherMk)) side = 'none'
+      else if (side !== 'other') kept.push(line)
+    }
+    return kept.join('\n')
+  }
+
+  const block = conflictOf([{ v: 'ours' }], [{ v: 'base' }], [{ v: 'theirs' }])
+  const documents: ReadonlyArray<readonly [string, JsonArray, string]> = [
+    ['the root', [{ Root: [block] }], 'Root'],
+    ['a nested element', [{ Root: [{ Inner: [block] }] }], 'Inner'],
+  ]
+
+  for (const [label, doc, closed] of documents) {
+    describe(`when it is the last child of ${label}`, () => {
+      it('should keep every marker alone on its line', async () => {
+        // Arrange & Act
+        const out = await serializeToString(sut, doc, {})
+
+        // Assert
+        const markers = out.split('\n').filter(isMarkerLine)
+        expect(markers).toHaveLength(4)
+        for (const line of markers) expect(line).toMatch(markerLine)
+      })
+
+      it('should leave well-formed XML after a line-based resolution', async () => {
+        // Arrange
+        const out = await serializeToString(sut, doc, {})
+
+        // Act
+        const resolved = resolveKeepingLocal(out)
+
+        // Assert
+        expect(resolved).toContain(`</${closed}>`)
+        expect(resolved).toContain('</Root>')
+        expect(resolved).toContain('<v>ours</v>')
+        expect(resolved).not.toContain('theirs')
+      })
+    })
+  }
+
+  describe('when a sibling follows the conflict', () => {
+    it('should keep the closing marker alone on its line', async () => {
+      // Arrange
+      const doc: JsonArray = [{ Root: [block, { next: 'n' }] }]
+
+      // Act
+      const out = await serializeToString(sut, doc, {})
+
+      // Assert
+      expect(out).toContain(`${otherLine}\n    <next>n</next>`)
+    })
+  })
+
+  describe.each([
+    [
+      'comments',
+      [{ '#xml__comment': ' c1 ' }],
+      [{ '#xml__comment': ' c2 ' }],
+      '    <!-- c1 -->',
+      '    <!-- c2 -->',
+    ],
+    ['text', [{ '#text': 'TO' }], [{ '#text': 'TX' }], '    TO', '    TX'],
+  ])('given a conflict between %s', (_name, local, other, ours, theirs) => {
+    it('when serialized then every marker stands on its own line', async () => {
+      // Arrange
+      const doc: JsonArray = [
+        { Root: [{ base: 'v' }, conflictOf(local, [], other)] },
+      ]
+
+      // Act
+      const out = await serializeToString(sut, doc, {})
+
+      // Assert
+      expect(out).toBe(
+        [
+          DECL,
+          '<Root>',
+          '    <base>v</base>',
+          localLine,
+          ours,
+          ancestorLine,
+          sepMk,
+          theirs,
+          otherLine,
+          '</Root>',
+          '',
+        ].join('\n')
+      )
     })
   })
 })

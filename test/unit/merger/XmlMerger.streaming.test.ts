@@ -120,36 +120,6 @@ describe('XmlMerger.mergeThreeWay', () => {
     })
   })
 
-  describe('given all three sides disagree on the namespace (no pair agreeing)', () => {
-    it('when merged then local wins the unrepresentable tie (an xmlns value cannot carry conflict markers)', async () => {
-      const ancestor = `<?xml version="1.0"?><R xmlns="http://anc"><v>a</v></R>`
-      const ours = `<?xml version="1.0"?><R xmlns="http://ours"><v>a</v></R>`
-      const theirs = `<?xml version="1.0"?><R xmlns="http://theirs"><v>a</v></R>`
-      const result = await runMergeStreams(sut, ancestor, ours, theirs)
-      expect(result.output).toContain('xmlns="http://ours"')
-      expect(result.output).not.toContain('xmlns="http://theirs"')
-    })
-
-    it('when merged then the discarded divergence is logged (it leaves no trace in the XML itself)', async () => {
-      const warnSpy = vi
-        .spyOn(Logger, 'warn')
-        .mockImplementation(() => undefined)
-      const ancestor = `<?xml version="1.0"?><R xmlns="http://anc"><v>a</v></R>`
-      const ours = `<?xml version="1.0"?><R xmlns="http://ours"><v>a</v></R>`
-      const theirs = `<?xml version="1.0"?><R xmlns="http://theirs"><v>a</v></R>`
-      await runMergeStreams(sut, ancestor, ours, theirs)
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('root attribute divergence'),
-        expect.objectContaining({
-          ancestor: 'http://anc',
-          local: 'http://ours',
-          other: 'http://theirs',
-        })
-      )
-      warnSpy.mockRestore()
-    })
-  })
-
   describe('given one side removes the namespace while the other leaves it unchanged', () => {
     it('when merged then the removal wins and no xmlns attribute is emitted', async () => {
       const ancestor = `<?xml version="1.0"?><R xmlns="http://anc"><v>a</v></R>`
@@ -273,25 +243,34 @@ describe('XmlMerger.mergeThreeWay', () => {
     const PRESERVED = `<?xml version="1.0" encoding="UTF-8"?>\n<Root/>\n`
 
     it('when all three sides are the empty root then it is preserved as <Root/>, not blanked', async () => {
-      // JsonMerger on three empty-content roots produces an empty output
-      // array; preserveEmptyRoot rebuilds the root because BOTH live sides
-      // carry it (a blank file is never valid Salesforce metadata).
+      // An emptied root is a root with no entries, not an absent one: the
+      // merge keeps it and renders it `<Root/>` (a blank file is never valid
+      // Salesforce metadata).
       const result = await runMergeStreams(sut, ROOT, ROOT, ROOT)
       expect(result.hasConflict).toBe(false)
       expect(result.output).toBe(PRESERVED)
     })
 
     it('when the ancestor is empty but both live sides agree on the empty root then it is preserved', async () => {
-      // The ancestor is never consulted: both live sides carrying the empty
-      // root is what authorises preservation.
+      // The ancestor holds no root and adds none: both live sides carrying
+      // the empty root is what the merge keeps.
       const result = await runMergeStreams(sut, '', ROOT, ROOT)
+      expect(result.output).toBe(PRESERVED)
+    })
+
+    it('when both live sides emptied a populated root then it is preserved as <Root/>', async () => {
+      // Every entry went away on both sides, yet both live sides still carry
+      // the root.
+      const populated = `<?xml version="1.0"?><Root><v>1</v></Root>`
+      const result = await runMergeStreams(sut, populated, ROOT, ROOT)
+      expect(result.hasConflict).toBe(false)
       expect(result.output).toBe(PRESERVED)
     })
 
     it('when ours deletes the file and theirs leaves it unchanged then the deletion wins (empty output)', async () => {
       // ours dropped the file (empty document, no root key); the root must
       // NOT be resurrected from theirs, or the driver would re-create a
-      // deleted file. localRoot === undefined → no preservation.
+      // deleted file.
       const populated = `<?xml version="1.0"?><Root><v>1</v></Root>`
       const result = await runMergeStreams(sut, populated, '', populated)
       expect(result.hasConflict).toBe(false)
@@ -299,7 +278,7 @@ describe('XmlMerger.mergeThreeWay', () => {
     })
 
     it('when theirs deletes the file and ours leaves it unchanged then the deletion wins (empty output)', async () => {
-      // Symmetric guard: otherRoot === undefined → no preservation.
+      // Symmetric guard: theirs dropped the file, ours did not touch it.
       const populated = `<?xml version="1.0"?><Root><v>1</v></Root>`
       const result = await runMergeStreams(sut, populated, populated, '')
       expect(result.hasConflict).toBe(false)
@@ -307,7 +286,7 @@ describe('XmlMerger.mergeThreeWay', () => {
     })
 
     it('when no side has a root element then sink receives empty output', async () => {
-      // Truly empty inputs: no root key anywhere, nothing to preserve.
+      // Truly empty inputs: no root key anywhere, nothing to write.
       const result = await runMergeStreams(sut, '', '', '')
       expect(result.hasConflict).toBe(false)
       expect(result.output).toBe('')
