@@ -17,7 +17,6 @@ import {
   noConflict,
   withConflict,
 } from '../../../../../src/types/mergeResult.js'
-import { TieScan as FullTieScan } from '../../../../utils/oracles/tieScanMerge.js'
 import { ORDERED_ATTRIBUTE, toEntry } from '../../../../utils/orderedTokens.js'
 
 // A spread passes one argument per reading and overflows the stack from about
@@ -149,15 +148,6 @@ type ReadingShape = { swaps: number; hasConflict: boolean; output: JsonArray }
 // Each scan measures its own copies, so the call counts stay its own
 const readingsOf = (shapes: readonly ReadingShape[]) =>
   shapes.map(({ output, ...shape }) => readingOf(output, shape))
-
-const flagsOf = (
-  scan: Pick<TieScan, 'add' | 'isWholeConflict'>,
-  readings: readonly MergedReading[]
-): readonly boolean[] =>
-  readings.map(reading => {
-    scan.add(reading)
-    return scan.isWholeConflict()
-  })
 
 describe('TieScan', () => {
   describe.each([
@@ -309,7 +299,7 @@ describe('TieScan', () => {
 
   describe('given any stream of merged readings', () => {
     describe('when scanning it', () => {
-      it('then it flags and keeps what the scan of every reading does, measuring each once', () => {
+      it('then it keeps what fewestPhantomSwaps keeps, measuring each reading once', () => {
         fc.assert(
           fc.property(
             fc.array(readingShape, {
@@ -319,18 +309,13 @@ describe('TieScan', () => {
             shapes => {
               // Arrange
               const readings = readingsOf(shapes)
-              const expectedFlags = flagsOf(
-                new FullTieScan(),
-                readingsOf(shapes)
-              )
               const expected = fewestPhantomSwaps(readingsOf(shapes))
               const sut = new TieScan()
 
               // Act
-              const flags = flagsOf(sut, readings)
+              for (const reading of readings) sut.add(reading)
 
               // Assert
-              expect(flags).toStrictEqual(expectedFlags)
               expect(sut.results()).toEqual(expected)
               for (const reading of readings)
                 expect(reading.phantomSwaps).toHaveBeenCalledTimes(

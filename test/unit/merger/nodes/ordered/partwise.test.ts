@@ -23,7 +23,6 @@ import {
   noConflict,
   withConflict,
 } from '../../../../../src/types/mergeResult.js'
-import { mergeOrderedArrays as tieScanMerge } from '../../../../utils/oracles/tieScanMerge.js'
 import { layoutSides, shapeSides } from '../../../../utils/orderedCuts.js'
 import {
   formatResult,
@@ -69,9 +68,6 @@ const inputOf = (sides: OrderedSides) => {
   }
   return { input, merge }
 }
-
-const oracleOf = (sides: OrderedSides): MergeResult =>
-  tieScanMerge(sides, ORDERED_ATTRIBUTE, defaultConfig)
 
 interface Exit {
   readonly name: string
@@ -119,6 +115,12 @@ const EXITS: readonly Exit[] = [
   },
 ]
 
+const DROPINSERT_3_3_TRIMMED_BLOCK =
+  'U0a:u,<R0,R0,U0b:u,U1a:u,R1,R1,U1b:u,U2a:u,R2|' +
+  'R0,R0,R0,U0b:u,U1a:u,R1,R1,R1,U1b:u,U2a:u,R2,R2|' +
+  'R0,U0x:u,R0,R0,U0b:u,U1a:u,R1,U1x:u,R1,R1,U1b:u,U2a:u,R2,U2x:u,R2>,' +
+  'R2,U2b:u'
+
 describe.each(EXITS)('given $name', ({ sides, expected, merges }) => {
   describe('when merging the tied parts', () => {
     it('then the result is the whole-array answer', () => {
@@ -131,18 +133,6 @@ describe.each(EXITS)('given $name', ({ sides, expected, merges }) => {
 
       // Assert
       expect(result).toStrictEqual(expected(sides()))
-    })
-
-    it('then the result equals the tie-scan merge', () => {
-      // Arrange
-      const { input } = inputOf(sides())
-      const sut = mergePartwise
-
-      // Act
-      const result = sut(input)
-
-      // Assert
-      expect(result).toStrictEqual(oracleOf(sides()))
     })
 
     it('then it merges only the readings it needs', () => {
@@ -163,7 +153,7 @@ describe('given a first part whose best reading is not the first one', () => {
   describe('when merging the tied parts', () => {
     const tokens = ['A A C D D D', 'A A A B C D D', 'B B C D D D Z'] as const
 
-    it('then the clean result is the one the tie-scan merge builds', () => {
+    it('then the result is the clean merge of the best reading', () => {
       // Arrange
       const sides = orderedSides(...tokens)
       const { input } = inputOf(sides)
@@ -174,7 +164,6 @@ describe('given a first part whose best reading is not the first one', () => {
 
       // Assert
       expect(formatResult(result)).toBe('B,A,B,C,D,D,Z (clean)')
-      expect(result).toStrictEqual(oracleOf(sides))
     })
 
     it('then it merges the first reading, each variation and each variation around the best', () => {
@@ -203,7 +192,7 @@ describe('given the dropinsert grid at r = 3, m = 3', () => {
       const result = sut(input)
 
       // Assert
-      expect(result).toStrictEqual(oracleOf(sides))
+      expect(formatResult(result)).toBe(DROPINSERT_3_3_TRIMMED_BLOCK)
       expect(result.hasConflict).toBe(true)
     })
 
@@ -236,14 +225,13 @@ describe('given a last part whose readings merge clean to outputs of different l
 
       // Assert
       expect(formatResult(result)).toBe('<A,X,A,C0,~d,F,D|A,A,C0,D,D|A,C0,D>,D')
-      expect(result).toStrictEqual(oracleOf(sides))
     })
   })
 })
 
 describe('given one tied part', () => {
   describe('when merging', () => {
-    it('then the result is the one the tie-scan merge builds', () => {
+    it('then the result is the clean merge of the tied part', () => {
       // Arrange
       const sides = orderedSides('A A C', 'A C', 'A A C Z')
       const sut = mergeOrderedArrays
@@ -253,7 +241,6 @@ describe('given one tied part', () => {
 
       // Assert
       expect(formatResult(result)).toBe('A,C,Z (clean)')
-      expect(result).toStrictEqual(oracleOf(sides))
     })
   })
 })

@@ -3,7 +3,6 @@ import { mergeOrderedArrays } from '../../../../../src/merger/nodes/ordered/merg
 import { mergeReading } from '../../../../../src/merger/nodes/ordered/mergeReading.js'
 import type { OrderedSides } from '../../../../../src/merger/nodes/ordered/orderedSides.js'
 import { mergePartwise } from '../../../../../src/merger/nodes/ordered/partwise.js'
-import { mergeOrderedArrays as tieScanMerge } from '../../../../utils/oracles/tieScanMerge.js'
 import { layoutSides } from '../../../../utils/orderedCuts.js'
 import {
   formatResult,
@@ -75,23 +74,15 @@ const mergedReadingsOf = (
 const mergedReadings = (ancestor: string, local: string, other: string) =>
   mergedReadingsOf(orderedSides(ancestor, local, other))
 
-const referenceOf = (sides: OrderedSides): string =>
-  formatResult(tieScanMerge(sides, ORDERED_ATTRIBUTE, defaultConfig))
-
-const reference = (ancestor: string, local: string, other: string): string =>
-  referenceOf(orderedSides(ancestor, local, other))
-
-// The readings the tie-scan merge builds for the same sides
-const referenceMerges = (
-  ancestor: string,
-  local: string,
-  other: string
-): number => {
-  const sides = orderedSides(ancestor, local, other)
-  constructions.count = 0
-  tieScanMerge(sides, ORDERED_ATTRIBUTE, defaultConfig)
-  return constructions.count
-}
+const UNEDITED_TIED_KEY_RESULT = '<C,C,X,K,U|C,C,X,K,K,U|C,C,X,K^,K,U>'
+const EDITED_TIED_KEY_RESULT = '<C,C,X,K,U*|C,C,X,K,K,U|C,C,X,K^,K,U+>'
+const SHARED_READING_CONFLICT_RESULT = 'K,K,<U*|U|U+>'
+const SHARED_READING_CLEAN_RESULT = 'K,K,U*,V* (clean)'
+const STREAMED_READINGS_RESULT = '<K,U|K,K,U|K^,K,U>'
+const GROUPED_READINGS_RESULT = '<U,K,J|K,K,J,J|J,J,K,K>'
+const STOPPED_STREAM_RESULT =
+  '<R0:R0 edited,R0,R1:R1 edited,R1|R0,R0,R1,R1|R0,R1>'
+const TIED_KEY_MERGES = 2
 
 describe('mergeOrderedArrays', () => {
   describe.each([
@@ -100,25 +91,23 @@ describe('mergeOrderedArrays', () => {
       'C C X K K U',
       'C C X K U',
       'C C X K^ K U',
+      UNEDITED_TIED_KEY_RESULT,
     ],
     [
       'the same keys with the neighbours edited apart',
       'C C X K K U',
       'C C X K U*',
       'C C X K^ K U+',
+      EDITED_TIED_KEY_RESULT,
     ],
-  ])('given %s', (_name, ancestor, local, other) => {
+  ])('given %s', (_name, ancestor, local, other, expected) => {
     describe('when merging', () => {
       it('then no reading is merged twice', () => {
-        // Arrange
-        const expected = reference(ancestor, local, other)
-        const merges = referenceMerges(ancestor, local, other)
-
         // Act
         const sut = mergedReadings(ancestor, local, other)
 
         // Assert
-        expect(sut.merges).toBe(merges)
+        expect(sut.merges).toBe(TIED_KEY_MERGES)
         expect(sut.result).toBe(expected)
       })
     })
@@ -130,7 +119,7 @@ describe('mergeOrderedArrays', () => {
     describe('when merging', () => {
       it('then the reading is merged once', () => {
         // Arrange
-        const expected = reference(...sides)
+        const expected = SHARED_READING_CONFLICT_RESULT
 
         // Act
         const sut = mergedReadings(...sides)
@@ -148,7 +137,7 @@ describe('mergeOrderedArrays', () => {
     describe('when merging', () => {
       it('then the reading is merged once', () => {
         // Arrange
-        const expected = reference(...sides)
+        const expected = SHARED_READING_CLEAN_RESULT
 
         // Act
         const sut = mergedReadings(...sides)
@@ -166,7 +155,7 @@ describe('mergeOrderedArrays', () => {
     describe('when merging', () => {
       it('then every reading goes down the stream', () => {
         // Arrange
-        const expected = reference(...sides)
+        const expected = STREAMED_READINGS_RESULT
 
         // Act
         const sut = mergedReadings(...sides)
@@ -184,7 +173,7 @@ describe('mergeOrderedArrays', () => {
     describe('when merging', () => {
       it('then one reading per group is merged', () => {
         // Arrange
-        const expected = reference(...sides)
+        const expected = GROUPED_READINGS_RESULT
 
         // Act
         const sut = mergedReadings(...sides)
@@ -201,7 +190,7 @@ describe('mergeOrderedArrays', () => {
       it('then the stream stops at the second reading', () => {
         // Arrange
         const sides = layoutSides('nocut-identical', 2, 2)
-        const expected = referenceOf(sides)
+        const expected = STOPPED_STREAM_RESULT
 
         // Act
         const sut = mergedReadingsOf(sides)
