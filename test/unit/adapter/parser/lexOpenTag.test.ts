@@ -413,4 +413,78 @@ describe('lexOpenTag', () => {
       expect(sut).toMatchObject({ strayQuote: false })
     })
   })
+  describe('given an open tag', () => {
+    it.each([
+      [
+        '<b>',
+        {
+          kind: 'tag',
+          name: 'b',
+          attrs: {},
+          hasAttrs: false,
+          end: 3,
+          selfClosing: false,
+          strayQuote: false,
+        },
+      ],
+      [
+        '<b >',
+        {
+          kind: 'tag',
+          name: 'b',
+          attrs: {},
+          hasAttrs: false,
+          end: 4,
+          selfClosing: false,
+          strayQuote: false,
+        },
+      ],
+      [
+        "<b'>",
+        {
+          kind: 'tag',
+          name: "b'",
+          attrs: {},
+          hasAttrs: false,
+          end: 4,
+          selfClosing: false,
+          strayQuote: true,
+        },
+      ],
+      ['<b', { kind: 'unterminated' }],
+      [
+        '<b/>',
+        {
+          kind: 'tag',
+          name: 'b',
+          attrs: {},
+          hasAttrs: false,
+          end: 4,
+          selfClosing: true,
+          strayQuote: false,
+        },
+      ],
+      [
+        '<b x="1">',
+        {
+          kind: 'tag',
+          name: 'b',
+          attrs: { x: '1' },
+          hasAttrs: true,
+          end: 9,
+          selfClosing: false,
+          strayQuote: false,
+        },
+      ],
+    ])(
+      'when %j is lexed then it reads as the expected tag',
+      (tag, expected) => {
+        // Act
+        const sut = lexOpenTag(tag, 0)
+
+        // Assert
+        expect(sut).toEqual(expected)
+      }
+    )
+  })
 })
