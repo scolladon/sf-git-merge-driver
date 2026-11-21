@@ -1,5 +1,6 @@
 // Counts, for every point, the points that lie below it on every coordinate.
-// Each coordinate holds distinct integers. Time is O(n log n) for two
+// Each coordinate holds distinct numbers: integers in a dense range are
+// ordered by counting, others by a comparator sort. Time is O(n log n) for two
 // coordinates and O(n log^2 n) for three.
 
 class Fenwick {
@@ -24,10 +25,61 @@ class Fenwick {
   }
 }
 
-const orderedBy = (values: ArrayLike<number>): Int32Array =>
+// Above this many slots per point, filling the counting slots can cost more
+// than sorting the points. Measured on node v22 from 64 to 4000 points:
+// counting wins up to 16 slots per point at every size, and loses at 64 slots
+// per point from 64 to 1000 points.
+const RANGE_FACTOR = 16
+
+interface CountableRange {
+  readonly least: number
+  readonly span: number
+}
+
+// The range the values span when counting orders them, undefined when there is
+// no value, a value is not an integer or the range is too sparse.
+const countableRange = (
+  values: ArrayLike<number>
+): CountableRange | undefined => {
+  if (values.length === 0) return undefined
+  let least = values[0]
+  let most = values[0]
+  for (let point = 0; point < values.length; point++) {
+    const value = values[point]
+    if (!Number.isInteger(value)) return undefined
+    if (value < least) least = value
+    if (value > most) most = value
+  }
+  const span = most - least + 1
+  return span > RANGE_FACTOR * values.length ? undefined : { least, span }
+}
+
+// Points of equal value keep their index order.
+const placedByCount = (
+  values: ArrayLike<number>,
+  { least, span }: CountableRange
+): Int32Array => {
+  const start = new Int32Array(span + 1)
+  for (let point = 0; point < values.length; point++) {
+    start[values[point] - least + 1]++
+  }
+  for (let slot = 1; slot <= span; slot++) start[slot] += start[slot - 1]
+  const order = new Int32Array(values.length)
+  for (let point = 0; point < values.length; point++) {
+    order[start[values[point] - least]++] = point
+  }
+  return order
+}
+
+const sortedByComparator = (values: ArrayLike<number>): Int32Array =>
   Int32Array.from({ length: values.length }, (_, point) => point).sort(
     (x, y) => values[x] - values[y]
   )
+
+export const orderedBy = (values: ArrayLike<number>): Int32Array => {
+  const range = countableRange(values)
+  return range ? placedByCount(values, range) : sortedByComparator(values)
+}
 
 const ranksOf = (values: ArrayLike<number>): Int32Array => {
   const ranks = new Int32Array(values.length)
@@ -82,16 +134,24 @@ class ThreeCoordinates {
     this.mergeBySecond(from, middle, to)
   }
 
+  // Adds the left points not above the point on the second coordinate, from
+  // the one the previous point stopped at, and returns where it stops.
+  private addBelow(point: number, start: number, middle: number): number {
+    let left = start
+    for (; left < middle; left++) {
+      const lower = this.order[left]
+      // Stryker disable next-line EqualityOperator: each coordinate holds distinct values
+      if (this.second[lower] > this.second[point]) break
+      this.tree.add(this.ranks[lower], 1)
+    }
+    return left
+  }
+
   private countAcross(from: number, middle: number, to: number): void {
     let left = from
     for (let right = middle; right < to; right++) {
       const point = this.order[right]
-      for (; left < middle; left++) {
-        const lower = this.order[left]
-        // Stryker disable next-line EqualityOperator: each coordinate holds distinct integers
-        if (this.second[lower] > this.second[point]) break
-        this.tree.add(this.ranks[lower], 1)
-      }
+      left = this.addBelow(point, left, middle)
       this.counts[point] += this.tree.countBelow(this.ranks[point])
     }
     for (let undo = from; undo < left; undo++) {
@@ -106,7 +166,7 @@ class ThreeCoordinates {
       const takeLeft =
         right >= to ||
         (left < middle &&
-          // Stryker disable next-line EqualityOperator: each coordinate holds distinct integers
+          // Stryker disable next-line EqualityOperator: each coordinate holds distinct values
           this.second[this.order[left]] < this.second[this.order[right]])
       this.merged[at] = this.order[takeLeft ? left++ : right++]
     }

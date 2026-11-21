@@ -1,47 +1,26 @@
 import type { MergeConfig } from '../../../types/conflictTypes.js'
-import type { JsonArray, JsonObject } from '../../../types/jsonTypes.js'
-import {
-  type MergeResult,
-  noConflict,
-  withConflict,
-} from '../../../types/mergeResult.js'
-import { pushAll } from '../../../utils/arrayUtils.js'
+import { type MergeResult, noConflict } from '../../../types/mergeResult.js'
 import { jsonIdentical } from '../../../utils/jsonEqual.js'
-import { buildConflictMarkers } from '../../ConflictMarkerBuilder.js'
-import { MergeOrchestrator } from '../../MergeOrchestrator.js'
-import { mergeEntryContent, wrapNonEmpty } from '../entryContent.js'
-import type { KeyedSides } from '../KeyedArrayIndex.js'
-import { defaultNodeFactory } from '../MergeNodeFactory.js'
-import { type Ambiguity, withAgreedReplacements } from './agreedReplacement.js'
-import { buildBlocks, type OrderedBlock, type OrderedItem } from './blocks.js'
-import { type ConflictMarks, ConflictSeeds, NO_MARKS } from './conflictSeeds.js'
-import { type EntryMerger, type EntryStatus, entryStatuses } from './content.js'
-import { identify } from './identity.js'
-import { placeOneSided } from './oneSidedPlacement.js'
-import { everyEntry, possiblyMoved } from './orderAxis.js'
-import { buildOrderedContext, type OrderedContext } from './orderedContext.js'
-import { type LiveSide, type Reading, valueOn } from './orderedEntry.js'
-import { placeAgreedInsertions } from './placement.js'
-import { cycleMarks, orderOverlaps, tournament } from './precedence.js'
-import { type OrderingView, orderingView, phantomSwaps } from './replacement.js'
-
-export interface OrderedSides {
-  readonly ancestor: JsonArray
-  readonly local: JsonArray
-  readonly other: JsonArray
-  readonly keys: KeyedSides
-}
-
-type Wrapped = Pick<OrderedSides, 'ancestor' | 'local' | 'other'>
-
-const wrapAll = (attribute: string, side: JsonArray): JsonArray =>
-  side.map(entry => ({ [attribute]: entry }))
-
-const wrapSides = (sides: OrderedSides, attribute: string): Wrapped => ({
-  ancestor: wrapAll(attribute, sides.ancestor),
-  local: wrapAll(attribute, sides.local),
-  other: wrapAll(attribute, sides.other),
-})
+import { collapsibleKeys } from './collapsible.js'
+import { entryStatusesBy, rememberingKept } from './content.js'
+import { type GroupedTies, identityTies } from './identity.js'
+import { isTied } from './identityComponents.js'
+import { type MergedReading, mergeReading } from './mergeReading.js'
+import type { Reading } from './orderedEntry.js'
+import {
+  type OrderedSides,
+  type WrapSides,
+  wrapAll,
+  wrapSides,
+} from './orderedSides.js'
+import { mergePartwise } from './partwise.js'
+import {
+  combineReadings,
+  fewestPhantomSwaps,
+  TieScan,
+  wholeConflict,
+} from './tieCombination.js'
+import { tiePartsOf } from './tieParts.js'
 
 // Raw entries, not a key lookup: a repeated key keeps every entry
 const takeWholeSide = (
@@ -62,249 +41,100 @@ const takeWholeSide = (
   return null
 }
 
-const entryMerger = (attribute: string, config: MergeConfig): EntryMerger => {
-  const orchestrator = new MergeOrchestrator(config, defaultNodeFactory)
-  return (ancestor, local, other) =>
-    mergeEntryContent(
-      { ancestor, local, other },
-      attribute,
-      config,
-      orchestrator,
-      wrapNonEmpty
-    )
-}
+// One tied part is the whole tie set: the parts split nothing.
+const FEWEST_TIED_PARTS = 2
 
-const seedsOf = (
-  ctx: OrderedContext,
-  marks: readonly ConflictMarks[]
-): ConflictSeeds => {
-  const seeds = new ConflictSeeds(ctx.entries.length)
-  const presence = Array.from(ctx.statuses.keys()).filter(
-    id => (ctx.statuses[id] as EntryStatus).kind === 'presenceConflict'
-  )
-  seeds.apply({ ...NO_MARKS, seeds: presence })
-  for (const mark of marks) seeds.apply(mark)
-  return seeds
-}
-
-const statusOutput = (ctx: OrderedContext, id: number): JsonArray =>
-  (ctx.statuses[id] as { readonly output: JsonArray }).output
-
-const sideValues = (
-  ctx: OrderedContext,
-  attribute: string,
-  ids: readonly number[],
-  side: LiveSide | 'ancestor'
-): JsonArray =>
-  ids.map(id => {
-    const entry = ctx.entries[id] as Reading[number]
-    const value = side === 'ancestor' ? entry.ancestor : valueOn(entry, side)
-    return { [attribute]: value as JsonObject }
-  })
-
-const renderBlock = (
-  ctx: OrderedContext,
-  attribute: string,
-  { local, ancestor, other }: OrderedBlock
-): JsonArray => [
-  buildConflictMarkers(
-    sideValues(ctx, attribute, local, 'local'),
-    sideValues(ctx, attribute, ancestor, 'ancestor'),
-    sideValues(ctx, attribute, other, 'other')
-  ),
-]
-
-const renderItem = (
-  ctx: OrderedContext,
-  attribute: string,
-  item: OrderedItem
-): JsonArray =>
-  'entry' in item
-    ? statusOutput(ctx, item.entry)
-    : renderBlock(ctx, attribute, item.block)
-
-const renderItems = (
-  ctx: OrderedContext,
-  attribute: string,
-  items: readonly OrderedItem[]
+const mergeStream = (
+  wrap: WrapSides,
+  readings: Iterable<Reading>,
+  merge: (reading: Reading) => MergedReading
 ): MergeResult => {
-  const output: JsonArray = []
-  for (const item of items) pushAll(output, renderItem(ctx, attribute, item))
-  return withConflict(output)
-}
-
-const renderClean = (
-  ctx: OrderedContext,
-  output: readonly number[]
-): MergeResult => {
-  const rendered: JsonArray = []
-  for (const id of output) pushAll(rendered, statusOutput(ctx, id))
-  const hasConflict = ctx.statuses.some(
-    status => status.kind === 'contentConflict'
-  )
-  return { output: rendered, hasConflict }
-}
-
-/** Phantom swaps are only worth counting when readings compete. */
-export interface MergedReading extends MergeResult {
-  readonly phantomSwaps: () => number
-}
-
-const settledStatuses = (
-  reading: Reading,
-  attribute: string,
-  config: MergeConfig
-): Ambiguity => {
-  const movedOwn = {
-    local: possiblyMoved(reading, 'local', everyEntry),
-    other: possiblyMoved(reading, 'other', everyEntry),
+  const scan = new TieScan()
+  for (const reading of readings) {
+    scan.add(merge(reading))
+    if (scan.isWholeConflict()) return wholeConflict(wrap())
   }
-  const statuses = entryStatuses({
-    reading,
-    movedOwn,
-    attribute,
-    mergeEntry: entryMerger(attribute, config),
-  })
-  return withAgreedReplacements(reading, statuses)
+  return combineReadings(wrap, scan.results())
 }
 
-interface Placed {
-  readonly output: readonly number[]
-  readonly seeds: ConflictSeeds
-}
-
-const placeEntries = (
-  ctx: OrderedContext,
-  ordering: OrderingView,
-  ambiguity: Ambiguity
-): Placed => {
-  const precedence = tournament(ctx)
-  const agreed = placeAgreedInsertions(ctx, precedence)
-  const oneSided = placeOneSided(ctx, agreed.spine)
-  const seeds = seedsOf(ctx, [
-    orderOverlaps(ctx),
-    cycleMarks(precedence),
-    agreed.marks,
-    oneSided.marks,
-    ordering.marks,
-    ambiguity.marks,
-  ])
-  return { output: oneSided.output, seeds }
-}
-
-export const mergeReading = (
-  reading: Reading,
-  attribute: string,
-  config: MergeConfig
-): MergedReading => {
-  const ambiguity = settledStatuses(reading, attribute, config)
-  const { statuses } = ambiguity
-  const ordering = orderingView(reading, statuses)
-  const ctx = buildOrderedContext(reading, statuses, ordering)
-  const { output, seeds } = placeEntries(ctx, ordering, ambiguity)
-  const swaps = () => phantomSwaps(ordering.view, statuses)
-  if (!seeds.hasSeeds()) {
-    return { ...renderClean(ctx, output), phantomSwaps: swaps }
+// One merge stands for its group because the merge treats the exchanged
+// copies alike. Three steps carry that and must be re-checked when they
+// change: possiblyMoved and notInEveryLis give a group's dropped copies one
+// flag, relations between insertions both sides agreed map copy for copy, and
+// the readings of a group count equal phantom swaps.
+const mergeRepresentatives = (
+  wrap: WrapSides,
+  representatives: Iterable<Reading>,
+  merge: (reading: Reading) => MergedReading
+): MergeResult | null => {
+  const merged: MergedReading[] = []
+  for (const reading of representatives) {
+    const result = merge(reading)
+    // A conflict may come from a block that differs across the group: the
+    // whole stream decides, in its own order
+    if (result.hasConflict) return null
+    merged.push(result)
   }
-  const items = buildBlocks(ctx, output, seeds)
-  return { ...renderItems(ctx, attribute, items), phantomSwaps: swaps }
+  return combineReadings(wrap, fewestPhantomSwaps(merged))
 }
 
-const itemsAgree = (
-  sides: readonly JsonArray[],
-  indexIn: (side: JsonArray) => number
-): boolean => {
-  const [first] = sides as [JsonArray]
-  const reference = first[indexIn(first)]
-  return sides.every(side => jsonIdentical(side[indexIn(side)], reference))
+interface Tied {
+  readonly sides: OrderedSides
+  readonly wrap: WrapSides
+  readonly ties: GroupedTies
+  readonly merge: (reading: Reading) => MergedReading
+  readonly mergeAmongTies: (reading: Reading) => MergedReading
 }
 
-/**
- * Terminates because the outputs differ: sides cannot all end together while
- * agreeing on every item.
- */
-const sharedHead = (sides: readonly JsonArray[]): number => {
-  let length = 0
-  while (itemsAgree(sides, () => length)) length++
-  return length
-}
-
-const sharedTail = (sides: readonly JsonArray[], head: number): number => {
-  const room = Math.min(...sides.map(side => side.length)) - head
-  let length = 0
-  const fromEnd = (side: JsonArray) => side.length - length - 1
-  while (length < room && itemsAgree(sides, fromEnd)) length++
-  return length
-}
-
-const middle = (side: JsonArray, head: number, tail: number): JsonArray =>
-  side.slice(head, side.length - tail)
-
-const startsAndEndsWith = (
-  ancestor: JsonArray,
-  head: JsonArray,
-  tail: JsonArray
+// A group has several readings only when a tied component holds an
+// interchangeable key: otherwise every reading is its own group
+const holdsCollapsible = (
+  ties: GroupedTies,
+  collapsible: ReadonlySet<string>
 ): boolean =>
-  head.every((item, index) => jsonIdentical(ancestor[index], item)) &&
-  tail.every((item, index) =>
-    jsonIdentical(ancestor[ancestor.length - tail.length + index], item)
+  ties.components.some(
+    component =>
+      isTied(component) &&
+      component.members.some(stretch => collapsible.has(ties.keyOf(stretch)))
   )
 
-const trimmedBlock = (
-  wrapped: Wrapped,
-  outputs: readonly JsonArray[]
-): MergeResult => {
-  const sides = [...outputs, wrapped.local, wrapped.other]
-  const head = sharedHead(sides)
-  const tail = sharedTail(sides, head)
-  const first = outputs[0] as JsonArray
-  const headItems = first.slice(0, head)
-  const tailItems = first.slice(first.length - tail)
-  const base = startsAndEndsWith(wrapped.ancestor, headItems, tailItems)
-    ? middle(wrapped.ancestor, head, tail)
-    : wrapped.ancestor
-  const block = buildConflictMarkers(
-    middle(wrapped.local, head, tail),
-    base,
-    middle(wrapped.other, head, tail)
-  )
-  return withConflict([...headItems, block, ...tailItems])
+// Without a group of several readings the stream merges them all, with its
+// early exit
+const mergeTied = (tied: Tied): MergeResult => {
+  const { sides, wrap, ties } = tied
+  const collapsible = collapsibleKeys(sides)
+  const grouped = holdsCollapsible(ties, collapsible)
+    ? mergeRepresentatives(wrap, ties.representatives(collapsible), tied.merge)
+    : null
+  return grouped ?? mergeStream(wrap, ties.readings(), tied.mergeAmongTies)
 }
 
-const asResult = ({ output, hasConflict }: MergeResult): MergeResult => ({
-  output,
-  hasConflict,
-})
-
-// Among the readings, only those with the fewest swaps of interchangeable
-// copies count (ADR 068): the others fabricate a disagreement.
-const fewestPhantomSwaps = (
-  merged: readonly MergedReading[]
-): readonly MergeResult[] => {
-  // Stryker disable next-line ConditionalExpression: a lone reading is its own minimum, so the filter keeps it
-  if (merged.length === 1) return merged.map(asResult)
-  const swaps = merged.map(reading => reading.phantomSwaps())
-  const least = Math.min(...swaps)
-  return merged.filter((_, index) => swaps[index] === least).map(asResult)
+// Two tied parts need two tied components: with fewer, the cuts are not even
+// looked for.
+const mergePartwiseOf = (
+  { sides, wrap, ties, mergeAmongTies }: Tied,
+  tiedComponents: number
+): MergeResult | null => {
+  if (tiedComponents < FEWEST_TIED_PARTS) return null
+  const parts = tiePartsOf(sides, ties)
+  return parts.tied.length >= FEWEST_TIED_PARTS
+    ? mergePartwise({ wrapped: wrap(), ties, parts, merge: mergeAmongTies })
+    : null
 }
 
-const combineReadings = (
-  wrapped: Wrapped,
-  results: readonly MergeResult[]
-): MergeResult => {
-  const [first] = results as [MergeResult]
-  if (results.every(result => jsonIdentical(result.output, first.output)))
-    return first
-  if (results.some(result => result.hasConflict)) {
-    return withConflict([
-      buildConflictMarkers(wrapped.local, wrapped.ancestor, wrapped.other),
-    ])
-  }
-  return trimmedBlock(
-    wrapped,
-    results.map(result => result.output)
-  )
+// The readings of one tie set pair most ancestor entries with the same
+// copies: they share the statuses they settle. A representative stands alone
+// in its group, so its merge keeps none.
+const amongTies = (
+  attribute: string,
+  config: MergeConfig
+): ((reading: Reading) => MergedReading) => {
+  const statusesOf = entryStatusesBy(rememberingKept())
+  return reading => mergeReading(reading, attribute, config, statusesOf)
 }
+
+const tiesOf = (sides: OrderedSides): GroupedTies =>
+  identityTies(sides.ancestor, sides.local, sides.other, sides.keys)
 
 export const mergeOrderedArrays = (
   sides: OrderedSides,
@@ -314,14 +144,14 @@ export const mergeOrderedArrays = (
   const whole = takeWholeSide(sides, attribute)
   // Stryker disable next-line ConditionalExpression: shortcut of the general path: a merge takes the changed side whole (doctrine.test.ts)
   if (whole !== null) return whole
-  const merged = identify(
-    sides.ancestor,
-    sides.local,
-    sides.other,
-    sides.keys
-  ).map(reading => mergeReading(reading, attribute, config))
-  return combineReadings(
-    wrapSides(sides, attribute),
-    fewestPhantomSwaps(merged)
-  )
+  const wrap: WrapSides = () => wrapSides(sides, attribute)
+  const ties = tiesOf(sides)
+  const merge = (reading: Reading): MergedReading =>
+    mergeReading(reading, attribute, config)
+  const tiedComponents = ties.components.filter(isTied).length
+  // One reading: nothing to group or to split, the stream merges it once
+  if (tiedComponents === 0) return mergeStream(wrap, ties.readings(), merge)
+  const mergeAmongTies = amongTies(attribute, config)
+  const tied = { sides, wrap, ties, merge, mergeAmongTies }
+  return mergePartwiseOf(tied, tiedComponents) ?? mergeTied(tied)
 }

@@ -38,6 +38,10 @@ interface MalformedOpenTag {
 
 const MALFORMED: MalformedOpenTag = Object.freeze({ kind: 'malformed' })
 
+const UNTERMINATED: UnterminatedOpenTag = Object.freeze({
+  kind: 'unterminated',
+})
+
 const isMalformed = (outcome: object | null): outcome is MalformedOpenTag =>
   outcome === MALFORMED
 
@@ -214,6 +218,21 @@ const lexAttrs = (
   return { end: pos, attrs, hasAttrs, strayQuote }
 }
 
+// Shared by every bare `<name>` tag: the bag is only read with for…in,
+// so one frozen empty bag serves them all.
+const NO_ATTRIBUTES: OpenTagAttrs = Object.freeze(Object.create(null))
+
+// `<name>`: the name run stops on the `>`, so there is no attribute to lex.
+const bareTag = (name: string, nameRun: StopRun): LexedOpenTag => ({
+  kind: 'tag',
+  name,
+  attrs: NO_ATTRIBUTES,
+  hasAttrs: false,
+  end: nameRun.end + 1,
+  selfClosing: false,
+  strayQuote: nameRun.strayQuote,
+})
+
 // Element open-tag lexer. `pos` is the position of the `<`. Returns the
 // tag lexed up to and including its `>`, or `{ kind: 'unterminated' }`
 // when no `>` or no closing quote is found before EOF.
@@ -221,12 +240,11 @@ export const lexOpenTag = (xml: string, pos: number): LexOpenTagResult => {
   const nameRun = scanStopRun(xml, pos + 1)
   if (!isNameStartChar(xml.charCodeAt(pos + 1))) return MALFORMED_NAME
   const name = xml.slice(pos + 1, nameRun.end)
+  if (xml.charCodeAt(nameRun.end) === GT) return bareTag(name, nameRun)
   const attrsResult = lexAttrs(xml, nameRun.end)
   // Stryker disable next-line ConditionalExpression: isMalformed(null) is false, the null check only narrows the type
   if (attrsResult !== null && isMalformed(attrsResult)) return MALFORMED
-  if (attrsResult === null || attrsResult.end >= xml.length) {
-    return { kind: 'unterminated' }
-  }
+  if (attrsResult === null || attrsResult.end >= xml.length) return UNTERMINATED
   return {
     kind: 'tag',
     name,

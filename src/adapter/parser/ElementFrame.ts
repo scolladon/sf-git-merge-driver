@@ -16,15 +16,16 @@ export const NO_ATTRS: AttrSet = Object.freeze({
 })
 
 // Per-open-element accumulator the scanner pushes on `<name` and pops
-// on the matching close. `grouped` stays undefined until the first
-// element, comment or CDATA child arrives, so a leaf — the dominant
-// node shape in Salesforce metadata — never allocates a Map.
+// on the matching close, for every element it does not take in one step
+// as a text leaf. `body` stays undefined until the first element, comment
+// or CDATA child arrives, so a leaf with no attribute never allocates an
+// object.
 export class ElementFrame {
   readonly name: string
   private readonly attrs: ElementAttrs
   private readonly hasAttrs: boolean
   private textBuf = ''
-  private grouped: Map<string, JsonValue[]> | undefined
+  private body: JsonObject | undefined
 
   constructor(name: string, { attrs, hasAttrs }: AttrSet) {
     this.name = name
@@ -37,41 +38,38 @@ export class ElementFrame {
   }
 
   addChild(key: string, value: JsonValue): void {
-    if (this.grouped === undefined) this.grouped = new Map()
-    const existing = this.grouped.get(key)
-    if (existing === undefined) {
-      this.grouped.set(key, [value])
+    const body = this.body ?? this.openBody()
+    const held = body[key]
+    if (held === undefined) {
+      body[key] = value
+    } else if (Array.isArray(held)) {
+      held.push(value)
     } else {
-      existing.push(value)
+      body[key] = [held, value]
     }
   }
 
   toCompact(): JsonValue {
-    if (!this.hasAttrs && this.grouped === undefined) {
-      return this.textBuf
+    const body = this.body
+    if (body === undefined) {
+      return this.hasAttrs ? this.attrsAndText() : this.textBuf
     }
-    const out: JsonObject = Object.create(null)
-    this.writeAttrsInto(out)
-    this.writeGroupedInto(out)
-    this.writeTextInto(out)
-    return out
-  }
-
-  private writeAttrsInto(out: JsonObject): void {
-    for (const k in this.attrs) out[`${ATTR_PREFIX}${k}`] = this.attrs[k]
-  }
-
-  private writeGroupedInto(out: JsonObject): void {
-    if (this.grouped === undefined) return
-    for (const [tag, values] of this.grouped) {
-      out[tag] = values.length === 1 ? values[0]! : values
-    }
+    if (this.textBuf !== '') body[TEXT_TAG] = this.textBuf
+    return body
   }
 
   // An element with attributes but no children still carries `#text: ''`.
-  private writeTextInto(out: JsonObject): void {
-    if (this.textBuf !== '' || this.grouped === undefined) {
-      out[TEXT_TAG] = this.textBuf
-    }
+  private attrsAndText(): JsonObject {
+    const body = this.openBody()
+    body[TEXT_TAG] = this.textBuf
+    return body
+  }
+
+  // Attributes first, so the children's keys follow them in first-seen order
+  private openBody(): JsonObject {
+    const body: JsonObject = Object.create(null)
+    for (const k in this.attrs) body[`${ATTR_PREFIX}${k}`] = this.attrs[k]
+    this.body = body
+    return body
   }
 }

@@ -8,6 +8,7 @@ import type { NormalisedParseResult } from '../XmlParser.js'
 import { findTagEnd } from './balanceOracle.js'
 import {
   BANG,
+  GT,
   isQuote,
   isXmlWhitespace,
   LT,
@@ -59,6 +60,18 @@ const TOP_FRAME_NAME = ''
 const SHORT_COMMENT_LIMIT = COMMENT_OPEN.length + COMMENT_CLOSE.length
 
 const failed = (message: string): ScanOutcome => ({ kind: 'failed', message })
+
+const NO_EXACT_CLOSE = -1
+
+// Only the element's own close in its exact spelling counts: a lax close
+// (`</b >`, `</bx>`) stays with the frame path, which decides what it means.
+const exactCloseEnd = (xml: string, lt: number, name: string): number => {
+  const nameStart = lt + CLOSE_TAG_OPEN.length
+  const gt = nameStart + name.length
+  if (lt === -1 || xml.charCodeAt(lt + 1) !== SLASH) return NO_EXACT_CLOSE
+  if (xml.charCodeAt(gt) !== GT) return NO_EXACT_CLOSE
+  return xml.startsWith(name, nameStart) ? gt + 1 : NO_EXACT_CLOSE
+}
 
 const hasQuoteChar = (text: string): boolean => {
   // Stryker disable next-line EqualityOperator: charCodeAt(length) is NaN, not a quote
@@ -289,8 +302,22 @@ class DocumentScanner {
       this.addToParent(frame.name, frame.toCompact())
       return undefined
     }
+    if (this.takesLeaf(lexed)) return undefined
     this.stack.push(this.buildFrame(lexed))
     return undefined
+  }
+
+  // `<name>text</name>` below the root, with no attribute and its exact
+  // close: the value is the trimmed text, so no frame is opened for it.
+  private takesLeaf(lexed: LexedOpenTag): boolean {
+    if (lexed.hasAttrs || this.isAtTopLevel()) return false
+    const lt = this.xml.indexOf('<', lexed.end)
+    const closeEnd = exactCloseEnd(this.xml, lt, lexed.name)
+    if (closeEnd === NO_EXACT_CLOSE) return false
+    const text = trimXmlWhitespace(this.xml.slice(lexed.end, lt))
+    this.currentFrame().addChild(lexed.name, text)
+    this.pos = closeEnd
+    return true
   }
 
   private hasRoot(): boolean {

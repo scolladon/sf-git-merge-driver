@@ -1,4 +1,8 @@
 import {
+  type ConflictMarks,
+  ConflictSeeds,
+} from '../../src/merger/nodes/ordered/conflictSeeds.js'
+import {
   type EntryStatus,
   entryStatuses,
 } from '../../src/merger/nodes/ordered/content.js'
@@ -51,3 +55,21 @@ export const keysOf = (
   ids: Iterable<number>
 ): readonly string[] =>
   [...ids].map(id => (ctx.entries[id] as { key: string }).key)
+
+// A class is named by its smallest id, so that two join lists inducing the
+// same partition give equal results whichever id each one picks as the root
+export const seededClasses = (
+  marks: ConflictMarks,
+  size: number
+): { classes: number[]; marked: boolean[] } => {
+  const seeds = new ConflictSeeds(size)
+  seeds.apply(marks)
+  const smallestOfRoot = new Map<number, number>()
+  const classes = Array.from({ length: size }, (_, id) => {
+    const root = seeds.root(id)
+    if (!smallestOfRoot.has(root)) smallestOfRoot.set(root, id)
+    return smallestOfRoot.get(root) as number
+  })
+  const marked = Array.from({ length: size }, (_, id) => seeds.isSeeded(id))
+  return { classes, marked }
+}

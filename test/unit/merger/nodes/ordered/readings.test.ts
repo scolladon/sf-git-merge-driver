@@ -1,9 +1,7 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
-import {
-  mergeOrderedArrays,
-  mergeReading,
-} from '../../../../../src/merger/nodes/ordered/mergeOrdered.js'
+import { mergeOrderedArrays } from '../../../../../src/merger/nodes/ordered/mergeOrdered.js'
+import { mergeReading } from '../../../../../src/merger/nodes/ordered/mergeReading.js'
 import { jsonEqual } from '../../../../../src/utils/jsonEqual.js'
 import {
   type Case,
@@ -93,6 +91,8 @@ const Q6_ROWS: readonly (readonly [string, string, string, string, number])[] =
     ['unique keys reorder', 'A B C', 'B A C', 'A C B', 1],
     ['surplus copies on the longer side', '', '~p', '~p ~p', 2],
     ['surplus copies on the longer side, mirrored', '', '~p ~p', '~p', 2],
+    ['as many surplus copies on each side', '', 'A A', 'A A*', 2],
+    ['as many surplus copies on each side, mirrored', '', 'A A*', 'A A', 2],
   ]
 
 const tokensOf = (side: string): Tokens => (side === '' ? [] : side.split(' '))

@@ -1,9 +1,21 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { KeyedArrayMergeNode } from '../../../../src/merger/nodes/KeyedArrayMergeNode.js'
+import { readings } from '../../../../src/merger/nodes/keyedReadings.js'
 import { MetadataService } from '../../../../src/service/MetadataService.js'
 import { isConflictBlock } from '../../../../src/types/conflictBlock.js'
 import type { JsonArray, JsonObject } from '../../../../src/types/jsonTypes.js'
 import { defaultConfig } from '../../../utils/testConfig.js'
+
+vi.mock(
+  '../../../../src/merger/nodes/keyedReadings.js',
+  async importOriginal => {
+    const original =
+      await importOriginal<
+        typeof import('../../../../src/merger/nodes/keyedReadings.js')
+      >()
+    return { ...original, readings: vi.fn(original.readings) }
+  }
+)
 
 const fieldPermissionsKey =
   MetadataService.getKeyFieldExtractor('fieldPermissions')
@@ -1697,6 +1709,78 @@ describe('KeyedArrayMergeNode', () => {
             ]).merge(defaultConfig).output
           )
         )
+      })
+    })
+  })
+
+  describe('given an unordered keyed array dispatched by key', () => {
+    describe('when no side repeats a key', () => {
+      it('then each key takes the one change made to it', () => {
+        // Arrange
+        const sut = keyedNode('A:f B:f', 'A:t B:f', 'A:f B:t C:f')
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(tokens(result.output)).toBe('A:t,B:t,C:f')
+      })
+    })
+
+    describe('when the sides add one copy of a key each, with different content', () => {
+      it('then the key conflicts without enumerating readings', () => {
+        // Arrange
+        const sut = keyedNode('', 'A:t', 'A:f')
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result.hasConflict).toBe(true)
+        expect(readings).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('when a side repeats a key the others agree on', () => {
+      it('then every copy is kept', () => {
+        // Arrange
+        const first = { field: 'Account.X__c', editable: 'false' }
+        const last = { field: 'Account.X__c', editable: 'true' }
+        const added = { field: 'Account.Y__c', editable: 'false' }
+        const sut = new KeyedArrayMergeNode(
+          [first, last],
+          [first, last],
+          [first, last, added],
+          'fieldPermissions',
+          fieldPermissionsKey,
+          false
+        )
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(result.hasConflict).toBe(false)
+        expect(result.output).toEqual([
+          { fieldPermissions: first },
+          { fieldPermissions: last },
+          { fieldPermissions: added },
+        ])
+      })
+    })
+
+    describe('when the copies of a repeated key differ on every side', () => {
+      it('then the key is settled through its readings', () => {
+        // Arrange
+        const sut = keyedNode('A:f A:t', 'A:t', 'A:f A:f')
+
+        // Act
+        const result = sut.merge(defaultConfig)
+
+        // Assert
+        expect(tokens(result.output)).toBe('A:f')
+        expect(readings).toHaveBeenCalledTimes(1)
       })
     })
   })

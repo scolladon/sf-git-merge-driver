@@ -1,34 +1,40 @@
 import type { JsonArray, JsonObject } from '../../../types/jsonTypes.js'
 import { signatureOf } from '../../../utils/jsonSignature.js'
 import type { KeyedSides } from '../KeyedArrayIndex.js'
+import { groupSides } from '../keyedReadings.js'
 import {
-  groupSides,
-  type Pairing,
-  readings,
-  type SideGroups,
-} from '../keyedReadings.js'
-import { lisLength } from './orderAxis.js'
+  type Alternative,
+  type Draft,
+  type KnownPoints,
+  type PairedCopies,
+  pairedCopiesOf,
+  type SideSignatures,
+  type Slot,
+  type Slots,
+} from './copyPairings.js'
+import {
+  firstChoice,
+  type Point,
+  type PointSet,
+  projected,
+  type TieComponent,
+  type Tuple,
+  tieComponents,
+  walkAround,
+} from './identityComponents.js'
 import {
   ABSENT_POSITION,
-  isOn,
-  LIVE_SIDES,
   type LiveSide,
   type OrderedEntry,
-  positionOn,
   type Reading,
 } from './orderedEntry.js'
 
-interface Slot {
-  readonly pos: number
-  readonly value: JsonObject
-}
-
-type Slots = SideGroups<Slot>
+type SlotsByKey = ReadonlyMap<string, Slots>
 
 const groupSlots = (
   sides: Readonly<Record<keyof Slots, JsonArray>>,
   keys: KeyedSides
-): ReadonlyMap<string, Slots> =>
+): SlotsByKey =>
   groupSides(keys, (side, pos) => ({
     pos,
     value: sides[side][pos] as JsonObject,
@@ -37,51 +43,10 @@ const groupSlots = (
 const positionOf = (slot: Slot | undefined): number =>
   slot?.pos ?? ABSENT_POSITION
 
-interface Draft {
-  readonly key: string
-  readonly ancestor: Slot | undefined
-  readonly local: Slot | undefined
-  readonly other: Slot | undefined
-}
-
 const isUnique = (slots: Slots): boolean =>
   slots.ancestor.length <= 1 &&
   slots.local.length <= 1 &&
   slots.other.length <= 1
-
-interface Clones {
-  readonly copies: Readonly<Record<keyof Slots, JsonObject[]>>
-  readonly slotOf: ReadonlyMap<JsonObject, Slot>
-}
-
-const cloneSlots = (slots: Slots): Clones => {
-  const slotOf = new Map<JsonObject, Slot>()
-  const cloned = (side: readonly Slot[]): JsonObject[] =>
-    side.map(slot => {
-      const clone = { ...slot.value }
-      slotOf.set(clone, slot)
-      return clone
-    })
-  const copies = {
-    ancestor: cloned(slots.ancestor),
-    local: cloned(slots.local),
-    other: cloned(slots.other),
-  }
-  return { copies, slotOf }
-}
-
-// readings() pairs values and may meet two equal ones: distinct clones tell
-// the copies apart so each pairing finds back its slot.
-function* pairingDrafts(key: string, slots: Slots): Generator<Draft[]> {
-  const { copies, slotOf } = cloneSlots(slots)
-  const draftOf = (pairing: Pairing): Draft => ({
-    key,
-    ancestor: pairing.ancestor && slotOf.get(pairing.ancestor),
-    local: pairing.local && slotOf.get(pairing.local),
-    other: pairing.other && slotOf.get(pairing.other),
-  })
-  for (const pairings of readings(copies)) yield pairings.map(draftOf)
-}
 
 const uniqueDraft = (key: string, slots: Slots): Draft => ({
   key,
@@ -90,20 +55,62 @@ const uniqueDraft = (key: string, slots: Slots): Draft => ({
   other: slots.other[0],
 })
 
-// The alternatives of a stretch of keys, regenerated on demand: the cross
-// product walks them again for each combination of the stretches before it.
-type Segment = () => Iterable<readonly Draft[]>
+const pointsOn = (drafts: readonly Draft[], side: LiveSide): Point[] => {
+  const points: Point[] = []
+  for (const draft of drafts) {
+    const { ancestor } = draft
+    const slot = draft[side]
+    if (ancestor && slot) {
+      points.push({ ancestor: ancestor.pos, position: slot.pos })
+    }
+  }
+  return points
+}
 
-// Keys with a single alternative fuse into one segment: recursing over every
+// The one alternative of keys held at most once per side
+class FusedRun implements Alternative {
+  constructor(private readonly run: readonly Draft[]) {}
+
+  get key(): string {
+    return this.run[0].key
+  }
+
+  drafts(): readonly Draft[] {
+    return this.run
+  }
+
+  pointsOn(side: LiveSide): readonly Point[] {
+    return pointsOn(this.run, side)
+  }
+}
+
+type Alternatives = readonly Alternative[]
+
+interface RepeatedKey {
+  readonly pairings: readonly PairedCopies[]
+  readonly slots: Slots
+}
+
+// A fused run has one alternative and no repeated key to choose from.
+interface Stretch {
+  readonly alternatives: Alternatives
+  readonly repeated: RepeatedKey | undefined
+}
+
+const repeatedStretch = (key: string, slots: Slots): Stretch => {
+  const pairings = pairedCopiesOf(key, slots)
+  return { alternatives: pairings, repeated: { pairings, slots } }
+}
+
+// Keys with a single alternative fuse into one stretch: recursing over every
 // key would nest as deep as the array is long.
-const segmentsOf = (groups: ReadonlyMap<string, Slots>): readonly Segment[] => {
-  const segments: Segment[] = []
+const stretchesOf = (groups: SlotsByKey): readonly Stretch[] => {
+  const stretches: Stretch[] = []
   let run: Draft[] = []
   const closeRun = (): void => {
     // Stryker disable next-line ConditionalExpression: an empty fused run adds a segment yielding the empty draft list, the identity of the cross product
     if (run.length === 0) return
-    const fused = run
-    segments.push(() => [fused])
+    stretches.push({ alternatives: [new FusedRun(run)], repeated: undefined })
     run = []
   }
   for (const [key, slots] of groups) {
@@ -112,146 +119,173 @@ const segmentsOf = (groups: ReadonlyMap<string, Slots>): readonly Segment[] => {
       continue
     }
     closeRun()
-    segments.push(() => pairingDrafts(key, slots))
+    stretches.push(repeatedStretch(key, slots))
   }
   closeRun()
-  return segments
+  return stretches
 }
 
-function* crossProduct(
-  segments: readonly Segment[],
-  from: number,
-  prefix: readonly Draft[]
-): Generator<readonly Draft[]> {
-  if (from === segments.length) {
-    yield prefix
-    return
-  }
-  for (const drafts of segments[from]()) {
-    yield* crossProduct(segments, from + 1, [...prefix, ...drafts])
-  }
+type Positions = 'ancestorPos' | 'localPos' | 'otherPos'
+
+type Writable<Shape> = { -readonly [Field in keyof Shape]: Shape[Field] }
+
+// Only the positions are owed when the entry is handed out: every other
+// required field is checked where the entry is first written
+type EntryInTheMaking = Writable<Omit<OrderedEntry, Positions>> &
+  Partial<Writable<Pick<OrderedEntry, Positions>>>
+
+// The fields come in the order the reading always gave them, a side's value
+// only when the side holds the entry
+const entryOf = (draft: Draft, id: number): OrderedEntry => {
+  const entry: EntryInTheMaking = { id, key: draft.key }
+  if (draft.ancestor) entry.ancestor = draft.ancestor.value
+  if (draft.local) entry.local = draft.local.value
+  if (draft.other) entry.other = draft.other.value
+  entry.ancestorPos = positionOf(draft.ancestor)
+  entry.localPos = positionOf(draft.local)
+  entry.otherPos = positionOf(draft.other)
+  return entry as OrderedEntry
 }
 
-const toReading = (drafts: readonly Draft[]): Reading =>
-  drafts.map(
-    (draft, id): OrderedEntry => ({
-      id,
-      key: draft.key,
-      ...(draft.ancestor && { ancestor: draft.ancestor.value }),
-      ...(draft.local && { local: draft.local.value }),
-      ...(draft.other && { other: draft.other.value }),
-      ancestorPos: positionOf(draft.ancestor),
-      localPos: positionOf(draft.local),
-      otherPos: positionOf(draft.other),
-    })
-  )
+const toReading = (drafts: readonly Draft[]): Reading => drafts.map(entryOf)
+
+const signaturesOf = (slots: Slots): SideSignatures => {
+  const signed = (side: readonly Slot[]): string[] =>
+    side.map(slot => signatureOf(slot.value))
+  return { local: signed(slots.local), other: signed(slots.other) }
+}
 
 const valuesBothSidesHold = (
-  local: JsonArray,
-  other: JsonArray
+  signatures: SideSignatures
 ): ReadonlySet<string> => {
-  const otherSignatures = new Set((other as JsonObject[]).map(signatureOf))
-  return new Set(
-    (local as JsonObject[]).map(signatureOf).filter(s => otherSignatures.has(s))
+  const otherSignatures = new Set(signatures.other)
+  return new Set(signatures.local.filter(s => otherSignatures.has(s)))
+}
+
+// Exact per key: the values a key's entries carry belong to it alone.
+const noLossOf = ({ alternatives, repeated }: Stretch): Alternatives => {
+  if (repeated === undefined) return alternatives
+  const signatures = signaturesOf(repeated.slots)
+  const held = valuesBothSidesHold(signatures)
+  return repeated.pairings.filter(paired => !paired.loses(held, signatures))
+}
+
+const withoutLosses = (
+  stretches: readonly Stretch[]
+): readonly Alternatives[] => {
+  const kept = stretches.map(noLossOf)
+  // A key losing a value in every alternative makes every reading lose: all
+  // of them stay, as when no reading avoids a loss.
+  return kept.every(alternatives => alternatives.length > 0)
+    ? kept
+    : stretches.map(stretch => stretch.alternatives)
+}
+
+const hasOneAlternative = (stretch: Stretch): boolean =>
+  stretch.alternatives.length === 1
+
+/** The tie set of the readings, exposed for a merge that walks it by parts. */
+export interface IdentityTies {
+  readonly first: Tuple
+  readonly components: readonly TieComponent[]
+  readonly readingOf: (tuple: Tuple) => Reading
+  // A component's stretch holds one key: fused stretches are never tied.
+  readonly keyOf: (stretch: number) => string
+  readonly readings: () => Iterable<Reading>
+  readonly around: (
+    components: readonly number[],
+    base: Tuple
+  ) => Iterable<Tuple>
+}
+
+function* readingsAlong(
+  tuples: Iterable<Tuple>,
+  readingOf: (tuple: Tuple) => Reading
+): Generator<Reading> {
+  for (const tuple of tuples) yield readingOf(tuple)
+}
+
+/** The tie set with the first reading of each group of interchangeable ones. */
+export interface GroupedTies extends IdentityTies {
+  // The groups are the readings choosing alike on every stretch whose key is
+  // not in the set; each comes once, at its first reading, in stream order.
+  readonly representatives: (
+    collapsible: ReadonlySet<string>
+  ) => Iterable<Reading>
+}
+
+type Walked = Pick<IdentityTies, 'components' | 'first' | 'keyOf' | 'readingOf'>
+
+const aroundOf =
+  (components: readonly TieComponent[]): IdentityTies['around'] =>
+  (selected, base) =>
+    walkAround(
+      selected.map(at => components[at]),
+      base
+    )
+
+const representativesOf =
+  ({ components, first, keyOf, readingOf }: Walked) =>
+  (collapsible: ReadonlySet<string>): Iterable<Reading> => {
+    const isFixed = (stretch: number): boolean =>
+      !collapsible.has(keyOf(stretch))
+    const reduced = components.map(component => projected(component, isFixed))
+    return readingsAlong(walkAround(reduced, first), readingOf)
+  }
+
+const tiesOver = (
+  kept: readonly Alternatives[],
+  components: readonly TieComponent[]
+): GroupedTies => {
+  const first = firstChoice(kept.length, components)
+  const keyOf = (stretch: number): string => kept[stretch][0].key
+  const readingOf = (tuple: Tuple): Reading =>
+    toReading(tuple.flatMap((choice, at) => kept[at][choice].drafts()))
+  return {
+    first,
+    components,
+    readingOf,
+    keyOf,
+    readings: () => readingsAlong(walkAround(components, first), readingOf),
+    around: aroundOf(components),
+    representatives: representativesOf({ components, first, keyOf, readingOf }),
+  }
+}
+
+// One memory of the points for the tie set: tieComponents reads them and
+// lets go
+const pointSetsOf = (
+  kept: readonly Alternatives[]
+): readonly (readonly PointSet[])[] => {
+  const known: KnownPoints = new Map()
+  return kept.map(alternatives =>
+    alternatives.map(
+      (alternative): PointSet =>
+        side =>
+          alternative.pointsOn(side, known)
+    )
   )
 }
 
-const isOnBothSides = (entry: OrderedEntry): boolean =>
-  entry.local !== undefined && entry.other !== undefined
-
-const sharedSignatures = (reading: Reading): ReadonlySet<string> => {
-  const shared = new Set<string>()
-  for (const entry of reading.filter(isOnBothSides)) {
-    shared.add(signatureOf(entry.local as JsonObject))
-    shared.add(signatureOf(entry.other as JsonObject))
-  }
-  return shared
-}
-
-// A reading loses a value when no entry shared by both sides carries it.
-const losesAValue = (reading: Reading, held: ReadonlySet<string>): boolean => {
-  const shared = sharedSignatures(reading)
-  return [...held].some(signature => !shared.has(signature))
-}
-
-const movesOn = (reading: Reading, side: LiveSide): number => {
-  const kept = reading
-    .filter(entry => entry.ancestor !== undefined && isOn(entry, side))
-    .sort((left, right) => left.ancestorPos - right.ancestorPos)
-  return kept.length - lisLength(kept.map(entry => positionOn(entry, side)))
-}
-
-const movesOf = (reading: Reading): number =>
-  LIVE_SIDES.reduce((total, side) => total + movesOn(reading, side), 0)
-
-function* mapped<T, U>(items: Iterable<T>, fn: (item: T) => U): Generator<U> {
-  for (const item of items) yield fn(item)
-}
-
-interface Leaders {
-  readonly offer: (reading: Reading) => void
-  readonly kept: () => readonly Reading[]
-}
-
-const leadersBy = (measure: (reading: Reading) => number): Leaders => {
-  // Stryker disable next-line ArrayDeclaration: the first offer resets kept: a measure is finite (a boolean or a count), so it is below the initial infinity
-  let kept: Reading[] = []
-  let least = Number.POSITIVE_INFINITY
-  return {
-    offer: reading => {
-      const value = measure(reading)
-      if (value < least) {
-        least = value
-        kept = []
-      }
-      if (value === least) kept.push(reading)
-    },
-    kept: () => kept,
-  }
-}
-
-// Streams the candidates, holding only the best ones. A lone candidate is
-// the best whatever the measure says: it is returned unmeasured.
-const keepLeast = (
-  readings: Iterable<Reading>,
-  measure: (reading: Reading) => number
-): readonly Reading[] => {
-  const leaders = leadersBy(measure)
-  let lone: Reading | undefined
-  for (const reading of readings) {
-    // Stryker disable next-line ConditionalExpression,EqualityOperator,BlockStatement: the lone slot only defers offering the first reading; offering it at once keeps the same leaders
-    if (lone === undefined && leaders.kept().length === 0) {
-      lone = reading
-      continue
-    }
-    if (lone !== undefined) leaders.offer(lone)
-    lone = undefined
-    leaders.offer(reading)
-  }
-  return lone === undefined ? leaders.kept() : [lone]
-}
-
-// Memoised on first use: a single reading is never measured, so its
-// signatures are never needed.
-const lazily = <T extends object>(compute: () => T): (() => T) => {
-  let value: T | undefined
-  return () => (value ??= compute())
-}
-
-export const identify = (
+// Each stretch keeps its no-loss alternatives; the fewest-move choices are
+// decided per group of stretches that share a gap, and walked back in the
+// order of the cross product of the alternatives.
+export const identityTies = (
   ancestor: JsonArray,
   local: JsonArray,
   other: JsonArray,
   keys: KeyedSides
-): readonly Reading[] => {
-  const groups = groupSlots({ ancestor, local, other }, keys)
-  const segments = segmentsOf(groups)
-  const held = lazily(() => valuesBothSidesHold(local, other))
-  // Minimising the losses keeps the no-loss readings when any exists and all
-  // of them otherwise.
-  const noLoss = keepLeast(
-    mapped(crossProduct(segments, 0, []), toReading),
-    reading => Number(losesAValue(reading, held()))
-  )
-  return keepLeast(noLoss, movesOf)
+): GroupedTies => {
+  // A value determines its key (a field of the entry, or its whole content),
+  // so the values both sides hold split across keys and each key is judged
+  // alone.
+  const stretches = stretchesOf(groupSlots({ ancestor, local, other }, keys))
+  if (stretches.every(hasOneAlternative)) {
+    return tiesOver(
+      stretches.map(stretch => stretch.alternatives),
+      []
+    )
+  }
+  const kept = withoutLosses(stretches)
+  return tiesOver(kept, tieComponents(pointSetsOf(kept)))
 }

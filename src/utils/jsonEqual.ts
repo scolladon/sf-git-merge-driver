@@ -59,34 +59,72 @@ const hasSameChildOrder: KeysMatch = (lKeys, rKeys, rObj) =>
   hasSameKeys(lKeys, rKeys, rObj) &&
   hasSameKeysInOrder(lKeys.filter(isChildKey), rKeys.filter(isChildKey), rObj)
 
-function deepEqual(a: unknown, b: unknown, keysMatch: KeysMatch): boolean {
-  const stack: [unknown, unknown][] = [[a, b]]
+const isNode = (value: unknown): value is object =>
+  typeof value === 'object' && value !== null
 
-  while (stack.length > 0) {
-    const [left, right] = stack.pop() as [unknown, unknown]
-
-    if (left === right) continue
-    if (left === null || right === null) return false
-    if (typeof left !== 'object' || typeof right !== 'object') return false
-
-    if (Array.isArray(left)) {
-      if (!Array.isArray(right)) return false
-      if (left.length !== right.length) return false
-      for (let i = left.length - 1; i >= 0; i--) {
-        stack.push([left[i], right[i]])
-      }
-      continue
-    }
-    if (Array.isArray(right)) return false
-
-    const lObj = left as JsonObject
-    const rObj = right as JsonObject
-    const lKeys = Object.keys(lObj)
-    if (!keysMatch(lKeys, Object.keys(rObj), rObj)) return false
-    for (const key of lKeys) {
-      stack.push([lObj[key], rObj[key]])
-    }
+// Two leaves are settled where they are read; only two nodes wait for a
+// level of their own. Items wait in reverse so that they are read in written
+// order: a difference near the start of a list is met first.
+const sameItems = (
+  left: readonly unknown[],
+  right: readonly unknown[],
+  pending: object[]
+): boolean => {
+  if (left.length !== right.length) return false
+  for (let index = left.length - 1; index >= 0; index--) {
+    const mine = left[index]
+    const theirs = right[index]
+    if (mine === theirs) continue
+    if (!isNode(mine) || !isNode(theirs)) return false
+    pending.push(mine, theirs)
   }
+  return true
+}
 
+const sameMembers = (
+  left: JsonObject,
+  right: JsonObject,
+  keysMatch: KeysMatch,
+  pending: object[]
+): boolean => {
+  const leftKeys = Object.keys(left)
+  if (!keysMatch(leftKeys, Object.keys(right), right)) return false
+  for (const key of leftKeys) {
+    const mine = left[key]
+    const theirs = right[key]
+    if (mine === theirs) continue
+    if (!isNode(mine) || !isNode(theirs)) return false
+    pending.push(mine, theirs)
+  }
+  return true
+}
+
+const sameLevel = (
+  left: object,
+  right: object,
+  keysMatch: KeysMatch,
+  pending: object[]
+): boolean => {
+  if (Array.isArray(left)) {
+    return Array.isArray(right) && sameItems(left, right, pending)
+  }
+  if (Array.isArray(right)) return false
+  return sameMembers(
+    left as JsonObject,
+    right as JsonObject,
+    keysMatch,
+    pending
+  )
+}
+
+function deepEqual(a: unknown, b: unknown, keysMatch: KeysMatch): boolean {
+  if (a === b) return true
+  if (!isNode(a) || !isNode(b)) return false
+  const pending: object[] = [a, b]
+  while (pending.length > 0) {
+    const right = pending.pop() as object
+    const left = pending.pop() as object
+    if (!sameLevel(left, right, keysMatch, pending)) return false
+  }
   return true
 }

@@ -1,8 +1,13 @@
+import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import {
   groupByKey,
+  type KeyCopies,
   matchings,
+  type Pairing,
+  type RepeatedCopies,
   readings,
+  type SingleCopy,
   valueClasses,
 } from '../../../../src/merger/nodes/keyedReadings.js'
 import type { JsonObject } from '../../../../src/types/jsonTypes.js'
@@ -206,50 +211,133 @@ describe('valueClasses', () => {
 })
 
 describe('groupByKey', () => {
-  describe('given a repeated key', () => {
-    it('then every copy is kept in written order', () => {
+  describe('given a key each side holds once', () => {
+    it('then its group holds the entry of each side', () => {
       // Arrange
-      const first = entry('a', '1')
-      const second = entry('a', '2')
-      const third = entry('b')
+      const [a, l, o] = [entry('a'), entry('a', 'l'), entry('a', 'o')]
+      const expected: SingleCopy = {
+        ancestor: a,
+        local: l,
+        other: o,
+        copies: undefined,
+      }
       const sut = groupByKey
 
       // Act
-      const result = sut([], [first, third, second], [third], {
-        ancestor: [],
-        local: ['a', 'b', 'a'],
-        other: ['b'],
+      const result = sut([a], [l], [o], {
+        ancestor: ['a'],
+        local: ['a'],
+        other: ['a'],
       })
 
       // Assert
-      expect([...result.keys()]).toEqual(['a', 'b'])
-      expect(result.get('a')).toEqual({
-        ancestor: [],
-        local: [first, second],
-        other: [],
-      })
-      expect(result.get('b')).toEqual({
-        ancestor: [],
-        local: [third],
-        other: [third],
-      })
+      expect(result.get('a')).toStrictEqual(expected)
     })
   })
 
-  describe('given keys first seen on the ancestor then local then other', () => {
-    it('then the groups follow that order', () => {
+  describe('given a key only local and other hold', () => {
+    it('then its group holds no ancestor entry', () => {
+      // Arrange
+      const [l, o] = [entry('a', 'l'), entry('a', 'o')]
+      const expected: SingleCopy = {
+        ancestor: undefined,
+        local: l,
+        other: o,
+        copies: undefined,
+      }
+      const sut = groupByKey
+
+      // Act
+      const result = sut([], [l], [o], {
+        ancestor: [],
+        local: ['a'],
+        other: ['a'],
+      })
+
+      // Assert
+      expect(result.get('a')).toStrictEqual(expected)
+    })
+  })
+
+  describe('given local holds a key twice and other does not hold it', () => {
+    it('then its group lists both copies and no other copy', () => {
+      // Arrange
+      const first = entry('a', '1')
+      const second = entry('a', '2')
+      const expected: RepeatedCopies = {
+        copies: { ancestor: [], local: [first, second], other: [] },
+      }
+      const sut = groupByKey
+
+      // Act
+      const result = sut([], [first, second], [], {
+        ancestor: [],
+        local: ['a', 'a'],
+        other: [],
+      })
+
+      // Assert
+      expect(result.get('a')).toStrictEqual(expected)
+    })
+  })
+
+  describe('given the ancestor and other hold a key once and local twice', () => {
+    it('then its group lists every copy of each side', () => {
+      // Arrange
+      const [a, o] = [entry('a'), entry('a', 'o')]
+      const [l1, l2] = [entry('a', 'l1'), entry('a', 'l2')]
+      const expected: RepeatedCopies = {
+        copies: { ancestor: [a], local: [l1, l2], other: [o] },
+      }
+      const sut = groupByKey
+
+      // Act
+      const result = sut([a], [l1, l2], [o], {
+        ancestor: ['a'],
+        local: ['a', 'a'],
+        other: ['a'],
+      })
+
+      // Assert
+      expect(result.get('a')).toStrictEqual(expected)
+    })
+  })
+
+  describe('given a side holds a key three times', () => {
+    it('then its group lists the three copies in written order', () => {
+      // Arrange
+      const copies = [entry('a', '1'), entry('a', '2'), entry('a', '3')]
+      const expected: RepeatedCopies = {
+        copies: { ancestor: [], local: copies, other: [] },
+      }
+      const sut = groupByKey
+
+      // Act
+      const result = sut([], copies, [], {
+        ancestor: [],
+        local: ['a', 'a', 'a'],
+        other: [],
+      })
+
+      // Assert
+      expect(result.get('a')).toStrictEqual(expected)
+    })
+  })
+
+  describe('given keys spread over the three sides', () => {
+    it('then every key has a group', () => {
       // Arrange
       const sut = groupByKey
 
       // Act
-      const result = sut([entry('z')], [entry('y')], [entry('x')], {
+      const result = sut([entry('z')], [entry('y'), entry('z')], [entry('x')], {
         ancestor: ['z'],
-        local: ['y'],
+        local: ['y', 'z'],
         other: ['x'],
       })
 
       // Assert
-      expect([...result.keys()]).toEqual(['z', 'y', 'x'])
+      expect(new Set(result.keys())).toStrictEqual(new Set(['x', 'y', 'z']))
     })
   })
 })
@@ -392,6 +480,109 @@ describe('readings', () => {
 
       // Assert
       expect(result).toEqual([[{ other: a }]])
+    })
+  })
+})
+
+const ABSENT = -1
+
+// Copies are told apart by identity: equal values are distinct objects here
+const placeOf = (
+  copies: readonly JsonObject[],
+  copy: JsonObject | undefined
+): number => (copy === undefined ? ABSENT : copies.indexOf(copy))
+
+type Places = readonly [ancestor: number, local: number, other: number]
+
+const placesOf =
+  (copies: KeyCopies) =>
+  (pairing: Pairing): Places => [
+    placeOf(copies.ancestor, pairing.ancestor),
+    placeOf(copies.local, pairing.local),
+    placeOf(copies.other, pairing.other),
+  ]
+
+const exchanged = ([ancestor, local, other]: Places): Places => [
+  ancestor,
+  other,
+  local,
+]
+
+// One reading as the set of its pairings, whatever order they come in
+const readingKey = (pairings: readonly Places[]): string =>
+  pairings
+    .map(places => places.join(':'))
+    .sort()
+    .join(' ')
+
+const readingKeys = (
+  copies: KeyCopies,
+  seenFrom: (places: Places) => Places
+): readonly string[] =>
+  [...readings(copies)]
+    .map(pairings => readingKey(pairings.map(placesOf(copies)).map(seenFrom)))
+    .sort()
+
+const asWritten = (places: Places): Places => places
+
+const exchangedSides = (copies: KeyCopies): KeyCopies => ({
+  ancestor: copies.ancestor,
+  local: copies.other,
+  other: copies.local,
+})
+
+describe('readings with the sides exchanged', () => {
+  describe.each([
+    ['local', ['', ''], ['', 'edited']],
+    ['other', ['', 'edited'], ['', '']],
+  ] as const)(
+    'given as many copies on each side and no ancestor, the copies of %s alike and one of the other side edited',
+    (_side, local, other) => {
+      it('then the identical copy pairs with either of the copies alike', () => {
+        // Arrange
+        const copies: KeyCopies = {
+          ancestor: [],
+          local: local.map(extra => entry('a', extra)),
+          other: other.map(extra => entry('a', extra)),
+        }
+
+        // Act
+        const sut = readingKeys(copies, asWritten)
+
+        // Assert
+        expect(sut).toHaveLength(2)
+        expect(sut).toEqual(readingKeys(exchangedSides(copies), exchanged))
+      })
+    }
+  )
+
+  describe('given generated copies of one key', () => {
+    const MAX_COPIES = 3
+    const sideArb = fc.array(fc.constantFrom('', 'edited', 'apart'), {
+      maxLength: MAX_COPIES,
+    })
+    const copiesArb: fc.Arbitrary<KeyCopies> = fc
+      .record({ ancestor: sideArb, local: sideArb, other: sideArb })
+      .map(({ ancestor, local, other }) => ({
+        ancestor: ancestor.map(extra => entry('a', extra)),
+        local: local.map(extra => entry('a', extra)),
+        other: other.map(extra => entry('a', extra)),
+      }))
+
+    it('then the readings are those of the exchanged sides, seen from the other side', () => {
+      fc.assert(
+        fc.property(copiesArb, copies => {
+          // Arrange
+          const expected = readingKeys(exchangedSides(copies), exchanged)
+
+          // Act
+          const sut = readingKeys(copies, asWritten)
+
+          // Assert
+          expect(sut).toEqual(expected)
+        }),
+        { numRuns: 2000 }
+      )
     })
   })
 })

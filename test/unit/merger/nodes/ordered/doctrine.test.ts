@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import {
-  mergeOrderedArrays,
-  mergeReading,
-} from '../../../../../src/merger/nodes/ordered/mergeOrdered.js'
+import { mergeOrderedArrays } from '../../../../../src/merger/nodes/ordered/mergeOrdered.js'
+import { mergeReading } from '../../../../../src/merger/nodes/ordered/mergeReading.js'
 import {
   formatResult,
   ORDERED_ATTRIBUTE,

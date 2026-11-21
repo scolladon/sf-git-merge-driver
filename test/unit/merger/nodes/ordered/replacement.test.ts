@@ -1,5 +1,11 @@
-import { describe, expect, it } from 'vitest'
-import type { OrderedEntry } from '../../../../../src/merger/nodes/ordered/orderedEntry.js'
+import fc from 'fast-check'
+import { describe, expect, it, vi } from 'vitest'
+import type { EntryStatus } from '../../../../../src/merger/nodes/ordered/content.js'
+import {
+  isOn,
+  type OrderedEntry,
+  type Reading,
+} from '../../../../../src/merger/nodes/ordered/orderedEntry.js'
 import {
   INHERITED_PLACE,
   orderingView,
@@ -7,8 +13,35 @@ import {
   type ReplacementRun,
   replacementRuns,
 } from '../../../../../src/merger/nodes/ordered/replacement.js'
+import { signatureOf } from '../../../../../src/utils/jsonSignature.js'
+import { phantomSwaps as signedSwaps } from '../../../../utils/oracles/signedSwaps.js'
+import {
+  type Case,
+  caseArb,
+  IDENTITY,
+  IDENTITY_ANCESTORS,
+  IDENTITY_TOKENS,
+} from '../../../../utils/orderedCases.js'
 import { statusesOf } from '../../../../utils/orderedContext.js'
-import { readingsOf } from '../../../../utils/orderedTokens.js'
+import {
+  cutCaseArb,
+  groupCaseArb,
+  stitchedCaseArb,
+} from '../../../../utils/orderedCuts.js'
+import {
+  type MovedCase,
+  movedCaseArb,
+  stridedCaseArb,
+} from '../../../../utils/orderedMoves.js'
+import { readingsOf, toEntry } from '../../../../utils/orderedTokens.js'
+
+vi.mock('../../../../../src/utils/jsonSignature.js', async importOriginal => {
+  const original =
+    await importOriginal<
+      typeof import('../../../../../src/utils/jsonSignature.js')
+    >()
+  return { ...original, signatureOf: vi.fn(original.signatureOf) }
+})
 
 const keyList = (entries: readonly OrderedEntry[]): string =>
   entries.map(entry => entry.key).join('')
@@ -483,6 +516,211 @@ describe('phantomSwaps', () => {
 
         // Assert
         expect(result).toEqual([0])
+      })
+    })
+  })
+})
+
+type Sides = readonly [ancestor: string, local: string, other: string]
+
+const joinedSides = ([ancestor, local, other]: Case): Sides => [
+  ancestor.join(' '),
+  local.join(' '),
+  other.join(' '),
+]
+
+const movedSides = ({ ancestor, local, other }: MovedCase): Sides => [
+  ancestor,
+  local,
+  other,
+]
+
+const MAX_MOVED_SIZE = 60
+const STRIDED_SIZES = { min: 40, max: 80 } as const
+
+const GENERATED_SIDES: readonly (readonly [string, fc.Arbitrary<Sides>])[] = [
+  [
+    'repeated keyed and keyless keys',
+    caseArb(IDENTITY_ANCESTORS, IDENTITY, IDENTITY_TOKENS).map(joinedSides),
+  ],
+  [
+    'repeated keys joined by unique keys',
+    cutCaseArb(IDENTITY_ANCESTORS, IDENTITY, IDENTITY_TOKENS).map(joinedSides),
+  ],
+  ['parts rendering apart', stitchedCaseArb.map(joinedSides)],
+  ['spans of identical copies one side drops', groupCaseArb.map(joinedSides)],
+  ['randomly moved unique keys', movedCaseArb(MAX_MOVED_SIZE).map(movedSides)],
+  [
+    'unique keys moved by strides',
+    stridedCaseArb(STRIDED_SIZES.min, STRIDED_SIZES.max).map(movedSides),
+  ],
+]
+
+const viewsOf = (sides: Sides) =>
+  readingsOf(...sides).map(reading => {
+    const statuses = statusesOf(reading)
+    return { view: orderingView(reading, statuses).view, statuses }
+  })
+
+const sharedCleanOf = (
+  view: Reading,
+  statuses: readonly EntryStatus[]
+): Reading =>
+  view.filter(
+    entry =>
+      isOn(entry, 'local') &&
+      isOn(entry, 'other') &&
+      statuses[entry.id]?.kind === 'clean'
+  )
+
+const isDistinct = (places: readonly number[]): boolean =>
+  new Set(places).size === places.length
+
+describe('phantomSwaps against generated sides', () => {
+  describe.each(GENERATED_SIDES)('given %s', (_name, sides) => {
+    describe('when counting the swaps of every reading', () => {
+      it('then each count is the one signing every shared entry', () => {
+        fc.assert(
+          fc.property(sides, generated => {
+            // Arrange
+            const views = viewsOf(generated)
+            const expected = views.map(({ view, statuses }) =>
+              signedSwaps(view, statuses)
+            )
+
+            // Act
+            const result = views.map(({ view, statuses }) =>
+              phantomSwaps(view, statuses)
+            )
+
+            // Assert
+            expect(result).toEqual(expected)
+          })
+        )
+      })
+
+      it('then no two shared entries share a place on a side', () => {
+        fc.assert(
+          fc.property(sides, generated => {
+            // Arrange
+            const views = viewsOf(generated)
+
+            // Act
+            const result = views.map(({ view, statuses }) =>
+              sharedCleanOf(view, statuses)
+            )
+
+            // Assert
+            for (const shared of result) {
+              expect(isDistinct(shared.map(entry => entry.localPos))).toBe(true)
+              expect(isDistinct(shared.map(entry => entry.otherPos))).toBe(true)
+            }
+          })
+        )
+      })
+    })
+  })
+})
+
+// A shared clean entry per written place pair, its output the copy of value
+const sharedViewOf = (
+  places: readonly (readonly [value: string, local: number, other: number])[]
+) => {
+  const view: Reading = places.map(([value, localPos, otherPos], id) => ({
+    id,
+    key: value,
+    local: toEntry(value),
+    other: toEntry(value),
+    ancestorPos: id,
+    localPos,
+    otherPos,
+  }))
+  const statuses: readonly EntryStatus[] = places.map(([value]) => ({
+    kind: 'clean',
+    output: [toEntry(value)],
+  }))
+  return { view, statuses }
+}
+
+describe('phantomSwaps on written places', () => {
+  describe('given shared entries both sides order alike', () => {
+    describe('when counting swaps', () => {
+      it('then no entry is signed', () => {
+        // Arrange
+        const { view, statuses } = sharedViewOf([
+          ['~p', 0, 0],
+          ['~p', 1, 1],
+          ['~q', 2, 2],
+        ])
+        const sut = phantomSwaps
+
+        // Act
+        const result = sut(view, statuses)
+
+        // Assert
+        expect(result).toBe(0)
+        expect(signatureOf).not.toHaveBeenCalled()
+      })
+    })
+  })
+
+  describe.each([
+    {
+      shape: 'two interchangeable copies the sides swap',
+      places: [
+        ['~p', 0, 1],
+        ['~p', 1, 0],
+      ],
+      expected: 1,
+    },
+    {
+      shape: 'two copies of different values the sides swap',
+      places: [
+        ['~p', 0, 1],
+        ['~q', 1, 0],
+      ],
+      expected: 0,
+    },
+    {
+      shape: 'interchangeable copies another entry crosses',
+      places: [
+        ['~p', 0, 1],
+        ['~p', 1, 2],
+        ['~u', 2, 0],
+      ],
+      expected: 0,
+    },
+    {
+      shape: 'two of three interchangeable copies swapped',
+      places: [
+        ['~p', 0, 1],
+        ['~p', 1, 0],
+        ['~p', 2, 2],
+      ],
+      expected: 1,
+    },
+    {
+      shape: 'three interchangeable copies reversed',
+      places: [
+        ['~p', 0, 2],
+        ['~p', 1, 1],
+        ['~p', 2, 0],
+      ],
+      expected: 3,
+    },
+  ] as const)('given $shape', ({ places, expected }) => {
+    describe('when counting swaps', () => {
+      it(`then it counts ${expected}`, () => {
+        // Arrange
+        const { view, statuses } = sharedViewOf(places)
+        const sut = phantomSwaps
+
+        // Act
+        const result = sut(view, statuses)
+
+        // Assert
+        expect(result).toBe(expected)
+        expect(result).toBe(signedSwaps(view, statuses))
       })
     })
   })

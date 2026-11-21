@@ -9,6 +9,13 @@ import {
 import type { JsonArray, JsonValue } from '../../../../src/types/jsonTypes.js'
 import { jsonIdentical } from '../../../../src/utils/jsonEqual.js'
 import {
+  caseArb,
+  IDENTITY,
+  IDENTITY_ANCESTORS,
+  IDENTITY_TOKENS,
+} from '../../../utils/orderedCases.js'
+import { toEntry } from '../../../utils/orderedTokens.js'
+import {
   assertLaw,
   CONFLICT,
   collectBlocks,
@@ -65,8 +72,11 @@ const swapValue = (value: JsonValue): JsonValue => {
 
 const swapAll = (values: JsonArray): JsonArray => values.map(swapValue)
 
-const symmetry = (spec: KindSpec) =>
-  fc.asyncProperty(sidesArb(spec), async ([a, l, o]) => {
+const symmetry = (
+  spec: KindSpec,
+  sides: fc.Arbitrary<readonly [Side, Side, Side]> = sidesArb(spec)
+) =>
+  fc.asyncProperty(sides, async ([a, l, o]) => {
     // Arrange
     const swapped = merge(spec, a, o, l)
 
@@ -572,6 +582,35 @@ const bothAddATag = (spec: KindSpec, [a, l, o]: readonly Side[]): boolean => {
   return local.some(tag => other.includes(tag) && !ancestor.includes(tag))
 }
 
+// One merge in three hundred of these sides draws as many surplus copies on
+// each side, where the readings once depended on which side was local: this
+// many runs miss them once in ten million
+const REPEATED_KEY_RUNS = 5000
+const REPEATED_KEY_TIMEOUT_MS = 60_000
+
+const entriesOfTokens = (tokens: readonly string[]): Side => tokens.map(toEntry)
+
+type Sides = readonly [Side, Side, Side]
+
+const repeatedKeySidesArb = caseArb(
+  IDENTITY_ANCESTORS,
+  IDENTITY,
+  IDENTITY_TOKENS
+).map(
+  ([ancestor, local, other]): Sides => [
+    entriesOfTokens(ancestor),
+    entriesOfTokens(local),
+    entriesOfTokens(other),
+  ]
+)
+
+// Both sides add two entries of one key, one of them edited by one side
+const EQUAL_SURPLUS: Sides = [
+  [],
+  entriesOfTokens(['A', 'A']),
+  entriesOfTokens(['A', 'A*']),
+]
+
 const MINIMUM_REACH = 0.25
 const REACH_SAMPLES = 400
 const MINIMUM_BOTH_ADDED_REACH = 0.1
@@ -586,6 +625,24 @@ describe('JsonMerger laws: smallest conflict', () => {
   ])('given %s sides', (_name, spec) => {
     it('when local and other are swapped then the merge mirrors', async () => {
       await assertLaw(symmetry(spec))
+    })
+  })
+
+  describe('given ordered sides of tokens that repeat keys, with keyless entries', () => {
+    it(
+      'when local and other are swapped then the merge mirrors',
+      async () => {
+        await fc.assert(symmetry(ordered, repeatedKeySidesArb), {
+          numRuns: REPEATED_KEY_RUNS,
+        })
+      },
+      REPEATED_KEY_TIMEOUT_MS
+    )
+
+    it('when each side adds two entries of one key, one of them edited by one side, and the sides are swapped then the merge mirrors', async () => {
+      await fc.assert(symmetry(ordered, fc.constant(EQUAL_SURPLUS)), {
+        numRuns: 1,
+      })
     })
   })
 

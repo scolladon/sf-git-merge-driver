@@ -534,6 +534,22 @@ const attributeString = (slot: RootSlot, attrs: Attributes): string =>
     ? attrsToString(attrs)
     : attrsToString(slot.attrs) + attrsToString(attrs)
 
+// The slot's attributes come straight from the source root, so their lines
+// are escaped here like any value when the document holds a conflict; the
+// element's own were escaped by the caller.
+const attributeTextOf = (
+  st: WalkState,
+  markers: ConflictMarkers,
+  slot: RootSlot,
+  attrs: Attributes
+): string =>
+  attributeString(
+    { ...slot, attrs: attributesOf(st, markers, slot.attrs) },
+    attrs
+  )
+
+// An opening with no attribute outside the root slot holds no value: unless
+// its name breaks the line, no line of it needs the value-range bookkeeping
 const writeOpening = (
   st: WalkState,
   name: string,
@@ -544,18 +560,82 @@ const writeOpening = (
 ): void => {
   const indent = st.isFirstTopLevelAfterDecl ? '' : getIndent(st.depth)
   st.isFirstTopLevelAfterDecl = false
-  const opening = openingOf(
-    slot.contested,
-    markers,
-    indent,
-    name,
-    attributeString(
-      { ...slot, attrs: attributesOf(st, markers, slot.attrs) },
-      attrs
-    ),
-    terminator
+  if (slot === NO_ROOT && attrs.length === 0 && !name.includes('\n')) {
+    return append(st, `${indent}<${name}${terminator}`)
+  }
+  const attrText = attributeTextOf(st, markers, slot, attrs)
+  appendValue(
+    st,
+    openingOf(slot.contested, markers, indent, name, attrText, terminator),
+    indent.length
   )
-  appendValue(st, opening, indent.length)
+}
+
+const AT_SIGN = 64
+const HASH = 35
+const UNDERSCORE = 95
+
+// Tested on the first character only: an attribute (`@_`), text, a comment
+// or CDATA (`#text`, `#xml__comment`, `__cdata`) and the conflict flag
+// (`__conflict`) are refused, and so is an element whose name starts with
+// `_`, which takes the general walk and is written the same.
+const isElementKey = (key: string): boolean => {
+  const first = key.charCodeAt(0)
+  return first !== AT_SIGN && first !== HASH && first !== UNDERSCORE
+}
+
+const isEmptyRepeat = (value: JsonValue | undefined): boolean =>
+  Array.isArray(value) && value.length === 0
+
+// The keys of a body the direct walk serves: every key an element key, one
+// child at least written; undefined for every other body, which takes the
+// general walk.
+const elementKeysOf = (body: JsonValue): readonly string[] | undefined => {
+  if (!isObject(body)) return undefined
+  const keys = Object.keys(body)
+  let written = false
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i]!
+    if (!isElementKey(key)) return undefined
+    written = written || !isEmptyRepeat(body[key])
+  }
+  return written ? keys : undefined
+}
+
+const writeRepeats = (
+  st: WalkState,
+  tagName: string,
+  value: JsonValue,
+  markers: ConflictMarkers
+): void => {
+  if (!Array.isArray(value)) {
+    return writeElement(st, tagName, value, NO_ROOT, markers)
+  }
+  for (let i = 0; i < value.length; i++) {
+    writeElement(st, tagName, value[i] as JsonValue, NO_ROOT, markers)
+  }
+}
+
+// Every child written here is an element, a leaf or a conflict block, and
+// each ends its line: the close tag always starts a line of its own.
+const writeElementsOnly = (
+  st: WalkState,
+  name: string,
+  body: JsonObject,
+  keys: readonly string[],
+  slot: RootSlot,
+  markers: ConflictMarkers
+): void => {
+  writeOpening(st, name, slot, markers, EMPTY_ATTRS, START_TAG_END)
+  const parentDepth = st.depth
+  st.depth = parentDepth + 1
+  st.endedWithGt = false
+  for (let i = 0; i < keys.length; i++) {
+    writeRepeats(st, keys[i]!, body[keys[i]!] as JsonValue, markers)
+  }
+  append(st, `${getIndent(parentDepth)}</${name}>`)
+  st.depth = parentDepth
+  st.endedWithGt = true
 }
 
 const writeBody = (
@@ -575,6 +655,45 @@ const writeBody = (
   st.depth = parentDepth
 }
 
+// `<name>text</name>`: the text follows the opening on its line and the close
+// follows the text, as the general walk writes a lone text child.
+const writeLeaf = (
+  st: WalkState,
+  name: string,
+  text: string,
+  slot: RootSlot,
+  markers: ConflictMarkers
+): void => {
+  writeOpening(st, name, slot, markers, EMPTY_ATTRS, START_TAG_END)
+  st.endedWithGt = false
+  writeText(st, contentOf(st, markers, text))
+  append(st, `</${name}>`)
+  st.endedWithGt = true
+}
+
+// The opening tag of a body none of the shortcuts serve, and the children
+// left to write: none for an empty element, which self-closes (`<tag/>`)
+// because `sf project retrieve` never emits the expanded `<tag></tag>` form,
+// so the merge output converges to its byte shape. It returns before any
+// child is written, so it adds no frame of its own to a nested document:
+// the stack is what bounds how deep a document can nest.
+const writeGeneralOpening = (
+  st: WalkState,
+  name: string,
+  body: JsonValue,
+  slot: RootSlot,
+  markers: ConflictMarkers
+): JsonArray | undefined => {
+  const { attrs: sourceAttrs, children } = splitAttrsAndChildren(body)
+  const attrs = attributesOf(st, markers, sourceAttrs)
+  const isEmpty = isEmptyElementBody(children)
+  const terminator = isEmpty ? EMPTY_TAG_END : START_TAG_END
+  writeOpening(st, name, slot, markers, attrs, terminator)
+  return isEmpty ? undefined : children
+}
+
+// Self-closed or expanded, the general element ends on a `>`: the parent
+// sees endedWithGt = true whatever the body's terminating chunk was.
 const writeElement = (
   st: WalkState,
   name: string,
@@ -583,19 +702,16 @@ const writeElement = (
   markers: ConflictMarkers
 ): void => {
   if (CONTENT_NAMES.has(name)) return writeContent(st, name, body, markers)
+  if (typeof body === 'string' && body !== '') {
+    return writeLeaf(st, name, body, slot, markers)
+  }
   if (isConflictBlock(body)) return writeConflict(st, body, markers)
-
-  const { attrs: sourceAttrs, children } = splitAttrsAndChildren(body)
-  const attrs = attributesOf(st, markers, sourceAttrs)
-  // Empty elements self-close (`<tag/>`): `sf project retrieve` never emits
-  // the expanded `<tag></tag>` form, so the merge output converges to its
-  // byte shape.
-  const isEmpty = isEmptyElementBody(children)
-  const terminator = isEmpty ? EMPTY_TAG_END : START_TAG_END
-  writeOpening(st, name, slot, markers, attrs, terminator)
-  if (!isEmpty) writeBody(st, name, children, markers)
-  // Both forms end on a `>`, so the parent frame always sees
-  // endedWithGt=true, whatever the body's terminating chunk was.
+  const keys = elementKeysOf(body)
+  if (keys !== undefined) {
+    return writeElementsOnly(st, name, body as JsonObject, keys, slot, markers)
+  }
+  const children = writeGeneralOpening(st, name, body, slot, markers)
+  if (children !== undefined) writeBody(st, name, children, markers)
   st.endedWithGt = true
 }
 
@@ -656,9 +772,9 @@ const writeChildren = (
     if (keys.length === 1) {
       // Canonical merger output: single-key wrapper. Treat the value as
       // the body of one `<tagName>` element (writer semantic). An inner
-      // parser-shape multi-key object is handled by the next recursion
-      // into writeChildren via splitAttrsAndChildren / the multi-key
-      // branch below.
+      // parser-shape multi-key object is handled by writeElement: key by
+      // key when it holds child elements only, else through
+      // splitAttrsAndChildren and the multi-key branch below.
       const tagName = keys[0]!
       writeElement(st, tagName, child[tagName] as JsonValue, childSlot, markers)
       continue
@@ -721,6 +837,19 @@ const getIndent = (depth: number): string => {
   return cached
 }
 
+const SPACE_CODE = 32
+const TAB_CODE = 9
+const LINE_FEED = '\n'
+// The document's last line: writeTo appends the trailing newline itself
+const NO_LINE_END = ''
+
+const indentEndOf = (line: string): number => {
+  let at = 0
+  let code = line.charCodeAt(0)
+  while (code === SPACE_CODE || code === TAB_CODE) code = line.charCodeAt(++at)
+  return at
+}
+
 // Design §6.3.3 line-state machine: strip horizontal whitespace before
 // a marker on the same line (pass 1), drop whitespace-only lines
 // (pass 2), but never a line of a value. Newline belongs to the line it
@@ -751,17 +880,15 @@ class ConflictLineFilter {
     // previous "no-newline fast path" went dead once the per-chunk
     // generator pipeline was replaced by buffered serialization.
     const out: string[] = []
-    let working = chunk
-    while (true) {
-      const nl = working.indexOf('\n')
-      if (nl < 0) {
-        this.buf += working
-        break
-      }
-      this.buf += working.slice(0, nl)
-      this.flushLine(out, true)
-      working = working.slice(nl + 1)
+    let from = 0
+    let nl = chunk.indexOf('\n')
+    while (nl >= 0) {
+      this.buf += chunk.slice(from, nl)
+      this.flushLine(out, LINE_FEED)
+      from = nl + 1
+      nl = chunk.indexOf('\n', from)
     }
+    this.buf += chunk.slice(from)
     return out.join('')
   }
 
@@ -771,7 +898,7 @@ class ConflictLineFilter {
     // carries residual content. flushLine is a no-op when buf is
     // empty (blank-line branch drops it), so this stays correct.
     const out: string[] = []
-    this.flushLine(out, false)
+    this.flushLine(out, NO_LINE_END)
     return out.join('')
   }
 
@@ -789,24 +916,35 @@ class ConflictLineFilter {
     return range !== undefined && range[0] <= lineStart
   }
 
-  private flushLine(out: string[], withNewline: boolean): void {
-    let line = this.buf
+  // Pass 1: strip horizontal whitespace directly before a marker on
+  // this line. The expression's `.` refuses a line holding \r, U+2028 or
+  // U+2029 after the marker, so such a line keeps its indent.
+  private withoutMarkerIndent(line: string, indentEnd: number): string {
+    if (indentEnd === 0 || !this.startsWithMarkerAt(line, indentEnd)) {
+      return line
+    }
+    const leadingWs = /^([ \t]+)(.*)$/.exec(line)
+    return leadingWs === null ? line : leadingWs[2]!
+  }
+
+  private startsWithMarkerAt(line: string, at: number): boolean {
+    for (let i = 0; i < this.markers.length; i++) {
+      if (line.startsWith(this.markers[i]!, at)) return true
+    }
+    return false
+  }
+
+  private flushLine(out: string[], lineEnd: string): void {
+    const line = this.buf
     this.skipValuesBefore(this.lineStart)
     const isValueLine = this.isInValue(this.lineStart)
     this.lineStart += line.length + 1
     this.buf = ''
-    // Pass 1: strip horizontal whitespace directly before a marker on
-    // this line. Mirrors ConflictMarkerFormatter.indentRegex semantics.
-    const leadingWs = /^([ \t]+)(.*)$/.exec(line)
-    if (
-      leadingWs !== null &&
-      this.markers.some(m => leadingWs[2]!.startsWith(m))
-    ) {
-      line = leadingWs[2]!
-    }
-    // Pass 2: drop whitespace-only lines (including their '\n').
-    if (!isValueLine && /^[ \t]*$/.test(line)) return
-    out.push(withNewline ? `${line}\n` : line)
+    const indentEnd = indentEndOf(line)
+    // Pass 2: drop whitespace-only lines (including their '\n'), save a line
+    // of a value; a line pass 1 would rewrite starts with a marker, never blank
+    if (!isValueLine && indentEnd === line.length) return
+    out.push(`${this.withoutMarkerIndent(line, indentEnd)}${lineEnd}`)
   }
 }
 
@@ -850,8 +988,7 @@ export class XmlStreamWriter implements XmlSerializer {
     // When the merge produced no conflicts, the ConflictLineFilter has
     // nothing to do (its only job is to clean indentation and blank
     // lines around marker tokens, none of which are emitted). Skipping
-    // it removes ~20 % of serialize CPU on conflict-free documents
-    // (newline scan + two regexes per line).
+    // it saves a newline scan and an indent scan per line.
     const markers = buildConflictMarkers(this.config)
     const st: WalkState = {
       buf: '',
