@@ -24,6 +24,8 @@ const OPENING_ROOT_ATTRIBUTES: JsonObject = {
   '@_a': 'x\n=======',
 }
 
+const UNDEFINED_BODY = { a: undefined } as unknown as JsonObject
+
 const sut = new XmlStreamWriter(defaultConfig)
 
 const conflictOf = (
@@ -83,6 +85,10 @@ describe('XmlStreamWriter', () => {
         [{ a: 7 }, '<a>7</a>'],
         [{ a: true }, '<a>true</a>'],
         [{ a: null }, '<a/>'],
+        [UNDEFINED_BODY, '<a/>'],
+        [{ a: {} }, '<a/>'],
+        [{ a: { b: null } }, '<a>\n    <b/>\n</a>'],
+        [{ a: { '@_x': '1', '#xml__comment': [] } }, '<a x="1"></a>'],
         [{ a: { b: 'l1\nl2' } }, '<a>\n    <b>l1\nl2</b>\n</a>'],
         [{ a: { 'b\nc': 'x' } }, '<a>\n    <b\nc>x</b\nc>\n</a>'],
         // An indented line starting with the word `undefined` is no marker
