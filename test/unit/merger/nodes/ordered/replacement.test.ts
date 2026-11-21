@@ -575,9 +575,9 @@ const sharedCleanOf = (
 const isDistinct = (places: readonly number[]): boolean =>
   new Set(places).size === places.length
 
-describe('phantomSwaps against generated sides', () => {
+describe('shared clean entries against generated sides', () => {
   describe.each(GENERATED_SIDES)('given %s', (_name, sides) => {
-    describe('when counting the swaps of every reading', () => {
+    describe('when reading the shared clean entries of every reading', () => {
       it('then no two shared entries share a place on a side', () => {
         fc.assert(
           fc.property(sides, generated => {

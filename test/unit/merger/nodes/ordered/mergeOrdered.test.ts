@@ -261,12 +261,14 @@ describe('mergeOrderedArrays', () => {
         // Arrange
         const sides = gridSides('dropone', 3, 3)
         const sut = mergeOrderedArrays
+        const expected =
+          'U0a:u,R0,R0,U0b:u,U1a:u,R1,R1,U1b:u,U2a:u,R2,R2,U2b:u,Z:added (clean)'
 
         // Act
         const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
 
         // Assert
-        expect(result.hasConflict).toBe(false)
+        expect(formatResult(result)).toBe(expected)
       })
     })
   })

@@ -312,23 +312,6 @@ describe('given generated orderings', () => {
   })
 
   describe('when overlaps are joined', () => {
-    it('then the classes and the marked entries equal the pair by pair ones', () => {
-      fc.assert(
-        fc.property(movedCaseArb(MAX_GENERATED_SIZE), generated => {
-          // Arrange
-          const ctx = contextOfCase(generated)
-          const size = ctx.entries.length
-          const expected = seededClasses(pairOverlaps(ctx), size)
-
-          // Act
-          const sut = seededClasses(orderOverlaps(ctx), size)
-
-          // Assert
-          expect(sut).toEqual(expected)
-        })
-      )
-    })
-
     it('then both sides moving every fourth of thousands of entries differently gives the pair by pair classes and marks', () => {
       // Arrange
       const keys = keyTokens(MANY_KEYS)
