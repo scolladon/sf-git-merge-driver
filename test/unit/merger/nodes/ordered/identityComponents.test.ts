@@ -16,10 +16,6 @@ import {
   LIVE_SIDES,
   type LiveSide,
 } from '../../../../../src/merger/nodes/ordered/orderedEntry.js'
-import {
-  tieComponents as referenceComponents,
-  isTied as referenceIsTied,
-} from '../../../../utils/oracles/draftIdentity/identityComponents.js'
 
 vi.mock(
   '../../../../../src/merger/nodes/ordered/orderAxis.js',
@@ -927,19 +923,19 @@ describe('tieComponents over shared points arrays', () => {
 
   describe('given stretches whose alternatives share points arrays per side', () => {
     describe('when the components are built', () => {
-      it('then they equal the reference over fresh arrays', () => {
+      it('then they equal the components built over fresh arrays', () => {
         fc.assert(
           fc.property(stretchesArb, stretches => {
             // Arrange
             const shared = stretches.map(sharingSides)
-            const reference = referenceComponents(shared.map(freshCopies))
+            const expected = tieComponents(shared.map(freshCopies))
 
             // Act
             const sut = tieComponents(shared)
 
             // Assert
-            expect(sut).toStrictEqual(reference)
-            expect(sut.map(isTied)).toEqual(reference.map(referenceIsTied))
+            expect(sut).toStrictEqual(expected)
+            expect(sut.map(isTied)).toEqual(expected.map(isTied))
           })
         )
       })

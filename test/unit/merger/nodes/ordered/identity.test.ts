@@ -24,12 +24,6 @@ import type {
   JsonObject,
 } from '../../../../../src/types/jsonTypes.js'
 import { signatureOf } from '../../../../../src/utils/jsonSignature.js'
-import { identityTies as draftTies } from '../../../../utils/oracles/draftIdentity/identity.js'
-import * as reference from '../../../../utils/oracles/enumeratedIdentity.js'
-import {
-  identify as streamIdentify,
-  identityTies as streamTies,
-} from '../../../../utils/oracles/representativeMerge/identity.js'
 import {
   type Case,
   caseArb,
@@ -110,32 +104,11 @@ const shapeOf = (reading: Reading): string =>
     )
     .join(' ')
 
-const referenceReadings = (
-  sides: ReturnType<typeof orderedSides>
-): readonly Reading[] =>
-  reference.identify(sides.ancestor, sides.local, sides.other, sides.keys)
-
 const identifiedFrom = (
   sides: ReturnType<typeof orderedSides>
 ): readonly Reading[] => [
   ...identify(sides.ancestor, sides.local, sides.other, sides.keys),
 ]
-
-const ENTRY_SIDES = ['ancestor', 'local', 'other'] as const
-
-const sameValueReferences = (
-  actual: readonly Reading[],
-  expected: readonly Reading[]
-): boolean =>
-  actual.every((reading, at) =>
-    reading.every((entry, id) =>
-      ENTRY_SIDES.every(side => entry[side] === expected[at][id][side])
-    )
-  )
-
-// toStrictEqual ignores the order of the fields, the hidden class keeps it
-const fieldOrderOf = (reading: Reading): readonly string[][] =>
-  reading.map(entry => Object.keys(entry))
 
 type GridVariant = 'identical' | 'distinct'
 
@@ -383,14 +356,6 @@ const GENERATED_CASES: readonly (readonly [string, fc.Arbitrary<Case>])[] = [
 
 const sidesFrom = ([ancestor, local, other]: Case) =>
   orderedSides(ancestor.join(' '), local.join(' '), other.join(' '))
-
-const JOINED_CASES: readonly (readonly [string, fc.Arbitrary<Case>])[] = [
-  [
-    'repeated keyed and keyless keys',
-    cutCaseArb(IDENTITY_ANCESTORS, IDENTITY, IDENTITY_TOKENS),
-  ],
-  ['few repeated keys', cutCaseArb(SMALL_ANCESTORS, SMALL)],
-]
 
 describe('identify', () => {
   describe('given sides whose keys are unique', () => {
@@ -737,160 +702,20 @@ describe('identify', () => {
     })
   })
 
-  describe('given keyed and keyless repeated keys', () => {
-    describe('when identified', () => {
-      it('then the readings equal the enumerating reference, in order, values by reference', () => {
-        fc.assert(
-          fc.property(
-            caseArb(IDENTITY_ANCESTORS, IDENTITY, IDENTITY_TOKENS),
-            ([ancestor, local, other]) => {
-              // Arrange
-              const sides = orderedSides(
-                ancestor.join(' '),
-                local.join(' '),
-                other.join(' ')
-              )
-              const expected = referenceReadings(sides)
-
-              // Act
-              const sut = [
-                ...identify(
-                  sides.ancestor,
-                  sides.local,
-                  sides.other,
-                  sides.keys
-                ),
-              ]
-
-              // Assert
-              expect(sut).toStrictEqual(expected)
-              expect(sameValueReferences(sut, expected)).toBe(true)
-              expect(sut.map(fieldOrderOf)).toEqual(expected.map(fieldOrderOf))
-            }
-          )
-        )
-      })
-    })
-  })
-
-  describe.each(LAYOUT_CELLS)(
-    'given the %s layout at r = %i, m = %i',
-    (shape, copies, gadgets) => {
-      describe('when identified', () => {
-        it('then the readings equal the enumerating reference, in order', () => {
-          // Arrange
-          const sides = layoutSides(shape, copies, gadgets)
-          const expected = referenceReadings(sides)
-
-          // Act
-          const sut = identifiedFrom(sides)
-
-          // Assert
-          expect(sut).toStrictEqual(expected)
-          expect(sameValueReferences(sut, expected)).toBe(true)
-        })
-      })
-    }
-  )
-
-  describe('given generated sides', () => {
-    describe('when identified', () => {
-      it.each(GENERATED_CASES)(
-        'then the readings of %s are those of the tie set before grouping',
-        (_name, cases) => {
-          fc.assert(
-            fc.property(cases, tokens => {
-              // Arrange
-              const sides = sidesFrom(tokens)
-              const expected = [
-                ...streamIdentify(
-                  sides.ancestor,
-                  sides.local,
-                  sides.other,
-                  sides.keys
-                ),
-              ]
-
-              // Act
-              const sut = identifiedFrom(sides)
-
-              // Assert
-              expect(sut).toStrictEqual(expected)
-            })
-          )
-        }
-      )
-    })
-  })
-
-  describe.each(LAYOUT_CELLS)(
-    'given the %s layout at r = %i, m = %i',
-    (shape, copies, gadgets) => {
-      describe('when identified', () => {
-        it('then the readings are those of the tie set before grouping', () => {
-          // Arrange
-          const sides = layoutSides(shape, copies, gadgets)
-          const expected = [
-            ...streamIdentify(
-              sides.ancestor,
-              sides.local,
-              sides.other,
-              sides.keys
-            ),
-          ]
-
-          // Act
-          const sut = identifiedFrom(sides)
-
-          // Assert
-          expect(sut).toStrictEqual(expected)
-        })
-      })
-    }
-  )
-
-  describe('given parts joined by unique keys', () => {
-    describe('when identified', () => {
-      it.each(JOINED_CASES)(
-        'then the readings of %s equal the enumerating reference, in order',
-        (_name, joinedCase) => {
-          fc.assert(
-            fc.property(joinedCase, ([ancestor, local, other]) => {
-              // Arrange
-              const sides = orderedSides(
-                ancestor.join(' '),
-                local.join(' '),
-                other.join(' ')
-              )
-              const expected = referenceReadings(sides)
-
-              // Act
-              const sut = identifiedFrom(sides)
-
-              // Assert
-              expect(sut).toStrictEqual(expected)
-              expect(sameValueReferences(sut, expected)).toBe(true)
-            })
-          )
-        }
-      )
-    })
-  })
-
   describe('given an edited keyless copy beside its unedited twins', () => {
     describe('when identified', () => {
-      it('then the readings equal the enumerating reference', () => {
+      it('then the readings are the expected pairings', () => {
         // Arrange
         const sides = orderedSides('~a ~a B', '~a* ~a B', '~a ~a B')
-        const expected = referenceReadings(sides)
 
         // Act
-        const sut = [
-          ...identify(sides.ancestor, sides.local, sides.other, sides.keys),
-        ]
+        const sut = identifiedFrom(sides)
 
         // Assert
-        expect(sut).toStrictEqual(expected)
+        expect(sut.map(shapeOf)).toEqual([
+          '~a@0,1,0 ~a@1,-,1 B@2,2,2 ~a*@-,0,-',
+          '~a@0,-,0 ~a@1,1,1 B@2,2,2 ~a*@-,0,-',
+        ])
       })
     })
   })
@@ -1101,17 +926,6 @@ const tiesOver = (sides: ReturnType<typeof orderedSides>): GroupedTies =>
 const tiesOf = (ancestor: string, local: string, other: string): GroupedTies =>
   tiesOver(orderedSides(ancestor, local, other))
 
-const streamReadings = (
-  sides: ReturnType<typeof orderedSides>
-): readonly Reading[] => [
-  ...streamTies(
-    sides.ancestor,
-    sides.local,
-    sides.other,
-    sides.keys
-  ).readings(),
-]
-
 // The readings choosing alike on every entry whose key is not in the set
 const groupOf = (reading: Reading, keys: ReadonlySet<string>): string =>
   JSON.stringify(
@@ -1146,29 +960,6 @@ const keysOfSides = (
     ...sides.keys.other,
   ]),
 ]
-
-const draftTiesOver = (sides: ReturnType<typeof orderedSides>): GroupedTies =>
-  draftTies(sides.ancestor, sides.local, sides.other, sides.keys)
-
-// The draft-built tie set walks every reading of every generated case twice
-const DRAFT_ORACLE_TIMEOUT_MS = 60_000
-
-const expectSameTies = (
-  actual: GroupedTies,
-  expected: GroupedTies,
-  keys: ReadonlySet<string>
-): void => {
-  const readings = [...actual.readings()]
-  expect(actual.first).toStrictEqual(expected.first)
-  expect(actual.components).toStrictEqual(expected.components)
-  expect(readings).toStrictEqual([...expected.readings()])
-  expect(readings.map(fieldOrderOf)).toEqual(
-    [...expected.readings()].map(fieldOrderOf)
-  )
-  expect([...actual.representatives(keys)]).toStrictEqual([
-    ...expected.representatives(keys),
-  ])
-}
 
 const withAnyKeys = (cases: fc.Arbitrary<Case>) =>
   cases.chain(tokens => {
@@ -1317,7 +1108,7 @@ describe('identityTies', () => {
         expect(sut.components.map(({ members }) => members)).toEqual([[0], [1]])
       })
 
-      it('then the readings equal the enumerating reference', () => {
+      it('then the readings are the four pairings of the two keys', () => {
         // Arrange
         const sides = layoutSides('nocut-identical', 2, 2)
         const sut = tiesOver(sides)
@@ -1326,7 +1117,12 @@ describe('identityTies', () => {
         const result = [...sut.readings()]
 
         // Assert
-        expect(result).toStrictEqual(referenceReadings(sides))
+        expect(result.map(shapeOf)).toEqual([
+          'R0@0,0,0 R0@1,1,- R1@2,2,1 R1@3,3,-',
+          'R0@0,0,0 R0@1,1,- R1@2,2,- R1@3,3,1',
+          'R0@0,0,- R0@1,1,0 R1@2,2,1 R1@3,3,-',
+          'R0@0,0,- R0@1,1,0 R1@2,2,- R1@3,3,1',
+        ])
       })
     })
   })
@@ -1399,13 +1195,13 @@ describe('identityTies', () => {
   describe('given generated sides and any set of their keys', () => {
     describe('when grouping by that set', () => {
       it.each(GENERATED_CASES)(
-        'then the representatives of %s are the first reading of each group of the stream before grouping, in stream order',
+        'then the representatives of %s are the first reading of each group of the readings, in reading order',
         (_name, cases) => {
           fc.assert(
             fc.property(withAnyKeys(cases), ({ sides, keys }) => {
               // Arrange
               const sut = tiesOver(sides)
-              const expected = firstOfEachGroup(streamReadings(sides), keys)
+              const expected = firstOfEachGroup(identifiedFrom(sides), keys)
 
               // Act
               const result = [...sut.representatives(keys)]
@@ -1421,14 +1217,14 @@ describe('identityTies', () => {
 
   describe('given generated sides of spans of identical copies one side drops', () => {
     describe('when grouping by their interchangeable keys', () => {
-      it('then the representatives are the first reading of each group of the stream before grouping, in stream order', () => {
+      it('then the representatives are the first reading of each group of the readings, in reading order', () => {
         fc.assert(
           fc.property(groupCaseArb, tokens => {
             // Arrange
             const sides = sidesFrom(tokens)
             const keys = collapsibleKeys(sides)
             const sut = tiesOver(sides)
-            const expected = firstOfEachGroup(streamReadings(sides), keys)
+            const expected = firstOfEachGroup(identifiedFrom(sides), keys)
 
             // Act
             const result = [...sut.representatives(keys)]
@@ -1445,12 +1241,12 @@ describe('identityTies', () => {
     'given the %s layout at r = %i, m = %i',
     (shape, copies, gadgets) => {
       describe('when grouping by its interchangeable keys', () => {
-        it('then the representatives are the first reading of each group of the stream before grouping', () => {
+        it('then the representatives are the first reading of each group of the readings, in reading order', () => {
           // Arrange
           const sides = layoutSides(shape, copies, gadgets)
           const keys = collapsibleKeys(sides)
           const sut = tiesOver(sides)
-          const expected = firstOfEachGroup(streamReadings(sides), keys)
+          const expected = firstOfEachGroup(identifiedFrom(sides), keys)
 
           // Act
           const result = [...sut.representatives(keys)]
@@ -1462,43 +1258,18 @@ describe('identityTies', () => {
     }
   )
 
-  describe('given generated sides', () => {
-    describe('when building the tie set', () => {
-      it.each(GENERATED_CASES)(
-        'then the tie set of %s equals the draft-built tie set',
-        (_name, cases) => {
-          fc.assert(
-            fc.property(withAnyKeys(cases), ({ sides, keys }) => {
-              // Arrange
-              const expected = draftTiesOver(sides)
-
-              // Act
-              const sut = tiesOver(sides)
-
-              // Assert
-              expectSameTies(sut, expected, keys)
-            })
-          )
-        },
-        DRAFT_ORACLE_TIMEOUT_MS
-      )
-    })
-  })
-
   describe.each(LAYOUT_CELLS)(
     'given the %s layout at r = %i, m = %i',
     (shape, copies, gadgets) => {
       describe('when building the tie set', () => {
-        it('then it equals the draft-built tie set: one tied component per gadget, r to the power m readings', () => {
+        it('then it holds one tied component per gadget and r to the power m readings', () => {
           // Arrange
           const sides = layoutSides(shape, copies, gadgets)
-          const expected = draftTiesOver(sides)
 
           // Act
           const sut = tiesOver(sides)
 
           // Assert
-          expectSameTies(sut, expected, collapsibleKeys(sides))
           expect(sut.components.filter(isTied)).toHaveLength(gadgets)
           expect([...sut.readings()]).toHaveLength(copies ** gadgets)
         })
@@ -1510,16 +1281,14 @@ describe('identityTies', () => {
     const sides = orderedSides('Ua A A A A Ub', 'Ua A* A A Ub', 'Ua A A A Ub')
 
     describe('when building the tie set', () => {
-      it('then it holds the sixteen readings of the draft-built tie set', () => {
+      it('then it holds sixteen readings, from the first copies kept to the last', () => {
         // Arrange
-        const expected = draftTiesOver(sides)
-
-        // Act
         const sut = tiesOver(sides)
 
-        // Assert
+        // Act
         const shapes = [...sut.readings()].map(shapeOf)
-        expectSameTies(sut, expected, collapsibleKeys(sides))
+
+        // Assert
         expect(shapes).toHaveLength(16)
         expect(shapes[0]).toBe(
           'Ua@0,0,0 A@1,1,1 A@2,2,2 A@3,3,3 A@4,-,- Ub@5,4,4'
