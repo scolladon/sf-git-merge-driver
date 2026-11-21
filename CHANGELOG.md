@@ -1,5 +1,32 @@
 # Changelog
 
+## [2.2.0](https://github.com/scolladon/sf-git-merge-driver/compare/v2.1.0...v2.2.0) (2026-11-21)
+
+
+### Features
+
+* **merger:** merge keyless arrays with the ordered algorithm ([e6f1d96](https://github.com/scolladon/sf-git-merge-driver/commit/e6f1d964728649459bab677fca61c09f6780d878))
+* **merger:** merge ordered arrays by entry identity, conflicting only where changes overlap ([e6f1d96](https://github.com/scolladon/sf-git-merge-driver/commit/e6f1d964728649459bab677fca61c09f6780d878))
+* **merger:** order child tags by doctrine, settling root-level contradictions in canonical order ([e6f1d96](https://github.com/scolladon/sf-git-merge-driver/commit/e6f1d964728649459bab677fca61c09f6780d878))
+
+
+### Bug Fixes
+
+* **merger:** classify every value by kind and merge a change of kind as one value ([e6f1d96](https://github.com/scolladon/sf-git-merge-driver/commit/e6f1d964728649459bab677fca61c09f6780d878))
+* **merger:** conflict as one block when a side deletes what the other changes ([e6f1d96](https://github.com/scolladon/sf-git-merge-driver/commit/e6f1d964728649459bab677fca61c09f6780d878))
+* **merger:** keep every copy of a repeated key and conflict when copies cannot be told apart ([e6f1d96](https://github.com/scolladon/sf-git-merge-driver/commit/e6f1d964728649459bab677fca61c09f6780d878))
+* **merger:** pair the copies both sides add the same way whichever side is local ([9c64c32](https://github.com/scolladon/sf-git-merge-driver/commit/9c64c3224778cddbab78a1d2e7f815bab278784e))
+* **merger:** take the least swap count of tied readings without overflowing the stack ([9c64c32](https://github.com/scolladon/sf-git-merge-driver/commit/9c64c3224778cddbab78a1d2e7f815bab278784e))
+* **parser:** refuse input that a rewrite of the file would lose or corrupt ([e6f1d96](https://github.com/scolladon/sf-git-merge-driver/commit/e6f1d964728649459bab677fca61c09f6780d878))
+* **writer:** write conflicted files that read back as written ([e6f1d96](https://github.com/scolladon/sf-git-merge-driver/commit/e6f1d964728649459bab677fca61c09f6780d878))
+
+
+### Performance Improvements
+
+* **adapter:** shorten the parse and the write of a metadata file ([9c64c32](https://github.com/scolladon/sf-git-merge-driver/commit/9c64c3224778cddbab78a1d2e7f815bab278784e))
+* **merger:** make the ordered merge scale with its size and with repeated keys ([9c64c32](https://github.com/scolladon/sf-git-merge-driver/commit/9c64c3224778cddbab78a1d2e7f815bab278784e))
+* **merger:** shorten the keyed merge of a Profile, equality and tied merges ([9c64c32](https://github.com/scolladon/sf-git-merge-driver/commit/9c64c3224778cddbab78a1d2e7f815bab278784e))
+
 ## [2.1.0](https://github.com/scolladon/sf-git-merge-driver/compare/v2.0.2...v2.1.0) (2026-10-08)
 
 
