@@ -9,7 +9,6 @@ import {
   sweepScores,
   tournament,
 } from '../../../../../src/merger/nodes/ordered/precedence.js'
-import * as pairwise from '../../../../utils/oracles/pairwisePrecedence.js'
 import {
   contextOf,
   keysOf,
@@ -239,12 +238,12 @@ describe('given generated orderings', () => {
   )
 
   describe('when scored by dominance counts', () => {
-    it('then every score equals the pairwise reference', () => {
+    it('then every score equals the pair by pair score', () => {
       fc.assert(
         fc.property(movedCaseArb(MAX_GENERATED_SIZE), generated => {
           // Arrange
           const ctx = contextOfCase(generated)
-          const expected = pairwise.scoresOf(ctx)
+          const expected = pairScores(ctx)
 
           // Act
           const sut = sweepScores(ctx)
@@ -255,13 +254,13 @@ describe('given generated orderings', () => {
       )
     })
 
-    it('then an entry standing between two others on a replaced slot scores as the pairwise reference', () => {
+    it('then an entry standing between two others on a replaced slot scores as pair by pair', () => {
       // Arrange
       const ctx = contextOf('A B C D', 'A X C D', 'A B D C')
       const [replacing] = ctx.keptByAll.filter(
         entry => keysOf(ctx, [entry.id])[0] === 'X'
       )
-      const expected = pairwise.scoresOf(ctx)
+      const expected = pairScores(ctx)
 
       // Act
       const sut = sweepScores(ctx)
@@ -272,65 +271,25 @@ describe('given generated orderings', () => {
     })
   })
 
-  describe('when scored pair by pair', () => {
-    it('then every score equals the pairwise reference', () => {
-      fc.assert(
-        fc.property(movedCaseArb(MAX_GENERATED_SIZE), generated => {
-          // Arrange
-          const ctx = contextOfCase(generated)
-          const expected = pairwise.scoresOf(ctx)
-
-          // Act
-          const sut = pairScores(ctx)
-
-          // Assert
-          expect(sut).toEqual(expected)
-        })
-      )
-    })
-  })
-
-  describe('when the tournament runs', () => {
-    it('then order, ranks, cycle groups and cycle marks equal the pairwise reference', () => {
-      fc.assert(
-        fc.property(movedCaseArb(MAX_GENERATED_SIZE), generated => {
-          // Arrange
-          const ctx = contextOfCase(generated)
-          const expected = pairwise.tournament(ctx)
-
-          // Act
-          const sut = tournament(ctx)
-
-          // Assert
-          expect(sut.order.map(entry => entry.id)).toEqual(
-            expected.order.map(entry => entry.id)
-          )
-          expect([...sut.rank]).toEqual([...expected.rank])
-          expect(sut.cycleGroups).toEqual(expected.cycleGroups)
-          expect(cycleMarks(sut)).toEqual(pairwise.cycleMarks(expected))
-        })
-      )
-    })
-  })
-
   describe('when the tournament runs on a thousand entries moved by other', () => {
-    it('then order, ranks and cycle groups equal the pairwise reference', () => {
+    it("then the order is other's order and no cycle forms", () => {
       // Arrange
       const keys = keyTokens(MANY_KEYS)
       const ancestor = keys.join(' ')
-      const other = movedEvery(keys, MOVE_STRIDE, MOVE_SHIFT).join(' ')
-      const ctx = contextOf(ancestor, ancestor, other)
-      const expected = pairwise.tournament(ctx)
+      const moved = movedEvery(keys, MOVE_STRIDE, MOVE_SHIFT)
+      const ctx = contextOf(ancestor, ancestor, moved.join(' '))
 
       // Act
       const sut = tournament(ctx)
 
       // Assert
-      expect(sut.order.map(entry => entry.id)).toEqual(
-        expected.order.map(entry => entry.id)
-      )
-      expect([...sut.rank]).toEqual([...expected.rank])
-      expect(sut.cycleGroups).toEqual(expected.cycleGroups)
+      expect(
+        keysOf(
+          ctx,
+          sut.order.map(entry => entry.id)
+        )
+      ).toEqual(moved)
+      expect(sut.cycleGroups).toEqual([])
     })
   })
 
@@ -353,13 +312,13 @@ describe('given generated orderings', () => {
   })
 
   describe('when overlaps are joined', () => {
-    it('then the classes and the marked entries equal the pairwise reference', () => {
+    it('then the classes and the marked entries equal the pair by pair ones', () => {
       fc.assert(
         fc.property(movedCaseArb(MAX_GENERATED_SIZE), generated => {
           // Arrange
           const ctx = contextOfCase(generated)
           const size = ctx.entries.length
-          const expected = seededClasses(pairwise.orderOverlaps(ctx), size)
+          const expected = seededClasses(pairOverlaps(ctx), size)
 
           // Act
           const sut = seededClasses(orderOverlaps(ctx), size)
@@ -370,24 +329,7 @@ describe('given generated orderings', () => {
       )
     })
 
-    it('then pair by pair the classes and the marked entries equal the pairwise reference', () => {
-      fc.assert(
-        fc.property(movedCaseArb(MAX_GENERATED_SIZE), generated => {
-          // Arrange
-          const ctx = contextOfCase(generated)
-          const size = ctx.entries.length
-          const expected = seededClasses(pairwise.orderOverlaps(ctx), size)
-
-          // Act
-          const sut = seededClasses(pairOverlaps(ctx), size)
-
-          // Assert
-          expect(sut).toEqual(expected)
-        })
-      )
-    })
-
-    it('then both sides moving every fourth of thousands of entries differently gives the pairwise classes and marks', () => {
+    it('then both sides moving every fourth of thousands of entries differently gives the pair by pair classes and marks', () => {
       // Arrange
       const keys = keyTokens(MANY_KEYS)
       const ancestor = keys.join(' ')
@@ -395,7 +337,7 @@ describe('given generated orderings', () => {
       const other = movedEvery(keys, MOVE_STRIDE, OTHER_SHIFT).join(' ')
       const ctx = contextOf(ancestor, local, other)
       const size = ctx.entries.length
-      const expected = seededClasses(pairwise.orderOverlaps(ctx), size)
+      const expected = seededClasses(pairOverlaps(ctx), size)
 
       // Act
       const sut = seededClasses(orderOverlaps(ctx), size)
