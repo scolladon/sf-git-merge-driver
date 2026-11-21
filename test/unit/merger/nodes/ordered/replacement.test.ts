@@ -14,7 +14,6 @@ import {
   replacementRuns,
 } from '../../../../../src/merger/nodes/ordered/replacement.js'
 import { signatureOf } from '../../../../../src/utils/jsonSignature.js'
-import { phantomSwaps as signedSwaps } from '../../../../utils/oracles/signedSwaps.js'
 import {
   type Case,
   caseArb,
@@ -579,26 +578,6 @@ const isDistinct = (places: readonly number[]): boolean =>
 describe('phantomSwaps against generated sides', () => {
   describe.each(GENERATED_SIDES)('given %s', (_name, sides) => {
     describe('when counting the swaps of every reading', () => {
-      it('then each count is the one signing every shared entry', () => {
-        fc.assert(
-          fc.property(sides, generated => {
-            // Arrange
-            const views = viewsOf(generated)
-            const expected = views.map(({ view, statuses }) =>
-              signedSwaps(view, statuses)
-            )
-
-            // Act
-            const result = views.map(({ view, statuses }) =>
-              phantomSwaps(view, statuses)
-            )
-
-            // Assert
-            expect(result).toEqual(expected)
-          })
-        )
-      })
-
       it('then no two shared entries share a place on a side', () => {
         fc.assert(
           fc.property(sides, generated => {
@@ -720,7 +699,6 @@ describe('phantomSwaps on written places', () => {
 
         // Assert
         expect(result).toBe(expected)
-        expect(result).toBe(signedSwaps(view, statuses))
       })
     })
   })

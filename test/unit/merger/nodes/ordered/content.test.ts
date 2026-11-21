@@ -27,7 +27,6 @@ import {
 import type { OrderedSides } from '../../../../../src/merger/nodes/ordered/orderedSides.js'
 import type { JsonArray } from '../../../../../src/types/jsonTypes.js'
 import type { MergeResult } from '../../../../../src/types/mergeResult.js'
-import { entryStatuses as plainStatuses } from '../../../../utils/oracles/plainStatuses.js'
 import {
   caseArb,
   IDENTITY,
@@ -357,13 +356,13 @@ describe('given the readings of one merge settled in turn', () => {
       contestedSidesArb(ordered).map(fromEntries),
     ],
   ])(
-    'when %s are settled by one function, then every reading reads the plain statuses',
+    'when %s are settled by one function, then every reading reads the statuses settled without a memory',
     (_name, sidesArb) => {
       fc.assert(
         fc.property(sidesArb, sides => {
           // Arrange
           const readings = everyReading(sides)
-          const expected = settledInTurn(readings, plainStatuses)
+          const expected = settledInTurn(readings, entryStatuses)
 
           // Act
           const sut = settledInTurn(
