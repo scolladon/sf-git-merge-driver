@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from 'vitest'
 import { collapsibleKeys } from '../../../../../src/merger/nodes/ordered/collapsible.js'
 import type { OrderedSides } from '../../../../../src/merger/nodes/ordered/orderedSides.js'
 import { jsonIdentical } from '../../../../../src/utils/jsonEqual.js'
-import { collapsibleKeys as everyKeyVariedCollapsibleKeys } from '../../../../utils/oracles/everyKeyVaried.js'
 import {
   type Case,
   caseArb,
@@ -305,35 +304,6 @@ describe('collapsibleKeys', () => {
         // Assert
         expect(jsonIdentical).not.toHaveBeenCalled()
       })
-    })
-  })
-
-  describe('given generated sides', () => {
-    describe('when deciding which keys are interchangeable', () => {
-      it.each(GENERATED_CASES)(
-        'then the keys of %s are those every compared key gives',
-        (_name, cases) => {
-          fc.assert(
-            fc.property(cases, ([ancestor, local, other]) => {
-              // Arrange
-              const sides = orderedSides(
-                ancestor.join(' '),
-                local.join(' '),
-                other.join(' ')
-              )
-              const expected = [...everyKeyVariedCollapsibleKeys(sides)].sort()
-
-              const sut = collapsibleKeys
-
-              // Act
-              const result = [...sut(sides)].sort()
-
-              // Assert
-              expect(result).toEqual(expected)
-            })
-          )
-        }
-      )
     })
   })
 

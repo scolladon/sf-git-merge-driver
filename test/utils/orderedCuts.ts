@@ -85,15 +85,6 @@ const SHAPED: Readonly<Record<Shape, (copies: number) => Shaped>> = {
   }),
 }
 
-export const SHAPES: readonly Shape[] = [
-  'identical',
-  'distinct',
-  'dropone',
-  'dropinsert',
-  'swapgrow',
-  'floorIdentical',
-]
-
 const entry = (key: string, label: string): JsonObject => ({
   fullName: key,
   label,

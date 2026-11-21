@@ -19,6 +19,9 @@ const inLocalSide = (content: JsonValue): JsonArray => [
 // the ancestor, separator and other markers of the one conflict
 const REAL_MARKER_LINES = 3
 
+const WHITESPACE_SIDE_DOCUMENT =
+  '<?xml version="1.0" encoding="UTF-8"?>\n<Root>\n<<<<<<< ours\n||||||| base\n=======\n>>>>>>> theirs\n</Root>\n'
+
 const lines = (out: string): string[] => out.split('\n')
 
 describe('XmlStreamWriter marker-like lines inside a conflict side', () => {
@@ -408,6 +411,19 @@ describe('XmlStreamWriter marker-like lines inside a conflict side', () => {
 
       // Assert
       expect(out).toContain('<a>1</a>\nfoo\nbar</Root>')
+    })
+  })
+
+  describe('given a side holding only whitespace text', () => {
+    it('when serialized then the line it leaves alone is dropped', async () => {
+      // Arrange
+      const tree: JsonArray = [{ Root: [conflictOf(['   '], [], [])] }]
+
+      // Act
+      const out = await serializeToString(sut, tree, {})
+
+      // Assert
+      expect(out).toBe(WHITESPACE_SIDE_DOCUMENT)
     })
   })
 })

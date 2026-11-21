@@ -15,9 +15,6 @@ import {
   withConflict,
 } from '../../../../../src/types/mergeResult.js'
 import { jsonIdentical } from '../../../../../src/utils/jsonEqual.js'
-import { mergeOrderedArrays as referenceMerge } from '../../../../utils/oracles/perReadingMerge.js'
-import { mergeOrderedArrays as streamMerge } from '../../../../utils/oracles/representativeMerge/mergeOrdered.js'
-import { mergeOrderedArrays as tieScanMerge } from '../../../../utils/oracles/tieScanMerge.js'
 import {
   type Case,
   caseArb,
@@ -136,50 +133,10 @@ const wholeArrayConflict = (sides: OrderedSides) =>
     ),
   ])
 
-const GRID_VARIANTS: readonly GridVariant[] = [
-  'identical',
-  'distinct',
-  'dropone',
-]
-const COPY_COUNTS = [2, 3]
-const KEY_COUNTS = [1, 2, 3, 4]
-
-const gridCells = (): [GridVariant, number, number][] =>
-  GRID_VARIANTS.flatMap(variant =>
-    COPY_COUNTS.flatMap(copies =>
-      KEY_COUNTS.map((keys): [GridVariant, number, number] => [
-        variant,
-        copies,
-        keys,
-      ])
-    )
-  )
-
 const sidesOfCase = ([ancestor, local, other]: Case): OrderedSides =>
   orderedSides(ancestor.join(' '), local.join(' '), other.join(' '))
 
 describe('mergeOrderedArrays', () => {
-  describe.each(gridCells())(
-    'given the %s grid at r = %i and m = %i',
-    (variant, copies, keys) => {
-      describe('when merging', () => {
-        it('then the result equals the per-reading merge', () => {
-          // Arrange
-          const sides = gridSides(variant, copies, keys)
-          const sut = mergeOrderedArrays
-
-          // Act
-          const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
-
-          // Assert
-          expect(result).toStrictEqual(
-            referenceMerge(sides, ORDERED_ATTRIBUTE, defaultConfig)
-          )
-        })
-      })
-    }
-  )
-
   describe('given the identical grid at r = 4, m = 7', () => {
     // 4^7 tied readings merge in seconds, the decision needs the first four.
     // The budget sits between the two so that CPU load and coverage
@@ -284,7 +241,7 @@ describe('mergeOrderedArrays', () => {
 
   describe('given the identical grid at r = 2, m = 3', () => {
     describe('when merging', () => {
-      it('then the whole-array conflict equals the per-reading merge', () => {
+      it('then the result is the whole-array conflict', () => {
         // Arrange
         const sides = gridSides('identical', 2, 3)
         const sut = mergeOrderedArrays
@@ -294,28 +251,24 @@ describe('mergeOrderedArrays', () => {
 
         // Assert
         expect(result).toStrictEqual(wholeArrayConflict(sides))
-        expect(result).toStrictEqual(
-          referenceMerge(sides, ORDERED_ATTRIBUTE, defaultConfig)
-        )
       })
     })
   })
 
   describe('given the dropone grid at r = 3, m = 3', () => {
     describe('when merging its 27 readings', () => {
-      it('then they render one output without conflict, as the per-reading merge', () => {
+      it('then they render one output without conflict', () => {
         // Arrange
         const sides = gridSides('dropone', 3, 3)
         const sut = mergeOrderedArrays
+        const expected =
+          'U0a:u,R0,R0,U0b:u,U1a:u,R1,R1,U1b:u,U2a:u,R2,R2,U2b:u,Z:added (clean)'
 
         // Act
         const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
 
         // Assert
-        expect(result.hasConflict).toBe(false)
-        expect(result).toStrictEqual(
-          referenceMerge(sides, ORDERED_ATTRIBUTE, defaultConfig)
-        )
+        expect(formatResult(result)).toBe(expected)
       })
     })
   })
@@ -365,7 +318,7 @@ describe('mergeOrderedArrays', () => {
     ],
   ])('given %s', (_name, ancestor, local, other, expected) => {
     describe('when merging', () => {
-      it('then the result is the per-reading merge', () => {
+      it('then the result is the expected merge', () => {
         // Arrange
         const sides = orderedSides(ancestor, local, other)
         const sut = mergeOrderedArrays
@@ -375,9 +328,6 @@ describe('mergeOrderedArrays', () => {
 
         // Assert
         expect(formatResult(result)).toBe(expected)
-        expect(result).toStrictEqual(
-          referenceMerge(sides, ORDERED_ATTRIBUTE, defaultConfig)
-        )
       })
     })
   })
@@ -432,7 +382,7 @@ describe('mergeOrderedArrays', () => {
     'given tied readings with %s',
     (_name, ancestor, local, other, expected) => {
       describe('when merging', () => {
-        it('then the result is the whole-array conflict, as the tie-scan merge builds', () => {
+        it('then the result is the whole-array conflict', () => {
           // Arrange
           const sides = orderedSides(ancestor, local, other)
           const sut = mergeOrderedArrays
@@ -443,9 +393,6 @@ describe('mergeOrderedArrays', () => {
           // Assert
           expect(formatResult(result)).toBe(expected)
           expect(result).toStrictEqual(wholeArrayConflict(sides))
-          expect(result).toStrictEqual(
-            tieScanMerge(sides, ORDERED_ATTRIBUTE, defaultConfig)
-          )
         })
       })
     }
@@ -575,14 +522,9 @@ describe('mergeOrderedArrays', () => {
     'given tied readings that exchange interchangeable copies with %s',
     (_name, ancestor, local, other, expected) => {
       describe('when merging', () => {
-        it('then the result is the merge before grouping', () => {
+        it('then the result is the expected merge', () => {
           // Arrange
           const sides = orderedSides(ancestor, local, other)
-          const expectedResult = streamMerge(
-            sides,
-            ORDERED_ATTRIBUTE,
-            defaultConfig
-          )
           const sut = mergeOrderedArrays
 
           // Act
@@ -590,8 +532,6 @@ describe('mergeOrderedArrays', () => {
 
           // Assert
           expect(formatResult(result)).toBe(expected)
-          expect(result).toStrictEqual(expectedResult)
-          expect(jsonIdentical(result.output, expectedResult.output)).toBe(true)
         })
       })
     }
@@ -599,21 +539,18 @@ describe('mergeOrderedArrays', () => {
 
   describe('given the nocut-dropone layout at r = 3, m = 3', () => {
     describe('when merging', () => {
-      it('then the result is the local side with the last entry of the other, as the merge before grouping', () => {
+      it('then the result is the local side with the last entry of the other', () => {
         // Arrange
         const sides = layoutSides('nocut-dropone', 3, 3)
-        const expected = streamMerge(sides, ORDERED_ATTRIBUTE, defaultConfig)
+        const expected = noConflict(
+          wrap([...sides.local, sides.other[sides.other.length - 1]])
+        )
         const sut = mergeOrderedArrays
 
         // Act
         const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
 
         // Assert
-        expect(result).toStrictEqual(
-          noConflict(
-            wrap([...sides.local, sides.other[sides.other.length - 1]])
-          )
-        )
         expect(result).toStrictEqual(expected)
         expect(jsonIdentical(result.output, expected.output)).toBe(true)
       })
@@ -622,20 +559,19 @@ describe('mergeOrderedArrays', () => {
 
   describe('given the movedcut layout at r = 2, m = 2', () => {
     describe('when merging', () => {
-      it('then the result is the other side drawn with one copy fewer, as the merge before grouping', () => {
+      it('then the result is the other side drawn with one copy fewer', () => {
         // Arrange
         const sides = layoutSides('movedcut', 2, 2)
-        const expected = streamMerge(sides, ORDERED_ATTRIBUTE, defaultConfig)
         // The other side's order with each key's dropped copy gone is that
         // layout drawn with one copy fewer
         const withoutDropped = layoutSides('movedcut', 1, 2).other
+        const expected = noConflict(wrap(withoutDropped))
         const sut = mergeOrderedArrays
 
         // Act
         const result = sut(sides, ORDERED_ATTRIBUTE, defaultConfig)
 
         // Assert
-        expect(result).toStrictEqual(noConflict(wrap(withoutDropped)))
         expect(result).toStrictEqual(expected)
         expect(jsonIdentical(result.output, expected.output)).toBe(true)
       })

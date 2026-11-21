@@ -5,11 +5,6 @@ import {
   belowOnBoth,
   orderedBy,
 } from '../../../../src/merger/tagOrder/dominance.js'
-import {
-  belowOnAll as referenceBelowOnAll,
-  belowOnBoth as referenceBelowOnBoth,
-  orderedBy as referenceOrderedBy,
-} from '../../../utils/oracles/comparatorDominance.js'
 
 const MAX_POINTS = 120
 // Far above any dense range, so that a sparse coordinate never takes the
@@ -64,6 +59,10 @@ const naiveBelow = (coordinates: number[][]): number[] =>
         coordinates.every(axis => axis[other] < axis[point])
       ).length
   )
+
+// Array.prototype.sort is stable: equal values keep their index order
+const stableOrder = (values: number[]): number[] =>
+  range(values.length).sort((x, y) => values[x] - values[y])
 
 describe('dominance', () => {
   describe('given points with two coordinates', () => {
@@ -137,38 +136,38 @@ describe('dominance', () => {
     })
   })
 
-  describe('given the comparator-sort reference', () => {
-    it('when ordering points then the order equals the reference element for element', () => {
+  describe('given generated coordinates and values', () => {
+    it('when ordering points then the order is the stable order by value', () => {
       fc.assert(
         fc.property(pointCountArb.chain(coordinateArb), values => {
           // Arrange
-          const expected = referenceOrderedBy(values)
+          const expected = stableOrder(values)
 
           // Act
           const sut = orderedBy(values)
 
           // Assert
-          expect([...sut]).toEqual([...expected])
+          expect([...sut]).toEqual(expected)
         })
       )
     })
 
-    it('when ordering equal values then the ties stay in index order as in the reference', () => {
+    it('when ordering equal values then the ties stay in index order', () => {
       fc.assert(
         fc.property(fc.oneof(duplicatesArb, halvedDuplicatesArb), values => {
           // Arrange
-          const expected = referenceOrderedBy(values)
+          const expected = stableOrder(values)
 
           // Act
           const sut = orderedBy(values)
 
           // Assert
-          expect([...sut]).toEqual([...expected])
+          expect([...sut]).toEqual(expected)
         })
       )
     })
 
-    it('when counting below on two coordinates then every count equals the reference', () => {
+    it('when counting below on two coordinates then every count is the pair by pair count', () => {
       fc.assert(
         fc.property(
           pointCountArb.chain(size =>
@@ -176,19 +175,19 @@ describe('dominance', () => {
           ),
           ([first, second]) => {
             // Arrange
-            const expected = referenceBelowOnBoth(first, second)
+            const expected = naiveBelow([first, second])
 
             // Act
             const sut = belowOnBoth(first, second)
 
             // Assert
-            expect([...sut]).toEqual([...expected])
+            expect([...sut]).toEqual(expected)
           }
         )
       )
     })
 
-    it('when counting below on three coordinates then every count equals the reference', () => {
+    it('when counting below on three coordinates then every count is the pair by pair count', () => {
       fc.assert(
         fc.property(
           pointCountArb.chain(size =>
@@ -200,13 +199,13 @@ describe('dominance', () => {
           ),
           ([first, second, third]) => {
             // Arrange
-            const expected = referenceBelowOnAll(first, second, third)
+            const expected = naiveBelow([first, second, third])
 
             // Act
             const sut = belowOnAll(first, second, third)
 
             // Assert
-            expect([...sut]).toEqual([...expected])
+            expect([...sut]).toEqual(expected)
           }
         ),
         { numRuns: 300 }

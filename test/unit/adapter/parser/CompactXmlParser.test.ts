@@ -1,8 +1,21 @@
 import { Readable } from 'node:stream'
 import { describe, expect, it } from 'vitest'
 import { CompactXmlParser } from '../../../../src/adapter/parser/CompactXmlParser.js'
+import type { JsonObject } from '../../../../src/types/jsonTypes.js'
 import { PARSER_BEHAVIOUR_CHANGES } from '../../../utils/parserBehaviourChanges.js'
 import { parseOutcome } from '../../../utils/parserParity.js'
+
+const ROOT_NAME = 'a'
+const CHILD_NAME = 'b'
+
+const okOutcome = (content: string): string =>
+  `ok:{"content":${content},"rootAttributes":{}}`
+
+const childOf = (element: JsonObject, name: string): JsonObject =>
+  element[name] as JsonObject
+
+const rootElementOf = (parser: CompactXmlParser, xml: string): JsonObject =>
+  childOf(parser.parseString(xml).content as JsonObject, ROOT_NAME)
 
 describe('CompactXmlParser', () => {
   const sut = new CompactXmlParser()
@@ -320,5 +333,89 @@ describe('CompactXmlParser', () => {
         expect(parseOutcome(sut, xml)).toBe(outcome)
       }
     )
+  })
+  describe('given a leaf, a close tag or a malformed element', () => {
+    it.each([
+      ['<a><b>x</b></a>', okOutcome('{"a":{"b":"x"}}')],
+      ['<a><b> x </b></a>', okOutcome('{"a":{"b":"x"}}')],
+      ['<a><b></b></a>', okOutcome('{"a":{"b":""}}')],
+      ['<a><b>x</bb></a>', okOutcome('{"a":{"b":"x"}}')],
+      ['<a><b>x</b ></a>', okOutcome('{"a":{"b":"x"}}')],
+      ['<a><b>x</ b></a>', okOutcome('{"a":{"b":"x"}}')],
+      ['<a><b>\n  x\n</b></a>', okOutcome('{"a":{"b":"x"}}')],
+      ['<a>x</a>', okOutcome('{"a":"x"}')],
+      [
+        '<a><b>x</b><c>1</c><b>y</b><b>z</b></a>',
+        okOutcome('{"a":{"b":["x","y","z"],"c":"1"}}'),
+      ],
+      [
+        '<a><b>x</b><b><c>1</c></b></a>',
+        okOutcome('{"a":{"b":["x",{"c":"1"}]}}'),
+      ],
+      ['<a><b x="1"></b></a>', okOutcome('{"a":{"b":{"@_x":"1","#text":""}}}')],
+      [
+        '<a><b x="1">t</b></a>',
+        okOutcome('{"a":{"b":{"@_x":"1","#text":"t"}}}'),
+      ],
+      [
+        '<a><b>x</c></a>',
+        'throw:Unexpected close tag\nLine: 0\nColumn: 11\nChar: >',
+      ],
+      [
+        "<a><b'>x</b'></a>",
+        'throw:XML parse error: tags unbalanced (final depth 1)',
+      ],
+      ['<a><b>x</b', 'throw:XML parse error: unterminated tag'],
+      ['<a><b>x', 'throw:XML parse error: tags unbalanced (final depth 2)'],
+      ['<a><1>x</1></a>', 'throw:XML parse error: invalid element name'],
+      [
+        '<a><__proto__>x</__proto__><__proto__>y</__proto__></a>',
+        okOutcome('{"a":{"__proto__":["x","y"]}}'),
+      ],
+      [
+        '<a><__cdata>x</__cdata><![CDATA[y]]></a>',
+        okOutcome('{"a":{"__cdata":["x","y"]}}'),
+      ],
+      [
+        '<a><b x="1"><c>2</c>t</b></a>',
+        okOutcome('{"a":{"b":{"@_x":"1","c":"2","#text":"t"}}}'),
+      ],
+      ['<a><b/></a>', okOutcome('{"a":{"b":""}}')],
+    ])(
+      'when %j is parsed then it reads as the expected outcome',
+      (xml, expected) => {
+        // Act
+        const result = parseOutcome(sut, xml)
+
+        // Assert
+        expect(result).toBe(expected)
+      }
+    )
+  })
+
+  describe('given repeated __proto__ elements', () => {
+    it('when parsed then their parent has no prototype', () => {
+      // Arrange
+      const xml = '<a><__proto__>x</__proto__><__proto__>y</__proto__></a>'
+
+      // Act
+      const result = Object.getPrototypeOf(rootElementOf(sut, xml))
+
+      // Assert
+      expect(result).toBeNull()
+    })
+  })
+
+  describe('given an element with an attribute, a child and text', () => {
+    it('when parsed then its keys run attribute, child, text', () => {
+      // Arrange
+      const xml = '<a><b x="1"><c>2</c>t</b></a>'
+
+      // Act
+      const result = Object.keys(childOf(rootElementOf(sut, xml), CHILD_NAME))
+
+      // Assert
+      expect(result).toEqual(['@_x', 'c', '#text'])
+    })
   })
 })

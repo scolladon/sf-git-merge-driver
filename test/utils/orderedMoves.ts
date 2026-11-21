@@ -1,6 +1,4 @@
 import fc from 'fast-check'
-import type { JsonArray } from '../../src/types/jsonTypes.js'
-import { toEntry } from './orderedTokens.js'
 
 const TOKEN_SEPARATOR = ' '
 const LOCAL_TAG = 'L'
@@ -167,6 +165,3 @@ export const stridedCaseArb = (
         other: moved(other),
       }
     })
-
-export const toOrderedSide = (tokens: string): JsonArray =>
-  tokens === '' ? [] : tokens.split(TOKEN_SEPARATOR).map(toEntry)

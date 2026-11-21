@@ -1,7 +1,7 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import { componentOverlaps } from '../../../../../src/merger/nodes/ordered/overlapComponents.js'
-import * as pairwise from '../../../../utils/oracles/pairwisePrecedence.js'
+import { pairOverlaps } from '../../../../../src/merger/nodes/ordered/precedence.js'
 import { contextOf, seededClasses } from '../../../../utils/orderedContext.js'
 import { movedCaseArb } from '../../../../utils/orderedMoves.js'
 
@@ -62,7 +62,7 @@ describe('componentOverlaps', () => {
 
   describe('given generated orderings', () => {
     describe('when joined by component', () => {
-      it('then the classes and the marked entries equal the pairwise reference', () => {
+      it('then the classes and the marked entries equal the pair by pair ones', () => {
         fc.assert(
           fc.property(movedCaseArb(MAX_GENERATED_SIZE), generated => {
             // Arrange
@@ -72,7 +72,7 @@ describe('componentOverlaps', () => {
               generated.other
             )
             const size = ctx.entries.length
-            const expected = seededClasses(pairwise.orderOverlaps(ctx), size)
+            const expected = seededClasses(pairOverlaps(ctx), size)
 
             // Act
             const sut = seededClasses(componentOverlaps(ctx), size)
