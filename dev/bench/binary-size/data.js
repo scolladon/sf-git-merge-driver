@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795267483525,
+  "lastUpdate": 1795275156606,
   "repoUrl": "https://github.com/scolladon/sf-git-merge-driver",
   "entries": {
     "Binary Size Benchmark": [
@@ -661,6 +661,35 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/scolladon/sf-git-merge-driver/commit/9c64c3224778cddbab78a1d2e7f815bab278784e"
         },
         "date": 1795267483430,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "bin/merge-driver.cjs",
+            "value": 96890,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "colladonsebastien@gmail.com",
+            "name": "Sebastien",
+            "username": "scolladon"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9eb329de86c1531880116ca11a44dd642e43b4c6",
+          "message": "chore(test): delete the temporary oracles left by #233 (#236)",
+          "timestamp": "2026-11-21T16:29:17+01:00",
+          "tree_id": "76325581da36c48a1fa1011ef0947e33ceccad77",
+          "url": "https://github.com/scolladon/sf-git-merge-driver/commit/9eb329de86c1531880116ca11a44dd642e43b4c6"
+        },
+        "date": 1795275156541,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
